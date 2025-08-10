@@ -1,0 +1,534 @@
+{
+  "title": "Designs in Progress",
+  "conversation_id": "671a79c0-4264-800a-a936-bf868078293c",
+  "create_time": 1729788355.864909,
+  "update_time": 1729788481.308578,
+  "messages": [
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a79c34c94203c365dafcf34ae4f3f395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 50924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.06
+          }
+        },
+        "audio_start_timestamp": 1.9261352908797562
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Hey there! What's up?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a79c78dcc203c20f75727446a88e4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 66284,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.38
+          }
+        },
+        "audio_start_timestamp": 6.404442741069943
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Take your time.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a79cfa18c203c23a740c76f94f3fd395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 276524,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.76
+          }
+        },
+        "audio_start_timestamp": 13.139584875199944
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it! What",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a79d7e794203c27845d2139641c68395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 120044,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.5
+          }
+        },
+        "audio_start_timestamp": 16.520847314037383
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "A tagline can really make your design pop! What's the vibe or message you want to convey with this tagline?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a79f1542c203c2ea4874d7baa51e3395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 765164,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 15.94
+          }
+        },
+        "audio_start_timestamp": 40.21156103210524
+      }
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides' design is a winter scene in Oklahoma State Park, and they need a tagline related to snowy Oklahoma."
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "How about something like \"Experience the Chill of Oklahoma's Snowy Serenity\"? Or maybe \"Oklahoma's Winter Wonderland: Nature's Frozen Canvas\"?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a79f7128c203c1702fe1f26531496395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 69164,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.44
+          }
+        },
+        "audio_start_timestamp": 50.24796138610691
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it. How about \"Snowy Oklahoma Bliss\" or \"Chill in OK\"?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a79fbbcf0203c2dd8de94639e49a8395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 27884,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.58
+          }
+        },
+        "audio_start_timestamp": 55.64589074626565
+      }
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's keep it short and sweet.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a7a01656c203c2d91a8863f0d73a4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 201644,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 4.2
+          }
+        },
+        "audio_start_timestamp": 61.2562469211407
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Sure, let's steer away from \"snowy.\" How",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a7a06a280203c2f33947c6b648454395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 37004,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.77
+          }
+        },
+        "audio_start_timestamp": 64.16689632507041
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "How about \"Oklahoma's Winter Charm\"? Or \"Oklahoma Frost Vibes\"?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a7a16788c203c1a1d123fbda4d9bf395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 127724,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.66
+          }
+        },
+        "audio_start_timestamp": 74.21246430603787
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, let's try again. How about \"Winter in OK\" or \"Oklahoma in White\"?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a7a22250c203c2f75e690367bf0ab395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 267404,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.57
+          }
+        },
+        "audio_start_timestamp": 92.93847625982016
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it, no mention of snow. How about \"Oklahoma's Winter Escape\"?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a7a311e18203c00598c11ce4803ac395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 173804,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.62
+          }
+        },
+        "audio_start_timestamp": 104.13395444303751
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I understand, let's find the perfect fit. How about \"Oklahoma's Crisp Calm\" or \"Whispers of Winter in OK\"?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a7a3625a8203c26dd99a14e7aa95d395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 18764,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.39
+          }
+        },
+        "audio_start_timestamp": 115.00973530299962
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Let's keep at it until we nail it. How about \"Oklahoma's Frosted Peace\" or",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671a7a3fa400203c3593cd905dca243c395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 98444,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.05
+          }
+        },
+        "audio_start_timestamp": 120.48759153624997
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "No worries, we can take a break from it. If you want to revisit it later or need help with something else, just let me know.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    }
+  ]
+}

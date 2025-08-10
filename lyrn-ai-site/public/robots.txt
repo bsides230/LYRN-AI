@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://lyrn-ai.com/sitemap.xml

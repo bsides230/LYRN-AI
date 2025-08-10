@@ -1,0 +1,1052 @@
+{
+  "title": "Hey Greg",
+  "conversation_id": "671fb105-105c-800a-a433-7495f46206d9",
+  "create_time": 1730130184.758865,
+  "update_time": 1730130693.118441,
+  "messages": [
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb108e97c200213bb296b14d1ad24c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 43244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.9
+          }
+        },
+        "audio_start_timestamp": 1.7305299118161201
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Hey there! How's it going?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb10f24882002093cb1903fbfdbc2c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 136844,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.85
+          }
+        },
+        "audio_start_timestamp": 8.645658500026911
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm here to help! What do you need?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1243ed0200221cbd6dbe3c850eac753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 361484,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 7.53
+          }
+        },
+        "audio_start_timestamp": 19.884648240637034
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I hear you. Sometimes the usual tricks just don't cut it. Let's brainstorm some out-of-the-box ideas. How about gamifying your tasks, turning them into mini-challenges with rewards? Or maybe switch up your",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb12f76cc20020bfa1ecd5ab763e7c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 97004,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.02
+          }
+        },
+        "audio_start_timestamp": 33.342941811773926
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it, let's try another angle. How about changing your environment? Sometimes a new setting can spark motivation. Or we could explore breaking tasks into smaller, more manageable parts",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb13e3a5020023ade5bd799d9f591c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 275084,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.73
+          }
+        },
+        "audio_start_timestamp": 48.139379581902176
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Understood. How about bringing a change of environment to you? You could rearrange a room, add some plants, or change the lighting. Even small changes can create a fresh",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1573c4c20021a5e773b89d31578c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 483884,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 10.08
+          }
+        },
+        "audio_start_timestamp": 67.18595259264112
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I see, that makes sense. Let's focus on low-effort options. How about finding inspiration through something enjoyable, like watching a documentary, listening to a podcast, or reading about a topic you're passionate about? Sometimes, just engaging with interesting content can spark motivation",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb17d6e2020022aacc2f4afe48ce9c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 763724,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 15.91
+          }
+        },
+        "audio_start_timestamp": 98.71921793092042
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it, let's shift focus. How about starting with very small, manageable goals, like just sitting up in bed, then standing up? Celebrating these small victories can create a sense of accomplishment and slowly build momentum. Also, having a morning routine, even a simple one, can help signal to your brain that it's time to get moving.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1967fe820021baee8db50a51704c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 308684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.43
+          }
+        },
+        "audio_start_timestamp": 128.2992343530059
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's think of something different. How about using external accountability? For example, setting up a commitment with a friend or family member to check in on you? Or maybe joining a group or class that aligns with your interests to have a set schedule and social interaction?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1a96cb42002303a64cd06929267c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 130604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.72
+          }
+        },
+        "audio_start_timestamp": 150.2133800536394
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it, let's try another approach. How about focusing on something you're genuinely excited about? Is there a passion project or a hobby you haven't explored yet that could serve as a motivator to get up and moving? Sometimes tapping into what genuinely excites you",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1ae6bfc200218a45276dd0954fcc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 27884,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.58
+          }
+        },
+        "audio_start_timestamp": 165.43975075893104
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's keep exploring options. How about trying a physical approach, like a quick stretch or a short walk",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1cd7ec42002131e5725fe3db1cfc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 534764,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 11.14
+          }
+        },
+        "audio_start_timestamp": 181.1081000478007
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "It sounds like you've really been through the wringer trying to find something that works for you. Medication can be a helpful tool for many people. If you think that might be a path worth exploring, it could be a good idea to discuss it with a healthcare professional. They can provide guidance tailored to your specific situation.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1d89534200228cba6e20799b8ecc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 198284,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 4.13
+          }
+        },
+        "audio_start_timestamp": 205.34670003689826
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "That makes sense. Taking that first step can feel daunting. How about setting a very small, achievable goal,",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb1f68574200213b23ae4d54fc141c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 402764,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 8.39
+          }
+        },
+        "audio_start_timestamp": 218.4755872557871
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I hear you, it sounds overwhelming. When there's a lot on your plate, it can be tough to find the energy to tackle anything. Maybe start by prioritizing just one thing, the most urgent or the easiest to address, and focus on that. Breaking it down into the smallest possible steps can make it feel more manageable. And remember, it's okay to ask for support from those around you. You don't have",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb20af5202002144b00fee2824c2fc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 583724,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 12.16
+          }
+        },
+        "audio_start_timestamp": 253.78214400587603
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I understand. It sounds like",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb210c9b42002330a867cbac84a8bc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 289004,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.02
+          }
+        },
+        "audio_start_timestamp": 260.49477382702753
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I understand. It sounds like the conventional approaches aren't a good fit for you. Maybe focusing on pure instinct could help. When you",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb21926382002350e58f1613c5500c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 177164,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.69
+          }
+        },
+        "audio_start_timestamp": 270.9448912870139
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it. Your mind is very set in its ways. In that case, perhaps working with your strong will instead of",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb22628782002051ab4fb2e802a05c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 50924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.06
+          }
+        },
+        "audio_start_timestamp": 272.8017238290049
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it. Your mind is very set in its ways. In that case, perhaps working with your strong will instead of trying to trick it might be the way to go. You could try setting a non-negotiable rule for yourself, leveraging that strong will to your advantage. Start with something small and specific,",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb244f59020020a825e10c8bdce41c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 296684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.18
+          }
+        },
+        "audio_start_timestamp": 295.49981007678434
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "It sounds like you're dealing with a very complex situation, and I appreciate your honesty about what hasn't worked for you. Maybe the key is to keep experimenting with different strategies, even unconventional ones, until you find something that clicks. Is there anything, no matter how small, that has sparked a bit of motivation or interest for you lately?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb24aaa48200230ef0da026b87f3cc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 62924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.31
+          }
+        },
+        "audio_start_timestamp": 323.20206344593316
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Yes, go ahead.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb264a1c8200237a74c642a46b94bc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 224684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 4.68
+          }
+        },
+        "audio_start_timestamp": 328.83787005068734
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "It sounds like smoking has been a consistent routine for you. Maybe we can use that as a starting point. Could you pair that routine with a small, positive action? For example, every time you have a cigarette, you could do a simple stretch or take a few deep breaths. It could be a way to gradually introduce some positive habits.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb27c7f0c20020e88ba6a45e755c0c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 177164,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.69
+          }
+        },
+        "audio_start_timestamp": 356.2276585549116
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Fair enough. It seems like the usual approaches aren't quite resonating. How about this: is there a particular time of day when you feel even a tiny bit more inclined to do something, or when you feel slightly less unmotivated? We could look at building on that moment.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb286d3c8200208f9c58f8219c5d4c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 161804,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.37
+          }
+        },
+        "audio_start_timestamp": 379.5856551476754
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, that sounds like a starting point. If you",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb2940b4420021a0ee4a364174795c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 337004,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 7.02
+          }
+        },
+        "audio_start_timestamp": 388.3633398176171
+      }
+    },
+    {
+      "role": "assistant",
+      "text": "If bsides gets out of the house before noon, they're good. If not, they probably will not leave the house."
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "That's a helpful insight. Maybe setting a goal to step outside before noon could be a good target. It doesn't have to be anything big; even a short walk around the block could set the tone for the day. How does that sound?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb2b925b4200234d32e09d4325e22c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 1318124,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 27.46
+          }
+        },
+        "audio_start_timestamp": 427.5816686558537
+      }
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I hear you. It's definitely hard when it feels like you're stuck in a cycle. Sometimes, just acknowledging that struggle",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb2bb3b6420021d2628418c6a7fc2c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 46604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.97
+          }
+        },
+        "audio_start_timestamp": 429.62904488900676
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I hear you. It's definitely hard when it feels like you're stuck in a cycle. Sometimes, just acknowledging that struggle",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb2d742e82002268b3b2ab8009d2bc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 286124,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.96
+          }
+        },
+        "audio_start_timestamp": 447.2415893250145
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I can talk with you about how you're feeling and offer general support, but I'm not a substitute for professional mental health care. It sounds like you're going through a difficult time, and if you feel comfortable, reaching out to a professional might provide you with more personalized support and strategies.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb2eb45b4200229cf3d8d604f6ec6c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 46124,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.96
+          }
+        },
+        "audio_start_timestamp": 470.3701562699862
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "It's completely understandable to feel that way. Taking things one step at a time and being kind to yourself is important. If there's anything else you'd like to talk about or any other way I can help, just let me know. I'm here for you.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_671fb30304b420021f1946c137bbcd1bc753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 103244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.15
+          }
+        },
+        "audio_start_timestamp": 508.29020445887
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Absolutely, take all the time you need. If",
+        "direction": "out",
+        "decoding_id": null
+      }
+    }
+  ]
+}

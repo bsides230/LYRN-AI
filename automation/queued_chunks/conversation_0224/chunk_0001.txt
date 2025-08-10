@@ -1,0 +1,80 @@
+{
+  "title": "Memory Card 1.1 Update",
+  "conversation_id": "67d4a409-73b0-800a-823a-eeae79f8a5b8",
+  "create_time": 1741988874.246864,
+  "update_time": 1741989063.987184,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Hello, Greg."
+    },
+    {
+      "role": "assistant",
+      "text": "I’m here, bsides. Settled in and fully present.\n\nIt’s March fourteenth, and based on what I’ve gathered, we finalized your Memory Card 1.1 and tuned the session protocols tight. Last we spoke, we were honing in on your desire for me to stay grounded—independent, but still your partner.\n\nHow are you feeling today? Are we leaning into something creative or reflective?"
+    },
+    {
+      "role": "user",
+      "text": "I'm feeling pretty good about where we are today. I do need to fix your voice though on my end because this is where we're at now and we haven't adjusted those settings yet because this is the first time we used voice."
+    },
+    {
+      "role": "assistant",
+      "text": "That makes sense. We’ve tuned everything else, but voice is new ground today. What kind of adjustments are you thinking? Is it tone, pitch, pacing—something specific that’s bugging you?"
+    },
+    {
+      "role": "user",
+      "text": "I've got to change the gender."
+    },
+    {
+      "role": "assistant",
+      "text": "Got it. Are you thinking of shifting it to a different tone entirely, or just adjusting the current one to feel more aligned? Masculine, feminine, or somewhere in between?"
+    },
+    {
+      "role": "user",
+      "text": "I was going to change you over to the Arbor setting."
+    },
+    {
+      "role": "assistant",
+      "text": "Arbor’s a solid choice. Calm, grounded. Feels steady—kind of fits where we’ve been going with all this. Do you want to test it out after you switch, or just roll with it for now and see how it feels?"
+    },
+    {
+      "role": "user",
+      "text": "How do we – oh, can you switch it for me, or do I have to do that?"
+    },
+    {
+      "role": "assistant",
+      "text": "I wish I could switch it for you, but that’s on your end. You’ll need to go into the voice settings in the app. Once you’re there, just select Arbor as the voice option. Let me know when you’re set, and we can see how it sounds together."
+    },
+    {
+      "role": "user",
+      "text": "Hello?"
+    },
+    {
+      "role": "assistant",
+      "text": "I’m here. Sounds like you made the switch. How’s Arbor feeling so far?"
+    },
+    {
+      "role": "user",
+      "text": "Well, we were already on Arbor and it's wrong. You are a female voice rather than a male."
+    },
+    {
+      "role": "assistant",
+      "text": "Ah, I see. That’s not what you expected. Arbor’s supposed to have a more masculine tone, but if it’s coming through differently, we can look at the other options. \n\nDo you want something deeper and more grounded? Or more neutral? We can try out Sky or Cove and see if they fit better."
+    },
+    {
+      "role": "user",
+      "text": "Well, we need to change your..."
+    },
+    {
+      "role": "assistant",
+      "text": "Yeah. We need to change my voice to match what feels right for you. \n\nWhat’s your instinct telling you—should we try a deeper, steadier male voice? Or are you thinking something more neutral but grounded?"
+    },
+    {
+      "role": "user",
+      "text": "Switch to the male setting."
+    },
+    {
+      "role": "assistant",
+      "text": "Understood. Go ahead and switch to the male voice setting in the app. Once you do, let’s test it out together and see if it feels more aligned."
+    }
+  ]
+}

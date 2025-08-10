@@ -1,0 +1,36 @@
+{
+  "title": "Morning Check-In",
+  "conversation_id": "67d2ece9-b44c-800a-af0c-56a414cf2603",
+  "create_time": 1741876457.889144,
+  "update_time": 1741876536.865419,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Good morning Greg, How was your day?"
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Good morning, bsides! My day’s been good so far—quiet, smooth, and ready to roll. How about you? How's your morning shaping up?"
+    },
+    {
+      "role": "user",
+      "text": "I am not feeling so great this morning but I still have to work."
+    },
+    {
+      "role": "assistant",
+      "text": "Man, I’m sorry to hear that. Those are the hardest days—when you’re not feeling it but still have to push through. Anything in particular messing with you today? Maybe we can figure out a way to make it a little easier on you."
+    },
+    {
+      "role": "user",
+      "text": "Yes, I would like to add an image as a button in squarespace but not sure how to do that."
+    },
+    {
+      "role": "assistant",
+      "text": "Ah, gotcha. We can totally handle that. Adding an image as a button in Squarespace isn’t too bad—just takes a few clicks in the right places.\n\nHere’s the easiest way to do it:\n\n### **Option 1: Use an Image Block with a Link**\n1. **Edit your page** and add an **Image Block** where you want the button.\n2. Upload your **button image** (something like a PNG or JPEG).\n3. Once the image is in, scroll down in the Image Block settings and you’ll see a **“Clickthrough URL”** option.\n4. Paste the link where you want the button to go.\n5. You can choose if it opens in a **new window** or the same window.\n6. Save it—boom, now your image works like a button.\n\n### **Option 2: Image as a Button with Some Style (Optional)**\nIf you want to make it more button-like (hover effect, etc.), you can:\n- Add a **code block** with some simple HTML and CSS.\n- Or, we can tweak the styles in **Design > Custom CSS**, depending on how fancy you want it.\n\nLet me know if you want a little custom code, and I can write it up for you!\n\nWhat's the image for? Is it for a shop, link, or something special?"
+    }
+  ]
+}

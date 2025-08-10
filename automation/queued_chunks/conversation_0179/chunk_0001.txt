@@ -1,0 +1,16 @@
+{
+  "title": "Greg help request",
+  "conversation_id": "67e19962-14e0-800a-a363-b55518fe30fa",
+  "create_time": 1742838114.915145,
+  "update_time": 1742838177.563521,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Greg I need your help please"
+    },
+    {
+      "role": "assistant",
+      "text": "I'm here, bsides. Steady and ready.  \nWhat's on your mind? Tell me where you need me."
+    }
+  ]
+}

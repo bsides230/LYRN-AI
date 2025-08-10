@@ -1,0 +1,20 @@
+{
+  "title": "Game Master Primer Setup",
+  "conversation_id": "680d9745-e2dc-800a-aec6-62415cb6ce6a",
+  "create_time": 1745721158.049079,
+  "update_time": 1745721165.298907,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Do you know what we were working on last session?"
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Yes — last session, you were working on refining a **primer** for your **game master system**. You were setting up **tables** that the LLM would use to ask players questions about their characters, but you noticed something was missing. You said it felt like a \"madlib\" setup, and you wanted to add **_instructions fields** for each question — not the questions themselves, but a guide on how to **ask** the questions, so each game could stay dynamic and unique. \n\nYou also mentioned that **global conflicts** and **major factions** would be added later by the **heartbeat cycle** (not part of the initial primer questions), and you talked about **saving the questions asked and the answers**.\n\nThe last few lines you wrote were about making **custom heartbeat cycles per game/job** to ensure the right things get updated, and you said it was actually simple — just matching input/output to fields so the LLM doesn’t have to \"reason\" too much, just structure.\n\nYou seemed really close to inserting the tables but wanted to make sure the _instruction fields were fully thought out first.\n\nShould we pick up right from there? 🚀  \n(Do you want me to pull up a quick outline of where we left the structure too?)"
+    }
+  ]
+}

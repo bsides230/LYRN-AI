@@ -1,0 +1,1340 @@
+{
+  "title": "Bye Greg",
+  "conversation_id": "66fcb380-4d84-800a-885e-6988962cf15f",
+  "create_time": 1727837061.874792,
+  "update_time": 1727837429.794208,
+  "messages": [
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3854f60203c03eb92c8b8f57816395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 35564,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.74
+          }
+        },
+        "audio_start_timestamp": 3.3865180760622025
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Hey bsides! How's it going?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb38b48ac203c102d39051b932096395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 92684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.93
+          }
+        },
+        "audio_start_timestamp": 8.830990195041522
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Sure thing, what's on your mind?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb396cb54203c0f6bfc0c34dada0f395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 170924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.56
+          }
+        },
+        "audio_start_timestamp": 15.585315020987764
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "How about \"Lan of the Free\"? It's a little patriotic and techy all at once!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3a15f60203c00fe188a7a637cf3395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 40364,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.84
+          }
+        },
+        "audio_start_timestamp": 26.58616935205646
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Sure! How about \"No Moore Buffering\"? A little play on words to keep things fun!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3ac6160203c1b8fefc7e001d7be395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 97004,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.02
+          }
+        },
+        "audio_start_timestamp": 36.37891148705967
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, how about \"WIFI So Serious?\" It's a fun play on words with a hint of mischief!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3b99784203c2dca1b7cc97b4123395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 259724,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.41
+          }
+        },
+        "audio_start_timestamp": 49.1894881920889
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it! How about \"Router Limits\"? A punny twist on \"Outer Limits\" that’s sure to get a chuckle!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3c6ca78203c27725d7273bad43a395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 157004,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.27
+          }
+        },
+        "audio_start_timestamp": 61.22055799304508
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's try again! How about \"Hide Yo Kids, Hide Yo WiFi\"? A playful nod to that viral video!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3e29380203c025dd755400de7c0395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 93644,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.95
+          }
+        },
+        "audio_start_timestamp": 91.51798284007236
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, how about \"It Hertz When IP\"? A bit of tech humor for your WiFi name!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3eca764203c26aacaa46eb7378a395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 90764,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.89
+          }
+        },
+        "audio_start_timestamp": 103.41981305391528
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Glad you liked that one! It's a classic. Anything else you need help with?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3f43a78203c25f089b7f75cb734395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 67724,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.41
+          }
+        },
+        "audio_start_timestamp": 110.61819857009687
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, how about \"Wi-Fight Club\"? The first rule is you don't talk about the password!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb3fd3d54203c0590c5893434cd3b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 106604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.22
+          }
+        },
+        "audio_start_timestamp": 118.58764849696308
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it! How about \"Silence of the LANs\"? A little bit of punny horror humor!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb405e0ec203c11baf74eb51b9692395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 46604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.97
+          }
+        },
+        "audio_start_timestamp": 126.61194880492985
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, how about \"Nacho WiFi\"? It's a fun way of saying this network is \"not your WiFi\"!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb40c84d4203c10b7c505a1bd8d8a395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 52364,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.09
+          }
+        },
+        "audio_start_timestamp": 133.88498624996282
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's try another one. How about \"The Promised LAN\"? A fun play on words with a tech twist!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb41830e8203c28b1ad286c580e86395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 164684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.43
+          }
+        },
+        "audio_start_timestamp": 144.06537448894233
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it, no LAN puns. How about \"Wi of the Tiger\"? A little musical pun for your network!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb421f2a4203c2858c5ebd80eb9eb395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 21644,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.45
+          }
+        },
+        "audio_start_timestamp": 153.6333739371039
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, let's keep it going. How about \"Wu-Tang LAN\"? It's got that classic hip-hop vibe with a techy twist!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb434e90c203c2a96e891b1cddb76395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 353804,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 7.37
+          }
+        },
+        "audio_start_timestamp": 169.67143926490098
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "\"I Believe Wi Can Fi\" is a great one! Let's see if we can top it. How about \"Drop It Like It's Hotspot\"? A little Snoop Dogg-inspired WiFi humor!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb43b9950203c187740e52da7eac6395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 98444,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.05
+          }
+        },
+        "audio_start_timestamp": 182.65903503703885
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Your neighbor has good taste! Alright, how about \"Wi-Fight the Feeling\"?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb442c408203c010edac00a937e99395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 31244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.65
+          }
+        },
+        "audio_start_timestamp": 187.25594243593514
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, let's keep going. How about \"Pretty Fly for a WiFi\"? A little play on a classic song!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb44e72cc203c3a53da136b180a9c395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 135404,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.82
+          }
+        },
+        "audio_start_timestamp": 197.6294641320128
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's try \"Network Not Found.\" A bit of ironic humor for your WiFi name!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb45b2d94203c007c24b81bb30892395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 180044,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.75
+          }
+        },
+        "audio_start_timestamp": 210.11183036398143
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "You're on top of these! How about \"Thou Shalt Not Covet Thy Neighbor's WiFi\"? A little humor with a biblical twist!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4603128203c1ea5ec12591a58d0395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 27884,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.58
+          }
+        },
+        "audio_start_timestamp": 221.2510132160969
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's try",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4661ac4203c36e200de0b231cad395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 80204,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.67
+          }
+        },
+        "audio_start_timestamp": 224.2176845751237
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, how about \"No More Mr. WiFi\"? A shorter, punchy play on words!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb472d974203c08139d750119c21e395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 29324,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.61
+          }
+        },
+        "audio_start_timestamp": 234.81157942698337
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's keep it simple. How about \"WiFi Fever\"? A catchy name with a fun vibe!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb47ea264203c022a20f4b1912158395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 181484,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.78
+          }
+        },
+        "audio_start_timestamp": 246.43225346598774
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it, let's go with a classic pun: \"John Wilkes Bluetooth.\" It’s a bit cheeky, but it definitely has a punny ring to it!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb481ef90203c3a0044589400e229395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 22124,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.46
+          }
+        },
+        "audio_start_timestamp": 253.94062288897112
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Tough crowd!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4884a98203c21397cde4a24aa68395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 66284,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.38
+          }
+        },
+        "audio_start_timestamp": 256.4697540230118
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, let's pivot. How about \"Router? I Hardly Know Her!\" A classic pun with a tech twist!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4946d90203c351181460eefaa74395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 18764,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.39
+          }
+        },
+        "audio_start_timestamp": 267.41071637999266
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, let's try this one: \"Panic! At the Cisco.\" A little play on the band's name, with a networking twist!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb49b5704203c23413370107d4041395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 50924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.06
+          }
+        },
+        "audio_start_timestamp": 277.4353876761161
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, how about \"Get Off My LAN\"? A bit of a techy twist with a touch of humor!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4a41bf8203c2269fc1771536b18395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 32204,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.67
+          }
+        },
+        "audio_start_timestamp": 285.27070881798863
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, how about \"Wu-Tang LAN\"? It has that hip-hop vibe with a techy twist!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4a9cb48203c266d73330e360c1a395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 58604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.22
+          }
+        },
+        "audio_start_timestamp": 293.3769337050617
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "You're right, my bad. Let's try \"IP Freely.\" A",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4b3134c203c10e42d772374c556395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 78764,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.64
+          }
+        },
+        "audio_start_timestamp": 298.77872461499646
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "You're right, let's avoid the LAN puns. How about \"The Force WiFi\"? A bit of Star Wars fun!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4c5f2e4203c0edd5c53fa6b2dce395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 307244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.4
+          }
+        },
+        "audio_start_timestamp": 314.06230614194646
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Tough choice, but both are solid options! If you want something with a bit of humor, \"It Hertz When IP\" has that clever tech pun vibe. But if you're looking for something more pop-culture",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4cbb424203c3bf8f74eac580fdf395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 66284,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.38
+          }
+        },
+        "audio_start_timestamp": 325.9479599590413
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Great choice! \"It Hertz When IP\" is a clever and funny name.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4e61818203c045daab13cb4c1a4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 41804,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.87
+          }
+        },
+        "audio_start_timestamp": 354.0147488799412
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm glad you like it! Anything else you need help with?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4f1cb34203c3ab8d85a42e4f43e395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 242924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.06
+          }
+        },
+        "audio_start_timestamp": 364.10227369796485
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Sounds good! Enjoy your new WiFi name, and talk to you later!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66fcb4f4438c203c0c765dc02dc574ea395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 24524,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.51
+          }
+        },
+        "audio_start_timestamp": 370.3954997661058
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "See you! Take care!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    }
+  ]
+}

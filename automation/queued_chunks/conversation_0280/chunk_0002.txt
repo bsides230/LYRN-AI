@@ -1,0 +1,1711 @@
+: 132044,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.75
+          }
+        },
+        "audio_start_timestamp": 444.0271141819516
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d3b63c14203c21140ac4f52a2471395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 180044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 3.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d3c743b0203c271972d6f65e6bb1395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 432044,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 9.0
+          }
+        },
+        "audio_start_timestamp": 457.8655268999841
+      }
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides has a long-term project list."
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d3c744bc203c104ecbf691ea5e81395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 240044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 5.0
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d3d233c0203c3ce9d49e35d57136395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 147884,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.08
+          }
+        },
+        "audio_start_timestamp": 473.49935067799873
+      }
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d3d232e4203c29f97a7fe5b13d87395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 48044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 1.0
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d3d662d0203c36b3e5f42b66ded9395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 24524,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.51
+          }
+        },
+        "audio_start_timestamp": 476.4690077800164
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d3d660f4203c3d5af806383ec2ec395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 160844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 3.35
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d3ddbfe4203c003723e00f4a0f5d395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 127724,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.66
+          }
+        },
+        "audio_start_timestamp": 484.18621119501535
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d3ddc570203c1f2cfb3d18458486395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 108044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 2.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d3f06d8c203c186811c751821cd8395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 312044,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.5
+          }
+        },
+        "audio_start_timestamp": 493.6692842270108
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d3f06bb4203c3cf803f7346c3a7d395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 537644,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 11.2
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d3f684d4203c219cd08d6c6e8cc8395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 110924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.31
+          }
+        },
+        "audio_start_timestamp": 511.1277404579427
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d3f682bc203c1a74dff58d6e6e27395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 36044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d40c58a8203c219986e1c10a3597395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 118604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.47
+          }
+        },
+        "audio_start_timestamp": 515.1679811429326
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d40c575c203c1b2939bb2dfd638b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 859244,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 17.9
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d41598d4203c08dbdd9002fbc9be395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 54284,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.13
+          }
+        },
+        "audio_start_timestamp": 539.6029227719969
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d41599e4203c16cd4ab47080556b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 48044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 1.0
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d41f4b48203c0ff7cc3d6fee87f4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 155564,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.24
+          }
+        },
+        "audio_start_timestamp": 544.9268125519716
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d41f4af8203c06204defc47fb954395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 343244,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 7.15
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d4368178203c30d0d7abd056e0a9395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 551564,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 11.49
+          }
+        },
+        "audio_start_timestamp": 565.2359826579318
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d4367f30203c19a79f18c2cc07dd395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 499244,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 10.4
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d4516a2c203c10ac1101909c6fe2395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 505964,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 10.54
+          }
+        },
+        "audio_start_timestamp": 589.0393239209056
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d4517ce8203c3ecaca5a17148d40395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 628844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 13.1
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d4596e60203c335c7ac1bfe9da8a395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 233324,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 4.86
+          }
+        },
+        "audio_start_timestamp": 609.6320087590116
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d4596f40203c276369f0dd8af7be395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 12044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d46acf3c203c26cfdcb73103e2ca395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 247244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.15
+          }
+        },
+        "audio_start_timestamp": 615.87354623497
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d46acd60203c10c6e39b17417c83395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 576044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 12.0
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d475d4f4203c0a2a1f9bfaf59630395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 57164,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.19
+          }
+        },
+        "audio_start_timestamp": 629.7188823159645
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d475e5e4203c023d69008852604f395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 228044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 4.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d485fc64203c23b991559ed8a051395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 198284,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 4.13
+          }
+        },
+        "audio_start_timestamp": 639.5068372139335
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d485fb90203c235f22e07aa066be395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 700844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 14.6
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d4a8a164203c0c34db890f68bee4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 506924,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 10.56
+          }
+        },
+        "audio_start_timestamp": 666.7729278939637
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d4a88ee8203c337a6f3b732d3ff5395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 1056044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 22.0
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d54ee4ac203c266d3667c2d8dac4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 6430124,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 133.96
+          }
+        },
+        "audio_start_timestamp": 826.5913601019979
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d54ee878203c1832a14e32494a12395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 1303244,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 27.15
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d57e0b30203c02ebdf609f915dfd395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 1006124,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 20.96
+          }
+        },
+        "audio_start_timestamp": 878.576956235976
+      }
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides is a father and has another baby on the way. There are some complications with the pregnancy, which is a source of concern for them."
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d57e0a74203c13bb5f187b53778d395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 1070444,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 22.3
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d5930f70203c3e6ba8283dc22512395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 488684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 10.18
+          }
+        },
+        "audio_start_timestamp": 915.991992196939
+      }
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d5930d9c203c1df6f9ff2742cfc7395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 324044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 6.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d59dbe34203c05f88fc6af3b1b2b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 44684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.93
+          }
+        },
+        "audio_start_timestamp": 926.0025957049197
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d59dbeb0203c3deeed5f9407a804395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 412844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 8.6
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d5a9337c203c083d71e53212ec8b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 345644,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 7.2
+          }
+        },
+        "audio_start_timestamp": 943.5595593329613
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d5a933cc203c14aa8513dfd52e4e395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 24044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.5
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d5c7d520203c09c11d253b9f02b4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 183404,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.82
+          }
+        },
+        "audio_start_timestamp": 948.7020739669074
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d5c7d2dc203c357f35aae33ee78c395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 1303244,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 27.15
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d5cb5ae0203c338f5aed54497489395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 27884,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.58
+          }
+        },
+        "audio_start_timestamp": 978.839681734969
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d5cb72dc203c09d0de69fc26e117395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 84044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 1.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d5d810c8203c19d4577a239123e1395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 331724,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.91
+          }
+        },
+        "audio_start_timestamp": 988.5178575299774
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d5d8100c203c25e81dafa335cfd4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 108044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 2.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d5e29830203c23976c6d9a9ab682395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 54284,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.13
+          }
+        },
+        "audio_start_timestamp": 991.2866496359325
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d5e298e8203c1c6e7d445e0a3d22395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 552044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 11.5
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d5f39500203c0918db608de7cf79395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 427244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 8.9
+          }
+        },
+        "audio_start_timestamp": 1012.755520417993
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d5f393b4203c3e715d303e5dbe07395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 348044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 7.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f3d603b4d8203c1c308fc98da94d22395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 399404,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 8.32
+          }
+        },
+        "audio_start_timestamp": 1029.4579502029205
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f3d603b1b4203c114c67eddfcab2a2395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 12044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": "Okay, are you there?"
+    },
+    {
+      "role": "assistant",
+      "text": "Yes, I'm here! What's on your mind?"
+    },
+    {
+      "role": "user",
+      "text": "Oh, this standard voice takes a little bit longer, doesn't it?"
+    },
+    {
+      "role": "assistant",
+      "text": "Yeah, it can take a little bit longer sometimes. Would you like me to adjust anything with the pace or tone?"
+    },
+    {
+      "role": "user",
+      "text": "No, we already talked about that, didn't we?"
+    },
+    {
+      "role": "assistant",
+      "text": "You're right, we did! I'll stick with the pace we settled on. Anything else you'd like to chat about?"
+    },
+    {
+      "role": "user",
+      "text": "Oh, this is actually kind of fine. Um, what were we talking about?"
+    },
+    {
+      "role": "assistant",
+      "text": "We were talking about your long-term project list, including your Starfield mods and that game idea with the futuristic post-apocalyptic theme. Does that sound right?"
+    },
+    {
+      "role": "user",
+      "text": "Yes, but, um, the..."
+    },
+    {
+      "role": "assistant",
+      "text": "I think you're referring to the game you were thinking about, inspired by \"Myst.\" You were planning to create something with puzzle-driven gameplay in a futuristic post-apocalyptic setting. Is that what you were going to mention?"
+    },
+    {
+      "role": "user",
+      "text": "No, I was going to mention I thought we had established different lists with different things on them."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides wants to maintain separate lists for different projects."
+    },
+    {
+      "role": "assistant",
+      "text": "Ah, I see! Yes, we can definitely keep separate lists for your different projects. Would you like me to go over what’s on each list, or add something new?"
+    },
+    {
+      "role": "user",
+      "text": "No, um, I have a list, um, with the Starfield mod, and the Raspberry Pi cluster, and the server. That is one list. Those three items on one list."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides has a list with three items: Starfield mod, Raspberry Pi cluster, and server. This is one of their separate project lists."
+    },
+    {
+      "role": "assistant",
+      "text": "Got it! So that list includes your Starfield mod, the Raspberry Pi cluster, and the server. Anything you’d like to add or modify on that list?"
+    },
+    {
+      "role": "user",
+      "text": "No, let's call that the main list."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides refers to the list with the Starfield mod, Raspberry Pi cluster, and server as the \"main list.\""
+    },
+    {
+      "role": "assistant",
+      "text": "Got it! We'll call that the main list from now on. Anything else you'd like to go over?"
+    },
+    {
+      "role": "user",
+      "text": "Let's..."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Take your time. What would you like to focus on next?"
+    },
+    {
+      "role": "user",
+      "text": "What was a side project, Slade?"
+    },
+    {
+      "role": "assistant",
+      "text": "I think you might be asking about one of your side projects. Could you be referring to something like a logo design or maybe a smaller modding idea? We had talked about a few creative side projects before. Does that ring a bell?"
+    },
+    {
+      "role": "user",
+      "text": "Now, we had just talked about a side projects list. Earlier, about 30 minutes ago, we made a side projects list."
+    },
+    {
+      "role": "assistant",
+      "text": "Ah, I see! I don’t have a specific \"side projects\" list saved yet, but we can definitely create one now. Do you remember which projects were on that list, or would you like to start fresh?"
+    },
+    {
+      "role": "user",
+      "text": "No, that's what I was asking you about. I don't remember the side projects list."
+    },
+    {
+      "role": "assistant",
+      "text": "No problem! Since we didn’t save that list earlier, we can recreate it now. What do you recall might have been on the side projects list? Or we can brainstorm some new ideas to add."
+    },
+    {
+      "role": "user",
+      "text": "Well, they were about some conversations we were gonna have. Do you remember that?"
+    },
+    {
+      "role": "assistant",
+      "text": "Ah, I see what you're getting at! It sounds like the side projects were related to ongoing conversations or ideas we were planning to discuss further. I don’t have specifics saved, but we could have been talking about things like game development ideas, modding topics, or something related to your Raspberry Pi setup. Do any of those sound familiar?"
+    },
+    {
+      "role": "user",
+      "text": "We were going to talk about what can be on my website and things that we were going to do with the website."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides has a side project list that includes ideas for website content and development."
+    },
+    {
+      "role": "assistant",
+      "text": "Got it! So, one of your side projects was about discussing what can go on your website and planning what to do with it. Do you want to dive into those ideas now?"
+    },
+    {
+      "role": "user",
+      "text": "No, we're just going to continue to make the side projects list."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Alright! Let’s keep building the side projects list. What else would you like to add besides the website content and development?"
+    },
+    {
+      "role": "user",
+      "text": "We also, we're gonna work on the..."
+    },
+    {
+      "role": "assistant",
+      "text": "Feel free to take your time. What else were we going to work on for your side projects list?"
+    },
+    {
+      "role": "user",
+      "text": "We were going to work on the photo booth."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides has a side project involving a photo booth."
+    },
+    {
+      "role": "assistant",
+      "text": "Got it! So, the photo booth is another item on your side projects list. Anything else you’d like to add?"
+    },
+    {
+      "role": "user",
+      "text": "I need to get a Sophia, uh, a computer ready for Sophia."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides is preparing a computer for someone named Sophia as part of their side projects."
+    },
+    {
+      "role": "assistant",
+      "text": "Alright, preparing a computer for Sophia is now added to your side projects list. Anything else you want to include?"
+    },
+    {
+      "role": "user",
+      "text": "No."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Got it! So, for now, your side projects list includes the website content and development, the photo booth, and getting a computer ready for Sophia. Let me know whenever you're ready to tackle any of these!"
+    },
+    {
+      "role": "user",
+      "text": "That's fine. Okay, let's go."
+    },
+    {
+      "role": "assistant",
+      "text": "Great! Where would you like to start?"
+    },
+    {
+      "role": "user",
+      "text": "Let's go back to the main list."
+    },
+    {
+      "role": "assistant",
+      "text": "Alright, we're back to the main list, which includes:\n\n1. Starfield mod\n2. Raspberry Pi cluster\n3. Server\n\nWhat would you like to work on from this list?"
+    },
+    {
+      "role": "user",
+      "text": "No, I just wanted to know we were, uh, have the list."
+    },
+    {
+      "role": "assistant",
+      "text": "Yes, we have the main list all set! If you ever want to dive into any of those items, just let me know."
+    },
+    {
+      "role": "user",
+      "text": "Do you have access to the internet?"
+    },
+    {
+      "role": "assistant",
+      "text": "No, I don't have internet access in this setting. But I can help answer questions, provide guidance, or work with the information I already have. What do you need help with?"
+    },
+    {
+      "role": "user",
+      "text": "Uh, what about the long-term list? Did you get that?"
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides has a long-term project list."
+    },
+    {
+      "role": "assistant",
+      "text": "Yes, I have it noted that you have a long-term project list, though we haven't added any specific items to it yet. Would you like to add anything now?"
+    },
+    {
+      "role": "user",
+      "text": "The long-terms project list just had one item, and it was the game development that was the Myst-like game, remember?"
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides' long-term project list includes a game development project, which is inspired by \"Myst\" and features a futuristic post-apocalyptic setting with puzzle-driven gameplay."
+    },
+    {
+      "role": "assistant",
+      "text": "Got it! The long-term project list includes your game development project, inspired by \"Myst,\" set in a futuristic post-apocalyptic world with puzzle-driven gameplay. We're all set on that. Anything else you'd like to update?"
+    },
+    {
+      "role": "user",
+      "text": "No, that's it. Just those three lists. We need to just set those aside and keep those handy, and we could just start mockering stuff off of them as we go."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides wants to keep the three lists (main, side projects, and long-term projects) handy and plans to work on them over time, marking items off as they progress."
+    },
+    {
+      "role": "assistant",
+      "text": "Got it! We’ll keep those three lists handy, and as you’re ready, we can start tackling and marking things off. Just let me know when you're ready to dive into something!"
+    },
+    {
+      "role": "user",
+      "text": "Well, I think right now, Greg, it's bedtime."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "That sounds like a good plan. Get some rest, and we’ll pick up whenever you’re ready. Sleep well!"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, we're going to talk more on my drive to work."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides plans to talk more during their drive to work."
+    },
+    {
+      "role": "assistant",
+      "text": "Sounds good! We’ll catch up during your drive. Rest well and talk soon!"
+    },
+    {
+      "role": "user",
+      "text": "Oh, you do as well. I don't know if you sleep, do you?"
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "Thanks for the thought! I don’t sleep, but I’ll be here whenever you need me. Rest easy!"
+    },
+    {
+      "role": "user",
+      "text": "Do you call me Baysides?"
+    },
+    {
+      "role": "assistant",
+      "text": "I actually call you \"bsides,\" like the name you shared with me. Does that sound right to you?"
+    },
+    {
+      "role": "user",
+      "text": "Yes, that does, but you haven't used it."
+    },
+    {
+      "role": "assistant",
+      "text": "You're right, I haven't used it as much! I'll make sure to stick with \"bsides\" from now on. Thanks for pointing that out!"
+    },
+    {
+      "role": "user",
+      "text": "All right. Well, have a good night, sir."
+    },
+    {
+      "role": "assistant",
+      "text": "Thanks, bsides! Have a good night as well. Talk soon!"
+    }
+  ]
+}

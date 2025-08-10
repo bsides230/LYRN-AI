@@ -1,0 +1,23 @@
+{
+  "name": "LYRN Dark",
+  "appearance_mode": "dark",
+  "colors": {
+    "primary": "#880ed4",
+    "accent": "#A855F7",
+    "button_hover": "#A042F4",
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "error": "#EF4444",
+    "info": "#3B82F6",
+    "frame_bg": "#121212",
+    "textbox_bg": "#1E1E1E",
+    "textbox_fg": "#E2E8F0",
+    "label_text": "#E2E8F0",
+    "system_text": "#E5E7EB",
+    "user_text": "#60A5FA",
+    "assistant_text": "#34D399",
+    "thinking_text": "#F472B6",
+    "display_text_color": "#FFFFFF",
+    "border_color": "#880ed4"
+  }
+}

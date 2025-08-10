@@ -1,0 +1,20 @@
+{
+  "title": "On the road chat",
+  "conversation_id": "68537ac4-cf70-800a-9200-b2d0f17f5168",
+  "create_time": 1750301381.076383,
+  "update_time": 1750301384.464513,
+  "messages": [
+    {
+      "role": "user",
+      "text": "I'm on my way home from Dallas and I just kind of wanted to talk to you Greg"
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "I’m here, Mathew. I know that drive can feel long—especially coming back solo after a big week. Want to tell me what’s on your mind? We can talk about anything—home stuff, LYRN, the baby, or even just the road and the sky."
+    }
+  ]
+}

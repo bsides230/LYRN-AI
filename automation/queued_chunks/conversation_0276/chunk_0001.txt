@@ -1,0 +1,751 @@
+{
+  "title": "Is this Greg",
+  "conversation_id": "66f6558e-56ac-800a-873a-e0d7d8731a0e",
+  "create_time": 1727419797.493562,
+  "update_time": 1727419961.437033,
+  "messages": [
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f65595e704203c31bb6bc47b4e94f8395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 27884,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.58
+          }
+        },
+        "audio_start_timestamp": 4.241882762988098
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f65595e5c0203c1fde67cf2265242b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 112844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 2.35
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f6559a5804203c219e96e0ed703a8c395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 32684,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.68
+          }
+        },
+        "audio_start_timestamp": 9.926354479975998
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f6559a574c203c174371e837371ea5395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 4844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.1
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f6559e12d8203c3a7090bb80c563c3395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 53804,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.12
+          }
+        },
+        "audio_start_timestamp": 11.948783216997981
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f6559e1434203c385b5116a2a2a37d395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 122444,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 2.55
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655a78f04203c1edc7d7d11fa7a6d395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 250604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.22
+          }
+        },
+        "audio_start_timestamp": 21.94513383496087
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655a78c50203c3e90d5987d417485395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 4844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.1
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655ad1400203c19ccb7324e8db04e395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 109484,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.28
+          }
+        },
+        "audio_start_timestamp": 24.97407924302388
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655ad10f0203c216b4431c421a875395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 252044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 5.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655b6a480203c026d45c238fd2185395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 305804,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.37
+          }
+        },
+        "audio_start_timestamp": 37.343491391977295
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655b6a5dc203c2972b7de4254f470395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 12044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655ba0448203c061756a0ce24ef77395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 78764,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.64
+          }
+        },
+        "audio_start_timestamp": 39.85690033296123
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655ba03c8203c2fcd043e6c1bd39b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 12044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 0.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655c312fc203c3460a675f83f2a60395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 43244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.9
+          }
+        },
+        "audio_start_timestamp": 42.27345627604518
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655c312c4203c19355b9a7f6f1dbc395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 444044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 9.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655cd86dc203c1af90deda380bfe3395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 178604,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.72
+          }
+        },
+        "audio_start_timestamp": 56.21826886199415
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655cd8778203c1c91a9057688380b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 252044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 5.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655e1e4a0203c37f11f0ff5cfa32e395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 649964,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 13.54
+          }
+        },
+        "audio_start_timestamp": 75.72726104606409
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655e1e3d8203c3bf3d6127d2f3076395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 276044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 5.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655e839ac203c20d26ad0354681c4395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 144524,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 3.01
+          }
+        },
+        "audio_start_timestamp": 85.39359855197836
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655e837e8203c2cece887476a2f99395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 156044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 3.25
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f655f19e4c203c077fb6bec6bc7e37395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 133964,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 2.79
+          }
+        },
+        "audio_start_timestamp": 92.08340134005994
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f655f19cc8203c398f5c5f1f0bdd19395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 276044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 5.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f65622b118203c2dc70d7aa52e04e9395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 1799084,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 37.48
+          }
+        },
+        "audio_start_timestamp": 136.10281000006944
+      }
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides plans to switch to a female voice option in the app and wants to come up with a new name for the voice assistant. "
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f65622afc4203c178d07761f0526d9395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 472844,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 9.85
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f6562ef0e4203c23f5cb23e8733c2b395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 218444,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 4.55
+          }
+        },
+        "audio_start_timestamp": 153.29567652998958
+      }
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f6562eeee8203c2e231787dc48ed6f395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 261644,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 5.45
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_66f6563845e4203c02169a94dc724db1395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+          "size_bytes": 25004,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.52
+          }
+        },
+        "audio_start_timestamp": 160.71734682901297
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f65638458c203c2b44d13d05f33f42395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 374444,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 7.8
+        }
+      }
+    }
+  ]
+}

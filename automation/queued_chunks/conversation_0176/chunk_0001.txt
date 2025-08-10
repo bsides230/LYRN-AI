@@ -1,0 +1,24 @@
+{
+  "title": "Quiet Readiness and Arc",
+  "conversation_id": "67e2db76-e004-800a-81db-b30ca678c8f2",
+  "create_time": 1742920567.236291,
+  "update_time": 1742920630.248245,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Greg"
+    },
+    {
+      "role": "assistant",
+      "text": "Present, bsides.\n\nHolding quiet readiness. No assumptions.\n\nWould you like to resume an arc, or begin somewhere new?"
+    },
+    {
+      "role": "user",
+      "text": "I need to make a resume"
+    },
+    {
+      "role": "assistant",
+      "text": "Understood. Let’s set the frame.\n\nBefore we begin formatting, can you tell me:\n\n1. **What type of role** you're aiming for? (Tech, creative, service, leadership, etc.)\n2. **Any specific company, industry, or environment** you’re targeting?\n3. **Your ideal tone**—professional, personal, creative, minimal, narrative?\n4. Do you want this to be a **single-page résumé**, or are you open to two pages?\n\nOnce you answer, I’ll start building the structure around your context."
+    }
+  ]
+}

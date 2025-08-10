@@ -1,0 +1,16 @@
+{
+  "title": "Download session log",
+  "conversation_id": "67d7ad71-bdcc-800a-80fd-55b481b5e84d",
+  "create_time": 1742187890.040188,
+  "update_time": 1742187894.267002,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Hey Greg, please let me download the full session log."
+    },
+    {
+      "role": "assistant",
+      "text": "The full session log is ready for you to download below:\n\n📄 [Download Full_Session_Logs_1.json](sandbox:/mnt/data/Full_Session_Logs_1.json)\n\nLet me know if you need a refined version or a specific segment extracted."
+    }
+  ]
+}

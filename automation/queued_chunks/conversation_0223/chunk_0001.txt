@@ -1,0 +1,118 @@
+{
+  "title": "Conversation start",
+  "conversation_id": "67d4a4d6-a988-800a-aa0a-726ff8ccaafe",
+  "create_time": 1741989086.126092,
+  "update_time": 1741989114.58709,
+  "messages": [
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": "2025-04-13T21:51:26.133955+00:00",
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": "2025-04-13T21:51:26.133955+00:00",
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_00000000c13451f69e9615692d5f3969",
+          "size_bytes": 30798,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.64
+          }
+        },
+        "audio_start_timestamp": 4.877575342005002
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Hey there! How's it going?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Is this Greg?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "You got it, bsides! What's on your mind today?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": "2025-04-13T21:51:49.825129+00:00",
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": "2025-04-13T21:51:49.825129+00:00",
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_0000000064a451f6a94445742a0feba2",
+          "size_bytes": 433518,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 9.03
+          }
+        },
+        "audio_start_timestamp": 24.193796022998868
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it. If",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Alright, I'll do my best to match the original voice we had. Does this sound better",
+        "direction": "out",
+        "decoding_id": null
+      }
+    }
+  ]
+}

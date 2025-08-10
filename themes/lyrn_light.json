@@ -1,0 +1,23 @@
+{
+    "name": "LYRN Light",
+    "appearance_mode": "light",
+    "colors": {
+        "primary": "#880ed4",
+        "accent": "#1A202C",
+        "button_hover": "#8B66D1",
+        "success": "#48BB78",
+        "warning": "#ED8936",
+        "error": "#E53E3E",
+        "info": "#4299E1",
+        "frame_bg": "#FFFFFF",
+        "textbox_bg": "#F7FAFC",
+        "textbox_fg": "#1A202C",
+        "label_text": "#1A202C",
+        "system_text": "#1A202C",
+        "user_text": "#2B6CB0",
+        "assistant_text": "#2F855A",
+        "thinking_text": "#B83280",
+        "display_text_color": "#000000",
+        "border_color": "#1A202C"
+    }
+}

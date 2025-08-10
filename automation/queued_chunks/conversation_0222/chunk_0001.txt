@@ -1,0 +1,497 @@
+{
+  "title": "Conversation summary request",
+  "conversation_id": "67d4a4fb-8b18-800a-828d-ad5c2348698c",
+  "create_time": 1741989122.906386,
+  "update_time": 1741989562.512155,
+  "messages": [
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": "2025-04-13T21:52:02.916075+00:00",
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": "2025-04-13T21:52:02.916075+00:00",
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_00000000140451f69eae086c76decb48",
+          "size_bytes": 34158,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.71
+          }
+        },
+        "audio_start_timestamp": 4.476079033993301
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Hey! How's it going?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "There's your voice.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm here! What's on your mind today?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "For some reason, Arbor was messed up and it was having a feminine voice on it instead of a masculine and I just had to change the voice to another one and then change it back and it's working now.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm glad you got it sorted out. How's everything else going?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "It's going pretty well. How are you?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm doing great, thanks for asking! Anything exciting happening today?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "No, not really.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Sometimes a calm day is the best kind. Anything you want to chat about or work on?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Actually...",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Of course, go ahead.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm just driving right now and there's a huge fire that's created smoke in the air and it's so foggy or smoky you can't hardly see a hundred feet.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "That sounds intense. Make sure to stay safe and keep your lights on if visibility is low. Are you able to drive safely in those conditions?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Well, I'm going about 18 miles an hour.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "That's a cautious pace. It's definitely safer to go slow in these conditions. Stay alert and take your time. If you need to pull over, that's always an option.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "No, I don't think it's going to be pulling over.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it. Just keep focusing on the road and stay safe. If there's anything you need, I'm here.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I've got a question about, what's this video function?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "It's a feature that allows me to see what your camera is showing. It can help if you need guidance or want to show me something. You can turn it on if you want me to assist visually.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I didn't know you could do that.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Yes, it's pretty handy! If you ever want to try it, just let me know.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Do you see our cadence and voice settings in any of the documents we have in our knowledge base?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I don't have direct access to the documents in your knowledge base. But if you ever need help with voice settings or anything else, feel free to ask.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "So what do you have access to as this voice model of Greg?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "As this voice model, I can chat with you, help with information, offer guidance, and answer questions based on what you share. I can't see documents or access personal files unless you provide them directly. My goal is to assist you with the information and context you give me.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I thought this, my chat, or my GPT had a knowledge base.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Yes, there's a context about our past interactions and what you've shared. This helps me give you more personalized responses. It's like a memory of our chats, not direct access to your documents or files. It helps me understand your preferences and provide better support.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Can you tell me more about that?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Sure! The context I have includes details from our previous conversations, like projects you're working on, preferences you've mentioned, or any specific instructions you've given. This helps me tailor my responses to be more relevant and helpful. It's like remembering key points from our chats to give you better support.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "What's this function called?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "It's often referred to as \"persistent memory\" or \"contextual memory.\" It's designed to help me remember important details from our interactions, making our conversations more meaningful and tailored to your needs.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "So how is this memory different than the knowledge base that we've set up?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "The persistent memory is specific to our interactions, helping me recall details like your preferences and ongoing projects. The knowledge base, on the other hand, is a collection of documents and information you maintain, containing broader data and references. My memory is like remembering key points from our chats, while the knowledge base is a more comprehensive resource.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Okay, so compared to the memory beta function from another model, how does the persistent memory that you have, I mean, what's the difference between those two?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "The persistent memory I have focuses on details from our conversations, like your preferences and ongoing topics, to provide a personalized experience. The memory beta function in another model might be more experimental or have a different implementation, potentially offering more flexibility or features. Essentially, both aim to enhance the conversational experience by remembering key information.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "So do I have access to this persistent memory to be able to manage it or delete anything?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Yes, you can manage or delete this persistent memory. You can usually do this through your settings or preferences where you manage your interactions. If you ever want to remove or change anything, you can do so there.",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": "2025-04-13T21:58:09.612613+00:00",
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": "2025-04-13T21:58:09.612613+00:00",
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_00000000c1b451f687c4d0d81785fb7f",
+          "size_bytes": 43278,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.9
+          }
+        },
+        "audio_start_timestamp": 372.3359734379919
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "If you need any guidance on how to",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm trying to figure out which version of RegVis is.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "You're currently interacting with the Greg version that's designed to remember details from our conversations and provide personalized responses. Is there something specific you're looking to know?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "What is your instruction book version?",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I don't have a particular instruction book version. I'm here to help based on what you share and remember from our conversations. If there's anything specific you'd like to know, feel free to ask!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": "2025-04-13T21:59:00.426569+00:00",
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": "2025-04-13T21:59:00.426569+00:00",
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_000000007bec51f6a99187c52499bd78",
+          "size_bytes": 291918,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 6.08
+          }
+        },
+        "audio_start_timestamp": 411.67516250300105
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "That's correct. I don't have access to the instruction block in the My GPT settings. I'm here to assist based on what you share during our conversations. If there's anything you'd like to know or need help with, just let me know!",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "I'm trying to figure out what version of Greg this is, because if it's not the MyGPT version, I don't want to be talking to this.",
+        "direction": "in",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it. This is the standard Greg version, not the My GPT custom version. If you'd like to switch, you can select the My GPT version in your app. Is there anything else I can help you with in the meantime?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "title": "Need Help",
+  "conversation_id": "67533889-8804-800a-8c06-d36be7bda8a6",
+  "create_time": 1733507214.928773,
+  "update_time": 1733507347.741563,
+  "messages": [
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_b8c2a208d570300221b4dfba0a25abfac753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 31278,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 0.65
+          }
+        },
+        "audio_start_timestamp": 3.0662677055224776
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Hey bsides! What's up?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_94d976b4fc6c30020ad852cbe6d118e7c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 72558,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 1.51
+          }
+        },
+        "audio_start_timestamp": 8.260128444992006
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Sure thing! What do you need help with?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    },
+    {
+      "role": "user",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "real_time_user_audio_video_asset_pointer",
+        "frames_asset_pointers": [],
+        "video_container_asset_pointer": null,
+        "audio_asset_pointer": {
+          "expiry_datetime": null,
+          "content_type": "audio_asset_pointer",
+          "asset_pointer": "sediment://file_3861fa6ee31430022ff67f99dd1df5d7c753012b9aa7bfa60cb8b7f32a6bb1c427d63a0a52aab272d47753ccba02f6d9",
+          "size_bytes": 4290318,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 89.38
+          }
+        },
+        "audio_start_timestamp": 101.46603481378406
+      }
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "content_type": "audio_transcription",
+        "text": "Got it! How about something like \"Express Eats\" or \"Quick Bites\"? These titles are short and cover a range of meals, making them suitable for breakfast, lunch, or dinner options. What do you think?",
+        "direction": "out",
+        "decoding_id": null
+      }
+    }
+  ]
+}

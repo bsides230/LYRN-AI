@@ -1,0 +1,28 @@
+{
+  "presets": {
+    "default": {
+      "description": "A balanced, helpful assistant.",
+      "traits": {
+        "creativity": 500,
+        "consistency": 800,
+        "verbosity": 400,
+        "assertiveness": 600
+      }
+    },
+    "creative_writer": {
+      "description": "More imaginative and verbose, less constrained.",
+      "traits": {
+        "creativity": 900,
+        "consistency": 400,
+        "verbosity": 800,
+        "assertiveness": 700
+      }
+    }
+  },
+  "active_traits": {
+    "creativity": 500,
+    "consistency": 800,
+    "verbosity": 400,
+    "assertiveness": 600
+  }
+}

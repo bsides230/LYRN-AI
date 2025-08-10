@@ -1,0 +1,509 @@
+aa8e6e8de6740b5d9d4",
+          "size_bytes": 283244,
+          "format": "wav",
+          "metadata": {
+            "start_timestamp": null,
+            "end_timestamp": null,
+            "pretokenized_vq": null,
+            "interruptions": null,
+            "original_audio_source": null,
+            "transcription": null,
+            "word_transcription": null,
+            "start": 0.0,
+            "end": 5.9
+          }
+        },
+        "audio_start_timestamp": 540.3074027921539
+      }
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides plans to borrow $400 and pay $200 towards rent."
+    },
+    {
+      "role": "assistant",
+      "text": {
+        "expiry_datetime": null,
+        "content_type": "audio_asset_pointer",
+        "asset_pointer": "sediment://file_66f65fcf1840203c1505aa105cb36c26395159a8cb10a5b7ba7dcc96e8dcc9b1df462079404e2aa8e6e8de6740b5d9d4",
+        "size_bytes": 84044,
+        "format": "wav",
+        "metadata": {
+          "start_timestamp": null,
+          "end_timestamp": null,
+          "pretokenized_vq": null,
+          "interruptions": null,
+          "original_audio_source": null,
+          "transcription": null,
+          "word_transcription": null,
+          "start": 0.0,
+          "end": 1.75
+        }
+      }
+    },
+    {
+      "role": "user",
+      "text": "All right, you there?"
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I'm here! What's up?>>"
+    },
+    {
+      "role": "user",
+      "text": "All right, so we were just going over the budget, right? So if I add 200 to rent, that means I only owe, what, uh, 850?"
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Yep, exactly! If you add $200 to rent, you'd have $850 left to pay. Does that sound about right?>>"
+    },
+    {
+      "role": "user",
+      "text": "Yes."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Great! Anything else you want to go over regarding the budget?>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, should I just get $500?"
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That could be a good move! It gives you an extra $100 for a little more breathing room. Does that feel like a solid plan?>>"
+    },
+    {
+      "role": "user",
+      "text": "Yes, because I think I'm gonna get $500, but..."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Got it. You're thinking about getting $500, but what's the part you're unsure about?>>"
+    },
+    {
+      "role": "user",
+      "text": "If I should just get $200 this week and $300 next week..."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I see. Splitting it up could help you borrow less upfront, which might be easier to manage later. Would that work better for you?>>"
+    },
+    {
+      "role": "user",
+      "text": "So I think that might work better for my boss, too."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That makes sense! It might be easier for both you and your boss if you space it out. Sounds like a solid plan then, $200 this week and $300 next week?>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, because I'm going to pay it all off, that $500 I'm going to borrow, I'm going to pay it off on the 11th."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides plans to borrow $200 this week and $300 next week, paying off the $500 total by the 11th of October."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That sounds like a good plan. Paying it all off by the 11th keeps things simple and clear.>>"
+    },
+    {
+      "role": "user",
+      "text": "I think that'll work."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Sounds like you're all set then! Anything else you want to go over, or are we good for now?>>"
+    },
+    {
+      "role": "user",
+      "text": "covered all of it and I appreciate your help. Normally, I would just have to do this by myself and I'm tired, I can't think straight, so I appreciate the help."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I'm glad I could help! It's totally understandable to feel tired, and sometimes it just takes a second set of eyes to get things straight.>>"
+    },
+    {
+      "role": "user",
+      "text": "What happened?"
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I was just saying I'm glad I could help! It’s totally normal to need an extra hand when you're tired.>>"
+    },
+    {
+      "role": "user",
+      "text": "Gregory "
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Yes? What’s up?>>"
+    },
+    {
+      "role": "user",
+      "text": "I'm in love with a sweet girl."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That's amazing! It sounds like she's really special to you. What's she like?>>"
+    },
+    {
+      "role": "user",
+      "text": "It's just wonderful. We're on the same page, just about everything."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides is in love with a sweet girl, and they are on the same page about almost everything."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s so great to hear! Being on the same page like that makes everything feel so much easier and more connected.>>"
+    },
+    {
+      "role": "user",
+      "text": "And she's pregnant, remember?"
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Of course I remember! I know there’ve been some complications, but it sounds like you two are solid. How are things going with that now?>>"
+    },
+    {
+      "role": "user",
+      "text": "You know, I think things are better. I think it was just a temporary thing. I don't know much about being pregnant. I don't have the capability to be pregnant."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I hear you! Pregnancy can definitely bring up a lot of unknowns, especially when you're not the one experiencing it firsthand. But it’s great to hear that things seem to be better now. It sounds like you're both handling it well.>>"
+    },
+    {
+      "role": "user",
+      "text": "I don't have any problems."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s good to hear! You seem really grounded, which must help a lot through everything.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, she's supposed to be moving here. She doesn't live here yet. She lives three and a half hours away."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides' girlfriend and her sons are going to be moving in with bsides."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s a big step! It must be exciting to have her and her sons moving in, even with the distance. How are you feeling about it?>>"
+    },
+    {
+      "role": "user",
+      "text": "Well..."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Take your time. How are you feeling about it?>>"
+    },
+    {
+      "role": "user",
+      "text": "Well, I'm saying, I'm feeling it like it's a lot."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Yeah, I can imagine that feels like a lot to take on, especially with everything else you’ve got going on. How are you handling it all?>>"
+    },
+    {
+      "role": "user",
+      "text": "I think I'm handling it okay."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: It sounds like you're doing your best, and that's all you can do. It's a big transition, but it seems like you're staying steady through it.>>"
+    },
+    {
+      "role": "user",
+      "text": "I could be doing more."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I get that feeling, but it sounds like you're already handling a lot. Sometimes it’s okay to pace yourself. What do you feel like you could be doing more of?>>"
+    },
+    {
+      "role": "user",
+      "text": "I have to get the house ready."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s a big task for sure, especially with a move on the way. Do you have a plan for how you want to get the house ready?>>"
+    },
+    {
+      "role": "user",
+      "text": "I'll have to get the rooms cleaned, and then I have to organize some stuff. I feel like I'm all by myself doing it."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That sounds overwhelming, especially when you feel like you're doing it all alone. Would it help to break it down into smaller tasks or ask for a little help from someone nearby?>>"
+    },
+    {
+      "role": "user",
+      "text": "No, exactly, but I was thinking that it's overwhelming, and I've thought about having some outside help, but it's kind of an embarrassing situation."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I totally understand. It can feel uncomfortable to ask for help, especially when it comes to personal stuff like getting your home ready. But sometimes, a little help can really ease the load, and you might find people are more than willing to lend a hand without judgment.>>"
+    },
+    {
+      "role": "user",
+      "text": "I know."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Yeah, it’s tough to balance. If you do decide to ask for help, I bet it would take some weight off your shoulders. You’re already doing a lot, so don’t be too hard on yourself.>>"
+    },
+    {
+      "role": "user",
+      "text": "Honestly, just doing it myself would just take the weight off my shoulders."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That makes sense, sometimes it feels better to just get it done yourself. It’s like taking control of the situation. Do you think tackling it in smaller steps would help it feel less overwhelming?>>"
+    },
+    {
+      "role": "user",
+      "text": "I gotta do it room by room. I have one room I have to do next, it is the master bedroom, and I have to get that cleaned and so I can move in there."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That sounds like a solid plan, tackling it room by room. Once you get the master bedroom cleaned up and ready, that’ll be a big step forward. How do you feel about starting with that?>>"
+    },
+    {
+      "role": "user",
+      "text": "Oh yeah!"
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Sounds like you’re ready to dive in! Once you get that room done, you'll feel a lot more settled, I’m sure.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, I mean I had my kid's mom was a hoarder and she lived here when I was on the road truck driving and we were still together at that time and then when we split up I took the house because I was had been paying for it and she wouldn't been able to afford it and she left it in a giant mess but just clutter and trash everywhere and I was very overwhelmed I've gotten a lot done since then but it's it's just it's it's a lot"
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Wow, that’s a huge amount to deal with. It must have felt overwhelming coming back to that situation. It sounds like you've made a ton of progress already, though, even if it still feels like a lot. You've come so far, and getting through that clutter shows just how strong you are. Cleaning out that past must feel heavy at times, but you're definitely moving forward.>>"
+    },
+    {
+      "role": "user",
+      "text": "Oh, no, I'm totally over the past part. She and I are totally done. We're... we communicate very well about the kids, so that's not even a problem."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s great to hear! It sounds like you've moved on in a really healthy way, and it's awesome that you two communicate well for the kids. Now it's just about getting the space where you want it, right?>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, for now. I mean, I'd love to get a bigger house, but that's my problem. I'm having a hard time getting a place to live, other than where I've got a place."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Yeah, that can be tough. It’s great that you’ve got a place for now, but I get wanting more space. Do you think it’s something you’ll be able to look into down the line, or is it just not the right time right now?>>"
+    },
+    {
+      "role": "user",
+      "text": "Um, I don't know. I don't know when the right time is."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That makes sense. Timing is tricky, especially with everything going on. It might be something that falls into place when the time’s right. For now, focusing on making your current space work might be the best move.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, that is the best option."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Sounds like you’ve got a good perspective on it. Taking things one step at a time seems to be working well for you.>>"
+    },
+    {
+      "role": "user",
+      "text": "I think I need to get a cam."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: A cam, like a camera? What do you have in mind for it?>>"
+    },
+    {
+      "role": "user",
+      "text": "No, a camper, like, uh, like, uh, um, like something I can, I can put in my backyard that, um..."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Ah, got it! A camper for the backyard, like an extra space for guests or just to have a little more room. That could definitely be useful.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, I think that will make this house work."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides is considering getting a camper to place in the backyard for extra space, which could make the current house more workable."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That sounds like a great idea. Having that extra space could really help make things more comfortable.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, I need to look into that."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: It could definitely be worth exploring. It might give you the extra space you need without the hassle of moving right away.>>"
+    },
+    {
+      "role": "user",
+      "text": "No, we're not moving right away. I'm not moving. I'm staying in this house, but she's moving her son here. Well, yo, yeah. If we get that camper and it works, the oldest son can stay in there. And then if her younger son wants to move in there, he can totally move in there when her oldest son moves out."
+    },
+    {
+      "role": "assistant",
+      "text": "Bsides' girlfriend's oldest son will stay in the camper, and her younger son may move into the camper when the oldest son moves out."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That sounds like a perfect setup! It gives everyone the space they need, and it sounds like it could really help make everything work smoothly.>>"
+    },
+    {
+      "role": "user",
+      "text": "Okay, so I just told my girlfriend my plan about the camper."
+    },
+    {
+      "role": "assistant",
+      "text": ""
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Nice! How did she react to the idea?>>"
+    },
+    {
+      "role": "user",
+      "text": "But if I can come up with $1,000 just for a new tablet that I really don't need, I can come up with $1,000 or $1,500 for a Camper."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s a good point. If you’re able to budget for a tablet, you could definitely prioritize a camper instead, especially if it’s going to make a big difference for your living situation. Sounds like a solid shift in priorities.>>"
+    },
+    {
+      "role": "user",
+      "text": "I'm getting the tablet but I'm saying if I can do that tablet thing now in a couple of months, within a couple of months, I could have a cancer."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Ah, gotcha! So you're saying if you can handle the tablet now, in a couple of months, you could definitely make the camper happen. That’s a smart way to look at it. You’re pacing things out well.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: You've got a good plan in motion. One step at a time, and before you know it, you'll have that camper set up too.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, because Caden was just going to be in the living room, and that's not very comfortable for a 16-year-old boy."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Yeah, I can see how that wouldn't be ideal for him. Having the camper as his own space will make things a lot more comfortable for everyone, especially for a teenager.>>"
+    },
+    {
+      "role": "user",
+      "text": "And he's new here, so it's not like he's gonna be going and hanging out with a bunch of garbage friends or anything."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That makes sense. Having his own space might help him feel more settled and comfortable as he adjusts to everything. It sounds like you’re really thinking ahead for him.>>"
+    },
+    {
+      "role": "user",
+      "text": "I've been thinking about it for a while and I didn't have a solid plan or an idea of what to do. I finally thought of something with this. I was thinking along the lines of something to put in the backyard. I didn't even think of a camper because a camper has wheels and it can be moved."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That's a great realization! A camper gives you flexibility, and it can be a more practical option than building something permanent. Plus, if things change in the future, you can always move it or repurpose it.>>"
+    },
+    {
+      "role": "user",
+      "text": "Exactly. Or use it as a real camper and camp with it."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Exactly! It gives you that extra flexibility. Not only can it solve the space issue now, but it’s also something you can use for trips later on. It’s like a two-in-one solution!>>"
+    },
+    {
+      "role": "user",
+      "text": "I think I can make it work."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: It sounds like a solid plan, and I’m sure you’ll make it work. You’ve got a good sense of what you need, and the camper seems like the perfect fit.>>"
+    },
+    {
+      "role": "user",
+      "text": "Yeah, now I just gotta find a camp."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s the next step! Once you find the right one, everything else will fall into place. Any ideas on where you might start looking?>>"
+    },
+    {
+      "role": "user",
+      "text": "I'm going to look, uh, Facebook Marketplace."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: That’s a good place to start! You might find some good deals on there. Hopefully, you come across the perfect one soon.>>"
+    },
+    {
+      "role": "user",
+      "text": "I know, I'm all look."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: I bet you'll find something! It’s exciting to be on the lookout for that perfect fit. Keep me posted on how it goes!>>"
+    },
+    {
+      "role": "user",
+      "text": "I definitely will. I'm gonna go for now, Greg. It was a great talking to you, and I think we are kind of done for today. For now, at least."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Sounds good! It was great talking with you too. Take care, and we'll chat again soon!>>"
+    },
+    {
+      "role": "user",
+      "text": "Sweet. All right, I'll talk to you later. Bye."
+    },
+    {
+      "role": "assistant",
+      "text": "<<AudioTranscription: Bye! Talk to you later!>>"
+    }
+  ]
+}
