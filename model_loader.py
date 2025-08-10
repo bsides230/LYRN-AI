@@ -9,86 +9,151 @@ from file_lock import SimpleFileLock
 
 # --- Configuration ---
 SCRIPT_DIR = Path(__file__).parent.resolve()
-IPC_DIR = SCRIPT_DIR / "ipc"
-PROMPTS_DIR = IPC_DIR / "prompts"
-RESPONSES_DIR = IPC_DIR / "responses"
-LOCK_FILE = IPC_DIR / "ipc.lock"
+SETTINGS_PATH = SCRIPT_DIR / "settings.json"
+TRIGGER_FILE = SCRIPT_DIR / "chat_trigger.txt"
 
 def log(message):
     """Prints a message to stderr for the GUI to capture."""
     print(f"MODEL_LOADER: {message}", file=sys.stderr, flush=True)
 
-def process_prompt(llm: Llama, prompt_file: Path):
-    """
-    Reads a prompt file, processes it with the loaded LLM,
-    and writes a response file.
-    """
+def load_settings():
+    """Loads settings from the shared settings.json file."""
+    if not SETTINGS_PATH.exists():
+        log("FATAL: settings.json not found.")
+        sys.exit(1)
     try:
-        with open(prompt_file, 'r', encoding='utf-8') as f:
-            prompt_data = json.load(f)
+        with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        log(f"FATAL: Error loading settings.json: {e}")
+        sys.exit(1)
 
-        log(f"Processing prompt: {prompt_file.name}")
+def build_full_prompt(settings: dict, chat_folder: str) -> str:
+    """Constructs the full prompt from snapshots and chat history."""
+    prompt_parts = []
+    paths = settings.get("paths", {})
 
-        system_prompt = prompt_data.get("system", "")
-        user_prompt = prompt_data.get("user", "")
+    def safe_read(path: str, label: str, required: bool = True) -> str:
+        if not path:
+            return f"[⚠️ Path for '{label}' not configured in settings.json]"
+        if not os.path.exists(path):
+            if required:
+                return f"[⚠️ Missing {label} file at: {path}]"
+            else:
+                return ""
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read().strip()
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+    # This logic is adapted from the old qwen_chat_v2.py
+    master_prompt_path = SCRIPT_DIR / "build_prompt" / "master_prompt.txt"
+    prompt_parts.append(f"--- START OF BASE PROMPT ---\n{safe_read(str(master_prompt_path), 'Master Prompt')}\n--- END OF BASE PROMPT ---")
 
-        # --- Actual LLM processing ---
-        completion = llm.create_chat_completion(
+    # Load chat history
+    if os.path.isdir(chat_folder):
+        chat_files = sorted([f for f in os.listdir(chat_folder) if f.startswith("chat_") and f.endswith(".txt")])
+        if chat_files:
+            prompt_parts.append("\n--- START OF CHAT HISTORY ---")
+            for fname in chat_files:
+                # We read the file but exclude the very last line if it's just 'model'
+                # because we are about to generate the response for it.
+                content = safe_read(os.path.join(chat_folder, fname), f"chat file {fname}")
+                if content.endswith("\nmodel"):
+                    content = content[:-5].strip()
+                prompt_parts.append(content)
+            prompt_parts.append("--- END OF CHAT HISTORY ---")
+
+    return "\n\n".join(prompt_parts)
+
+
+def process_chat_request(llm: Llama, settings: dict, chat_file_path_str: str):
+    """
+    Processes a chat request by building a full prompt and streaming the
+    response back into the specified chat file.
+    """
+    log(f"Processing request for chat file: {chat_file_path_str}")
+    chat_file_path = Path(chat_file_path_str)
+    chat_folder = chat_file_path.parent
+
+    try:
+        full_prompt = build_full_prompt(settings, str(chat_folder))
+
+        messages = [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": full_prompt}]
+
+        stream = llm.create_chat_completion(
             messages=messages,
-            max_tokens=2048,  # Consider making this an arg
-            stream=False # Non-streaming for simple IPC
+            max_tokens=settings.get("active", {}).get("max_tokens", 4096),
+            temperature=settings.get("active", {}).get("temperature", 0.7),
+            top_p=settings.get("active", {}).get("top_p", 0.95),
+            top_k=settings.get("active", {}).get("top_k", 40),
+            stream=True,
         )
-        response_content = completion['choices'][0]['message']['content']
 
-        response_data = {
-            "response": response_content,
-            "timestamp": time.time()
-        }
+        # Stream the response back to the same chat file
+        with open(chat_file_path, "a", encoding="utf-8") as f:
+            for token_data in stream:
+                content = token_data['choices'][0]['delta'].get('content', '')
+                if content:
+                    f.write(content)
+                    f.flush() # Ensure the GUI can read the token immediately
+            f.write("\n") # Add a final newline for clean separation
 
-        # The response file has the same name as the prompt file.
-        response_file = RESPONSES_DIR / prompt_file.name
-
-        with open(response_file, 'w', encoding='utf-8') as f:
-            json.dump(response_data, f)
-
-        log(f"Wrote response: {response_file.name}")
+        log(f"Finished streaming response to {chat_file_path.name}")
 
     except Exception as e:
-        log(f"Error processing prompt {prompt_file.name}: {e}")
-    finally:
-        # Clean up the prompt file after processing
+        log(f"Error processing chat request for {chat_file_path.name}: {e}")
+        # Write error to file so GUI can see it
         try:
-            prompt_file.unlink()
-        except OSError as e:
-            log(f"Error deleting prompt file {prompt_file.name}: {e}")
+            with open(chat_file_path, "a", encoding="utf-8") as f:
+                f.write(f"\n[MODEL_LOADER_ERROR]: {e}\n")
+        except Exception as write_e:
+            log(f"Failed to write error to chat file: {write_e}")
 
-def watch_for_prompts(llm: Llama):
-    """
-    Main loop that watches for new files in the prompts directory.
-    """
-    log(f"Watching for prompts in: {PROMPTS_DIR}")
+
+def handle_startup_prompt(llm: Llama, settings: dict):
+    """Handles the special '###startup###' prompt."""
+    log("Processing '###startup###' request.")
+    try:
+        # Build a prompt that only includes the master prompt, no chat history
+        master_prompt_path = SCRIPT_DIR / "build_prompt" / "master_prompt.txt"
+        with open(master_prompt_path, "r", encoding="utf-8") as f:
+            master_prompt = f.read().strip()
+
+        startup_prompt = f"{master_prompt}\n\n---SYSTEM BOOT---"
+        messages = [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": startup_prompt}]
+
+        # We just need to run this to load the model, no real output is needed for the GUI
+        _ = llm.create_chat_completion(messages=messages, max_tokens=1)
+        log("Startup prompt processed successfully.")
+    except Exception as e:
+        log(f"Error processing startup prompt: {e}")
+
+
+def watch_for_trigger(llm: Llama, settings: dict):
+    """Main loop that watches for the chat_trigger.txt file."""
+    log(f"Watching for trigger file: {TRIGGER_FILE}")
     while True:
-        try:
-            # Use a file lock to ensure only one process is checking the queue
-            with SimpleFileLock(LOCK_FILE, timeout=5):
-                # Get the oldest file in the directory
-                prompt_files = sorted(PROMPTS_DIR.iterdir(), key=os.path.getmtime)
-                if prompt_files:
-                    process_prompt(llm, prompt_files[0])
+        if TRIGGER_FILE.exists():
+            try:
+                with open(TRIGGER_FILE, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
 
-        except TimeoutError:
-            # Another process (e.g., the GUI writing a prompt) has the lock.
-            # This is expected, so we just continue and try again shortly.
-            pass
-        except Exception as e:
-            log(f"An unexpected error occurred in the watch loop: {e}")
+                # Immediately delete the trigger file to prevent reprocessing
+                TRIGGER_FILE.unlink()
 
-        # Wait a short time before checking again to avoid busy-waiting
+                if content == "###startup###":
+                    handle_startup_prompt(llm, settings)
+                elif content:
+                    process_chat_request(llm, settings, content)
+                else:
+                    log("Trigger file was empty. Ignoring.")
+
+            except Exception as e:
+                log(f"Error processing trigger file: {e}")
+                if TRIGGER_FILE.exists():
+                    try:
+                        TRIGGER_FILE.unlink()
+                    except OSError:
+                        pass # Ignore if it's already gone
         time.sleep(0.1)
 
 def main():
@@ -100,29 +165,16 @@ def main():
     parser.add_argument("--n_ctx", type=int, default=8192, help="Context size.")
     parser.add_argument("--n_threads", type=int, default=8, help="Number of threads.")
     parser.add_argument("--n_gpu_layers", type=int, default=0, help="Number of GPU layers.")
-    parser.add_argument("--ipc-id", type=str, default=None, help="Unique ID for the IPC directory.")
-
     args = parser.parse_args()
 
-    global IPC_DIR, PROMPTS_DIR, RESPONSES_DIR, LOCK_FILE
-    if args.ipc_id:
-        IPC_DIR = SCRIPT_DIR / "ipc" / args.ipc_id
-        PROMPTS_DIR = IPC_DIR / "prompts"
-        RESPONSES_DIR = IPC_DIR / "responses"
-        LOCK_FILE = IPC_DIR / "ipc.lock"
-        log(f"Using isolated IPC directory: {IPC_DIR}")
-
-    log("--- LYRN-AI Model Loader ---")
-    log(f"IPC ID: {args.ipc_id or 'default'}")
+    log("--- LYRN-AI Model Loader (File-based) ---")
     log(f"Model Path: {args.model_path}")
     log(f"Context Size: {args.n_ctx}")
     log(f"Threads: {args.n_threads}")
     log(f"GPU Layers: {args.n_gpu_layers}")
-    log("----------------------------")
+    log("-----------------------------------------")
 
-    # --- Create IPC directories ---
-    PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
-    RESPONSES_DIR.mkdir(parents=True, exist_ok=True)
+    settings = load_settings()
 
     # --- Load the actual Llama model ---
     try:
@@ -140,7 +192,7 @@ def main():
         sys.exit(1) # Exit if the model can't be loaded
 
     # Start the main watch loop
-    watch_for_prompts(llm)
+    watch_for_trigger(llm, settings)
 
 if __name__ == "__main__":
     main()

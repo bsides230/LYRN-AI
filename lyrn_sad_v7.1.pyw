@@ -58,16 +58,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.json")
 THEME_PATH = os.path.join(SCRIPT_DIR, "lyrn-theme.json")
 
-# IPC Directories for model communication
-IPC_DIR = Path(SCRIPT_DIR) / "ipc"
-PROMPTS_DIR = IPC_DIR / "prompts"
-RESPONSES_DIR = IPC_DIR / "responses"
-LOCK_FILE = IPC_DIR / "ipc.lock"
-
-# Create IPC directories if they don't exist
-IPC_DIR.mkdir(exist_ok=True)
-PROMPTS_DIR.mkdir(exist_ok=True)
-RESPONSES_DIR.mkdir(exist_ok=True)
+# Communication file for the model loader
+TRIGGER_FILE = Path(SCRIPT_DIR) / "chat_trigger.txt"
 
 
 # LYRN-AI Brand Colors
@@ -207,7 +199,7 @@ class ThemeManager:
     def __init__(self):
         self.themes_dir = os.path.join(SCRIPT_DIR, "themes")
         self.themes = {}
-        self.current_theme_name = "Purple Dark"  # Fallback default
+        self.current_theme_name = "LYRN Dark"  # Fallback default
         self.current_colors = {}
         self.load_available_themes()
 
@@ -233,30 +225,10 @@ class ThemeManager:
                     print(f"Error loading theme file {filename}: {e}")
 
         if not self.themes:
-            print("Warning: No themes found. Using fallback default.")
-            self.themes["Purple Dark"] = {
-                "name": "Purple Dark",
-                "appearance_mode": "dark",
-                "colors": {
-                    "primary": "#880ED4",
-                    "accent": "#A855F7",
-                    "success": "#10B981",
-                    "warning": "#F59E0B",
-                    "error": "#EF4444",
-                    "info": "#3B82F6",
-                    "frame_bg": "#000000",
-                    "textbox_bg": "#1A202C",
-                    "textbox_fg": "#E2E8F0",
-                    "label_text": "#E2E8F0",
-                    "system_text": "#E5E7EB",
-                    "user_text": "#60A5FA",
-                    "assistant_text": "#34D399",
-                    "thinking_text": "#F472B6",
-                    "display_text_color": "#FFFFFF",
-                    "border_color": "#880ED4",
-                    "status_bg_color": "#3A475A"
-                }
-            }
+            print("FATAL: No themes found in the 'themes' directory. The application cannot start without a theme.")
+            # In a real-world scenario, you might want to create a default theme file here.
+            # For now, we will exit or let it fail gracefully.
+            return
 
     def get_theme_names(self) -> List[str]:
         """Returns a list of available theme names."""
@@ -869,19 +841,28 @@ class LogViewerPopup(ctk.CTkToplevel):
         self.geometry("800x600")
         self.minsize(400, 300)
 
-        # Set always on top if specified in settings
-        if self.settings_manager.ui_settings.get("llm_log_on_top", False):
-            self.attributes("-topmost", True)
-
-        # Override the close button behavior to just hide the window
-        # The actual close button is in the custom top bar now.
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
 
+        # --- Top bar for controls ---
+        top_frame = ctk.CTkFrame(self)
+        top_frame.pack(fill="x", padx=10, pady=(10,0))
+
+        self.on_top_var = ctk.BooleanVar(value=True)
+        self.on_top_checkbox = ctk.CTkCheckBox(top_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
+        self.on_top_checkbox.pack(side="left", padx=10)
+        self.toggle_on_top() # Apply the default state on launch
+
+        # --- Main textbox ---
         self.textbox = ctk.CTkTextbox(self, wrap="word", font=("Consolas", 11))
         self.textbox.pack(expand=True, fill="both", padx=10, pady=10)
         self.textbox.configure(state="disabled")
 
         self.after(100, self.process_log_queue)
+
+    def toggle_on_top(self):
+        """Toggles the always-on-top status of the log viewer."""
+        is_on_top = self.on_top_var.get()
+        self.attributes("-topmost", is_on_top)
 
     def process_log_queue(self):
         """Checks the queue for new output and displays it."""
@@ -2504,6 +2485,13 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         self.initialize_application()
 
+        # Trigger startup prompt for the model
+        try:
+            with open(TRIGGER_FILE, "w", encoding='utf-8') as f:
+                f.write("###startup###")
+        except Exception as e:
+            self.update_status(f"Failed to send startup trigger: {e}", LYRN_ERROR)
+
         # Model Status Indicator
         self.model_status = "Off"
         self.status_animation_after_id = None
@@ -2521,6 +2509,19 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         self.set_model_status("Off") # Start in Off state
         self.update_datetime()
+
+    def show_loading_indicator(self):
+        """Shows the indeterminate loading progress bar."""
+        if hasattr(self, 'loading_progressbar'):
+            self.loading_progressbar.pack(fill="x", pady=5, padx=10)
+            self.loading_progressbar.start()
+            self.update_status("Loading model...", LYRN_INFO)
+
+    def hide_loading_indicator(self):
+        """Hides the indeterminate loading progress bar."""
+        if hasattr(self, 'loading_progressbar'):
+            self.loading_progressbar.stop()
+            self.loading_progressbar.pack_forget()
 
     def update_datetime(self):
         """Updates the time and date labels."""
@@ -2908,16 +2909,16 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         # Datetime display
         try:
-            datetime_font = ctk.CTkFont(family="Consolas", size=18, weight="bold")
+            datetime_font = ctk.CTkFont(family="Consolas", size=22, weight="bold")
         except:
-            datetime_font = ("Consolas", 18, "bold")
+            datetime_font = ("Consolas", 22, "bold")
 
         datetime_frame = ctk.CTkFrame(self.right_sidebar, fg_color="transparent")
         datetime_frame.pack(pady=(20,10), padx=10, anchor="ne")
         self.time_label = ctk.CTkLabel(datetime_frame, text="", font=datetime_font)
-        self.time_label.pack()
+        self.time_label.pack(side="left", padx=5)
         self.date_label = ctk.CTkLabel(datetime_frame, text="", font=datetime_font)
-        self.date_label.pack()
+        self.date_label.pack(side="left", padx=5)
 
         # Enhanced Performance Metrics Section
         self.create_enhanced_metrics()
@@ -3527,7 +3528,7 @@ Enhanced LYRN-AI system with advanced features active.
             self.update_status("No response to copy yet", LYRN_WARNING)
 
     def send_message(self):
-        """Send user message and generate response"""
+        """Saves the user's message to a file and triggers the model loader."""
         user_text = self.input_box.get("0.0", "end").strip()
         if not user_text:
             return
@@ -3537,110 +3538,103 @@ Enhanced LYRN-AI system with advanced features active.
             self.set_model_status("Model Error")
             return
 
+        if TRIGGER_FILE.exists():
+            self.update_status("Model is currently busy. Please wait.", LYRN_WARNING)
+            return
+
         # Display user message
         self.display_colored_message(f"You: {user_text}\n\n", "user_text")
-
-        # Clear input and disable send
         self.input_box.delete("0.0", "end")
         self.send_btn.configure(state="disabled")
 
-        # Save chat message
-        self.save_chat_message("user", user_text)
+        try:
+            # Save the user message to a new chat file
+            chat_filepath = self.save_chat_message("user", user_text)
+            if not chat_filepath:
+                raise IOError("Failed to save chat message.")
 
-        # Display thinking message and start response generation
-        self.display_colored_message("Assistant: Thinking...\n\n", "thinking_text")
-        self.is_thinking = True
-        self.set_model_status("Thinking")
-        threading.Thread(target=self.generate_response, args=(user_text,), daemon=True).start()
-        self.update_status("Generating response...", LYRN_INFO)
+            # Display "Thinking..." and start the response generation process
+            self.display_colored_message("Assistant: ", "assistant_text")
+            self.is_thinking = True
+            self.set_model_status("Thinking")
+
+            # Start the thread that will tail the file for the response
+            threading.Thread(target=self._stream_response_from_file, args=(chat_filepath,), daemon=True).start()
+
+            # Write the trigger file to start the model loader
+            with open(TRIGGER_FILE, "w", encoding='utf-8') as f:
+                f.write(chat_filepath)
+
+            self.update_status("Generating response...", LYRN_INFO)
+
+        except Exception as e:
+            self.update_status(f"Error sending message: {e}", LYRN_ERROR)
+            self.send_btn.configure(state="normal")
+
+
+    def _stream_response_from_file(self, chat_filepath: str):
+        """
+        Tails the specified chat file, streaming new content to the GUI
+        until the model loader is finished (indicated by the trigger file's absence).
+        """
+        try:
+            with open(chat_filepath, "r", encoding="utf-8") as f:
+                # First, seek past the user's message that's already in the file
+                while True:
+                    line = f.readline()
+                    if not line:
+                        break
+                    if line.strip() == "model":
+                        break
+
+                # Now, tail the file for the model's response
+                while TRIGGER_FILE.exists():
+                    new_content = f.read()
+                    if new_content:
+                        if self.is_thinking:
+                            self.is_thinking = False # First token received
+                        self.stream_queue.put(('token', new_content, 'assistant'))
+                        self.last_assistant_response += new_content
+                    time.sleep(0.05) # Small sleep to prevent busy-waiting
+
+                # One last read to catch any final content after the trigger is deleted
+                final_content = f.read()
+                if final_content:
+                     self.stream_queue.put(('token', final_content, 'assistant'))
+                     self.last_assistant_response += final_content
+
+            # Save the final response to a new file with the 'assistant' role
+            # This is a bit redundant as it's already in the main chat file,
+            # but we'll keep the save_chat_message call for consistency.
+            # self.save_chat_message("assistant", self.last_assistant_response)
+
+        except Exception as e:
+            self.stream_queue.put(('error', f"Error streaming response: {e}"))
+        finally:
+            if self.is_thinking: # If no tokens were generated
+                self.is_thinking = False
+            self.stream_queue.put(('finished', ''))
+            self.stream_queue.put(('enable_send', ''))
+            self.set_model_status("Ready")
 
     def remove_thinking_message(self):
         """Finds and removes the 'Thinking...' message from the chat display."""
-        self.chat_display.configure(state="normal")
-        # Search for the "Thinking..." message starting from the end.
-        pos = self.chat_display.search("Assistant: Thinking...", "end", backwards=True, stopindex="1.0")
-        if pos:
-            # If found, delete from that position to the end of the textbox.
-            # This is robust enough to clear the message even if other text arrived.
-            self.chat_display.delete(pos, "end")
-        self.chat_display.configure(state="disabled")
+        # This method is no longer needed with the new streaming implementation
+        # as we write "Assistant: " and then stream tokens directly.
+        pass
 
-    def _wait_for_response(self, prompt_filename: str):
-        """Polls for a response file from the model loader process."""
-        response_file = RESPONSES_DIR / prompt_filename
-        start_time = time.time()
-        timeout = 60 # 60-second timeout for a response
-
-        try:
-            while not response_file.exists():
-                if time.time() - start_time > timeout:
-                    raise TimeoutError("Model response timeout")
-                time.sleep(0.1)
-
-            # Use lock to read and delete the file
-            with SimpleFileLock(LOCK_FILE):
-                with open(response_file, 'r', encoding='utf-8') as f:
-                    response_data = json.load(f)
-
-                response_file.unlink() # Delete after reading
-
-            # Stream the response back to the GUI
-            # For now, we send the whole thing at once.
-            # A more advanced implementation could stream character by character.
-            self.stream_queue.put(('token', response_data.get("response", ""), 'assistant'))
-            self.last_assistant_response = response_data.get("response", "")
-            self.save_chat_message("assistant", self.last_assistant_response)
-
-        except Exception as e:
-            self.stream_queue.put(('error', f"Error waiting for model response: {e}"))
-        finally:
-            self.stream_queue.put(('finished', '')) # Signal end of generation
-            self.stream_queue.put(('enable_send', ''))
-
-    def generate_response(self, user_text: str):
-        """Sends a prompt to the external model process and waits for a response."""
-        if self.model_process is None or self.model_process.poll() is not None:
-            self.stream_queue.put(('error', "Model process is not running."))
-            self.stream_queue.put(('finished', ''))
-            self.stream_queue.put(('enable_send', ''))
-            self.set_model_status("Model Error")
-            return
-
-        try:
-            # Create a unique filename for the prompt
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            prompt_filename = f"prompt_{timestamp}.json"
-            prompt_filepath = PROMPTS_DIR / prompt_filename
-
-            # Build the prompt data
-            base_prompt = self.snapshot_loader.load_base_prompt()
-            # In a real implementation, history and deltas would be added here.
-            prompt_data = {
-                "system": base_prompt,
-                "user": user_text
-            }
-
-            # Write the prompt file
-            with SimpleFileLock(LOCK_FILE):
-                with open(prompt_filepath, 'w', encoding='utf-8') as f:
-                    json.dump(prompt_data, f)
-
-            # Start a thread to wait for the response
-            threading.Thread(target=self._wait_for_response, args=(prompt_filename,), daemon=True).start()
-
-        except Exception as e:
-            self.stream_queue.put(('error', str(e)))
-            self.stream_queue.put(('finished', ''))
-            self.stream_queue.put(('enable_send', ''))
-
-    def save_chat_message(self, role: str, content: str):
-        """Save chat message to file"""
+    def save_chat_message(self, role: str, content: str) -> Optional[str]:
+        """
+        Saves a chat message to a file in the format expected by the system
+        and returns the full path to the file.
+        """
         if not self.settings_manager.settings:
-            return
+            return None
 
         chat_dir = self.settings_manager.settings["paths"].get("chat", "")
         if not chat_dir:
-            return
+            log("Chat directory not configured in settings.")
+            return None
 
         os.makedirs(chat_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -3649,9 +3643,16 @@ Enhanced LYRN-AI system with advanced features active.
 
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(f"{role}\n{content}")
+                if role == "user":
+                    # The 'model' header acts as a marker for where the response begins
+                    f.write(f"user\n{content}\n\nmodel\n")
+                else:
+                    # Assistant messages are just saved directly for logging
+                    f.write(f"assistant\n{content}\n")
+            return filepath
         except Exception as e:
             print(f"Error saving chat message: {e}")
+            return None
 
     def process_queue(self):
         """Process messages from stream queue with enhanced handling"""

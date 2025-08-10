@@ -40,11 +40,18 @@ class DeltaManager:
                 json.dump(self.manifest, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
-            os.rename(temp_path, self.manifest_path)
+            # Atomically replace the old manifest with the new one.
+            # This is generally safer than os.rename on its own.
+            # On Windows, os.rename will fail if the destination exists.
+            # os.replace will overwrite it.
+            os.replace(temp_path, self.manifest_path)
         except Exception as e:
             print(f"Error saving manifest: {e}")
             if temp_path.exists():
-                os.remove(temp_path)
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     def create_delta(self, key: str, scope: str, target: str, op: str, path: str, value: str, value_mode: str = "RAW"):
         """
