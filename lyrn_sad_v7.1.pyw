@@ -1657,7 +1657,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
                 self.theme_selector_combo.configure(values=new_theme_names)
                 self.parent_app.theme_dropdown.configure(values=new_theme_names)
 
-                safe_theme = new_theme_names[0] if new_theme_names else "Purple Dark"
+                safe_theme = new_theme_names[0] if new_theme_names else "LYRN Dark"
                 self.theme_selector_combo.set(safe_theme)
                 self.parent_app.theme_dropdown.set(safe_theme)
                 self.parent_app.on_theme_selected(safe_theme)
@@ -2389,7 +2389,7 @@ class ThemeBuilderPopup(ctk.CTkToplevel):
                 new_theme_names = self.theme_manager.get_theme_names()
                 self.theme_selector_combo.configure(values=new_theme_names)
                 self.parent_app.theme_dropdown.configure(values=new_theme_names)
-                safe_theme = new_theme_names[0] if new_theme_names else "Purple Dark"
+                safe_theme = new_theme_names[0] if new_theme_names else "LYRN Dark"
                 self.theme_selector_combo.set(safe_theme)
                 self.parent_app.theme_dropdown.set(safe_theme)
                 self.parent_app.on_theme_selected(safe_theme)
@@ -2473,6 +2473,19 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Control-Shift-P>", self.open_command_palette)
 
+    def show_loading_indicator(self):
+        """Shows the indeterminate loading progress bar."""
+        if hasattr(self, 'loading_progressbar'):
+            self.loading_progressbar.pack(fill="x", pady=5, padx=10)
+            self.loading_progressbar.start()
+            self.update_status("Loading model...", LYRN_INFO)
+
+    def hide_loading_indicator(self):
+        """Hides the indeterminate loading progress bar."""
+        if hasattr(self, 'loading_progressbar'):
+            self.loading_progressbar.stop()
+            self.loading_progressbar.pack_forget()
+
     def start_application_logic(self):
         if self.settings_manager.ui_settings.get("autoload_model", False) and self.settings_manager.settings.get("active", {}).get("model_path"):
             self.update_status("Autoloading model...", LYRN_INFO)
@@ -2510,24 +2523,11 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.set_model_status("Off") # Start in Off state
         self.update_datetime()
 
-    def show_loading_indicator(self):
-        """Shows the indeterminate loading progress bar."""
-        if hasattr(self, 'loading_progressbar'):
-            self.loading_progressbar.pack(fill="x", pady=5, padx=10)
-            self.loading_progressbar.start()
-            self.update_status("Loading model...", LYRN_INFO)
-
-    def hide_loading_indicator(self):
-        """Hides the indeterminate loading progress bar."""
-        if hasattr(self, 'loading_progressbar'):
-            self.loading_progressbar.stop()
-            self.loading_progressbar.pack_forget()
-
     def update_datetime(self):
         """Updates the time and date labels."""
         now = datetime.now()
-        self.time_label.configure(text=now.strftime("%H:%M:%S"))
-        self.date_label.configure(text=now.strftime("%Y-%m-%d"))
+        if hasattr(self, 'datetime_label'):
+            self.datetime_label.configure(text=now.strftime("%Y-%m-%d  %H:%M:%S"))
         self.after(1000, self.update_datetime)
 
     def set_model_status(self, status: str):
@@ -2909,16 +2909,16 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         # Datetime display
         try:
-            datetime_font = ctk.CTkFont(family="Consolas", size=22, weight="bold")
+            datetime_font = ctk.CTkFont(family="Consolas", size=24, weight="bold")
         except:
-            datetime_font = ("Consolas", 22, "bold")
+            datetime_font = ("Consolas", 24, "bold")
 
         datetime_frame = ctk.CTkFrame(self.right_sidebar, fg_color="transparent")
-        datetime_frame.pack(pady=(20,10), padx=10, anchor="ne")
-        self.time_label = ctk.CTkLabel(datetime_frame, text="", font=datetime_font)
-        self.time_label.pack(side="left", padx=5)
-        self.date_label = ctk.CTkLabel(datetime_frame, text="", font=datetime_font)
-        self.date_label.pack(side="left", padx=5)
+        datetime_frame.pack(pady=(20, 10), padx=10, anchor="n")
+
+        # Combine date and time into a single label for guaranteed one-line display
+        self.datetime_label = ctk.CTkLabel(datetime_frame, text="", font=datetime_font)
+        self.datetime_label.pack()
 
         # Enhanced Performance Metrics Section
         self.create_enhanced_metrics()

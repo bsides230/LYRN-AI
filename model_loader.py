@@ -28,46 +28,70 @@ def load_settings():
         log(f"FATAL: Error loading settings.json: {e}")
         sys.exit(1)
 
-def build_full_prompt(settings: dict, chat_folder: str) -> str:
-    """Constructs the full prompt from snapshots and chat history."""
-    prompt_parts = []
-    paths = settings.get("paths", {})
-
-    def safe_read(path: str, label: str, required: bool = True) -> str:
-        if not path:
-            return f"[⚠️ Path for '{label}' not configured in settings.json]"
-        if not os.path.exists(path):
-            if required:
-                return f"[⚠️ Missing {label} file at: {path}]"
-            else:
-                return ""
-        with open(path, "r", encoding="utf-8") as fh:
-            return fh.read().strip()
-
-    # This logic is adapted from the old qwen_chat_v2.py
+def build_message_list(settings: dict, chat_folder_path: str, exclude_file: str = None) -> list:
+    """
+    Constructs the list of messages for the chat model, parsing chat history
+    from the chat directory.
+    """
+    # 1. Get the system prompt from the master prompt file.
     master_prompt_path = SCRIPT_DIR / "build_prompt" / "master_prompt.txt"
-    prompt_parts.append(f"--- START OF BASE PROMPT ---\n{safe_read(str(master_prompt_path), 'Master Prompt')}\n--- END OF BASE PROMPT ---")
+    try:
+        with open(master_prompt_path, "r", encoding="utf-8") as f:
+            system_prompt = f.read().strip()
+    except FileNotFoundError:
+        log(f"WARNING: Master prompt file not found at {master_prompt_path}. Using a default system prompt.")
+        system_prompt = "You are a helpful assistant."
 
-    # Load chat history
-    if os.path.isdir(chat_folder):
-        chat_files = sorted([f for f in os.listdir(chat_folder) if f.startswith("chat_") and f.endswith(".txt")])
-        if chat_files:
-            prompt_parts.append("\n--- START OF CHAT HISTORY ---")
-            for fname in chat_files:
-                # We read the file but exclude the very last line if it's just 'model'
-                # because we are about to generate the response for it.
-                content = safe_read(os.path.join(chat_folder, fname), f"chat file {fname}")
-                if content.endswith("\nmodel"):
-                    content = content[:-5].strip()
-                prompt_parts.append(content)
-            prompt_parts.append("--- END OF CHAT HISTORY ---")
+    messages = [{"role": "system", "content": system_prompt}]
 
-    return "\n\n".join(prompt_parts)
+    # 2. Get the chat history from files.
+    if not os.path.isdir(chat_folder_path):
+        log(f"WARNING: Chat directory not found at {chat_folder_path}")
+        return messages
 
+    try:
+        chat_files = sorted([f for f in os.listdir(chat_folder_path) if f.startswith("chat_") and f.endswith(".txt")])
+        if exclude_file:
+            chat_files = [f for f in chat_files if f != exclude_file]
+    except OSError as e:
+        log(f"ERROR: Could not list files in chat directory {chat_folder_path}: {e}")
+        return messages
+
+    for filename in chat_files:
+        filepath = os.path.join(chat_folder_path, filename)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # The file format is: user\n{user_content}\n\nmodel\n{assistant_content}
+            if not content.startswith("user\n"):
+                log(f"WARNING: Skipping malformed chat file {filename}: does not start with 'user\\n'.")
+                continue
+
+            model_separator = "\n\nmodel\n"
+            separator_pos = content.find(model_separator)
+
+            if separator_pos == -1:
+                # This could be the file currently being generated, which is fine.
+                log(f"INFO: Skipping chat file {filename} as it seems incomplete (no model response).")
+                continue
+
+            user_content = content[len("user\n"):separator_pos].strip()
+            assistant_content = content[separator_pos + len(model_separator):].strip()
+
+            if user_content:
+                messages.append({"role": "user", "content": user_content})
+            if assistant_content:
+                messages.append({"role": "assistant", "content": assistant_content})
+
+        except Exception as e:
+            log(f"ERROR: Failed to read or parse chat file {filename}: {e}")
+
+    return messages
 
 def process_chat_request(llm: Llama, settings: dict, chat_file_path_str: str):
     """
-    Processes a chat request by building a full prompt and streaming the
+    Processes a chat request by building a proper message list and streaming the
     response back into the specified chat file.
     """
     log(f"Processing request for chat file: {chat_file_path_str}")
@@ -75,10 +99,27 @@ def process_chat_request(llm: Llama, settings: dict, chat_file_path_str: str):
     chat_folder = chat_file_path.parent
 
     try:
-        full_prompt = build_full_prompt(settings, str(chat_folder))
+        # 1. Build message history from all previous chat files.
+        messages = build_message_list(settings, str(chat_folder), exclude_file=chat_file_path.name)
 
-        messages = [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": full_prompt}]
+        # 2. Get the current user prompt from the trigger file content.
+        with open(chat_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
 
+        if not content.startswith("user\n"):
+            raise ValueError("Malformed chat trigger file: does not start with 'user\\n'.")
+
+        model_separator = "\n\nmodel\n"
+        separator_pos = content.find(model_separator)
+        if separator_pos == -1:
+            raise ValueError("Malformed chat trigger file: no 'model' separator.")
+
+        user_content = content[len("user\n"):separator_pos].strip()
+
+        # 3. Add the current user message to the list.
+        messages.append({"role": "user", "content": user_content})
+
+        # 4. Call the model with the structured message list.
         stream = llm.create_chat_completion(
             messages=messages,
             max_tokens=settings.get("active", {}).get("max_tokens", 4096),
@@ -88,20 +129,19 @@ def process_chat_request(llm: Llama, settings: dict, chat_file_path_str: str):
             stream=True,
         )
 
-        # Stream the response back to the same chat file
+        # 5. Stream the response back to the same chat file.
         with open(chat_file_path, "a", encoding="utf-8") as f:
             for token_data in stream:
-                content = token_data['choices'][0]['delta'].get('content', '')
-                if content:
-                    f.write(content)
-                    f.flush() # Ensure the GUI can read the token immediately
-            f.write("\n") # Add a final newline for clean separation
+                content_part = token_data['choices'][0]['delta'].get('content', '')
+                if content_part:
+                    f.write(content_part)
+                    f.flush()
+            f.write("\n")
 
         log(f"Finished streaming response to {chat_file_path.name}")
 
     except Exception as e:
         log(f"Error processing chat request for {chat_file_path.name}: {e}")
-        # Write error to file so GUI can see it
         try:
             with open(chat_file_path, "a", encoding="utf-8") as f:
                 f.write(f"\n[MODEL_LOADER_ERROR]: {e}\n")
@@ -113,15 +153,16 @@ def handle_startup_prompt(llm: Llama, settings: dict):
     """Handles the special '###startup###' prompt."""
     log("Processing '###startup###' request.")
     try:
-        # Build a prompt that only includes the master prompt, no chat history
         master_prompt_path = SCRIPT_DIR / "build_prompt" / "master_prompt.txt"
         with open(master_prompt_path, "r", encoding="utf-8") as f:
-            master_prompt = f.read().strip()
+            system_prompt = f.read().strip()
 
-        startup_prompt = f"{master_prompt}\n\n---SYSTEM BOOT---"
-        messages = [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": startup_prompt}]
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "System bootup complete. Confirm initialization."}
+        ]
 
-        # We just need to run this to load the model, no real output is needed for the GUI
+        # Run a single generation to load the model and process the system prompt.
         _ = llm.create_chat_completion(messages=messages, max_tokens=1)
         log("Startup prompt processed successfully.")
     except Exception as e:

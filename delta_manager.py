@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import uuid
+from file_lock import SimpleFileLock
 
 class DeltaManager:
     """
@@ -12,6 +13,7 @@ class DeltaManager:
     def __init__(self, deltas_base_dir: str = "deltas"):
         self.base_dir = Path(deltas_base_dir)
         self.manifest_path = self.base_dir / "_manifest.json"
+        self.manifest_lock = SimpleFileLock(self.base_dir / "_manifest.lock")
         self._ensure_base_dir()
         self._load_manifest()
 
@@ -21,37 +23,40 @@ class DeltaManager:
 
     def _load_manifest(self):
         """Loads the manifest file or creates a new one."""
-        if self.manifest_path.exists():
-            try:
-                with open(self.manifest_path, 'r', encoding='utf-8') as f:
-                    self.manifest = json.load(f)
-            except json.JSONDecodeError:
-                print("Warning: Manifest file is corrupted. Creating a new one.")
+        with self.manifest_lock:
+            if self.manifest_path.exists():
+                try:
+                    with open(self.manifest_path, 'r', encoding='utf-8') as f:
+                        self.manifest = json.load(f)
+                except json.JSONDecodeError:
+                    print("Warning: Manifest file is corrupted. Creating a new one.")
+                    self.manifest = {"deltas": []}
+                    # Immediately save the newly created empty manifest
+                    with open(self.manifest_path, 'w', encoding='utf-8') as f:
+                        json.dump(self.manifest, f, indent=2)
+            else:
                 self.manifest = {"deltas": []}
-        else:
-            self.manifest = {"deltas": []}
-        self._save_manifest()
+                # Immediately save the newly created empty manifest
+                with open(self.manifest_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.manifest, f, indent=2)
 
     def _save_manifest(self):
         """Saves the manifest file with crash-safe writing."""
-        temp_path = self.manifest_path.with_suffix(f".tmp.{uuid.uuid4().hex}")
-        try:
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(self.manifest, f, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
-            # Atomically replace the old manifest with the new one.
-            # This is generally safer than os.rename on its own.
-            # On Windows, os.rename will fail if the destination exists.
-            # os.replace will overwrite it.
-            os.replace(temp_path, self.manifest_path)
-        except Exception as e:
-            print(f"Error saving manifest: {e}")
-            if temp_path.exists():
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
+        with self.manifest_lock:
+            temp_path = self.manifest_path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+            try:
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.manifest, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temp_path, self.manifest_path)
+            except Exception as e:
+                print(f"Error saving manifest: {e}")
+                if temp_path.exists():
+                    try:
+                        os.remove(temp_path)
+                    except OSError:
+                        pass
 
     def create_delta(self, key: str, scope: str, target: str, op: str, path: str, value: str, value_mode: str = "RAW"):
         """
