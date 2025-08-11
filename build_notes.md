@@ -1,5 +1,21 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.4 - Quick Controls UI Refactor (2025-08-11)
+
+This update significantly reorganizes the main user interface to improve workflow and consolidate settings.
+
+- **Quick Controls Cleanup:**
+    - The "Quick Controls" section has been streamlined to focus on core actions.
+    - The "Theme" combobox and "Font Size" controls have been moved to the "UI Settings" tab in the main Settings window.
+    - The "Change Model" button has been moved to the "System Status" section, placing it logically with the "Load" and "Offload" buttons.
+    - The "Mode" combobox has been moved directly under the "Change Model" button.
+- **New Quick Controls Layout:**
+    - The section now contains:
+        - "View Logs"
+        - "Clear Chat Folder" button, now paired with a new "Open Folder" button for quick directory access.
+        - "Code Terminal"
+        - "Settings"
+
 ## v7.2.3 - Settings Refactor & UI Cleanup (2025-08-11)
 
 This update focuses on streamlining the settings window and improving user workflow based on feedback.
