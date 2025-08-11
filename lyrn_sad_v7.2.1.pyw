@@ -3046,10 +3046,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         model_status_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
         model_status_frame.pack(fill="x", pady=5)
 
-        self.model_status_label = ctk.CTkLabel(model_status_frame, text="Model Status:", font=status_font)
-        self.model_status_label.pack(side="left", padx=(0, 10))
-
-        self.model_status_progress_bar = ctk.CTkProgressBar(model_status_frame, width=100, height=15)
+        self.model_status_progress_bar = ctk.CTkProgressBar(model_status_frame, width=150, height=15)
         self.model_status_progress_bar.set(1) # Set to 100%
         self.model_status_progress_bar.pack(side="left")
 
@@ -3765,14 +3762,6 @@ Enhanced LYRN-AI system with advanced features active.
             self.status_textbox.delete("1.0", "end")
             self.status_textbox.insert("1.0", message)
             self.status_textbox.configure(state="disabled", text_color=color)
-
-            # Update detailed status labels
-            if self.llm and self.settings_manager.settings:
-                model_path = self.settings_manager.settings.get("active", {}).get("model_path", "N/A")
-                model_name = os.path.basename(model_path) if model_path else "N/A"
-                self.model_status_label.configure(text=f"Model: {model_name}")
-            else:
-                self.model_status_label.configure(text="Model: Not Loaded")
 
         except Exception as e:
             print(f"Error updating status: {e}")
