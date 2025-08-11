@@ -1,5 +1,53 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.4 - Settings Path Hotfix (2025-08-11)
+
+This is a hotfix release to address a critical bug in the settings system.
+
+- **Fixed Hardcoded Paths:** The `SettingsManager` was using a hardcoded absolute path (`D:\LYRN\chat`) for the chat directory, which would cause the application to fail for other users.
+- **Improved First-Time Setup:** The system now correctly detects when `settings.json` is missing and generates a new, default settings file using relative paths (e.g., `./chat`), ensuring the application runs correctly on first launch without manual configuration.
+
+## v7.2.3 - Settings Refactor & UI Cleanup (2025-08-11)
+
+This update focuses on streamlining the settings window and improving user workflow based on feedback.
+
+- **Settings Window Refactor:**
+    - The "Model Config" tab has been removed from the settings window to reduce redundancy, as model selection is handled by the "Change Model" button on the main screen.
+    - The "Theme Builder" tab has been removed. The theme builder is still accessible via a button in the "Advanced" tab.
+    - The "Personality" editor, formerly a popup, has been moved into its own dedicated "Personality" tab within the settings window.
+    - The "Reload Model (Full)" button has been removed from the "Advanced" tab to simplify the UI.
+
+- **Prompt Manager Enhancements:**
+    - The "Prompt Manager" tab in settings now includes a "Mode Management" section.
+    - Users can now view all saved modes in a list.
+    - A "Load Mode" button allows users to activate a saved mode, which updates the current prompt build order.
+    - A "Delete Mode" button allows users to permanently remove a saved mode.
+
+- **Chat History:**
+    - Clarified that the chat history is saved as individual `.txt` files.
+    - The save location is visible and configurable in the settings window under `Directory Paths -> Chat Directory`.
+
+## v7.2.2 - UI Enhancements & Feature Additions (2025-08-11)
+
+This update focuses on quality-of-life improvements, new features, and better project organization.
+
+- **Terminal Popup:**
+    - A new "Code Terminal" button has been added to the Quick Controls section.
+    - This button opens a new native terminal window, allowing users to execute code or commands in a clean environment.
+    - A "Terminal Start Path" setting was added to the "UI Settings" tab in the Settings window. This allows users to configure the default directory where the terminal opens. The default is the application's root directory.
+
+- **Dependency Management:**
+    - A new `dependencies` directory has been created to formalize project dependencies.
+    - A `requirements.txt` file is now included in this directory, listing all required Python packages.
+    - The `AGENTS.md` file has been updated to include a rule for maintaining this new dependency file, ensuring a smoother setup for future development.
+
+- **Performance Metrics UI Overhaul:**
+    - The status dot (●) next to the "generation tok/s" label has been removed, and the label is now centered for a cleaner look.
+    - The "KV Cache" progress bar has been updated to accurately reflect the number of tokens used from the cache relative to the total context size (`n_ctx`), providing a more meaningful metric.
+    - A new progress bar for "Total Tokens" has been added, which also shows the usage against the total context size, allowing for a quick comparison of token usage.
+
+---
+
 ## Phase 1: Core Architecture (2025-08-09)
 
 This initial phase implements the core architectural changes outlined in `cognition_upgrade_v1.2.md`.

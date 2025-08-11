@@ -14,6 +14,7 @@ Major Updates:
 import os
 import sys
 import json
+import subprocess
 import re
 import time
 import queue
@@ -318,7 +319,7 @@ class SettingsManager:
         self.load_or_detect_first_boot()
 
     def load_or_detect_first_boot(self):
-        """Load settings or detect first boot scenario"""
+        """Load settings or create a default one on first boot."""
         if os.path.exists(SETTINGS_PATH):
             try:
                 with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
@@ -326,7 +327,7 @@ class SettingsManager:
                     self.settings = data.get('settings', {})
                     self.ui_settings.update(data.get('ui_settings', {}))
 
-                # Resolve relative paths
+                # Resolve relative paths for the current session
                 if "paths" in self.settings:
                     for key, path in self.settings["paths"].items():
                         if path and not os.path.isabs(path):
@@ -336,11 +337,45 @@ class SettingsManager:
                 self.ensure_automation_flag()
                 self.ensure_next_job_flag()
             except Exception as e:
-                print(f"Error loading settings: {e}")
+                print(f"Error loading settings: {e}. Assuming first boot.")
                 self.first_boot = True
         else:
-            print("No settings.json found - First boot detected")
+            print("No settings.json found - First boot detected. Creating default settings.")
             self.first_boot = True
+
+        if self.first_boot:
+            # Create and save a default settings file
+            self.settings = self.create_empty_settings_structure()
+            default_paths = {
+                "static_snapshots": "build_prompt/static_snapshots",
+                "dynamic_snapshots": "build_prompt/dynamic_snapshots",
+                "active_jobs": "build_prompt/active_jobs",
+                "deltas": "deltas",
+                "chat": "chat",
+                "output": "output",
+                "keywords": "active_keywords",
+                "topics": "active_topics",
+                "active_chunk": "active_chunk",
+                "chunk_queue": "automation/chunk_queue.json",
+                "job_list": "automation/job_list.txt",
+                "job_log": "automation/job_log.json",
+                "automation_flag_path": "global_flags/automation.txt",
+                "chunk_queue_path": "automation/chunk_queue.json",
+                "chat_dir": "chat",
+                "chat_parsed_dir": "chat_parsed",
+                "audit_dir": "automation/job_audit",
+                "metrics_logs": "metrics_logs"
+            }
+            self.settings["paths"] = default_paths
+            self.save_settings() # This saves the file with relative paths
+
+            # Now resolve paths for the current session
+            for key, path in self.settings["paths"].items():
+                if path and not os.path.isabs(path):
+                    self.settings["paths"][key] = os.path.join(SCRIPT_DIR, path)
+
+            self.ensure_automation_flag()
+            self.ensure_next_job_flag()
 
     def create_empty_settings_structure(self) -> dict:
         """Create empty settings structure for first boot"""
@@ -1144,17 +1179,15 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         self.tabview.pack(fill="both", expand=True, padx=20, pady=(0, 20))
 
         # Create tabs
-        self.tab_model = self.tabview.add(self.language_manager.get("tab_model_config"))
         self.tab_paths = self.tabview.add(self.language_manager.get("tab_directory_paths"))
         self.tab_prompt = self.tabview.add(self.language_manager.get("tab_prompt_manager"))
-        self.tab_theme_builder = self.tabview.add("Theme Builder")
+        self.tab_personality = self.tabview.add("Personality")
         self.tab_ui_settings = self.tabview.add("UI Settings")
         self.tab_advanced = self.tabview.add(self.language_manager.get("tab_advanced"))
 
-        self.create_model_tab()
         self.create_paths_tab()
         self.create_prompt_manager_tab()
-        self.create_theme_builder_tab()
+        self.create_personality_tab()
         self.create_ui_settings_tab()
         self.create_advanced_tab()
 
@@ -1171,43 +1204,6 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
                                           command=self.destroy)
         self.cancel_button.pack(side="right", padx=10, pady=10)
         Tooltip(self.cancel_button, self.parent_app.tooltips.get("cancel_settings_button", ""))
-
-    def create_model_tab(self):
-        """Create model configuration tab"""
-        # Use Consolas font
-        try:
-            font = ctk.CTkFont(family="Consolas", size=12)
-            title_font = ctk.CTkFont(family="Consolas", size=16, weight="bold")
-        except:
-            font = ("Consolas", 12)
-            title_font = ("Consolas", 16, "bold")
-
-        ctk.CTkLabel(self.tab_model, text="LYRN-AI Model Configuration",
-                    font=title_font).pack(pady=20)
-
-        # Model path
-        ctk.CTkLabel(self.tab_model, text="Model Path:", font=font).pack(anchor="w", padx=20)
-        self.model_path_entry = ctk.CTkEntry(self.tab_model, width=500, font=font)
-        self.model_path_entry.pack(padx=20, pady=5, fill="x")
-
-        # Parameters frame
-        params_frame = ctk.CTkFrame(self.tab_model)
-        params_frame.pack(fill="x", padx=20, pady=20)
-
-        # Grid layout for parameters
-        params = [
-            ("Context Size:", "n_ctx", 0, 0), ("Threads:", "n_threads", 0, 2),
-            ("GPU Layers:", "n_gpu_layers", 1, 0), ("Max Tokens:", "max_tokens", 1, 2),
-            ("Temperature:", "temperature", 2, 0), ("Top P:", "top_p", 2, 2)
-        ]
-
-        self.model_entries = {}
-        for label, key, row, col in params:
-            ctk.CTkLabel(params_frame, text=label, font=font).grid(
-                row=row, column=col, padx=10, pady=5, sticky="w")
-            entry = ctk.CTkEntry(params_frame, width=100, font=font)
-            entry.grid(row=row, column=col+1, padx=10, pady=5)
-            self.model_entries[key] = entry
 
     def create_paths_tab(self):
         """Create directory paths tab"""
@@ -1282,6 +1278,18 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         clear_chat_button.pack(padx=10, pady=5, anchor="w")
         Tooltip(clear_chat_button, self.parent_app.tooltips.get("clear_chat_button", ""))
 
+        # --- Terminal Settings ---
+        terminal_frame = ctk.CTkFrame(self.tab_ui_settings)
+        terminal_frame.pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(terminal_frame, text="Terminal", font=title_font).pack(pady=10, anchor="w", padx=10)
+
+        path_frame = ctk.CTkFrame(terminal_frame)
+        path_frame.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(path_frame, text="Terminal Start Path:", font=font).pack(side="left", padx=5)
+        self.terminal_start_path_entry = ctk.CTkEntry(path_frame, font=font)
+        self.terminal_start_path_entry.pack(side="left", expand=True, fill="x", padx=5)
+
     def create_advanced_tab(self):
         """Create advanced settings tab"""
         try:
@@ -1322,11 +1330,6 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         # Model operations
         model_frame = ctk.CTkFrame(maint_frame)
         model_frame.pack(fill="x", padx=10, pady=10)
-
-        reload_model_button = ctk.CTkButton(model_frame, text="🔄 Reload Model (Full)",
-                        font=font, command=self.reload_model_full)
-        reload_model_button.pack(side="left", padx=5, pady=5)
-        Tooltip(reload_model_button, self.parent_app.tooltips.get("reload_model_full_button", ""))
 
         force_cleanup_button = ctk.CTkButton(model_frame, text="🧹 Force Memory Cleanup",
                         font=font, command=self.force_memory_cleanup)
@@ -1412,6 +1415,37 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
 
         self.update_prompt_file_list()
 
+        # --- Mode Management ---
+        mode_management_frame = ctk.CTkFrame(self.tab_prompt)
+        mode_management_frame.pack(expand=True, fill="both", padx=20, pady=10)
+
+        ctk.CTkLabel(mode_management_frame, text="Mode Management", font=title_font).pack(pady=10)
+
+        # Frame for the list of modes and buttons
+        mode_content_frame = ctk.CTkFrame(mode_management_frame)
+        mode_content_frame.pack(expand=True, fill="both", padx=10, pady=5)
+        mode_content_frame.grid_columnconfigure(0, weight=1)
+        mode_content_frame.grid_rowconfigure(0, weight=1)
+
+        # Listbox for modes
+        self.modes_listbox = ctk.CTkScrollableFrame(mode_content_frame, label_text="Saved Modes")
+        self.modes_listbox.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.selected_mode_label = None
+
+        # Frame for mode buttons
+        mode_button_frame = ctk.CTkFrame(mode_content_frame, fg_color="transparent")
+        mode_button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
+
+        load_mode_button = ctk.CTkButton(mode_button_frame, text="Load Mode", command=self.load_selected_mode)
+        load_mode_button.pack(padx=10, pady=10, anchor="n")
+        Tooltip(load_mode_button, "Loads the selected mode, overwriting the current prompt build order.")
+
+        delete_mode_button = ctk.CTkButton(mode_button_frame, text="Delete Mode", command=self.delete_selected_mode)
+        delete_mode_button.pack(padx=10, pady=10, anchor="n")
+        Tooltip(delete_mode_button, "Deletes the selected mode file.")
+
+        self.update_modes_list()
+
 
     def on_prompt_list_reorder(self, new_order: List[str]):
         """Callback function to save the new prompt order."""
@@ -1422,288 +1456,163 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
             with open(master_index_path, 'w', encoding='utf-8') as f:
                 json.dump(new_order, f, indent=2)
             print(f"Master index saved to {master_index_path}")
-            # Rebuild the master prompt file
-            self.parent_app.snapshot_loader.generate_master_index()
+            # Rebuild the master prompt file using the new order
+            self.parent_app.snapshot_loader._build_master_prompt_file(new_order)
             self.parent_app.update_status("Prompt order saved and rebuilt", LYRN_SUCCESS)
         except IOError as e:
             print(f"Error writing master index file {master_index_path}: {e}")
             self.parent_app.update_status("Error saving prompt order", LYRN_ERROR)
 
-    def create_theme_builder_tab(self):
-        """Create the theme builder tab UI with an advanced preview."""
-        try:
-            font = ctk.CTkFont(family="Consolas", size=12)
-            title_font = ctk.CTkFont(family="Consolas", size=14, weight="bold")
-        except:
-            font = ("Consolas", 12)
-            title_font = ("Consolas", 14, "bold")
+    def create_personality_tab(self):
+        """Creates the personality tab UI."""
+        self.personality_file = Path(SCRIPT_DIR) / "personality.json"
+        self.personality_data = self._load_personality_data()
+        self.initial_traits = self.personality_data.get("active_traits", {}).copy()
+        self.current_traits = self.initial_traits.copy()
+        self.personality_sliders = {}
+        self.personality_labels = {}
+        self.personality_preset_var = ctk.StringVar()
 
-        ctk.CTkLabel(self.tab_theme_builder, text="Theme Builder", font=title_font).pack(pady=10)
+        # Preset management frame
+        preset_frame = ctk.CTkFrame(self.tab_personality)
+        preset_frame.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(preset_frame, text="Presets:").pack(side="left", padx=5)
+        self.personality_preset_menu = ctk.CTkComboBox(preset_frame, variable=self.personality_preset_var, command=self.load_personality_preset)
+        self.personality_preset_menu.pack(side="left", expand=True, fill="x", padx=5)
 
-        # Main frame for the builder
-        main_frame = ctk.CTkFrame(self.tab_theme_builder)
-        main_frame.pack(expand=True, fill="both", padx=20, pady=10)
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=1)
+        save_preset_button = ctk.CTkButton(preset_frame, text="Save Preset", width=100, command=self.save_personality_preset)
+        save_preset_button.pack(side="left", padx=5)
 
-        # Left side for color pickers
-        left_frame = ctk.CTkScrollableFrame(main_frame, label_text="Color Settings")
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.personality_main_frame = ctk.CTkScrollableFrame(self.tab_personality, label_text="Active Traits")
+        self.personality_main_frame.pack(expand=True, fill="both", padx=10, pady=0)
 
-        # Right side for preview
-        right_frame = ctk.CTkFrame(main_frame)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
-
-        # --- Theme Management ---
-        manage_frame = ctk.CTkFrame(left_frame)
-        manage_frame.pack(fill="x", padx=10, pady=10)
-
-        self.theme_selector_combo = ctk.CTkComboBox(manage_frame, values=self.theme_manager.get_theme_names(), command=self.load_selected_theme)
-        self.theme_selector_combo.pack(side="left", expand=True, fill="x", padx=(0,5))
-        Tooltip(self.theme_selector_combo, "Select a theme to edit or delete.")
-
-        delete_button = ctk.CTkButton(manage_frame, text="Delete", width=60, command=self.delete_selected_theme)
-        delete_button.pack(side="left")
-        Tooltip(delete_button, "Deletes the currently selected theme.")
-
-        # --- Color Pickers ---
-        ctk.CTkLabel(left_frame, text="Theme Name:", font=font).pack(anchor="w", padx=10, pady=(10, 0))
-        self.theme_name_entry = ctk.CTkEntry(left_frame, font=font)
-        self.theme_name_entry.pack(fill="x", padx=10, pady=(0, 10))
-
-        self.color_widgets = {}
-        color_labels = {
-            "primary": "Primary", "accent": "Accent", "button_hover": "Button Hover",
-            "success": "Success", "warning": "Warning", "error": "Error", "info": "Info",
-            "frame_bg": "Frame BG", "textbox_bg": "Textbox BG", "textbox_fg": "Textbox FG",
-            "label_text": "Label Text", "system_text": "System Text", "user_text": "User Text",
-            "assistant_text": "Assistant Text", "thinking_text": "Thinking Text",
-            "display_text_color": "Display Text", "border_color": "Border Color"
-        }
-
-        for key, label_text in color_labels.items():
-            container = ctk.CTkFrame(left_frame)
-            container.pack(fill="x", padx=10, pady=4)
-
-            ctk.CTkLabel(container, text=label_text, font=font, width=120, anchor="w").pack(side="left", padx=5)
-
-            hex_label = ctk.CTkLabel(container, text="#000000", font=font, width=70)
-            hex_label.pack(side="left", padx=5)
-
-            color_swatch = ctk.CTkFrame(container, fg_color="#000000", width=100, height=25, corner_radius=3, border_width=1)
-            color_swatch.pack(side="left", padx=10, fill="x", expand=True)
-
-            self.color_widgets[key] = {'label': hex_label, 'swatch': color_swatch}
-
-            # Bind click events to both swatch and label for better UX
-            for widget in [color_swatch, hex_label]:
-                widget.bind("<Button-1>", lambda e, k=key: self.choose_color(k))
-
-        # --- Buttons ---
-        button_frame = ctk.CTkFrame(left_frame)
+        # Bottom button frame
+        button_frame = ctk.CTkFrame(self.tab_personality)
         button_frame.pack(fill="x", padx=10, pady=10)
 
-        apply_theme_button = ctk.CTkButton(button_frame, text="Apply", font=font, command=self.apply_preview_theme)
-        apply_theme_button.pack(side="left", padx=10)
-        Tooltip(apply_theme_button, "Apply the current theme settings for preview.")
+        apply_button = ctk.CTkButton(button_frame, text="Apply Changes", command=self.apply_personality_changes)
+        apply_button.pack(side="right")
 
-        save_theme_button = ctk.CTkButton(button_frame, text="Save Theme", font=font, command=self.save_theme)
-        save_theme_button.pack(side="right", padx=10)
-        Tooltip(save_theme_button, self.parent_app.tooltips.get("save_theme_button", ""))
+        self.populate_personality_sliders()
+        self.populate_personality_presets()
 
-        # --- Advanced Preview Area ---
-        self.preview_frame = ctk.CTkFrame(right_frame, border_width=2)
-        self.preview_frame.pack(expand=True, fill="both", padx=10, pady=10)
-
-        ctk.CTkLabel(self.preview_frame, text="Theme Preview", font=title_font).pack(pady=5)
-
-        self.preview_widgets = {}
-
-        # Label
-        self.preview_widgets["label"] = ctk.CTkLabel(self.preview_frame, text="This is a label.")
-        self.preview_widgets["label"].pack(pady=5, padx=10)
-
-        # Button
-        self.preview_widgets["button"] = ctk.CTkButton(self.preview_frame, text="Click Me")
-        self.preview_widgets["button"].pack(pady=5, padx=10)
-
-        # Textbox
-        self.preview_widgets["textbox"] = ctk.CTkTextbox(self.preview_frame, height=50)
-        self.preview_widgets["textbox"].insert("0.0", "This is a textbox for longer text.\nIt can have multiple lines.")
-        self.preview_widgets["textbox"].pack(pady=5, padx=10, fill="x")
-
-        # ComboBox
-        self.preview_widgets["combobox"] = ctk.CTkComboBox(self.preview_frame, values=["Option 1", "Option 2"])
-        self.preview_widgets["combobox"].pack(pady=5, padx=10)
-
-        # ProgressBar
-        self.preview_widgets["progressbar"] = ctk.CTkProgressBar(self.preview_frame)
-        self.preview_widgets["progressbar"].set(0.7)
-        self.preview_widgets["progressbar"].pack(pady=5, padx=10, fill="x")
-
-        # Switch
-        self.preview_widgets["switch"] = ctk.CTkSwitch(self.preview_frame, text="A switch")
-        self.preview_widgets["switch"].pack(pady=5, padx=10)
-        self.preview_widgets["switch"].select()
-
-    def choose_color(self, key):
-        """Opens a color chooser and updates the widgets for the given color key."""
-        initial_color = self.color_widgets[key]['label'].cget("text")
-        color_code = colorchooser.askcolor(initialcolor=initial_color, title="Choose color")
-        if color_code and color_code[1]:
-            new_color = color_code[1]
-            self.color_widgets[key]['label'].configure(text=new_color)
-            self.color_widgets[key]['swatch'].configure(fg_color=new_color)
-            self.preview_theme()
-
-    def apply_preview_theme(self):
-        """Applies the current settings in the theme builder for a live preview."""
-        theme_name = self.theme_name_entry.get()
-        if not theme_name:
-            # Maybe show a small error label? For now, just print.
-            print("Please enter a theme name to apply a preview.")
-            return
-
-        # 1. Collect the colors from the widgets
-        preview_colors = {key: widgets['label'].cget("text") for key, widgets in self.color_widgets.items()}
-
-        # 2. Update the theme manager's state directly
-        self.theme_manager.current_theme_name = f"{theme_name} (Preview)"
-        self.theme_manager.current_colors = preview_colors
-        # Note: We are not changing the appearance mode here, just colors.
-
-        # 3. Trigger the main application to re-apply the theme from the manager's current state
-        self.parent_app.apply_color_theme()
-
-        # 4. Also re-apply to the settings dialog itself
-        self.apply_theme()
-
-        self.parent_app.update_status(f"Previewing theme: {theme_name}", LYRN_INFO)
-
-    def preview_theme(self):
-        """Updates the advanced preview area with the current colors."""
-        colors = {key: widgets['label'].cget("text") for key, widgets in self.color_widgets.items()}
-
-        # Get all the colors with fallbacks
-        primary = colors.get("primary", "#007BFF")
-        accent = colors.get("accent", "#28A745")
-        frame_bg = colors.get("frame_bg", "#F8F9FA")
-        textbox_bg = colors.get("textbox_bg", "#FFFFFF")
-        textbox_fg = colors.get("textbox_fg", "#212529")
-        label_text = colors.get("label_text", "#495057")
-        border = colors.get("border_color", "#DEE2E6")
-        # A reasonable default for button text color is the textbox background
-        button_text_color = colors.get("textbox_bg", "#FFFFFF")
-
-
-        # Apply colors to preview widgets
-        self.preview_frame.configure(fg_color=frame_bg, border_color=accent)
-
-        self.preview_widgets["label"].configure(text_color=label_text)
-        self.preview_widgets["button"].configure(fg_color=primary, text_color=button_text_color)
-        self.preview_widgets["textbox"].configure(fg_color=textbox_bg, text_color=textbox_fg, border_color=border)
-        self.preview_widgets["combobox"].configure(fg_color=textbox_bg, text_color=textbox_fg, border_color=border, button_color=primary)
-        self.preview_widgets["progressbar"].configure(progress_color=primary)
-        self.preview_widgets["switch"].configure(progress_color=accent, text_color=label_text)
-
-
-    def load_selected_theme(self, theme_name: str):
-        """Loads a theme's properties into the editor fields."""
-        if not theme_name or theme_name not in self.theme_manager.themes:
-            return
-
-        theme_data = self.theme_manager.themes[theme_name]
-
-        self.theme_name_entry.delete(0, "end")
-        self.theme_name_entry.insert(0, theme_data.get("name", ""))
-
-        theme_colors = theme_data.get("colors", {})
-        for key, widgets in self.color_widgets.items():
-            color = theme_colors.get(key, "#ffffff")
-            widgets['label'].configure(text=color)
-            widgets['swatch'].configure(fg_color=color)
-
-        self.preview_theme()
-        self.parent_app.update_status(f"Loaded '{theme_name}' for editing", LYRN_INFO)
-
-    def delete_selected_theme(self):
-        """Deletes the currently selected theme."""
-        theme_name = self.theme_selector_combo.get()
-        if not theme_name or theme_name not in self.theme_manager.themes:
-            return
-
-        # Simple confirmation dialog
-        dialog = ctk.CTkInputDialog(text=f"Type DELETE to confirm deleting theme '{theme_name}':", title="Confirm Deletion")
-        confirmation = dialog.get_input()
-
-        if confirmation != "DELETE":
-            self.parent_app.update_status("Theme deletion cancelled", LYRN_WARNING)
-            return
-
-        filename = f"{theme_name.lower().replace(' ', '_')}.json"
-        filepath = os.path.join(self.theme_manager.themes_dir, filename)
-
-        if os.path.exists(filepath):
+    def _load_personality_data(self):
+        """Loads personality data from the JSON file."""
+        if self.personality_file.exists():
             try:
-                os.remove(filepath)
-                self.theme_manager.load_available_themes()
-
-                new_theme_names = self.theme_manager.get_theme_names()
-                self.theme_selector_combo.configure(values=new_theme_names)
-                self.parent_app.theme_dropdown.configure(values=new_theme_names)
-
-                safe_theme = new_theme_names[0] if new_theme_names else "LYRN Dark"
-                self.theme_selector_combo.set(safe_theme)
-                self.parent_app.theme_dropdown.set(safe_theme)
-                self.parent_app.on_theme_selected(safe_theme)
-
-                self.parent_app.update_status(f"Theme '{theme_name}' deleted", LYRN_SUCCESS)
-            except Exception as e:
-                self.parent_app.update_status(f"Error deleting theme: {e}", LYRN_ERROR)
+                with open(self.personality_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Error loading or parsing personality.json: {e}. Using default values.")
+                return {"presets": {}, "active_traits": {"creativity": 500}}
         else:
-            self.parent_app.update_status(f"Theme file not found for '{theme_name}'", LYRN_ERROR)
+            print("Warning: personality.json not found. Creating with default values.")
+            default_data = {
+                "presets": {
+                    "Default": {
+                        "description": "The standard, balanced LYRN personality.",
+                        "traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
+                    }
+                },
+                "active_traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
+            }
+            try:
+                with open(self.personality_file, 'w', encoding='utf-8') as f:
+                    json.dump(default_data, f, indent=2)
+            except IOError as e:
+                print(f"Error creating default personality.json: {e}")
+            return default_data
 
-    def save_theme(self):
-        """Saves the current theme to a JSON file."""
-        theme_name = self.theme_name_entry.get()
-        if not theme_name:
-            # TODO: Show an error message
-            return
-
-        theme_data = {
-            "name": theme_name,
-            "appearance_mode": "dark", # TODO: Add a way to select this
-            "colors": {}
-        }
-
-        for key, widgets in self.color_widgets.items():
-            theme_data["colors"][key] = widgets['label'].cget("text")
-
-        themes_dir = os.path.join(SCRIPT_DIR, "themes")
-        os.makedirs(themes_dir, exist_ok=True)
-
-        filename = f"{theme_name.lower().replace(' ', '_')}.json"
-        filepath = os.path.join(themes_dir, filename)
-
+    def _save_personality_data(self):
+        """Saves the current personality data to the JSON file."""
         try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(theme_data, f, indent=4)
+            with open(self.personality_file, 'w', encoding='utf-8') as f:
+                json.dump(self.personality_data, f, indent=2)
+        except IOError as e:
+            print(f"Error saving personality file: {e}")
 
-            # Refresh themes and update all dropdowns
-            self.parent_app.theme_manager.load_available_themes()
-            new_theme_names = self.parent_app.theme_manager.get_theme_names()
+    def populate_personality_sliders(self):
+        """Creates or updates sliders based on the data in active_traits."""
+        for widget in self.personality_main_frame.winfo_children():
+            widget.destroy()
 
-            self.parent_app.theme_dropdown.configure(values=new_theme_names)
-            self.theme_selector_combo.configure(values=new_theme_names)
+        for trait, value in self.current_traits.items():
+            frame = ctk.CTkFrame(self.personality_main_frame)
+            frame.pack(fill="x", pady=5, padx=5)
 
-            # Select the newly saved theme
-            self.parent_app.theme_dropdown.set(theme_name)
-            self.theme_selector_combo.set(theme_name)
+            label_text = f"{trait.capitalize()}: {value}"
+            label = ctk.CTkLabel(frame, text=label_text, width=150, anchor="w")
+            label.pack(side="left", padx=10)
+            self.personality_labels[trait] = label
 
-            self.parent_app.update_status(f"Theme '{theme_name}' saved", LYRN_SUCCESS)
-        except Exception as e:
-            print(f"Error saving theme: {e}")
-            self.parent_app.update_status("Error saving theme", LYRN_ERROR)
+            slider = ctk.CTkSlider(frame, from_=0, to=1000, number_of_steps=1000,
+                                   command=lambda v, t=trait: self._on_personality_slider_change(t, v))
+            slider.set(value)
+            slider.pack(side="left", expand=True, fill="x", padx=10)
+            self.personality_sliders[trait] = slider
+
+    def populate_personality_presets(self):
+        """Populates the preset dropdown menu."""
+        presets = list(self.personality_data.get("presets", {}).keys())
+        self.personality_preset_menu.configure(values=["Custom"] + presets)
+
+        active_preset_name = "Custom"
+        for name, preset_data in self.personality_data.get("presets", {}).items():
+            if preset_data.get("traits") == self.current_traits:
+                active_preset_name = name
+                break
+        self.personality_preset_var.set(active_preset_name)
+
+    def _on_personality_slider_change(self, trait_name: str, new_value: float):
+        """Callback when a slider value changes, updates the label and current_traits."""
+        int_value = int(new_value)
+        self.personality_labels[trait_name].configure(text=f"{trait_name.capitalize()}: {int_value}")
+        self.current_traits[trait_name] = int_value
+        self.populate_personality_presets()
+
+    def apply_personality_changes(self):
+        """Applies the changes made to the sliders."""
+        changes_applied = False
+        for trait, value in self.current_traits.items():
+            if self.initial_traits.get(trait) != value:
+                print(f"Delta: {trait} changed from {self.initial_traits.get(trait)} to {value}")
+                self.parent_app.delta_manager.create_delta(
+                    "P-001", "personality", "traits", "update",
+                    trait, str(value)
+                )
+                changes_applied = True
+
+        if changes_applied:
+            self.personality_data["active_traits"] = self.current_traits
+            self._save_personality_data()
+            self.initial_traits = self.current_traits.copy()
+            self.parent_app.update_status("Personality changes applied.", LYRN_SUCCESS)
+        else:
+            self.parent_app.update_status("No changes to apply.", LYRN_INFO)
+
+    def load_personality_preset(self, preset_name: str):
+        """Loads a selected preset's traits into the active sliders."""
+        if preset_name == "Custom":
+            return
+        preset_traits = self.personality_data.get("presets", {}).get(preset_name, {}).get("traits")
+        if preset_traits:
+            self.current_traits = preset_traits.copy()
+            self.populate_personality_sliders()
+            self.populate_personality_presets()
+
+    def save_personality_preset(self):
+        """Saves the current active traits as a new preset."""
+        dialog = ctk.CTkInputDialog(text="Enter a name for the new preset:", title="Save Preset")
+        preset_name = dialog.get_input()
+
+        if preset_name and preset_name not in ["Custom"]:
+            self.personality_data["presets"][preset_name] = {
+                "description": "User-saved preset.",
+                "traits": self.current_traits.copy()
+            }
+            self._save_personality_data()
+            self.populate_personality_presets()
+            self.personality_preset_var.set(preset_name)
 
     def update_prompt_file_list(self):
         """Reads the master index and displays it in the draggable list."""
@@ -1772,6 +1681,111 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
                 print(f"Error saving mode: {e}")
                 self.parent_app.update_status(f"Error saving mode", LYRN_ERROR)
 
+    def update_modes_list(self):
+        """Scans the modes directory and populates the listbox."""
+        for widget in self.modes_listbox.winfo_children():
+            widget.destroy()
+
+        self.selected_mode_label = None
+        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
+        if not os.path.exists(modes_dir):
+            ctk.CTkLabel(self.modes_listbox, text="No 'modes' directory found.").pack()
+            return
+
+        try:
+            mode_files = [f for f in os.listdir(modes_dir) if f.endswith(".txt")]
+            mode_names = [os.path.splitext(f)[0] for f in mode_files]
+
+            if not mode_names:
+                ctk.CTkLabel(self.modes_listbox, text="No modes saved yet.").pack()
+                return
+
+            for mode_name in sorted(mode_names):
+                label = ctk.CTkLabel(self.modes_listbox, text=mode_name, anchor="w", cursor="hand2")
+                label.pack(fill="x", padx=10, pady=2)
+                label.bind("<Button-1>", lambda e, l=label: self._on_mode_selected(l))
+
+        except Exception as e:
+            print(f"Error loading modes: {e}")
+            ctk.CTkLabel(self.modes_listbox, text="Error loading modes.").pack()
+
+    def _on_mode_selected(self, selected_label):
+        """Handles the selection of a mode in the list."""
+        # Reset color of previously selected label
+        for child in self.modes_listbox.winfo_children():
+            if isinstance(child, ctk.CTkLabel):
+                 child.configure(fg_color="transparent")
+
+        # Highlight the new selection
+        selected_label.configure(fg_color=self.theme_manager.get_color("accent"))
+        self.selected_mode_label = selected_label
+
+    def load_selected_mode(self):
+        """Loads the content of the selected mode into the master prompt."""
+        if not self.selected_mode_label:
+            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
+            return
+
+        mode_name = self.selected_mode_label.cget("text")
+        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
+        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
+
+        if not os.path.exists(mode_filepath):
+            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
+            self.update_modes_list()
+            return
+
+        try:
+            with open(mode_filepath, 'r', encoding='utf-8') as f:
+                mode_content = f.read()
+
+            master_prompt_path = self.parent_app.snapshot_loader.master_prompt_path
+            with open(master_prompt_path, 'w', encoding='utf-8') as f:
+                f.write(mode_content)
+
+            # After loading, we need to refresh the prompt index and the draggable list
+            self.refresh_prompt_index()
+
+            self.parent_app.update_status(f"Mode '{mode_name}' loaded successfully.", LYRN_SUCCESS)
+
+        except Exception as e:
+            print(f"Error loading mode '{mode_name}': {e}")
+            self.parent_app.update_status(f"Error loading mode.", LYRN_ERROR)
+
+    def delete_selected_mode(self):
+        """Deletes the selected mode file."""
+        if not self.selected_mode_label:
+            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
+            return
+
+        mode_name = self.selected_mode_label.cget("text")
+
+        dialog = ctk.CTkInputDialog(text=f"Type DELETE to confirm deleting mode '{mode_name}':", title="Confirm Deletion")
+        confirmation = dialog.get_input()
+
+        if confirmation != "DELETE":
+            self.parent_app.update_status("Mode deletion cancelled.", LYRN_INFO)
+            return
+
+        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
+        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
+
+        if not os.path.exists(mode_filepath):
+            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
+            self.update_modes_list()
+            return
+
+        try:
+            os.remove(mode_filepath)
+            self.parent_app.update_status(f"Mode '{mode_name}' deleted.", LYRN_SUCCESS)
+            self.update_modes_list()
+            # Also refresh the main UI dropdown
+            if hasattr(self.parent_app, 'update_modes_dropdown'):
+                self.parent_app.update_modes_dropdown()
+        except Exception as e:
+            print(f"Error deleting mode '{mode_name}': {e}")
+            self.parent_app.update_status(f"Error deleting mode.", LYRN_ERROR)
+
     def load_current_settings(self):
         """Load current settings into all tabs"""
         if not self.settings_manager.settings:
@@ -1781,10 +1795,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         active = settings.get("active", {})
         paths = settings.get("paths", {})
 
-        # Load model settings
-        self.model_path_entry.insert(0, active.get("model_path", ""))
-        for key, entry in self.model_entries.items():
-            entry.insert(0, str(active.get(key, "")))
+        # Model settings are managed in the main UI now.
 
         # Load paths
         for key, entry in self.path_entries.items():
@@ -1796,6 +1807,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         self.autoload_model_var.set(self.settings_manager.ui_settings.get("autoload_model", False))
         self.llm_log_visible_var.set(self.settings_manager.ui_settings.get("llm_log_visible", False))
         self.llm_log_on_top_var.set(self.settings_manager.ui_settings.get("llm_log_on_top", False))
+        self.terminal_start_path_entry.insert(0, self.settings_manager.ui_settings.get("terminal_start_path", ""))
 
     def apply_theme(self):
         """Applies the current theme colors to all widgets in this dialog."""
@@ -1959,14 +1971,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
 
             settings = self.settings_manager.settings.copy()
 
-            # Save model settings
-            settings["active"]["model_path"] = self.model_path_entry.get()
-            for key, entry in self.model_entries.items():
-                value = entry.get()
-                if key in ["temperature", "top_p"]:
-                    settings["active"][key] = float(value) if value else 0.0
-                else:
-                    settings["active"][key] = int(value) if value else 0
+            # Model settings are managed in the main UI now.
 
             # Save paths
             for key, entry in self.path_entries.items():
@@ -1978,6 +1983,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
             self.settings_manager.ui_settings["llm_log_visible"] = self.llm_log_visible_var.get()
             self.settings_manager.ui_settings["llm_log_on_top"] = self.llm_log_on_top_var.get()
             self.settings_manager.ui_settings["language"] = self.language_var.get()
+            self.settings_manager.ui_settings["terminal_start_path"] = self.terminal_start_path_entry.get()
 
 
             # Save all settings
@@ -1988,188 +1994,6 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
 
         except Exception as e:
             print(f"Error saving settings: {e}")
-
-class PersonalityPopup(ctk.CTkToplevel):
-    """A popup window for adjusting personality traits with sliders."""
-
-    def __init__(self, parent, delta_manager):
-        super().__init__(parent)
-        self.parent_app = parent
-        self.delta_manager = delta_manager
-        self.personality_file = Path(SCRIPT_DIR) / "personality.json"
-        self.data = self._load_data()
-
-        self.title("Personality Sliders")
-        self.geometry("450x550")
-        self.transient(parent)
-        # self.grab_set() # Removed to allow other windows to be opened
-
-        self.initial_traits = self.data.get("active_traits", {}).copy()
-        self.current_traits = self.initial_traits.copy()
-
-        self.sliders = {}
-        self.labels = {}
-        self.preset_var = ctk.StringVar()
-
-        self.create_widgets()
-        self.populate_sliders()
-        self.populate_presets()
-
-    def _load_data(self):
-        """Loads personality data from the JSON file."""
-        if self.personality_file.exists():
-            try:
-                with open(self.personality_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading or parsing personality.json: {e}. Using default values.")
-                return {"presets": {}, "active_traits": {"creativity": 500}}
-        else:
-            print("Warning: personality.json not found. Creating with default values.")
-            default_data = {
-                "presets": {
-                    "Default": {
-                        "description": "The standard, balanced LYRN personality.",
-                        "traits": {
-                            "creativity": 500,
-                            "consistency": 750,
-                            "verbosity": 400,
-                            "assertiveness": 600,
-                            "curiosity": 800
-                        }
-                    }
-                },
-                "active_traits": {
-                    "creativity": 500,
-                    "consistency": 750,
-                    "verbosity": 400,
-                    "assertiveness": 600,
-                    "curiosity": 800
-                }
-            }
-            try:
-                with open(self.personality_file, 'w', encoding='utf-8') as f:
-                    json.dump(default_data, f, indent=2)
-            except IOError as e:
-                print(f"Error creating default personality.json: {e}")
-            return default_data
-
-    def _save_data(self):
-        """Saves the current personality data to the JSON file."""
-        try:
-            with open(self.personality_file, 'w', encoding='utf-8') as f:
-                json.dump(self.data, f, indent=2)
-        except IOError as e:
-            print(f"Error saving personality file: {e}")
-
-    def create_widgets(self):
-        """Create the main widgets for the popup."""
-        # Preset management frame
-        preset_frame = ctk.CTkFrame(self)
-        preset_frame.pack(fill="x", padx=10, pady=10)
-        ctk.CTkLabel(preset_frame, text="Presets:").pack(side="left", padx=5)
-        self.preset_menu = ctk.CTkComboBox(preset_frame, variable=self.preset_var, command=self.load_preset)
-        self.preset_menu.pack(side="left", expand=True, fill="x", padx=5)
-
-        save_preset_button = ctk.CTkButton(preset_frame, text="Save", width=60, command=self.save_preset)
-        save_preset_button.pack(side="left", padx=5)
-
-        self.main_frame = ctk.CTkScrollableFrame(self, label_text="Active Traits")
-        self.main_frame.pack(expand=True, fill="both", padx=10, pady=0)
-
-        # Bottom button frame
-        button_frame = ctk.CTkFrame(self)
-        button_frame.pack(fill="x", padx=10, pady=10)
-
-        ctk.CTkButton(button_frame, text="Cancel", command=self.destroy).pack(side="right", padx=(10,0))
-        ctk.CTkButton(button_frame, text="Apply", command=self.apply_changes).pack(side="right")
-
-
-    def populate_sliders(self):
-        """Creates or updates sliders based on the data in active_traits."""
-        for widget in self.main_frame.winfo_children():
-            widget.destroy()
-
-        for trait, value in self.current_traits.items():
-            frame = ctk.CTkFrame(self.main_frame)
-            frame.pack(fill="x", pady=5, padx=5)
-
-            label_text = f"{trait.capitalize()}: {value}"
-            label = ctk.CTkLabel(frame, text=label_text, width=150, anchor="w")
-            label.pack(side="left", padx=10)
-            self.labels[trait] = label
-
-            slider = ctk.CTkSlider(frame, from_=0, to=1000, number_of_steps=1000,
-                                   command=lambda v, t=trait: self._on_slider_change(t, v))
-            slider.set(value)
-            slider.pack(side="left", expand=True, fill="x", padx=10)
-            self.sliders[trait] = slider
-
-    def populate_presets(self):
-        """Populates the preset dropdown menu."""
-        presets = list(self.data.get("presets", {}).keys())
-        self.preset_menu.configure(values=["Custom"] + presets)
-
-        active_preset_name = "Custom"
-        for name, preset_data in self.data.get("presets", {}).items():
-            if preset_data.get("traits") == self.current_traits:
-                active_preset_name = name
-                break
-        self.preset_var.set(active_preset_name)
-
-    def _on_slider_change(self, trait_name: str, new_value: float):
-        """Callback when a slider value changes, updates the label and current_traits."""
-        int_value = int(new_value)
-        self.labels[trait_name].configure(text=f"{trait_name.capitalize()}: {int_value}")
-        self.current_traits[trait_name] = int_value
-        self.populate_presets()
-
-    def apply_changes(self):
-        """Applies the changes made to the sliders and keeps the window open."""
-        changes_applied = False
-        for trait, value in self.current_traits.items():
-            if self.initial_traits.get(trait) != value:
-                print(f"Delta: {trait} changed from {self.initial_traits.get(trait)} to {value}")
-                self.delta_manager.create_delta(
-                    "P-001", "personality", "traits", "update",
-                    trait, str(value)
-                )
-                changes_applied = True
-
-        if changes_applied:
-            self.data["active_traits"] = self.current_traits
-            self._save_data()
-            # Update the initial traits to the newly applied ones
-            self.initial_traits = self.current_traits.copy()
-            self.parent_app.update_status("Personality changes applied.", LYRN_SUCCESS)
-        else:
-            self.parent_app.update_status("No changes to apply.", LYRN_INFO)
-        # self.destroy() is removed to keep the window open
-
-    def load_preset(self, preset_name: str):
-        """Loads a selected preset's traits into the active sliders."""
-        if preset_name == "Custom":
-            return
-        preset_traits = self.data.get("presets", {}).get(preset_name, {}).get("traits")
-        if preset_traits:
-            self.current_traits = preset_traits.copy()
-            self.populate_sliders()
-            self.populate_presets()
-
-    def save_preset(self):
-        """Saves the current active traits as a new preset."""
-        dialog = ctk.CTkInputDialog(text="Enter a name for the new preset:", title="Save Preset")
-        preset_name = dialog.get_input()
-
-        if preset_name and preset_name not in ["Custom"]:
-            self.data["presets"][preset_name] = {
-                "description": "User-saved preset.",
-                "traits": self.current_traits.copy()
-            }
-            self._save_data()
-            self.populate_presets()
-            self.preset_var.set(preset_name)
-
 
 class ThemeBuilderPopup(ctk.CTkToplevel):
     """A popup window for creating and editing themes."""
@@ -2865,9 +2689,11 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.clear_chat_folder_button.pack(padx=10, pady=3, fill="x")
         Tooltip(self.clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
 
-        self.personality_button = ctk.CTkButton(self.quick_frame, text="🧠 Personality", command=self.open_personality_popup)
-        self.personality_button.pack(fill="x", padx=10, pady=3)
-        Tooltip(self.personality_button, "Adjust the AI's personality traits.")
+        # self.personality_button moved to settings
+
+        self.terminal_button = ctk.CTkButton(self.quick_frame, text="📟 Code Terminal", command=self.open_terminal)
+        self.terminal_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.terminal_button, "Opens a new terminal in the specified directory.")
 
         # Add a spacer to push content to the top
         spacer = ctk.CTkFrame(self.left_sidebar, fg_color="transparent")
@@ -2929,22 +2755,22 @@ class LyrnAIInterface(ctk.CTkToplevel):
                                         font=normal_font)
         self.prompt_label.pack(pady=2)
 
-        # Generation speed with visual indicator
-        gen_frame = ctk.CTkFrame(self.metrics_frame)
-        gen_frame.pack(fill="x", padx=10, pady=2)
-
-        self.eval_label = ctk.CTkLabel(gen_frame, text="Generation: 0 tok/s",
+        # Generation speed
+        self.eval_label = ctk.CTkLabel(self.metrics_frame, text="Generation: 0 tok/s",
                                      font=normal_font)
-        self.eval_label.pack(side="left", padx=5)
-
-        self.speed_indicator = ctk.CTkLabel(gen_frame, text="●",
-                                          font=("Arial", 16), text_color="#666666")
-        self.speed_indicator.pack(side="right", padx=5)
+        self.eval_label.pack(pady=2)
 
         # Total tokens
-        self.total_label = ctk.CTkLabel(self.metrics_frame, text="Total: 0 tokens",
+        total_frame = ctk.CTkFrame(self.metrics_frame)
+        total_frame.pack(fill="x", padx=10, pady=2)
+
+        self.total_label = ctk.CTkLabel(total_frame, text="Total: 0 tokens",
                                        font=normal_font)
-        self.total_label.pack(pady=2)
+        self.total_label.pack(side="left", padx=5)
+
+        self.total_progress = ctk.CTkProgressBar(total_frame, width=100, height=8)
+        self.total_progress.pack(side="right", padx=5)
+        self.total_progress.set(0)
 
         # Save metrics button
         ctk.CTkButton(self.metrics_frame, text="💾 Save Metrics",
@@ -3034,7 +2860,15 @@ class LyrnAIInterface(ctk.CTkToplevel):
             status_font = ("Consolas", 12, "bold")
             normal_font = ("Consolas", self.current_font_size)
 
-        ctk.CTkLabel(self.status_frame, text="System Status", font=section_font).pack(pady=(10, 5))
+        # Frame for title and status light
+        title_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
+        title_frame.pack(pady=(10, 5))
+
+        ctk.CTkLabel(title_frame, text="System Status", font=section_font).pack(side="left", padx=(0, 10))
+
+        self.model_status_progress_bar = ctk.CTkProgressBar(title_frame, width=80, height=15)
+        self.model_status_progress_bar.set(1) # Set to 100%
+        self.model_status_progress_bar.pack(side="left")
 
         # Restored textbox for general status messages
         self.status_textbox = ctk.CTkTextbox(self.status_frame, height=50, wrap="char", font=status_font)
@@ -3042,25 +2876,18 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.status_textbox.insert("end", "System ready.")
         self.status_textbox.configure(state="disabled")
 
-        # New model status indicator section
-        model_status_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
-        model_status_frame.pack(fill="x", pady=5)
+        # New frame for the buttons
+        button_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=5)
 
-        self.model_status_label = ctk.CTkLabel(model_status_frame, text="Model Status:", font=status_font)
-        self.model_status_label.pack(side="left", padx=(0, 10))
-
-        self.model_status_progress_bar = ctk.CTkProgressBar(model_status_frame, width=100, height=15)
-        self.model_status_progress_bar.set(1) # Set to 100%
-        self.model_status_progress_bar.pack(side="left")
-
-        # Model Control Buttons
-        self.load_model_button = ctk.CTkButton(model_status_frame, text="Load", width=50, font=normal_font, command=self.reload_model_full)
-        self.load_model_button.pack(side="right", padx=(5, 0))
-        Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
-
-        self.offload_model_button = ctk.CTkButton(model_status_frame, text="Offload", width=50, font=normal_font, command=self.offload_model)
-        self.offload_model_button.pack(side="right", padx=(5, 0))
+        # Model Control Buttons that fill the space
+        self.offload_model_button = ctk.CTkButton(button_frame, text="Offload", font=normal_font, command=self.offload_model)
+        self.offload_model_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         Tooltip(self.offload_model_button, self.tooltips.get("offload_model_button", ""))
+
+        self.load_model_button = ctk.CTkButton(button_frame, text="Load", font=normal_font, command=self.reload_model_full)
+        self.load_model_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
+        Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
 
         # Loading Progress Bar (hidden by default)
         self.loading_progressbar = ctk.CTkProgressBar(self.status_frame, mode='indeterminate')
@@ -3331,14 +3158,34 @@ Enhanced LYRN-AI system with advanced features active.
             else:
                 self.update_status("Failed to save metrics", LYRN_ERROR)
 
-    def open_personality_popup(self):
-        """Opens the personality editor popup."""
-        if not hasattr(self, 'personality_popup') or not self.personality_popup.winfo_exists():
-            self.personality_popup = PersonalityPopup(self, self.delta_manager)
-            self.personality_popup.focus()
-        else:
-            self.personality_popup.lift()
-            self.personality_popup.focus()
+    # open_personality_popup removed, functionality moved to settings dialog
+
+    def open_terminal(self):
+        """Opens a new terminal window in the specified path."""
+        start_path = self.settings_manager.ui_settings.get("terminal_start_path", SCRIPT_DIR)
+        if not os.path.isdir(start_path):
+            start_path = SCRIPT_DIR
+            self.update_status(f"Terminal path not found, defaulting to script dir.", LYRN_WARNING)
+
+        try:
+            if sys.platform == "win32":
+                subprocess.Popen(f'start cmd', shell=True, cwd=start_path)
+            elif sys.platform == "darwin":
+                # For macOS, 'open -a Terminal .' works well from a specific directory
+                subprocess.Popen(['open', '-a', 'Terminal', start_path])
+            else:  # Assuming Linux
+                try:
+                    # Tries to open gnome-terminal, common on many Linux distros
+                    subprocess.Popen(['gnome-terminal', '--working-directory', start_path])
+                except FileNotFoundError:
+                    try:
+                        # Fallback to xterm, which is more likely to be installed
+                        subprocess.Popen(['xterm', '-e', f'cd "{start_path}" && bash'])
+                    except FileNotFoundError:
+                        self.update_status("Could not find a terminal to open.", LYRN_ERROR)
+        except Exception as e:
+            self.update_status(f"Failed to open terminal: {e}", LYRN_ERROR)
+            print(f"Failed to open terminal: {e}")
 
     def open_settings(self):
         """Open enhanced tabbed settings dialog"""
@@ -3596,7 +3443,7 @@ Enhanced LYRN-AI system with advanced features active.
 
         chat_dir = self.settings_manager.settings["paths"].get("chat", "")
         if not chat_dir:
-            log("Chat directory not configured in settings.")
+            print("Chat directory not configured in settings.")
             return None
 
         os.makedirs(chat_dir, exist_ok=True)
@@ -3723,20 +3570,14 @@ Enhanced LYRN-AI system with advanced features active.
             self.eval_label.configure(text=f"Generation: {self.metrics.eval_speed:.1f} tok/s")
             self.total_label.configure(text=f"Total: {self.metrics.total_tokens:,} tokens")
 
-            # Update progress bar for KV cache (normalize to reasonable range)
-            if self.metrics.total_tokens > 0:
-                kv_ratio = min(self.metrics.kv_cache_reused / self.metrics.total_tokens, 1.0)
+            # Update progress bar for KV cache and Total Tokens
+            n_ctx = self.settings_manager.settings.get("active", {}).get("n_ctx", 1)
+            if n_ctx > 0:
+                kv_ratio = min(self.metrics.kv_cache_reused / n_ctx, 1.0)
                 self.kv_progress.set(kv_ratio)
 
-            # Update speed indicator color based on generation speed
-            if self.metrics.eval_speed > 50:
-                color = LYRN_SUCCESS  # Fast
-            elif self.metrics.eval_speed > 20:
-                color = LYRN_WARNING  # Medium
-            else:
-                color = LYRN_ERROR    # Slow
-
-            self.speed_indicator.configure(text_color=color)
+                total_ratio = min(self.metrics.total_tokens / n_ctx, 1.0)
+                self.total_progress.set(total_ratio)
 
         except Exception as e:
             print(f"Error updating metrics: {e}")
@@ -3765,14 +3606,6 @@ Enhanced LYRN-AI system with advanced features active.
             self.status_textbox.delete("1.0", "end")
             self.status_textbox.insert("1.0", message)
             self.status_textbox.configure(state="disabled", text_color=color)
-
-            # Update detailed status labels
-            if self.llm and self.settings_manager.settings:
-                model_path = self.settings_manager.settings.get("active", {}).get("model_path", "N/A")
-                model_name = os.path.basename(model_path) if model_path else "N/A"
-                self.model_status_label.configure(text=f"Model: {model_name}")
-            else:
-                self.model_status_label.configure(text="Model: Not Loaded")
 
         except Exception as e:
             print(f"Error updating status: {e}")
