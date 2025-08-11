@@ -1422,8 +1422,8 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
             with open(master_index_path, 'w', encoding='utf-8') as f:
                 json.dump(new_order, f, indent=2)
             print(f"Master index saved to {master_index_path}")
-            # Rebuild the master prompt file
-            self.parent_app.snapshot_loader.generate_master_index()
+            # Rebuild the master prompt file using the new order
+            self.parent_app.snapshot_loader._build_master_prompt_file(new_order)
             self.parent_app.update_status("Prompt order saved and rebuilt", LYRN_SUCCESS)
         except IOError as e:
             print(f"Error writing master index file {master_index_path}: {e}")
