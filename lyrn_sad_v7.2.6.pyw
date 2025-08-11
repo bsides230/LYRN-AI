@@ -1022,6 +1022,51 @@ class LogViewerPopup(ctk.CTkToplevel):
         finally:
             self.after(100, self.process_log_queue)
 
+
+class StructuredChatLogger:
+    """Handles the creation and appending of structured chat logs for automation."""
+    def __init__(self, chat_dir: str):
+        self.chat_dir = Path(chat_dir)
+        self.chat_dir.mkdir(parents=True, exist_ok=True)
+        self.current_log_path = None
+
+    def start_log(self) -> str:
+        """
+        Starts a new log file with a timestamp and returns the path.
+        """
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"chat_{timestamp}.txt"
+        self.current_log_path = self.chat_dir / filename
+        # Create the file immediately to establish its existence
+        with open(self.current_log_path, 'w', encoding='utf-8') as f:
+            f.write("") # Write an empty string to create the file
+        return str(self.current_log_path)
+
+    def append_log(self, role: str, content: str):
+        """
+        Appends a new section to the current log file.
+        Role can be 'USER', 'THINKING', or 'RESPONSE'.
+        """
+        if not self.current_log_path:
+            print("Error: start_log() must be called before appending.")
+            return
+
+        role_upper = role.upper()
+        start_tag = f"#{role_upper}_START#"
+        end_tag = f"#{role_upper}_END#"
+
+        formatted_content = f"{start_tag}\n{content}\n{end_tag}\n\n"
+
+        try:
+            with open(self.current_log_path, 'a', encoding='utf-8') as f:
+                f.write(formatted_content)
+        except Exception as e:
+            print(f"Error appending to log file {self.current_log_path}: {e}")
+
+    def new_log_session(self):
+        """Resets the current_log_path to ensure the next write starts a new file."""
+        self.current_log_path = None
+
 class ModelSelectorPopup(ctk.CTkToplevel):
     """A popup window to select a model and configure settings on startup."""
     def __init__(self, parent, settings_manager: SettingsManager, theme_manager: ThemeManager):
@@ -2684,6 +2729,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.delta_manager = DeltaManager()
         self.automation_controller = AutomationController()
         self.metrics = EnhancedPerformanceMetrics()
+        self.chat_logger = StructuredChatLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
 
         # Start background services
         self.resource_monitor.start()
@@ -3535,6 +3581,10 @@ Enhanced LYRN-AI system with advanced features active.
             self.update_status("No model loaded", LYRN_ERROR)
             return
 
+        # Start a new structured log for this interaction
+        self.chat_logger.start_log()
+        self.chat_logger.append_log("USER", user_text)
+
         # Display user message
         self.display_colored_message(f"You: {user_text}\n\n", "user_text")
 
@@ -3542,8 +3592,8 @@ Enhanced LYRN-AI system with advanced features active.
         self.input_box.delete("0.0", "end")
         self.send_btn.configure(state="disabled")
 
-        # Save chat message
-        self.save_chat_message("user", user_text)
+        # The old save_chat_message is now deprecated.
+        # self.save_chat_message("user", user_text)
 
         # Display thinking message and start response generation
         self.display_colored_message("Assistant: Thinking...\n\n", "thinking_text")
@@ -3615,43 +3665,45 @@ Enhanced LYRN-AI system with advanced features active.
             # Save complete response
             complete_response = ''.join(response_parts)
             self.last_assistant_response = complete_response
-            self.save_chat_message("assistant", complete_response)
+            self.chat_logger.append_log("RESPONSE", complete_response)
+            # The old save_chat_message is now deprecated.
+            # self.save_chat_message("assistant", complete_response)
 
         except Exception as e:
             self.stream_queue.put(('error', str(e)))
         finally:
             self.stream_queue.put(('enable_send', ''))
 
-    def save_chat_message(self, role: str, content: str) -> Optional[str]:
-        """
-        Saves a chat message to a file in the format expected by the system
-        and returns the full path to the file.
-        """
-        if not self.settings_manager.settings:
-            return None
+    # def save_chat_message(self, role: str, content: str) -> Optional[str]:
+    #     """
+    #     Saves a chat message to a file in the format expected by the system
+    #     and returns the full path to the file.
+    #     """
+    #     if not self.settings_manager.settings:
+    #         return None
 
-        chat_dir = self.settings_manager.settings["paths"].get("chat", "")
-        if not chat_dir:
-            print("Chat directory not configured in settings.")
-            return None
+    #     chat_dir = self.settings_manager.settings["paths"].get("chat", "")
+    #     if not chat_dir:
+    #         print("Chat directory not configured in settings.")
+    #         return None
 
-        os.makedirs(chat_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"chat_{timestamp}.txt"
-        filepath = os.path.join(chat_dir, filename)
+    #     os.makedirs(chat_dir, exist_ok=True)
+    #     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    #     filename = f"chat_{timestamp}.txt"
+    #     filepath = os.path.join(chat_dir, filename)
 
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                if role == "user":
-                    # The 'model' header acts as a marker for where the response begins
-                    f.write(f"user\n{content}\n\nmodel\n")
-                else:
-                    # Assistant messages are just saved directly for logging
-                    f.write(f"assistant\n{content}\n")
-            return filepath
-        except Exception as e:
-            print(f"Error saving chat message: {e}")
-            return None
+    #     try:
+    #         with open(filepath, 'w', encoding='utf-8') as f:
+    #             if role == "user":
+    #                 # The 'model' header acts as a marker for where the response begins
+    #                 f.write(f"user\n{content}\n\nmodel\n")
+    #             else:
+    #                 # Assistant messages are just saved directly for logging
+    #                 f.write(f"assistant\n{content}\n")
+    #         return filepath
+    #     except Exception as e:
+    #         print(f"Error saving chat message: {e}")
+    #         return None
 
     def process_queue(self):
         """Process messages from stream queue with enhanced handling"""
@@ -3677,6 +3729,7 @@ Enhanced LYRN-AI system with advanced features active.
                     elif message[0] == 'thinking':
                         # This handles the model's internal monologue, separate from the UI's "Thinking..."
                         _, thinking_content = message
+                        self.chat_logger.append_log("THINKING", thinking_content)
                         self.display_colored_message(f"🤔 Thinking Log: {thinking_content[:150]}...\n\n", "thinking_text")
 
                     elif message[0] == 'finished':
