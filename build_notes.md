@@ -1,5 +1,17 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.7 - UI Layout and Readability Enhancements (2025-08-11)
+
+This update focuses on improving the main user interface layout for better balance and readability, based on user feedback.
+
+- **Right Sidebar Reorganization:**
+    - The "Job Automation" section has been moved from the left sidebar to the right sidebar, positioned below the "System Resources" block. This consolidates monitoring and action-oriented controls in one place.
+
+- **Cleaner Performance Metrics:**
+    - The layout of the "Performance Metrics" and "System Resources" sections has been updated for improved clarity.
+    - All progress bars are now positioned directly underneath their corresponding labels, creating a cleaner, more organized, and easier-to-read vertical layout.
+    - This change also helps ensure that the left and right sidebars can maintain a consistent width, contributing to a more balanced and visually appealing interface.
+
 ## v7.2.6 - Job Automation Logging (2025-08-11)
 
 This update introduces a new structured logging system specifically for job automation. The goal is to create a detailed, machine-readable log of each interaction, which can be monitored by an external "watcher" script to trigger automated workflows.
