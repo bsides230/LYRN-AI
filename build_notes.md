@@ -1,5 +1,23 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.8 - Job Automation Watcher (2025-08-11)
+
+This update introduces a new "Job Automation Watcher" feature, providing a user-friendly interface to create, manage, and run simple parser jobs. These jobs can extract text from the main chat window based on user-defined start and end triggers and save the result to a specified file.
+
+- **New Backend Module:**
+    - A new `job_watcher_manager.py` file was created to handle the logic for these new parser jobs, keeping them separate from the existing prompt-based automation system.
+    - It uses a new `automation/watcher_jobs.json` file to store job definitions.
+
+- **Job Automation Watcher Popup:**
+    - A new "Job Automation Watcher" button has been added to the right sidebar, launching a dedicated popup for this feature.
+    - The popup has a two-tab interface:
+        - **Job Viewer:** Displays a list of all saved parser jobs. Users can select a job to run, edit, or delete it. A confirmation dialog has been added for deletions.
+        - **Job Builder:** A form for creating or editing jobs. It includes fields for a job name, start/end triggers, an output filename, and a directory selector for the output path.
+
+- **Functionality:**
+    - Users can now define simple, reusable parsing tasks directly within the GUI.
+    - The "Run" function a job against the current content of the chat display, making it easy to extract information from conversations.
+
 ## v7.2.7 - UI Layout and Readability Enhancements (2025-08-11)
 
 This update focuses on improving the main user interface layout for better balance and readability, based on user feedback.
