@@ -319,7 +319,7 @@ class SettingsManager:
         self.load_or_detect_first_boot()
 
     def load_or_detect_first_boot(self):
-        """Load settings or detect first boot scenario"""
+        """Load settings or create a default one on first boot."""
         if os.path.exists(SETTINGS_PATH):
             try:
                 with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
@@ -327,7 +327,7 @@ class SettingsManager:
                     self.settings = data.get('settings', {})
                     self.ui_settings.update(data.get('ui_settings', {}))
 
-                # Resolve relative paths
+                # Resolve relative paths for the current session
                 if "paths" in self.settings:
                     for key, path in self.settings["paths"].items():
                         if path and not os.path.isabs(path):
@@ -337,11 +337,45 @@ class SettingsManager:
                 self.ensure_automation_flag()
                 self.ensure_next_job_flag()
             except Exception as e:
-                print(f"Error loading settings: {e}")
+                print(f"Error loading settings: {e}. Assuming first boot.")
                 self.first_boot = True
         else:
-            print("No settings.json found - First boot detected")
+            print("No settings.json found - First boot detected. Creating default settings.")
             self.first_boot = True
+
+        if self.first_boot:
+            # Create and save a default settings file
+            self.settings = self.create_empty_settings_structure()
+            default_paths = {
+                "static_snapshots": "build_prompt/static_snapshots",
+                "dynamic_snapshots": "build_prompt/dynamic_snapshots",
+                "active_jobs": "build_prompt/active_jobs",
+                "deltas": "deltas",
+                "chat": "chat",
+                "output": "output",
+                "keywords": "active_keywords",
+                "topics": "active_topics",
+                "active_chunk": "active_chunk",
+                "chunk_queue": "automation/chunk_queue.json",
+                "job_list": "automation/job_list.txt",
+                "job_log": "automation/job_log.json",
+                "automation_flag_path": "global_flags/automation.txt",
+                "chunk_queue_path": "automation/chunk_queue.json",
+                "chat_dir": "chat",
+                "chat_parsed_dir": "chat_parsed",
+                "audit_dir": "automation/job_audit",
+                "metrics_logs": "metrics_logs"
+            }
+            self.settings["paths"] = default_paths
+            self.save_settings() # This saves the file with relative paths
+
+            # Now resolve paths for the current session
+            for key, path in self.settings["paths"].items():
+                if path and not os.path.isabs(path):
+                    self.settings["paths"][key] = os.path.join(SCRIPT_DIR, path)
+
+            self.ensure_automation_flag()
+            self.ensure_next_job_flag()
 
     def create_empty_settings_structure(self) -> dict:
         """Create empty settings structure for first boot"""

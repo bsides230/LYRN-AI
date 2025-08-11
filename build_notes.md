@@ -1,20 +1,11 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
-## v7.2.4 - Quick Controls UI Refactor (2025-08-11)
+## v7.2.4 - Settings Path Hotfix (2025-08-11)
 
-This update significantly reorganizes the main user interface to improve workflow and consolidate settings.
+This is a hotfix release to address a critical bug in the settings system.
 
-- **Quick Controls Cleanup:**
-    - The "Quick Controls" section has been streamlined to focus on core actions.
-    - The "Theme" combobox and "Font Size" controls have been moved to the "UI Settings" tab in the main Settings window.
-    - The "Change Model" button has been moved to the "System Status" section, placing it logically with the "Load" and "Offload" buttons.
-    - The "Mode" combobox has been moved directly under the "Change Model" button.
-- **New Quick Controls Layout:**
-    - The section now contains:
-        - "View Logs"
-        - "Clear Chat Folder" button, now paired with a new "Open Folder" button for quick directory access.
-        - "Code Terminal"
-        - "Settings"
+- **Fixed Hardcoded Paths:** The `SettingsManager` was using a hardcoded absolute path (`D:\LYRN\chat`) for the chat directory, which would cause the application to fail for other users.
+- **Improved First-Time Setup:** The system now correctly detects when `settings.json` is missing and generates a new, default settings file using relative paths (e.g., `./chat`), ensuring the application runs correctly on first launch without manual configuration.
 
 ## v7.2.3 - Settings Refactor & UI Cleanup (2025-08-11)
 

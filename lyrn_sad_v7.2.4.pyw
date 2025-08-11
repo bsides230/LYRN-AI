@@ -319,7 +319,7 @@ class SettingsManager:
         self.load_or_detect_first_boot()
 
     def load_or_detect_first_boot(self):
-        """Load settings or detect first boot scenario"""
+        """Load settings or create a default one on first boot."""
         if os.path.exists(SETTINGS_PATH):
             try:
                 with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
@@ -327,7 +327,7 @@ class SettingsManager:
                     self.settings = data.get('settings', {})
                     self.ui_settings.update(data.get('ui_settings', {}))
 
-                # Resolve relative paths
+                # Resolve relative paths for the current session
                 if "paths" in self.settings:
                     for key, path in self.settings["paths"].items():
                         if path and not os.path.isabs(path):
@@ -337,11 +337,45 @@ class SettingsManager:
                 self.ensure_automation_flag()
                 self.ensure_next_job_flag()
             except Exception as e:
-                print(f"Error loading settings: {e}")
+                print(f"Error loading settings: {e}. Assuming first boot.")
                 self.first_boot = True
         else:
-            print("No settings.json found - First boot detected")
+            print("No settings.json found - First boot detected. Creating default settings.")
             self.first_boot = True
+
+        if self.first_boot:
+            # Create and save a default settings file
+            self.settings = self.create_empty_settings_structure()
+            default_paths = {
+                "static_snapshots": "build_prompt/static_snapshots",
+                "dynamic_snapshots": "build_prompt/dynamic_snapshots",
+                "active_jobs": "build_prompt/active_jobs",
+                "deltas": "deltas",
+                "chat": "chat",
+                "output": "output",
+                "keywords": "active_keywords",
+                "topics": "active_topics",
+                "active_chunk": "active_chunk",
+                "chunk_queue": "automation/chunk_queue.json",
+                "job_list": "automation/job_list.txt",
+                "job_log": "automation/job_log.json",
+                "automation_flag_path": "global_flags/automation.txt",
+                "chunk_queue_path": "automation/chunk_queue.json",
+                "chat_dir": "chat",
+                "chat_parsed_dir": "chat_parsed",
+                "audit_dir": "automation/job_audit",
+                "metrics_logs": "metrics_logs"
+            }
+            self.settings["paths"] = default_paths
+            self.save_settings() # This saves the file with relative paths
+
+            # Now resolve paths for the current session
+            for key, path in self.settings["paths"].items():
+                if path and not os.path.isabs(path):
+                    self.settings["paths"][key] = os.path.join(SCRIPT_DIR, path)
+
+            self.ensure_automation_flag()
+            self.ensure_next_job_flag()
 
     def create_empty_settings_structure(self) -> dict:
         """Create empty settings structure for first boot"""
@@ -1213,42 +1247,6 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(self.tab_ui_settings, text="User Interface Customization",
                     font=title_font).pack(pady=20)
-
-        # --- Appearance Settings ---
-        appearance_frame = ctk.CTkFrame(self.tab_ui_settings)
-        appearance_frame.pack(fill="x", padx=20, pady=10)
-        ctk.CTkLabel(appearance_frame, text="Appearance", font=title_font).pack(pady=10, anchor="w", padx=10)
-
-        # Theme selection
-        theme_frame = ctk.CTkFrame(appearance_frame)
-        theme_frame.pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkLabel(theme_frame, text="Theme:", font=font).pack(side="left", padx=5)
-        theme_dropdown = ctk.CTkComboBox(
-            theme_frame,
-            values=self.parent_app.theme_manager.get_theme_names(),
-            command=self.parent_app.on_theme_selected
-        )
-        theme_dropdown.pack(side="right", padx=5, expand=True, fill="x")
-        theme_dropdown.set(self.parent_app.theme_manager.get_current_theme_name())
-        Tooltip(theme_dropdown, self.parent_app.tooltips.get("theme_dropdown", ""))
-
-        # Font size controls
-        font_frame = ctk.CTkFrame(appearance_frame)
-        font_frame.pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkLabel(font_frame, text="Font Size:", font=font).pack(side="left", padx=5)
-        font_decrease_button = ctk.CTkButton(font_frame, text="A-", width=30, height=25,
-                     font=font,
-                     command=self.parent_app.decrease_font_size)
-        font_decrease_button.pack(side="right", padx=2)
-        Tooltip(font_decrease_button, self.parent_app.tooltips.get("font_decrease_button", ""))
-
-        font_increase_button = ctk.CTkButton(font_frame, text="A+", width=30, height=25,
-                     font=font,
-                     command=self.parent_app.increase_font_size)
-        font_increase_button.pack(side="right", padx=2)
-        Tooltip(font_increase_button, self.parent_app.tooltips.get("font_increase_button", ""))
 
         # --- Language Settings ---
         language_frame = ctk.CTkFrame(self.tab_ui_settings)
@@ -2621,35 +2619,81 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         ctk.CTkLabel(self.quick_frame, text="Quick Controls", font=section_font).pack(pady=10)
 
+        self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
+        self.settings_button.pack(fill="x", padx=10, pady=(0, 5))
+        Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
+
+        self.change_model_button = ctk.CTkButton(self.quick_frame, text="🔄 Change Model", command=self.open_model_selector)
+        self.change_model_button.pack(fill="x", padx=10, pady=(0, 5))
+        Tooltip(self.change_model_button, "Open the model selector to change the loaded model.")
+
+        # Theme selection
+        theme_frame = ctk.CTkFrame(self.quick_frame)
+        theme_frame.pack(fill="x", padx=10, pady=5)
+
+        ctk.CTkLabel(theme_frame, text="Theme:", font=normal_font).pack(side="left", padx=5)
+        self.theme_dropdown = ctk.CTkComboBox(
+            theme_frame,
+            values=self.theme_manager.get_theme_names(),
+            command=self.on_theme_selected
+        )
+        self.theme_dropdown.pack(side="right", padx=5, expand=True, fill="x")
+        self.theme_dropdown.set(self.theme_manager.get_current_theme_name())
+        Tooltip(self.theme_dropdown, self.tooltips.get("theme_dropdown", ""))
+
+        # Font size controls
+        font_frame = ctk.CTkFrame(self.quick_frame)
+        font_frame.pack(fill="x", padx=10, pady=5)
+
+        ctk.CTkLabel(font_frame, text="Font Size:", font=normal_font).pack(side="left", padx=5)
+        self.font_decrease_button = ctk.CTkButton(font_frame, text="A-", width=30, height=25,
+                     font=normal_font,
+                     command=self.decrease_font_size)
+        self.font_decrease_button.pack(side="right", padx=2)
+        Tooltip(self.font_decrease_button, self.tooltips.get("font_decrease_button", ""))
+
+        self.font_increase_button = ctk.CTkButton(font_frame, text="A+", width=30, height=25,
+                     font=normal_font,
+                     command=self.increase_font_size)
+        self.font_increase_button.pack(side="right", padx=2)
+        Tooltip(self.font_increase_button, self.tooltips.get("font_increase_button", ""))
+
+        # Mode selection
+        mode_frame = ctk.CTkFrame(self.quick_frame)
+        mode_frame.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(mode_frame, text="Mode:", font=normal_font).pack(side="left", padx=5)
+        self.mode_dropdown = ctk.CTkComboBox(
+            mode_frame,
+            values=[],
+            command=self.on_mode_selected
+        )
+        self.mode_dropdown.pack(side="left", expand=True, fill="x", padx=5)
+        Tooltip(self.mode_dropdown, self.tooltips.get("mode_dropdown", ""))
+
+        self.refresh_prompt_button = ctk.CTkButton(mode_frame, text="🔄", width=30, height=25,
+                                         font=normal_font,
+                                         command=self.refresh_prompt_from_mode)
+        self.refresh_prompt_button.pack(side="right", padx=2)
+        Tooltip(self.refresh_prompt_button, self.tooltips.get("refresh_prompt_button", ""))
+
+        self.update_modes_dropdown()
+
+        # Other controls moved from System Controls
         self.show_llm_log_button = ctk.CTkButton(self.quick_frame, text="📋 View Logs",
                                                  font=normal_font, command=self.toggle_log_viewer)
         self.show_llm_log_button.pack(padx=10, pady=3, fill="x")
         Tooltip(self.show_llm_log_button, self.tooltips.get("show_llm_log_button", ""))
 
-        # Frame for clear chat and open folder buttons
-        chat_folder_frame = ctk.CTkFrame(self.quick_frame, fg_color="transparent")
-        chat_folder_frame.pack(fill="x", padx=10, pady=3)
-
-        self.clear_chat_folder_button = ctk.CTkButton(chat_folder_frame, text="🗑️ Clear Chat Folder",
+        self.clear_chat_folder_button = ctk.CTkButton(self.quick_frame, text="📁 Clear Chat Folder",
                                                       font=normal_font, command=self.clear_chat_folder)
-        self.clear_chat_folder_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        self.clear_chat_folder_button.pack(padx=10, pady=3, fill="x")
         Tooltip(self.clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
 
-        self.open_chat_folder_button = ctk.CTkButton(chat_folder_frame, text="📂 Open Folder",
-                                                      font=normal_font, command=self.open_chat_folder)
-        self.open_chat_folder_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
-        Tooltip(self.open_chat_folder_button, "Opens the chat log directory in your file explorer.")
+        # self.personality_button moved to settings
 
         self.terminal_button = ctk.CTkButton(self.quick_frame, text="📟 Code Terminal", command=self.open_terminal)
         self.terminal_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.terminal_button, "Opens a new terminal in the specified directory.")
-
-        self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
-        self.settings_button.pack(fill="x", padx=10, pady=3)
-        Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
-
-
-        self.update_modes_dropdown()
 
         # Add a spacer to push content to the top
         spacer = ctk.CTkFrame(self.left_sidebar, fg_color="transparent")
@@ -2844,30 +2888,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.load_model_button = ctk.CTkButton(button_frame, text="Load", font=normal_font, command=self.reload_model_full)
         self.load_model_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
         Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
-
-        self.change_model_button = ctk.CTkButton(self.status_frame, text="🔄 Change Model", command=self.open_model_selector, font=normal_font)
-        self.change_model_button.pack(fill="x", pady=(5, 5))
-        Tooltip(self.change_model_button, "Open the model selector to change the loaded model.")
-
-        # Mode selection
-        mode_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
-        mode_frame.pack(fill="x", pady=5)
-        ctk.CTkLabel(mode_frame, text="Mode:", font=normal_font).pack(side="left", padx=5)
-        self.mode_dropdown = ctk.CTkComboBox(
-            mode_frame,
-            values=[],
-            command=self.on_mode_selected,
-            font=normal_font
-        )
-        self.mode_dropdown.pack(side="left", expand=True, fill="x", padx=5)
-        Tooltip(self.mode_dropdown, self.tooltips.get("mode_dropdown", ""))
-
-        self.refresh_prompt_button = ctk.CTkButton(mode_frame, text="🔄", width=30, height=25,
-                                         font=normal_font,
-                                         command=self.refresh_prompt_from_mode)
-        self.refresh_prompt_button.pack(side="right", padx=2)
-        Tooltip(self.refresh_prompt_button, self.tooltips.get("refresh_prompt_button", ""))
-
 
         # Loading Progress Bar (hidden by default)
         self.loading_progressbar = ctk.CTkProgressBar(self.status_frame, mode='indeterminate')
@@ -3599,33 +3619,6 @@ Enhanced LYRN-AI system with advanced features active.
             self.update_status("Chat display cleared", LYRN_INFO)
         except Exception as e:
             print(f"Error clearing chat: {e}")
-
-    def open_chat_folder(self):
-        """Opens the configured chat folder in the system's file explorer."""
-        if not self.settings_manager.settings:
-            self.update_status("Settings not loaded.", LYRN_ERROR)
-            return
-
-        chat_dir = self.settings_manager.settings["paths"].get("chat", "")
-        if not chat_dir or not os.path.isdir(chat_dir):
-            self.update_status("Chat directory not configured or found.", LYRN_WARNING)
-            try:
-                os.makedirs(chat_dir, exist_ok=True)
-            except Exception as e:
-                 self.update_status(f"Could not create chat dir: {e}", LYRN_ERROR)
-                 return
-
-        try:
-            if sys.platform == "win32":
-                os.startfile(chat_dir)
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", chat_dir])
-            else: # Linux
-                subprocess.Popen(["xdg-open", chat_dir])
-            self.update_status("Opened chat folder.", LYRN_SUCCESS)
-        except Exception as e:
-            self.update_status(f"Failed to open folder: {e}", LYRN_ERROR)
-            print(f"Failed to open folder: {e}")
 
     def clear_chat_folder(self):
         """Deletes all files in the chat directory."""
