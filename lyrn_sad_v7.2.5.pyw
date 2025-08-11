@@ -3033,21 +3033,17 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         # Restored textbox for general status messages
         self.status_textbox = ctk.CTkTextbox(self.status_frame, height=50, wrap="char", font=status_font)
-        self.status_textbox.pack(fill="x", pady=5)
+        self.status_textbox.pack(fill="x", padx=10, pady=5)
         self.status_textbox.insert("end", "System ready.")
         self.status_textbox.configure(state="disabled")
 
-        # New frame for the buttons
-        button_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
-        button_frame.pack(fill="x", pady=5)
-
-        # Model Control Buttons that fill the space
-        self.offload_model_button = ctk.CTkButton(button_frame, text="Offload", font=normal_font, command=self.offload_model)
-        self.offload_model_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        # Model Control Buttons
+        self.offload_model_button = ctk.CTkButton(self.status_frame, text="Offload Model", font=normal_font, command=self.offload_model)
+        self.offload_model_button.pack(fill="x", padx=10, pady=(5, 2))
         Tooltip(self.offload_model_button, self.tooltips.get("offload_model_button", ""))
 
-        self.load_model_button = ctk.CTkButton(button_frame, text="Load", font=normal_font, command=self.reload_model_full)
-        self.load_model_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
+        self.load_model_button = ctk.CTkButton(self.status_frame, text="Load Model", font=normal_font, command=self.reload_model_full)
+        self.load_model_button.pack(fill="x", padx=10, pady=(2, 5))
         Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
 
         # --- Relocated Controls ---
