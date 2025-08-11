@@ -1,5 +1,28 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.5 - Prompt Builder Overhaul (2025-08-11)
+
+This update completely revamps the System Prompt Builder for a significantly improved user experience and adds powerful new features for managing prompt components.
+
+- **Dedicated Prompt Builder Window:**
+    - The "Prompt Manager" tab has been removed from the Settings window.
+    - A new "Open System Prompt Maker" button has been added to the "Advanced" tab in Settings, which launches the prompt builder in a dedicated, non-modal popup window.
+    - The popup includes a "Keep on Top" checkbox, allowing it to stay visible while interacting with the main application.
+
+- **File Pinning:**
+    - Users can now pin individual prompt files to the top of the build order.
+    - Pinned files are visually distinct and will always be loaded first, regardless of other sorting.
+    - The pinning status is saved and preserved when the prompt index is refreshed.
+
+- **Enhanced Drag-and-Drop:**
+    - The drag-and-drop functionality for reordering prompt files has been completely overhauled.
+    - It now features a smooth dragging motion and a clear, visual drop indicator line, so users know exactly where a file will land.
+    - The reordering logic now respects pinning, preventing un-pinned files from being dropped into the pinned section and vice-versa.
+
+- **Underlying Data Structure:**
+    - The `build_prompt_index.json` has been upgraded from a simple list of paths to a list of objects, allowing metadata like `pinned` status to be stored for each file.
+    - A migration path has been added to automatically and seamlessly update the old file format for existing users.
+
 ## v7.2.4 - Settings Path Hotfix (2025-08-11)
 
 This is a hotfix release to address a critical bug in the settings system.
