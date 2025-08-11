@@ -1,5 +1,26 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.2 - UI Enhancements & Feature Additions (2025-08-11)
+
+This update focuses on quality-of-life improvements, new features, and better project organization.
+
+- **Terminal Popup:**
+    - A new "Code Terminal" button has been added to the Quick Controls section.
+    - This button opens a new native terminal window, allowing users to execute code or commands in a clean environment.
+    - A "Terminal Start Path" setting was added to the "UI Settings" tab in the Settings window. This allows users to configure the default directory where the terminal opens. The default is the application's root directory.
+
+- **Dependency Management:**
+    - A new `dependencies` directory has been created to formalize project dependencies.
+    - A `requirements.txt` file is now included in this directory, listing all required Python packages.
+    - The `AGENTS.md` file has been updated to include a rule for maintaining this new dependency file, ensuring a smoother setup for future development.
+
+- **Performance Metrics UI Overhaul:**
+    - The status dot (●) next to the "generation tok/s" label has been removed, and the label is now centered for a cleaner look.
+    - The "KV Cache" progress bar has been updated to accurately reflect the number of tokens used from the cache relative to the total context size (`n_ctx`), providing a more meaningful metric.
+    - A new progress bar for "Total Tokens" has been added, which also shows the usage against the total context size, allowing for a quick comparison of token usage.
+
+---
+
 ## Phase 1: Core Architecture (2025-08-09)
 
 This initial phase implements the core architectural changes outlined in `cognition_upgrade_v1.2.md`.

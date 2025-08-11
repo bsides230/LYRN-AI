@@ -14,6 +14,7 @@ Major Updates:
 import os
 import sys
 import json
+import subprocess
 import re
 import time
 import queue
@@ -1282,6 +1283,18 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         clear_chat_button.pack(padx=10, pady=5, anchor="w")
         Tooltip(clear_chat_button, self.parent_app.tooltips.get("clear_chat_button", ""))
 
+        # --- Terminal Settings ---
+        terminal_frame = ctk.CTkFrame(self.tab_ui_settings)
+        terminal_frame.pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(terminal_frame, text="Terminal", font=title_font).pack(pady=10, anchor="w", padx=10)
+
+        path_frame = ctk.CTkFrame(terminal_frame)
+        path_frame.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(path_frame, text="Terminal Start Path:", font=font).pack(side="left", padx=5)
+        self.terminal_start_path_entry = ctk.CTkEntry(path_frame, font=font)
+        self.terminal_start_path_entry.pack(side="left", expand=True, fill="x", padx=5)
+
     def create_advanced_tab(self):
         """Create advanced settings tab"""
         try:
@@ -1796,6 +1809,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         self.autoload_model_var.set(self.settings_manager.ui_settings.get("autoload_model", False))
         self.llm_log_visible_var.set(self.settings_manager.ui_settings.get("llm_log_visible", False))
         self.llm_log_on_top_var.set(self.settings_manager.ui_settings.get("llm_log_on_top", False))
+        self.terminal_start_path_entry.insert(0, self.settings_manager.ui_settings.get("terminal_start_path", ""))
 
     def apply_theme(self):
         """Applies the current theme colors to all widgets in this dialog."""
@@ -1978,6 +1992,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
             self.settings_manager.ui_settings["llm_log_visible"] = self.llm_log_visible_var.get()
             self.settings_manager.ui_settings["llm_log_on_top"] = self.llm_log_on_top_var.get()
             self.settings_manager.ui_settings["language"] = self.language_var.get()
+            self.settings_manager.ui_settings["terminal_start_path"] = self.terminal_start_path_entry.get()
 
 
             # Save all settings
@@ -2869,6 +2884,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.personality_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.personality_button, "Adjust the AI's personality traits.")
 
+        self.terminal_button = ctk.CTkButton(self.quick_frame, text="📟 Code Terminal", command=self.open_terminal)
+        self.terminal_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.terminal_button, "Opens a new terminal in the specified directory.")
+
         # Add a spacer to push content to the top
         spacer = ctk.CTkFrame(self.left_sidebar, fg_color="transparent")
         spacer.pack(expand=True, fill="both")
@@ -2929,22 +2948,22 @@ class LyrnAIInterface(ctk.CTkToplevel):
                                         font=normal_font)
         self.prompt_label.pack(pady=2)
 
-        # Generation speed with visual indicator
-        gen_frame = ctk.CTkFrame(self.metrics_frame)
-        gen_frame.pack(fill="x", padx=10, pady=2)
-
-        self.eval_label = ctk.CTkLabel(gen_frame, text="Generation: 0 tok/s",
+        # Generation speed
+        self.eval_label = ctk.CTkLabel(self.metrics_frame, text="Generation: 0 tok/s",
                                      font=normal_font)
-        self.eval_label.pack(side="left", padx=5)
-
-        self.speed_indicator = ctk.CTkLabel(gen_frame, text="●",
-                                          font=("Arial", 16), text_color="#666666")
-        self.speed_indicator.pack(side="right", padx=5)
+        self.eval_label.pack(pady=2)
 
         # Total tokens
-        self.total_label = ctk.CTkLabel(self.metrics_frame, text="Total: 0 tokens",
+        total_frame = ctk.CTkFrame(self.metrics_frame)
+        total_frame.pack(fill="x", padx=10, pady=2)
+
+        self.total_label = ctk.CTkLabel(total_frame, text="Total: 0 tokens",
                                        font=normal_font)
-        self.total_label.pack(pady=2)
+        self.total_label.pack(side="left", padx=5)
+
+        self.total_progress = ctk.CTkProgressBar(total_frame, width=100, height=8)
+        self.total_progress.pack(side="right", padx=5)
+        self.total_progress.set(0)
 
         # Save metrics button
         ctk.CTkButton(self.metrics_frame, text="💾 Save Metrics",
@@ -3341,6 +3360,33 @@ Enhanced LYRN-AI system with advanced features active.
             self.personality_popup.lift()
             self.personality_popup.focus()
 
+    def open_terminal(self):
+        """Opens a new terminal window in the specified path."""
+        start_path = self.settings_manager.ui_settings.get("terminal_start_path", SCRIPT_DIR)
+        if not os.path.isdir(start_path):
+            start_path = SCRIPT_DIR
+            self.update_status(f"Terminal path not found, defaulting to script dir.", LYRN_WARNING)
+
+        try:
+            if sys.platform == "win32":
+                subprocess.Popen(f'start cmd', shell=True, cwd=start_path)
+            elif sys.platform == "darwin":
+                # For macOS, 'open -a Terminal .' works well from a specific directory
+                subprocess.Popen(['open', '-a', 'Terminal', start_path])
+            else:  # Assuming Linux
+                try:
+                    # Tries to open gnome-terminal, common on many Linux distros
+                    subprocess.Popen(['gnome-terminal', '--working-directory', start_path])
+                except FileNotFoundError:
+                    try:
+                        # Fallback to xterm, which is more likely to be installed
+                        subprocess.Popen(['xterm', '-e', f'cd "{start_path}" && bash'])
+                    except FileNotFoundError:
+                        self.update_status("Could not find a terminal to open.", LYRN_ERROR)
+        except Exception as e:
+            self.update_status(f"Failed to open terminal: {e}", LYRN_ERROR)
+            print(f"Failed to open terminal: {e}")
+
     def open_settings(self):
         """Open enhanced tabbed settings dialog"""
         if not hasattr(self, 'settings_dialog') or not self.settings_dialog.winfo_exists():
@@ -3724,20 +3770,14 @@ Enhanced LYRN-AI system with advanced features active.
             self.eval_label.configure(text=f"Generation: {self.metrics.eval_speed:.1f} tok/s")
             self.total_label.configure(text=f"Total: {self.metrics.total_tokens:,} tokens")
 
-            # Update progress bar for KV cache (normalize to reasonable range)
-            if self.metrics.total_tokens > 0:
-                kv_ratio = min(self.metrics.kv_cache_reused / self.metrics.total_tokens, 1.0)
+            # Update progress bar for KV cache and Total Tokens
+            n_ctx = self.settings_manager.settings.get("active", {}).get("n_ctx", 1)
+            if n_ctx > 0:
+                kv_ratio = min(self.metrics.kv_cache_reused / n_ctx, 1.0)
                 self.kv_progress.set(kv_ratio)
 
-            # Update speed indicator color based on generation speed
-            if self.metrics.eval_speed > 50:
-                color = LYRN_SUCCESS  # Fast
-            elif self.metrics.eval_speed > 20:
-                color = LYRN_WARNING  # Medium
-            else:
-                color = LYRN_ERROR    # Slow
-
-            self.speed_indicator.configure(text_color=color)
+                total_ratio = min(self.metrics.total_tokens / n_ctx, 1.0)
+                self.total_progress.set(total_ratio)
 
         except Exception as e:
             print(f"Error updating metrics: {e}")
