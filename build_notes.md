@@ -1,5 +1,17 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.9 - UI Polish and Combobox Fix (2025-08-11)
+
+This update focuses on minor UI polishing and fixing a persistent issue with `CTkComboBox` widgets.
+
+- **Combobox Default Text:**
+    - Fixed a bug where several `CTkComboBox` widgets across the application would display the text "ctkcombobox" when they had no items to show.
+    - All relevant comboboxes now correctly display an empty string ("") by default, providing a cleaner and more professional user experience.
+
+- **UI Text Cleanup:**
+    - The "Job Automation Watcher" button on the right sidebar has been renamed to simply "Automation" for a cleaner look.
+    - The title of the corresponding popup window has also been updated to "Automation" for consistency.
+
 ## v7.2.8 - Job Automation Watcher (2025-08-11)
 
 This update introduces a new "Job Automation Watcher" feature, providing a user-friendly interface to create, manage, and run simple parser jobs. These jobs can extract text from the main chat window based on user-defined start and end triggers and save the result to a specified file.
