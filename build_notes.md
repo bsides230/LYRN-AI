@@ -65,3 +65,20 @@ This major update introduces a multi-agent architecture, allowing users to load 
     - A new "Startup Agents" tab has been added to the main Settings window.
     - Users can select from their saved "Quick Picks" to create a list of agents that will be loaded automatically when the application starts.
     - This startup configuration is saved in `settings.json`. The application will now auto-load the user's preferred set of agents for a personalized experience.
+
+---
+
+## v7.2.1 - Revert to In-Process Model Loading (2025-08-10)
+
+This update reverts the model loading mechanism to an in-process approach, removing the external `model_loader.py` and the associated file-based IPC. This change was made to simplify the architecture and resolve issues related to the IPC implementation, as the multi-agent control for which it was designed is no longer a project goal.
+
+- **In-Process Model Loading:**
+    - The `Llama` model is now instantiated directly within the main GUI process, as it was in v6.8 and earlier.
+    - The `setup_model` function was updated to handle direct, in-process loading.
+- **Removed External Process:**
+    - The `model_loader.py` script is no longer used.
+    - The `subprocess` calls and file-based trigger system (`chat_trigger.txt`) have been completely removed from the GUI.
+- **Direct Response Generation:**
+    - The `send_message` function now directly calls the `generate_response` method in a thread.
+    - The `generate_response` method uses `self.llm.create_chat_completion` to stream the response directly to the GUI, eliminating the need for file tailing.
+- **Code Simplification:** The removal of the IPC layer has simplified the codebase, making it easier to maintain and debug.
