@@ -103,30 +103,71 @@ class Tooltip:
 
 
 class DraggableListbox(ctk.CTkScrollableFrame):
-    """A scrollable frame that supports drag-and-drop reordering of items."""
+    """A scrollable frame that supports drag-and-drop reordering and pinning of items."""
     def __init__(self, master, command=None, **kwargs):
         super().__init__(master, **kwargs)
         self.command = command
         self.items = []
         self.item_map = {}
         self.dragged_item = None
+        self.drop_indicator = ctk.CTkFrame(self, height=2, fg_color=LYRN_ACCENT, corner_radius=0)
+        self.drop_indicator_index = -1
+        self.drag_offset_y = 0
 
-    def add_item(self, text, **kwargs):
+    def add_item(self, item_data: dict, **kwargs):
         """Adds a new draggable item to the list."""
+        text = item_data["path"]
+        is_pinned = item_data.get("pinned", False)
+
         item_frame = ctk.CTkFrame(self, corner_radius=3)
+        if is_pinned:
+            # A light purple to indicate pinned status, works in light/dark themes
+            item_frame.configure(fg_color=("#E8D5F9", "#402354"))
         item_frame.pack(fill="x", padx=5, pady=3)
+
+        # Pin button
+        pin_char = "📌" if is_pinned else "📍"
+        pin_button = ctk.CTkButton(item_frame, text=pin_char, width=30,
+                                   command=lambda frame=item_frame: self.toggle_pin(frame))
+        pin_button.pack(side="left", padx=5, pady=5)
 
         label = ctk.CTkLabel(item_frame, text=text, **kwargs)
         label.pack(side="left", padx=10, pady=5)
 
-        # Bind events to the frame and the label
         for widget in [item_frame, label]:
             widget.bind("<ButtonPress-1>", lambda e, frame=item_frame: self._on_press(e, frame))
             widget.bind("<B1-Motion>", self._on_drag)
             widget.bind("<ButtonRelease-1>", self._on_release)
 
         self.items.append(item_frame)
-        self.item_map[item_frame] = text
+        self.item_map[item_frame] = item_data
+
+    def toggle_pin(self, item_frame):
+        """Toggles the pinned state of an item and re-sorts the list."""
+        item_data = self.item_map[item_frame]
+        item_data["pinned"] = not item_data.get("pinned", False)
+
+        # Re-sort all items based on pinned status, then by their original order (for stability)
+        self.items.sort(key=lambda frame: not self.item_map[frame].get("pinned", False))
+
+        # Repack all items in the new order
+        for item in self.items:
+            item.pack_forget()
+        for item in self.items:
+            item.pack(fill="x", padx=5, pady=3)
+            # Update visual state
+            is_pinned = self.item_map[item].get("pinned", False)
+            pin_char = "📌" if is_pinned else "📍"
+            item.winfo_children()[0].configure(text=pin_char) # Assumes pin button is the first child
+            if is_pinned:
+                item.configure(fg_color=("#E8D5F9", "#402354"))
+            else:
+                item.configure(fg_color="transparent")
+
+
+        # Trigger the command to save the new state
+        if self.command:
+            self.command(self.get_item_objects())
 
     def clear(self):
         """Removes all items from the list."""
@@ -135,49 +176,103 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.items.clear()
         self.item_map.clear()
 
-    def get_item_texts(self) -> List[str]:
-        """Returns the list of item texts in their current order."""
+    def get_item_objects(self) -> List[dict]:
+        """Returns the list of item data objects in their current order."""
         return [self.item_map[item] for item in self.items]
 
     def _on_press(self, event, widget):
         """Callback for when a mouse button is pressed on an item."""
-        self.dragged_item = widget
-        self.dragged_item.configure(fg_color=self.cget("fg_color")[0]) # Use the darker hover color
+        # Find the actual frame to drag from the widget that was clicked
+        if isinstance(widget, (ctk.CTkLabel, ctk.CTkButton)):
+            self.dragged_item = widget.master
+        else:
+            self.dragged_item = widget
+
+        self.dragged_item.configure(fg_color=LYRN_PURPLE)
         self.dragged_item.lift()
+        self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
 
     def _on_drag(self, event):
         """Callback for when an item is being dragged."""
         if not self.dragged_item:
             return
 
-        # Move the item with the mouse
-        y = self.dragged_item.winfo_y() + event.y
-        self.dragged_item.place(x=0, y=y, anchor="nw")
+        # Move the item using root coordinates for smoothness
+        new_y_root = event.y_root - self.drag_offset_y
+        new_y_parent = new_y_root - self.winfo_rooty()
+        self.dragged_item.place(y=new_y_parent)
+
+        # Update the drop indicator's position
+        self._update_drop_indicator()
+
+    def _update_drop_indicator(self):
+        """Calculates and places the drop indicator line."""
+        if not self.dragged_item:
+            return
+
+        # Use the center of the dragged item to determine its logical position
+        drag_center_y = self.dragged_item.winfo_y() + (self.dragged_item.winfo_height() / 2)
+
+        # Find the index where the dragged item should be inserted
+        target_index = 0
+        for item in self.items:
+            if item == self.dragged_item:
+                continue
+            if drag_center_y > item.winfo_y() + (item.winfo_height() / 2):
+                target_index += 1
+
+        self.drop_indicator_index = target_index
+
+        # Determine the visual y-position for the indicator line
+        # Place it at the top of the item that will be pushed down
+        if target_index < len(self.items):
+            # If the target is the dragged item itself, find the next one
+            if self.items[target_index] == self.dragged_item:
+                if target_index + 1 < len(self.items):
+                    indicator_y = self.items[target_index + 1].winfo_y()
+                else: # Dragged to the very end
+                    last_item = self.items[target_index - 1]
+                    indicator_y = last_item.winfo_y() + last_item.winfo_height()
+            else:
+                 indicator_y = self.items[target_index].winfo_y()
+        else: # Dragged past the last item
+            last_item = self.items[-1] if self.items[-1] != self.dragged_item else self.items[-2]
+            indicator_y = last_item.winfo_y() + last_item.winfo_height()
+
+        self.drop_indicator.place(x=0, y=indicator_y - 1, relwidth=1)
+        self.drop_indicator.lift()
+
 
     def _on_release(self, event):
         """Callback for when the mouse button is released."""
         if not self.dragged_item:
             return
 
-        self.dragged_item.configure(fg_color="transparent") # Reset color
+        # Hide indicator
+        self.drop_indicator.place_forget()
 
-        # Determine the new index based on the drop position
-        drop_y = self.dragged_item.winfo_y()
+        # Reset visual state of the dragged item
+        is_pinned = self.item_map[self.dragged_item].get("pinned", False)
+        if is_pinned:
+            self.dragged_item.configure(fg_color=("#E8D5F9", "#402354"))
+        else:
+            self.dragged_item.configure(fg_color="transparent")
 
-        # Find the target index
-        target_index = 0
-        for i, item in enumerate(self.items):
-            if item == self.dragged_item:
-                continue
-            if drop_y > item.winfo_y():
-                target_index = i + 1
+        # Use the calculated target_index from the indicator
+        target_index = self.drop_indicator_index
 
-        # Remove the dragged item and insert it at the new position
+        # Constrain the drop to respect pinning boundaries
+        num_pinned = sum(1 for item in self.items if self.item_map[item].get("pinned", False) and item != self.dragged_item)
+        if is_pinned:
+            target_index = min(target_index, num_pinned)
+        else:
+            target_index = max(target_index, num_pinned)
+
+        # Move the item in the list and repack everything
         original_item = self.dragged_item
         self.items.remove(original_item)
         self.items.insert(target_index, original_item)
 
-        # Forget the 'place' geometry and repack all items in the new order
         original_item.place_forget()
         for item in self.items:
             item.pack_forget()
@@ -185,10 +280,11 @@ class DraggableListbox(ctk.CTkScrollableFrame):
             item.pack(fill="x", padx=5, pady=3)
 
         self.dragged_item = None
+        self.drop_indicator_index = -1
 
         # Execute the callback command if provided
         if self.command:
-            self.command(self.get_item_texts())
+            self.command(self.get_item_objects())
 
 class ThemeManager:
     """Discovers, loads, and applies themes from the 'themes' directory."""
@@ -520,11 +616,12 @@ class SnapshotLoader:
             print(f"Error reading text file {path}: {e}")
             return ""
 
-    def _build_master_prompt_file(self, master_index: List[str]):
+    def _build_master_prompt_file(self, master_index: List[dict]):
         """Builds the master prompt file from the index."""
         print(f"Building master prompt file at {self.master_prompt_path}")
         prompt_parts = []
-        for relative_path in master_index:
+        for item in master_index:
+            relative_path = item["path"]
             full_path = os.path.join(self.build_prompt_dir, relative_path)
             content = self._load_text_file(full_path)
             if content:
@@ -540,13 +637,26 @@ class SnapshotLoader:
         except IOError as e:
             print(f"Error writing master prompt file: {e}")
 
-    def generate_master_index(self) -> List[str]:
+    def generate_master_index(self) -> List[dict]:
         """
-        Scans for local indexes, aggregates them, saves the master index,
+        Scans for local indexes, aggregates them, preserves pinning, saves the master index,
         and then builds the master prompt file.
         """
         print("Generating master prompt index...")
-        master_index = []
+
+        # 1. Load existing pinned statuses
+        existing_pinned_statuses = {}
+        if os.path.exists(self.master_index_path):
+            existing_index = self._load_json_file(self.master_index_path)
+            if existing_index and isinstance(existing_index, list) and existing_index:
+                # Handle both old (str) and new (dict) formats
+                if isinstance(existing_index[0], dict):
+                    existing_pinned_statuses = {item['path']: item.get('pinned', False) for item in existing_index}
+                else: # Old format, no pinned data to preserve
+                    pass
+
+        # 2. Scan for all current files from sub-indexes
+        found_files = set()
         if not os.path.exists(self.build_prompt_dir):
             os.makedirs(self.build_prompt_dir)
             print(f"Created 'build_prompt' directory at {self.build_prompt_dir}")
@@ -557,20 +667,24 @@ class SnapshotLoader:
                 local_index = self._load_json_file(index_path)
 
                 if local_index and isinstance(local_index, list):
-                    # Get the relative path of the directory from 'build_prompt'
                     relative_dir = os.path.relpath(root, self.build_prompt_dir)
                     for item in local_index:
-                        # Join the relative directory with the item path
-                        # If relative_dir is '.', it means the root of build_prompt, so don't prepend it.
                         if relative_dir == ".":
                             full_item_path = item
                         else:
                             full_item_path = os.path.join(relative_dir, item)
-                        master_index.append(full_item_path.replace('\\', '/')) # Normalize path separators
+                        found_files.add(full_item_path.replace('\\', '/'))
 
-        self._save_json_file(self.master_index_path, master_index)
-        self._build_master_prompt_file(master_index)
-        return master_index
+        # 3. Create the new master index, preserving pinning
+        new_master_index = []
+        for file_path in sorted(list(found_files)): # Sort for consistent order
+            is_pinned = existing_pinned_statuses.get(file_path, False)
+            new_master_index.append({"path": file_path, "pinned": is_pinned})
+
+        # 4. Save and build
+        self._save_json_file(self.master_index_path, new_master_index)
+        self._build_master_prompt_file(new_master_index)
+        return new_master_index
 
     def load_base_prompt(self) -> str:
         """
@@ -1161,7 +1275,7 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         self.create_widgets()
         self.load_current_settings()
         self.apply_theme()
-        self.refresh_prompt_index()
+        # self.refresh_prompt_index() # No longer needed here
 
     def open_theme_builder(self):
         """Opens the theme builder popup."""
@@ -1180,13 +1294,13 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
 
         # Create tabs
         self.tab_paths = self.tabview.add(self.language_manager.get("tab_directory_paths"))
-        self.tab_prompt = self.tabview.add(self.language_manager.get("tab_prompt_manager"))
+        # self.tab_prompt = self.tabview.add(self.language_manager.get("tab_prompt_manager")) # Tab is being removed
         self.tab_personality = self.tabview.add("Personality")
         self.tab_ui_settings = self.tabview.add("UI Settings")
         self.tab_advanced = self.tabview.add(self.language_manager.get("tab_advanced"))
 
         self.create_paths_tab()
-        self.create_prompt_manager_tab()
+        # self.create_prompt_manager_tab() # Logic moved to popup
         self.create_personality_tab()
         self.create_ui_settings_tab()
         self.create_advanced_tab()
@@ -1267,6 +1381,42 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         # A restart will be required to see changes.
         ctk.CTkLabel(language_frame, text="Language changes require an application restart.", font=font).pack(padx=20, pady=5, anchor="w")
 
+        # --- Font and Theme Settings ---
+        display_frame = ctk.CTkFrame(self.tab_ui_settings)
+        display_frame.pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(display_frame, text="Display & Theme", font=title_font).pack(pady=10, anchor="w", padx=10)
+
+        # Theme selection
+        theme_frame = ctk.CTkFrame(display_frame)
+        theme_frame.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(theme_frame, text="Theme:", font=font).pack(side="left", padx=5)
+        theme_selector = ctk.CTkComboBox(
+            theme_frame,
+            values=self.parent_app.theme_manager.get_theme_names(),
+            command=self.parent_app.on_theme_selected
+        )
+        theme_selector.pack(side="left", expand=True, fill="x", padx=5)
+        theme_selector.set(self.parent_app.theme_manager.get_current_theme_name())
+        Tooltip(theme_selector, self.parent_app.tooltips.get("theme_dropdown", ""))
+
+        # Font size controls
+        font_frame = ctk.CTkFrame(display_frame)
+        font_frame.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(font_frame, text="Font Size:", font=font).pack(side="left", padx=5)
+
+        self.font_size_label = ctk.CTkLabel(font_frame, text=str(self.parent_app.current_font_size), font=font)
+        self.font_size_label.pack(side="left", padx=5)
+
+        font_decrease_button = ctk.CTkButton(font_frame, text="A-", width=30, height=25,
+                     font=font,
+                     command=self.decrease_font_in_settings)
+        font_decrease_button.pack(side="left", padx=2)
+
+        font_increase_button = ctk.CTkButton(font_frame, text="A+", width=30, height=25,
+                     font=font,
+                     command=self.increase_font_in_settings)
+        font_increase_button.pack(side="left", padx=2)
+
 
         # --- Moved Buttons ---
         moved_buttons_frame = ctk.CTkFrame(self.tab_ui_settings)
@@ -1289,6 +1439,14 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         ctk.CTkLabel(path_frame, text="Terminal Start Path:", font=font).pack(side="left", padx=5)
         self.terminal_start_path_entry = ctk.CTkEntry(path_frame, font=font)
         self.terminal_start_path_entry.pack(side="left", expand=True, fill="x", padx=5)
+
+    def increase_font_in_settings(self):
+        self.parent_app.increase_font_size()
+        self.font_size_label.configure(text=str(self.parent_app.current_font_size))
+
+    def decrease_font_in_settings(self):
+        self.parent_app.decrease_font_size()
+        self.font_size_label.configure(text=str(self.parent_app.current_font_size))
 
     def create_advanced_tab(self):
         """Create advanced settings tab"""
@@ -1380,88 +1538,6 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         ctk.CTkCheckBox(model_loading_frame, text="Show model selector on startup", font=font, variable=self.show_model_selector_var).pack(anchor="w", padx=10, pady=5)
         ctk.CTkCheckBox(model_loading_frame, text="LLM log default visibility", font=font, variable=self.llm_log_visible_var).pack(anchor="w", padx=10, pady=5)
         ctk.CTkCheckBox(model_loading_frame, text="LLM log always on top", font=font, variable=self.llm_log_on_top_var).pack(anchor="w", padx=10, pady=5)
-
-    def create_prompt_manager_tab(self):
-        """Create the prompt manager tab UI."""
-        try:
-            font = ctk.CTkFont(family="Consolas", size=12)
-            title_font = ctk.CTkFont(family="Consolas", size=14, weight="bold")
-        except:
-            font = ("Consolas", 12)
-            title_font = ("Consolas", 14, "bold")
-
-        ctk.CTkLabel(self.tab_prompt, text="Prompt Build Order", font=title_font).pack(pady=10)
-
-        # Frame for buttons
-        button_frame = ctk.CTkFrame(self.tab_prompt)
-        button_frame.pack(fill="x", padx=20, pady=10)
-
-        refresh_button = ctk.CTkButton(button_frame, text="🔄 Refresh Index from Subfolders",
-                        font=font, command=self.refresh_prompt_index)
-        refresh_button.pack(side="left", padx=10)
-        Tooltip(refresh_button, self.parent_app.tooltips.get("refresh_prompt_index_button", ""))
-
-        save_mode_button = ctk.CTkButton(button_frame, text="💾 Save as Mode",
-                        font=font, command=self.save_as_mode)
-        save_mode_button.pack(side="left", padx=10)
-        Tooltip(save_mode_button, self.parent_app.tooltips.get("save_as_mode_button", ""))
-
-        # Frame for the list
-        list_frame = ctk.CTkFrame(self.tab_prompt)
-        list_frame.pack(expand=True, fill="both", padx=20, pady=10)
-
-        self.prompt_dnd_list = DraggableListbox(list_frame, label_text="Indexed Files (drag to reorder)", command=self.on_prompt_list_reorder)
-        self.prompt_dnd_list.pack(expand=True, fill="both", padx=5, pady=5)
-
-        self.update_prompt_file_list()
-
-        # --- Mode Management ---
-        mode_management_frame = ctk.CTkFrame(self.tab_prompt)
-        mode_management_frame.pack(expand=True, fill="both", padx=20, pady=10)
-
-        ctk.CTkLabel(mode_management_frame, text="Mode Management", font=title_font).pack(pady=10)
-
-        # Frame for the list of modes and buttons
-        mode_content_frame = ctk.CTkFrame(mode_management_frame)
-        mode_content_frame.pack(expand=True, fill="both", padx=10, pady=5)
-        mode_content_frame.grid_columnconfigure(0, weight=1)
-        mode_content_frame.grid_rowconfigure(0, weight=1)
-
-        # Listbox for modes
-        self.modes_listbox = ctk.CTkScrollableFrame(mode_content_frame, label_text="Saved Modes")
-        self.modes_listbox.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        self.selected_mode_label = None
-
-        # Frame for mode buttons
-        mode_button_frame = ctk.CTkFrame(mode_content_frame, fg_color="transparent")
-        mode_button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
-
-        load_mode_button = ctk.CTkButton(mode_button_frame, text="Load Mode", command=self.load_selected_mode)
-        load_mode_button.pack(padx=10, pady=10, anchor="n")
-        Tooltip(load_mode_button, "Loads the selected mode, overwriting the current prompt build order.")
-
-        delete_mode_button = ctk.CTkButton(mode_button_frame, text="Delete Mode", command=self.delete_selected_mode)
-        delete_mode_button.pack(padx=10, pady=10, anchor="n")
-        Tooltip(delete_mode_button, "Deletes the selected mode file.")
-
-        self.update_modes_list()
-
-
-    def on_prompt_list_reorder(self, new_order: List[str]):
-        """Callback function to save the new prompt order."""
-        print(f"New prompt order: {new_order}")
-        # Save the new order to the master index file
-        master_index_path = self.parent_app.snapshot_loader.master_index_path
-        try:
-            with open(master_index_path, 'w', encoding='utf-8') as f:
-                json.dump(new_order, f, indent=2)
-            print(f"Master index saved to {master_index_path}")
-            # Rebuild the master prompt file using the new order
-            self.parent_app.snapshot_loader._build_master_prompt_file(new_order)
-            self.parent_app.update_status("Prompt order saved and rebuilt", LYRN_SUCCESS)
-        except IOError as e:
-            print(f"Error writing master index file {master_index_path}: {e}")
-            self.parent_app.update_status("Error saving prompt order", LYRN_ERROR)
 
     def create_personality_tab(self):
         """Creates the personality tab UI."""
@@ -1613,178 +1689,6 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
             self._save_personality_data()
             self.populate_personality_presets()
             self.personality_preset_var.set(preset_name)
-
-    def update_prompt_file_list(self):
-        """Reads the master index and displays it in the draggable list."""
-        # Clear existing widgets
-        self.prompt_dnd_list.clear()
-
-        # Get the master index from the snapshot_loader instance
-        master_index_path = self.parent_app.snapshot_loader.master_index_path
-        try:
-            with open(master_index_path, 'r', encoding='utf-8') as f:
-                index_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            index_data = [] # If file doesn't exist or is invalid, show an empty list
-
-        if not index_data:
-            ctk.CTkLabel(self.prompt_dnd_list, text="No files in index. Click Refresh to generate.").pack(pady=10)
-            return
-
-        for filepath in index_data:
-            self.prompt_dnd_list.add_item(filepath)
-
-    def refresh_prompt_index(self):
-        """Calls the prompt builder to regenerate the index and updates the UI."""
-        print("UI triggered prompt index refresh.")
-        self.parent_app.snapshot_loader.generate_master_index()
-        self.update_prompt_file_list()
-        self.parent_app.update_status("Prompt index refreshed", LYRN_SUCCESS)
-
-    def save_as_mode(self):
-        """Saves the current master prompt as a new mode."""
-        dialog = ctk.CTkInputDialog(text="Enter a name for this mode:", title="Save Mode")
-        mode_name = dialog.get_input()
-
-        if mode_name:
-            # Sanitize the mode name to be a valid filename
-            safe_mode_name = "".join(c for c in mode_name if c.isalnum() or c in (' ', '_')).rstrip()
-            if not safe_mode_name:
-                print("Invalid mode name provided.")
-                # Optionally, show an error to the user
-                return
-
-            modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-            os.makedirs(modes_dir, exist_ok=True)
-
-            master_prompt_path = self.parent_app.snapshot_loader.master_prompt_path
-            mode_filepath = os.path.join(modes_dir, f"{safe_mode_name}.txt")
-
-            try:
-                with open(master_prompt_path, 'r', encoding='utf-8') as f_read:
-                    content = f_read.read()
-
-                with open(mode_filepath, 'w', encoding='utf-8') as f_write:
-                    f_write.write(content)
-
-                print(f"Mode '{safe_mode_name}' saved successfully to {mode_filepath}")
-                self.parent_app.update_status(f"Mode '{safe_mode_name}' saved", LYRN_SUCCESS)
-
-                # Refresh the mode dropdown in the main GUI
-                if hasattr(self.parent_app, 'update_modes_dropdown'):
-                    self.parent_app.update_modes_dropdown()
-
-            except FileNotFoundError:
-                print(f"Error: Master prompt file not found at {master_prompt_path}")
-                self.parent_app.update_status("Error: Master prompt not found", LYRN_ERROR)
-            except Exception as e:
-                print(f"Error saving mode: {e}")
-                self.parent_app.update_status(f"Error saving mode", LYRN_ERROR)
-
-    def update_modes_list(self):
-        """Scans the modes directory and populates the listbox."""
-        for widget in self.modes_listbox.winfo_children():
-            widget.destroy()
-
-        self.selected_mode_label = None
-        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-        if not os.path.exists(modes_dir):
-            ctk.CTkLabel(self.modes_listbox, text="No 'modes' directory found.").pack()
-            return
-
-        try:
-            mode_files = [f for f in os.listdir(modes_dir) if f.endswith(".txt")]
-            mode_names = [os.path.splitext(f)[0] for f in mode_files]
-
-            if not mode_names:
-                ctk.CTkLabel(self.modes_listbox, text="No modes saved yet.").pack()
-                return
-
-            for mode_name in sorted(mode_names):
-                label = ctk.CTkLabel(self.modes_listbox, text=mode_name, anchor="w", cursor="hand2")
-                label.pack(fill="x", padx=10, pady=2)
-                label.bind("<Button-1>", lambda e, l=label: self._on_mode_selected(l))
-
-        except Exception as e:
-            print(f"Error loading modes: {e}")
-            ctk.CTkLabel(self.modes_listbox, text="Error loading modes.").pack()
-
-    def _on_mode_selected(self, selected_label):
-        """Handles the selection of a mode in the list."""
-        # Reset color of previously selected label
-        for child in self.modes_listbox.winfo_children():
-            if isinstance(child, ctk.CTkLabel):
-                 child.configure(fg_color="transparent")
-
-        # Highlight the new selection
-        selected_label.configure(fg_color=self.theme_manager.get_color("accent"))
-        self.selected_mode_label = selected_label
-
-    def load_selected_mode(self):
-        """Loads the content of the selected mode into the master prompt."""
-        if not self.selected_mode_label:
-            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
-            return
-
-        mode_name = self.selected_mode_label.cget("text")
-        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
-
-        if not os.path.exists(mode_filepath):
-            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
-            self.update_modes_list()
-            return
-
-        try:
-            with open(mode_filepath, 'r', encoding='utf-8') as f:
-                mode_content = f.read()
-
-            master_prompt_path = self.parent_app.snapshot_loader.master_prompt_path
-            with open(master_prompt_path, 'w', encoding='utf-8') as f:
-                f.write(mode_content)
-
-            # After loading, we need to refresh the prompt index and the draggable list
-            self.refresh_prompt_index()
-
-            self.parent_app.update_status(f"Mode '{mode_name}' loaded successfully.", LYRN_SUCCESS)
-
-        except Exception as e:
-            print(f"Error loading mode '{mode_name}': {e}")
-            self.parent_app.update_status(f"Error loading mode.", LYRN_ERROR)
-
-    def delete_selected_mode(self):
-        """Deletes the selected mode file."""
-        if not self.selected_mode_label:
-            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
-            return
-
-        mode_name = self.selected_mode_label.cget("text")
-
-        dialog = ctk.CTkInputDialog(text=f"Type DELETE to confirm deleting mode '{mode_name}':", title="Confirm Deletion")
-        confirmation = dialog.get_input()
-
-        if confirmation != "DELETE":
-            self.parent_app.update_status("Mode deletion cancelled.", LYRN_INFO)
-            return
-
-        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
-
-        if not os.path.exists(mode_filepath):
-            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
-            self.update_modes_list()
-            return
-
-        try:
-            os.remove(mode_filepath)
-            self.parent_app.update_status(f"Mode '{mode_name}' deleted.", LYRN_SUCCESS)
-            self.update_modes_list()
-            # Also refresh the main UI dropdown
-            if hasattr(self.parent_app, 'update_modes_dropdown'):
-                self.parent_app.update_modes_dropdown()
-        except Exception as e:
-            print(f"Error deleting mode '{mode_name}': {e}")
-            self.parent_app.update_status(f"Error deleting mode.", LYRN_ERROR)
 
     def load_current_settings(self):
         """Load current settings into all tabs"""
@@ -1994,6 +1898,308 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
 
         except Exception as e:
             print(f"Error saving settings: {e}")
+
+
+class PromptBuilderPopup(ctk.CTkToplevel):
+    """A popup window for building and managing the system prompt."""
+    def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
+        super().__init__(parent)
+        self.theme_manager = theme_manager
+        self.language_manager = language_manager
+        self.snapshot_loader = snapshot_loader
+        self.parent_app = parent
+
+        self.title("System Prompt Builder")
+        self.geometry("800x700") # Increased height a bit
+        self.minsize(600, 500)
+
+        self.transient(parent)
+
+        self.on_top_var = ctk.BooleanVar(value=False)
+
+        self.create_widgets()
+        self.apply_theme()
+        self.update_modes_list()
+        self.toggle_on_top() # Set initial state
+
+    def create_widgets(self):
+        """Create the prompt manager tab UI."""
+        try:
+            font = ctk.CTkFont(family="Consolas", size=12)
+            title_font = ctk.CTkFont(family="Consolas", size=14, weight="bold")
+        except:
+            font = ("Consolas", 12)
+            title_font = ("Consolas", 14, "bold")
+
+        ctk.CTkLabel(self, text="Prompt Build Order", font=title_font).pack(pady=10)
+
+        # Frame for buttons
+        button_frame = ctk.CTkFrame(self)
+        button_frame.pack(fill="x", padx=20, pady=10)
+
+        refresh_button = ctk.CTkButton(button_frame, text="🔄 Refresh Index from Subfolders",
+                        font=font, command=self.refresh_prompt_index)
+        refresh_button.pack(side="left", padx=10)
+        Tooltip(refresh_button, self.parent_app.tooltips.get("refresh_prompt_index_button", ""))
+
+        save_mode_button = ctk.CTkButton(button_frame, text="💾 Save as Mode",
+                        font=font, command=self.save_as_mode)
+        save_mode_button.pack(side="left", padx=10)
+        Tooltip(save_mode_button, self.parent_app.tooltips.get("save_as_mode_button", ""))
+
+        self.on_top_checkbox = ctk.CTkCheckBox(button_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
+        self.on_top_checkbox.pack(side="right", padx=10)
+
+        # Frame for the list
+        list_frame = ctk.CTkFrame(self)
+        list_frame.pack(expand=True, fill="both", padx=20, pady=10)
+
+        self.prompt_dnd_list = DraggableListbox(list_frame, label_text="Indexed Files (drag to reorder)", command=self.on_prompt_list_reorder)
+        self.prompt_dnd_list.pack(expand=True, fill="both", padx=5, pady=5)
+
+        self.update_prompt_file_list()
+
+        # --- Mode Management ---
+        mode_management_frame = ctk.CTkFrame(self)
+        mode_management_frame.pack(expand=True, fill="both", padx=20, pady=10)
+
+        ctk.CTkLabel(mode_management_frame, text="Mode Management", font=title_font).pack(pady=10)
+
+        # Frame for the list of modes and buttons
+        mode_content_frame = ctk.CTkFrame(mode_management_frame)
+        mode_content_frame.pack(expand=True, fill="both", padx=10, pady=5)
+        mode_content_frame.grid_columnconfigure(0, weight=1)
+        mode_content_frame.grid_rowconfigure(0, weight=1)
+
+        # Listbox for modes
+        self.modes_listbox = ctk.CTkScrollableFrame(mode_content_frame, label_text="Saved Modes")
+        self.modes_listbox.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.selected_mode_label = None
+
+        # Frame for mode buttons
+        mode_button_frame = ctk.CTkFrame(mode_content_frame, fg_color="transparent")
+        mode_button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
+
+        load_mode_button = ctk.CTkButton(mode_button_frame, text="Load Mode", command=self.load_selected_mode)
+        load_mode_button.pack(padx=10, pady=10, anchor="n")
+        Tooltip(load_mode_button, "Loads the selected mode, overwriting the current prompt build order.")
+
+        delete_mode_button = ctk.CTkButton(mode_button_frame, text="Delete Mode", command=self.delete_selected_mode)
+        delete_mode_button.pack(padx=10, pady=10, anchor="n")
+        Tooltip(delete_mode_button, "Deletes the selected mode file.")
+
+    def toggle_on_top(self):
+        """Toggles the always-on-top status of the window."""
+        is_on_top = self.on_top_var.get()
+        self.attributes("-topmost", is_on_top)
+
+    def apply_theme(self):
+        """Apply the current theme to the popup's widgets."""
+        # This will be properly implemented later. For now, just a basic background.
+        tm = self.theme_manager
+        frame_bg = tm.get_color("frame_bg")
+        self.configure(fg_color=frame_bg)
+
+    def on_prompt_list_reorder(self, new_order: List[dict]):
+        """Callback function to save the new prompt order."""
+        print(f"New prompt order: {new_order}")
+        # Save the new order to the master index file
+        master_index_path = self.parent_app.snapshot_loader.master_index_path
+        try:
+            with open(master_index_path, 'w', encoding='utf-8') as f:
+                json.dump(new_order, f, indent=2)
+            print(f"Master index saved to {master_index_path}")
+            # Rebuild the master prompt file using the new order
+            self.parent_app.snapshot_loader._build_master_prompt_file(new_order)
+            self.parent_app.update_status("Prompt order saved and rebuilt", LYRN_SUCCESS)
+        except IOError as e:
+            print(f"Error writing master index file {master_index_path}: {e}")
+            self.parent_app.update_status("Error saving prompt order", LYRN_ERROR)
+
+    def update_prompt_file_list(self):
+        """Reads the master index, handles migration, and displays it in the draggable list."""
+        self.prompt_dnd_list.clear()
+
+        master_index_path = self.parent_app.snapshot_loader.master_index_path
+        try:
+            with open(master_index_path, 'r', encoding='utf-8') as f:
+                index_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            index_data = []
+
+        # Migration logic for old format (list of strings)
+        if index_data and isinstance(index_data[0], str):
+            print("Migrating prompt index to new format...")
+            index_data = [{"path": path, "pinned": False} for path in index_data]
+            try:
+                with open(master_index_path, 'w', encoding='utf-8') as f:
+                    json.dump(index_data, f, indent=2)
+                print("Migration successful.")
+            except IOError as e:
+                print(f"Error saving migrated index: {e}")
+
+        if not index_data:
+            ctk.CTkLabel(self.prompt_dnd_list, text="No files in index. Click Refresh to generate.").pack(pady=10)
+            return
+
+        # Sort by pinned status first
+        index_data.sort(key=lambda x: not x.get("pinned", False))
+
+        for item_data in index_data:
+            self.prompt_dnd_list.add_item(item_data)
+
+    def refresh_prompt_index(self):
+        """Calls the prompt builder to regenerate the index and updates the UI."""
+        print("UI triggered prompt index refresh.")
+        self.parent_app.snapshot_loader.generate_master_index()
+        self.update_prompt_file_list()
+        self.parent_app.update_status("Prompt index refreshed", LYRN_SUCCESS)
+
+    def save_as_mode(self):
+        """Saves the current master prompt as a new mode."""
+        dialog = ctk.CTkInputDialog(text="Enter a name for this mode:", title="Save Mode")
+        mode_name = dialog.get_input()
+
+        if mode_name:
+            # Sanitize the mode name to be a valid filename
+            safe_mode_name = "".join(c for c in mode_name if c.isalnum() or c in (' ', '_')).rstrip()
+            if not safe_mode_name:
+                print("Invalid mode name provided.")
+                # Optionally, show an error to the user
+                return
+
+            modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
+            os.makedirs(modes_dir, exist_ok=True)
+
+            master_prompt_path = self.parent_app.snapshot_loader.master_prompt_path
+            mode_filepath = os.path.join(modes_dir, f"{safe_mode_name}.txt")
+
+            try:
+                with open(master_prompt_path, 'r', encoding='utf-8') as f_read:
+                    content = f_read.read()
+
+                with open(mode_filepath, 'w', encoding='utf-8') as f_write:
+                    f_write.write(content)
+
+                print(f"Mode '{safe_mode_name}' saved successfully to {mode_filepath}")
+                self.parent_app.update_status(f"Mode '{safe_mode_name}' saved", LYRN_SUCCESS)
+
+                # Refresh the mode dropdown in the main GUI
+                if hasattr(self.parent_app, 'update_modes_dropdown'):
+                    self.parent_app.update_modes_dropdown()
+
+            except FileNotFoundError:
+                print(f"Error: Master prompt file not found at {master_prompt_path}")
+                self.parent_app.update_status("Error: Master prompt not found", LYRN_ERROR)
+            except Exception as e:
+                print(f"Error saving mode: {e}")
+                self.parent_app.update_status(f"Error saving mode", LYRN_ERROR)
+
+    def update_modes_list(self):
+        """Scans the modes directory and populates the listbox."""
+        for widget in self.modes_listbox.winfo_children():
+            widget.destroy()
+
+        self.selected_mode_label = None
+        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
+        if not os.path.exists(modes_dir):
+            ctk.CTkLabel(self.modes_listbox, text="No 'modes' directory found.").pack()
+            return
+
+        try:
+            mode_files = [f for f in os.listdir(modes_dir) if f.endswith(".txt")]
+            mode_names = [os.path.splitext(f)[0] for f in mode_files]
+
+            if not mode_names:
+                ctk.CTkLabel(self.modes_listbox, text="No modes saved yet.").pack()
+                return
+
+            for mode_name in sorted(mode_names):
+                label = ctk.CTkLabel(self.modes_listbox, text=mode_name, anchor="w", cursor="hand2")
+                label.pack(fill="x", padx=10, pady=2)
+                label.bind("<Button-1>", lambda e, l=label: self._on_mode_selected(l))
+
+        except Exception as e:
+            print(f"Error loading modes: {e}")
+            ctk.CTkLabel(self.modes_listbox, text="Error loading modes.").pack()
+
+    def _on_mode_selected(self, selected_label):
+        """Handles the selection of a mode in the list."""
+        # Reset color of previously selected label
+        for child in self.modes_listbox.winfo_children():
+            if isinstance(child, ctk.CTkLabel):
+                 child.configure(fg_color="transparent")
+
+        # Highlight the new selection
+        selected_label.configure(fg_color=self.theme_manager.get_color("accent"))
+        self.selected_mode_label = selected_label
+
+    def load_selected_mode(self):
+        """Loads the content of the selected mode into the master prompt."""
+        if not self.selected_mode_label:
+            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
+            return
+
+        mode_name = self.selected_mode_label.cget("text")
+        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
+        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
+
+        if not os.path.exists(mode_filepath):
+            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
+            self.update_modes_list()
+            return
+
+        try:
+            with open(mode_filepath, 'r', encoding='utf-8') as f:
+                mode_content = f.read()
+
+            master_prompt_path = self.parent_app.snapshot_loader.master_prompt_path
+            with open(master_prompt_path, 'w', encoding='utf-8') as f:
+                f.write(mode_content)
+
+            # After loading, we need to refresh the prompt index and the draggable list
+            self.refresh_prompt_index()
+
+            self.parent_app.update_status(f"Mode '{mode_name}' loaded successfully.", LYRN_SUCCESS)
+
+        except Exception as e:
+            print(f"Error loading mode '{mode_name}': {e}")
+            self.parent_app.update_status(f"Error loading mode.", LYRN_ERROR)
+
+    def delete_selected_mode(self):
+        """Deletes the selected mode file."""
+        if not self.selected_mode_label:
+            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
+            return
+
+        mode_name = self.selected_mode_label.cget("text")
+
+        dialog = ctk.CTkInputDialog(text=f"Type DELETE to confirm deleting mode '{mode_name}':", title="Confirm Deletion")
+        confirmation = dialog.get_input()
+
+        if confirmation != "DELETE":
+            self.parent_app.update_status("Mode deletion cancelled.", LYRN_INFO)
+            return
+
+        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
+        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
+
+        if not os.path.exists(mode_filepath):
+            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
+            self.update_modes_list()
+            return
+
+        try:
+            os.remove(mode_filepath)
+            self.parent_app.update_status(f"Mode '{mode_name}' deleted.", LYRN_SUCCESS)
+            self.update_modes_list()
+            # Also refresh the main UI dropdown
+            if hasattr(self.parent_app, 'update_modes_dropdown'):
+                self.parent_app.update_modes_dropdown()
+        except Exception as e:
+            print(f"Error deleting mode '{mode_name}': {e}")
+            self.parent_app.update_status(f"Error deleting mode.", LYRN_ERROR)
+
 
 class ThemeBuilderPopup(ctk.CTkToplevel):
     """A popup window for creating and editing themes."""
@@ -2441,7 +2647,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Interface v6.7")
+        self.title("LYRN-AI Interface v7.2.5")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -2619,81 +2825,36 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         ctk.CTkLabel(self.quick_frame, text="Quick Controls", font=section_font).pack(pady=10)
 
-        self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
-        self.settings_button.pack(fill="x", padx=10, pady=(0, 5))
-        Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
-
-        self.change_model_button = ctk.CTkButton(self.quick_frame, text="🔄 Change Model", command=self.open_model_selector)
-        self.change_model_button.pack(fill="x", padx=10, pady=(0, 5))
-        Tooltip(self.change_model_button, "Open the model selector to change the loaded model.")
-
-        # Theme selection
-        theme_frame = ctk.CTkFrame(self.quick_frame)
-        theme_frame.pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkLabel(theme_frame, text="Theme:", font=normal_font).pack(side="left", padx=5)
-        self.theme_dropdown = ctk.CTkComboBox(
-            theme_frame,
-            values=self.theme_manager.get_theme_names(),
-            command=self.on_theme_selected
-        )
-        self.theme_dropdown.pack(side="right", padx=5, expand=True, fill="x")
-        self.theme_dropdown.set(self.theme_manager.get_current_theme_name())
-        Tooltip(self.theme_dropdown, self.tooltips.get("theme_dropdown", ""))
-
-        # Font size controls
-        font_frame = ctk.CTkFrame(self.quick_frame)
-        font_frame.pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkLabel(font_frame, text="Font Size:", font=normal_font).pack(side="left", padx=5)
-        self.font_decrease_button = ctk.CTkButton(font_frame, text="A-", width=30, height=25,
-                     font=normal_font,
-                     command=self.decrease_font_size)
-        self.font_decrease_button.pack(side="right", padx=2)
-        Tooltip(self.font_decrease_button, self.tooltips.get("font_decrease_button", ""))
-
-        self.font_increase_button = ctk.CTkButton(font_frame, text="A+", width=30, height=25,
-                     font=normal_font,
-                     command=self.increase_font_size)
-        self.font_increase_button.pack(side="right", padx=2)
-        Tooltip(self.font_increase_button, self.tooltips.get("font_increase_button", ""))
-
-        # Mode selection
-        mode_frame = ctk.CTkFrame(self.quick_frame)
-        mode_frame.pack(fill="x", padx=10, pady=5)
-        ctk.CTkLabel(mode_frame, text="Mode:", font=normal_font).pack(side="left", padx=5)
-        self.mode_dropdown = ctk.CTkComboBox(
-            mode_frame,
-            values=[],
-            command=self.on_mode_selected
-        )
-        self.mode_dropdown.pack(side="left", expand=True, fill="x", padx=5)
-        Tooltip(self.mode_dropdown, self.tooltips.get("mode_dropdown", ""))
-
-        self.refresh_prompt_button = ctk.CTkButton(mode_frame, text="🔄", width=30, height=25,
-                                         font=normal_font,
-                                         command=self.refresh_prompt_from_mode)
-        self.refresh_prompt_button.pack(side="right", padx=2)
-        Tooltip(self.refresh_prompt_button, self.tooltips.get("refresh_prompt_button", ""))
-
-        self.update_modes_dropdown()
-
-        # Other controls moved from System Controls
+        # Reordered as per user request
         self.show_llm_log_button = ctk.CTkButton(self.quick_frame, text="📋 View Logs",
                                                  font=normal_font, command=self.toggle_log_viewer)
-        self.show_llm_log_button.pack(padx=10, pady=3, fill="x")
+        self.show_llm_log_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.show_llm_log_button, self.tooltips.get("show_llm_log_button", ""))
 
-        self.clear_chat_folder_button = ctk.CTkButton(self.quick_frame, text="📁 Clear Chat Folder",
+        chat_folder_frame = ctk.CTkFrame(self.quick_frame)
+        chat_folder_frame.pack(fill="x", padx=10, pady=3)
+
+        self.clear_chat_folder_button = ctk.CTkButton(chat_folder_frame, text="Clear Chat Folder",
                                                       font=normal_font, command=self.clear_chat_folder)
-        self.clear_chat_folder_button.pack(padx=10, pady=3, fill="x")
+        self.clear_chat_folder_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         Tooltip(self.clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
 
-        # self.personality_button moved to settings
+        self.open_chat_folder_button = ctk.CTkButton(chat_folder_frame, text="📂", width=40,
+                                                     font=normal_font, command=self.open_chat_folder)
+        self.open_chat_folder_button.pack(side="left")
+        Tooltip(self.open_chat_folder_button, "Open chat folder in file explorer.")
 
         self.terminal_button = ctk.CTkButton(self.quick_frame, text="📟 Code Terminal", command=self.open_terminal)
         self.terminal_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.terminal_button, "Opens a new terminal in the specified directory.")
+
+        self.prompt_builder_button = ctk.CTkButton(self.quick_frame, text="📝 System Prompt", command=self.open_prompt_builder)
+        self.prompt_builder_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.prompt_builder_button, "Open the System Prompt Builder window.")
+
+        self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
+        self.settings_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
 
         # Add a spacer to push content to the top
         spacer = ctk.CTkFrame(self.left_sidebar, fg_color="transparent")
@@ -2872,22 +3033,41 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         # Restored textbox for general status messages
         self.status_textbox = ctk.CTkTextbox(self.status_frame, height=50, wrap="char", font=status_font)
-        self.status_textbox.pack(fill="x", pady=5)
+        self.status_textbox.pack(fill="x", padx=10, pady=5)
         self.status_textbox.insert("end", "System ready.")
         self.status_textbox.configure(state="disabled")
 
-        # New frame for the buttons
-        button_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
-        button_frame.pack(fill="x", pady=5)
-
-        # Model Control Buttons that fill the space
-        self.offload_model_button = ctk.CTkButton(button_frame, text="Offload", font=normal_font, command=self.offload_model)
-        self.offload_model_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        # Model Control Buttons
+        self.offload_model_button = ctk.CTkButton(self.status_frame, text="Offload Model", font=normal_font, command=self.offload_model)
+        self.offload_model_button.pack(fill="x", padx=10, pady=(5, 2))
         Tooltip(self.offload_model_button, self.tooltips.get("offload_model_button", ""))
 
-        self.load_model_button = ctk.CTkButton(button_frame, text="Load", font=normal_font, command=self.reload_model_full)
-        self.load_model_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
+        self.load_model_button = ctk.CTkButton(self.status_frame, text="Load Model", font=normal_font, command=self.reload_model_full)
+        self.load_model_button.pack(fill="x", padx=10, pady=(2, 5))
         Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
+
+        # --- Relocated Controls ---
+        self.change_model_button = ctk.CTkButton(self.status_frame, text="🔄 Change Model", command=self.open_model_selector)
+        self.change_model_button.pack(fill="x", padx=10, pady=(10, 5))
+        Tooltip(self.change_model_button, "Open the model selector to change the loaded model.")
+
+        mode_frame = ctk.CTkFrame(self.status_frame)
+        mode_frame.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(mode_frame, text="Mode:", font=normal_font).pack(side="left", padx=5)
+        self.mode_dropdown = ctk.CTkComboBox(
+            mode_frame,
+            values=[],
+            command=self.on_mode_selected
+        )
+        self.mode_dropdown.pack(side="left", expand=True, fill="x", padx=5)
+        Tooltip(self.mode_dropdown, self.tooltips.get("mode_dropdown", ""))
+
+        self.refresh_prompt_button = ctk.CTkButton(mode_frame, text="🔄", width=30, height=25,
+                                         font=normal_font,
+                                         command=self.refresh_prompt_from_mode)
+        self.refresh_prompt_button.pack(side="right", padx=2)
+        Tooltip(self.refresh_prompt_button, self.tooltips.get("refresh_prompt_button", ""))
+        # --- End Relocated Controls ---
 
         # Loading Progress Bar (hidden by default)
         self.loading_progressbar = ctk.CTkProgressBar(self.status_frame, mode='indeterminate')
@@ -3195,6 +3375,15 @@ Enhanced LYRN-AI system with advanced features active.
         else:
             self.settings_dialog.lift()
             self.settings_dialog.focus()
+
+    def open_prompt_builder(self):
+        """Opens the prompt builder popup window."""
+        if not hasattr(self, 'prompt_builder_popup') or not self.prompt_builder_popup.winfo_exists():
+            self.prompt_builder_popup = PromptBuilderPopup(self, self.theme_manager, self.language_manager, self.snapshot_loader)
+            self.prompt_builder_popup.focus()
+        else:
+            self.prompt_builder_popup.lift()
+            self.prompt_builder_popup.focus()
 
     def toggle_log_viewer(self):
         """Creates, shows, or focuses the LLM log viewer window."""
@@ -3619,6 +3808,29 @@ Enhanced LYRN-AI system with advanced features active.
             self.update_status("Chat display cleared", LYRN_INFO)
         except Exception as e:
             print(f"Error clearing chat: {e}")
+
+    def open_chat_folder(self):
+        """Opens the configured chat directory in the system's file explorer."""
+        if not self.settings_manager.settings:
+            self.update_status("Settings not loaded.", LYRN_ERROR)
+            return
+
+        chat_dir = self.settings_manager.settings["paths"].get("chat", "")
+        if not chat_dir or not os.path.isdir(chat_dir):
+            self.update_status("Chat directory not configured or found.", LYRN_WARNING)
+            return
+
+        try:
+            if sys.platform == "win32":
+                os.startfile(os.path.realpath(chat_dir))
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", chat_dir])
+            else:
+                subprocess.Popen(["xdg-open", chat_dir])
+            self.update_status("Opened chat folder.", LYRN_INFO)
+        except Exception as e:
+            self.update_status(f"Error opening folder: {e}", LYRN_ERROR)
+            print(f"Error opening folder: {e}")
 
     def clear_chat_folder(self):
         """Deletes all files in the chat directory."""
