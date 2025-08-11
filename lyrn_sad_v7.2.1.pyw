@@ -3036,7 +3036,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         # Frame for title and status light
         title_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
-        title_frame.pack(fill="x", pady=(10, 5))
+        title_frame.pack(pady=(10, 5))
 
         ctk.CTkLabel(title_frame, text="System Status", font=section_font).pack(side="left", padx=(0, 10))
 
