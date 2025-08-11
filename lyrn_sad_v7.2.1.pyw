@@ -3034,7 +3034,15 @@ class LyrnAIInterface(ctk.CTkToplevel):
             status_font = ("Consolas", 12, "bold")
             normal_font = ("Consolas", self.current_font_size)
 
-        ctk.CTkLabel(self.status_frame, text="System Status", font=section_font).pack(pady=(10, 5))
+        # Frame for title and status light
+        title_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
+        title_frame.pack(fill="x", pady=(10, 5))
+
+        ctk.CTkLabel(title_frame, text="System Status", font=section_font).pack(side="left", padx=(0, 10))
+
+        self.model_status_progress_bar = ctk.CTkProgressBar(title_frame, width=80, height=15)
+        self.model_status_progress_bar.set(1) # Set to 100%
+        self.model_status_progress_bar.pack(side="left")
 
         # Restored textbox for general status messages
         self.status_textbox = ctk.CTkTextbox(self.status_frame, height=50, wrap="char", font=status_font)
@@ -3042,22 +3050,18 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.status_textbox.insert("end", "System ready.")
         self.status_textbox.configure(state="disabled")
 
-        # New model status indicator section
-        model_status_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
-        model_status_frame.pack(fill="x", pady=5)
+        # New frame for the buttons
+        button_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=5)
 
-        self.model_status_progress_bar = ctk.CTkProgressBar(model_status_frame, width=150, height=15)
-        self.model_status_progress_bar.set(1) # Set to 100%
-        self.model_status_progress_bar.pack(side="left")
-
-        # Model Control Buttons
-        self.load_model_button = ctk.CTkButton(model_status_frame, text="Load", width=50, font=normal_font, command=self.reload_model_full)
-        self.load_model_button.pack(side="right", padx=(5, 0))
-        Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
-
-        self.offload_model_button = ctk.CTkButton(model_status_frame, text="Offload", width=50, font=normal_font, command=self.offload_model)
-        self.offload_model_button.pack(side="right", padx=(5, 0))
+        # Model Control Buttons that fill the space
+        self.offload_model_button = ctk.CTkButton(button_frame, text="Offload", font=normal_font, command=self.offload_model)
+        self.offload_model_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         Tooltip(self.offload_model_button, self.tooltips.get("offload_model_button", ""))
+
+        self.load_model_button = ctk.CTkButton(button_frame, text="Load", font=normal_font, command=self.reload_model_full)
+        self.load_model_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
+        Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
 
         # Loading Progress Bar (hidden by default)
         self.loading_progressbar = ctk.CTkProgressBar(self.status_frame, mode='indeterminate')
