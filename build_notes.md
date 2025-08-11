@@ -1,5 +1,24 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.6 - Job Automation Logging (2025-08-11)
+
+This update introduces a new structured logging system specifically for job automation. The goal is to create a detailed, machine-readable log of each interaction, which can be monitored by an external "watcher" script to trigger automated workflows.
+
+- **Structured Chat Logger:**
+    - A new `StructuredChatLogger` class has been added to handle the creation of timestamped log files.
+    - For each user interaction, a new log file is created (e.g., `chat_20250811_102000_123456.txt`).
+
+- **Tagged Log Content:**
+    - The logger saves the interaction in three distinct, tagged sections within the same file:
+        - The user's input is saved under `#USER_START#` and `#USER_END#`.
+        - The model's internal "thinking" process (text between `<thinking>` tags) is saved under `#THINKING_START#` and `#THINKING_END#`.
+        - The final, complete response from the assistant is saved under `#RESPONSE_START#` and `#RESPONSE_END#`.
+    - This structured format allows an external script to easily parse the different components of the conversation for automation purposes.
+
+- **Integration:**
+    - The new logger is integrated into the main chat workflow. It captures user input, thinking, and the final response, and logs them to the appropriate file.
+    - The previous chat saving mechanism (`save_chat_message`) has been deprecated to avoid redundancy.
+
 ## v7.2.5 - Prompt Builder Overhaul (2025-08-11)
 
 This update completely revamps the System Prompt Builder for a significantly improved user experience and adds powerful new features for managing prompt components.
