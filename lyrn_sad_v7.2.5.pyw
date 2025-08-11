@@ -1479,11 +1479,6 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
         open_theme_builder_button.pack(side="left", padx=5, pady=5)
         Tooltip(open_theme_builder_button, "Open the live theme editor popup.")
 
-        open_prompt_builder_button = ctk.CTkButton(util_frame, text="Open System Prompt Maker",
-                        font=font, command=self.parent_app.open_prompt_builder)
-        open_prompt_builder_button.pack(side="left", padx=5, pady=5)
-        Tooltip(open_prompt_builder_button, "Open the system prompt builder window.")
-
         # Add checkbox for re-enabling model selector
         # Model Loading Control Section
         model_loading_frame = ctk.CTkFrame(self.tab_advanced)
@@ -2789,6 +2784,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
         self.settings_button.pack(fill="x", padx=10, pady=(0, 5))
         Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
+
+        self.prompt_builder_button = ctk.CTkButton(self.quick_frame, text="📝 System Prompt", command=self.open_prompt_builder)
+        self.prompt_builder_button.pack(fill="x", padx=10, pady=(0, 5))
+        Tooltip(self.prompt_builder_button, "Open the System Prompt Builder window.")
 
         self.change_model_button = ctk.CTkButton(self.quick_frame, text="🔄 Change Model", command=self.open_model_selector)
         self.change_model_button.pack(fill="x", padx=10, pady=(0, 5))
