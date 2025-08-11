@@ -1,5 +1,25 @@
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
+## v7.2.3 - Settings Refactor & UI Cleanup (2025-08-11)
+
+This update focuses on streamlining the settings window and improving user workflow based on feedback.
+
+- **Settings Window Refactor:**
+    - The "Model Config" tab has been removed from the settings window to reduce redundancy, as model selection is handled by the "Change Model" button on the main screen.
+    - The "Theme Builder" tab has been removed. The theme builder is still accessible via a button in the "Advanced" tab.
+    - The "Personality" editor, formerly a popup, has been moved into its own dedicated "Personality" tab within the settings window.
+    - The "Reload Model (Full)" button has been removed from the "Advanced" tab to simplify the UI.
+
+- **Prompt Manager Enhancements:**
+    - The "Prompt Manager" tab in settings now includes a "Mode Management" section.
+    - Users can now view all saved modes in a list.
+    - A "Load Mode" button allows users to activate a saved mode, which updates the current prompt build order.
+    - A "Delete Mode" button allows users to permanently remove a saved mode.
+
+- **Chat History:**
+    - Clarified that the chat history is saved as individual `.txt` files.
+    - The save location is visible and configurable in the settings window under `Directory Paths -> Chat Directory`.
+
 ## v7.2.2 - UI Enhancements & Feature Additions (2025-08-11)
 
 This update focuses on quality-of-life improvements, new features, and better project organization.
