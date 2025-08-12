@@ -3921,7 +3921,7 @@ Enhanced LYRN-AI system with advanced features active.
                 (ctk.CTkComboBox, {"button_color": primary_color, "button_hover_color": button_hover_color}),
                 (ctk.CTkFrame, {"fg_color": frame_bg, "border_color": border_color}),
                 (ctk.CTkLabel, {"text_color": label_text}),
-                (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": accent_color}),
+                (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
                 (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color})
             ]:
                 for widget in self.find_widgets_recursively(self, widget_type):
