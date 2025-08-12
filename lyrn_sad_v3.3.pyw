@@ -979,9 +979,10 @@ class ConsoleRedirector:
 class ThemedPopup(ctk.CTkToplevel):
     """A base class for popups that handles automatic theming."""
     def __init__(self, parent, theme_manager, **kwargs):
-        super().__init__(parent, **kwargs)
         self.parent_app = parent
         self.theme_manager = theme_manager
+        frame_bg = self.theme_manager.get_color("frame_bg")
+        super().__init__(parent, fg_color=frame_bg, **kwargs)
 
     def apply_theme(self):
         """Applies the current theme colors to all widgets in this popup."""
