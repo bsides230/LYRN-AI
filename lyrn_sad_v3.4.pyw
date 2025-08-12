@@ -28,10 +28,11 @@ from pathlib import Path
 import shutil
 from tkinter import colorchooser, filedialog
 from delta_manager import DeltaManager
-from automation_controller import AutomationController
+from automation_controller import AutomationController, Job
 from heartbeat import get_heartbeat_job_prompt
 from file_lock import SimpleFileLock
 from job_watcher_manager import JobWatcherManager, WatcherJob
+from affordance_manager import AffordanceManager, Affordance
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -60,7 +61,7 @@ SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.json")
 THEME_PATH = os.path.join(SCRIPT_DIR, "lyrn-theme.json")
 
 # LYRN-AI Brand Colors
-LYRN_PURPLE = "#880ED4"
+LYRN_PURPLE = "#7552bf"
 LYRN_ACCENT = "#A855F7"
 LYRN_SUCCESS = "#10B981"
 LYRN_WARNING = "#F59E0B"
@@ -975,10 +976,81 @@ class ConsoleRedirector:
         sys.stdout = self.original_stdout
         sys.stderr = self.original_stderr
 
-class LogViewerPopup(ctk.CTkToplevel):
+class ThemedPopup(ctk.CTkToplevel):
+    """A base class for popups that handles automatic theming."""
+    def __init__(self, parent, theme_manager, **kwargs):
+        self.parent_app = parent
+        self.theme_manager = theme_manager
+        frame_bg = self.theme_manager.get_color("frame_bg")
+        super().__init__(parent, fg_color=frame_bg, **kwargs)
+
+        # Set taskbar icon for all popups
+        try:
+            icon_path = os.path.join(SCRIPT_DIR, "images", "favicon.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"Error setting popup icon: {e}")
+
+        # Make the popup transient for the parent, which can help with window management
+        # and theming on some platforms.
+        self.transient(parent)
+
+    def apply_theme(self):
+        """Applies the current theme colors to all widgets in this popup."""
+        tm = self.theme_manager
+        primary_color = tm.get_color("primary")
+        accent_color = tm.get_color("accent")
+        frame_bg = tm.get_color("frame_bg")
+        textbox_bg = tm.get_color("textbox_bg")
+        textbox_fg = tm.get_color("textbox_fg")
+        label_text = tm.get_color("label_text")
+        border_color = tm.get_color("border_color")
+        button_hover_color = tm.get_color("button_hover", fallback=accent_color)
+
+        self.configure(fg_color=frame_bg)
+
+        widget_configs = [
+            (ctk.CTkButton, {"fg_color": primary_color, "hover_color": button_hover_color}),
+            (ctk.CTkComboBox, {"button_color": primary_color, "button_hover_color": button_hover_color, "border_color": border_color}),
+            (ctk.CTkFrame, {"fg_color": frame_bg, "border_color": border_color}),
+            (ctk.CTkLabel, {"text_color": label_text}),
+            (ctk.CTkEntry, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
+            (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
+            (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
+            (ctk.CTkCheckBox, {"fg_color": primary_color}),
+            (ctk.CTkSwitch, {"progress_color": accent_color}),
+            (ctk.CTkProgressBar, {"progress_color": primary_color}),
+            (ctk.CTkSlider, {"button_color": primary_color, "progress_color": accent_color}),
+            (ctk.CTkTabview, {
+                "segmented_button_selected_color": primary_color,
+                "segmented_button_selected_hover_color": accent_color,
+                "fg_color": frame_bg
+            })
+        ]
+
+        for widget_type, config in widget_configs:
+            for widget in self.find_widgets_recursively(self, widget_type):
+                try:
+                    # Special handling for frames that should be transparent
+                    if isinstance(widget, ctk.CTkFrame) and widget.cget("fg_color") == "transparent":
+                        continue
+                    widget.configure(**config)
+                except Exception:
+                    pass  # Ignore if a widget doesn't support a property
+
+    def find_widgets_recursively(self, widget, widget_type):
+        widgets = []
+        if isinstance(widget, widget_type):
+            widgets.append(widget)
+        for child in widget.winfo_children():
+            widgets.extend(self.find_widgets_recursively(child, widget_type))
+        return widgets
+
+class LogViewerPopup(ThemedPopup):
     """A popup window that displays redirected console output."""
     def __init__(self, parent, log_queue: queue.Queue, settings_manager: SettingsManager, theme_manager: ThemeManager):
-        super().__init__(parent)
+        super().__init__(parent=parent, theme_manager=theme_manager)
         self.log_queue = log_queue
         self.settings_manager = settings_manager
 
@@ -1003,6 +1075,7 @@ class LogViewerPopup(ctk.CTkToplevel):
         self.textbox.configure(state="disabled")
 
         self.after(100, self.process_log_queue)
+        self.apply_theme()
 
     def toggle_on_top(self):
         """Toggles the always-on-top status of the log viewer."""
@@ -1068,17 +1141,15 @@ class StructuredChatLogger:
         """Resets the current_log_path to ensure the next write starts a new file."""
         self.current_log_path = None
 
-class ModelSelectorPopup(ctk.CTkToplevel):
+class ModelSelectorPopup(ThemedPopup):
     """A popup window to select a model and configure settings on startup."""
     def __init__(self, parent, settings_manager: SettingsManager, theme_manager: ThemeManager):
-        super().__init__(parent)
-        self.parent_app = parent
+        super().__init__(parent=parent, theme_manager=theme_manager)
         self.settings_manager = settings_manager
 
         self.title("LYRN-AI Model Selector")
         self.geometry("600x450")
         self.minsize(500, 400)
-        self.transient(parent) # Keep popup on top of main window
         self.grab_set() # Modal - prevent interaction with main window
 
         self.model_path = ""
@@ -1089,14 +1160,6 @@ class ModelSelectorPopup(ctk.CTkToplevel):
         self.load_models()
         self.load_current_settings()
         self.apply_theme()
-
-    def apply_theme(self):
-        """Applies the current theme colors to widgets in this popup."""
-        primary_color = self.parent_app.theme_manager.get_color("primary")
-        self.load_button.configure(fg_color=primary_color)
-        # Apply theme to the top bar as well
-        self.configure(fg_color=self.parent_app.theme_manager.get_color("frame_bg"))
-
 
     def create_widgets(self):
         """Create widgets for the popup."""
@@ -1226,17 +1289,15 @@ class ModelSelectorPopup(ctk.CTkToplevel):
         self.grab_release()
         self.destroy()
 
-class CommandPalette(ctk.CTkToplevel):
+class CommandPalette(ThemedPopup):
     def __init__(self, parent, commands: List[Dict[str, any]], theme_manager: ThemeManager):
-        super().__init__(parent)
-        self.parent_app = parent
+        super().__init__(parent=parent, theme_manager=theme_manager)
         self.all_commands = commands
         self.filtered_commands = commands
 
         self.title("Command Palette")
         self.geometry("600x350")
         self.minsize(400, 300)
-        self.transient(parent)
         self.grab_set()
 
         self.grid_rowconfigure(1, weight=1)
@@ -1259,13 +1320,6 @@ class CommandPalette(ctk.CTkToplevel):
 
         self._populate_command_list()
         self.apply_theme()
-
-    def apply_theme(self):
-        """Applies the current theme colors to widgets in this popup."""
-        tm = self.parent_app.theme_manager
-        self.configure(fg_color=tm.get_color("frame_bg"))
-        self.results_frame.configure(fg_color=tm.get_color("frame_bg"))
-        self.search_entry.configure(fg_color=tm.get_color("textbox_bg"), text_color=tm.get_color("textbox_fg"))
 
     def _filter_commands(self, event=None):
         search_term = self.search_entry.get().lower()
@@ -1301,29 +1355,23 @@ class CommandPalette(ctk.CTkToplevel):
         self.destroy()
         self.parent_app.after(50, command_func) # Use after to ensure palette closes first
 
-class TabbedSettingsDialog(ctk.CTkToplevel):
+class TabbedSettingsDialog(ThemedPopup):
     """Enhanced settings dialog with tabs"""
 
     def __init__(self, parent, settings_manager: SettingsManager, theme_manager: ThemeManager, language_manager: LanguageManager):
-        super().__init__(parent)
+        super().__init__(parent=parent, theme_manager=theme_manager)
         self.settings_manager = settings_manager
-        self.theme_manager = theme_manager
         self.language_manager = language_manager
-        self.parent_app = parent
 
         self.title(self.language_manager.get("settings_window_title"))
         self.geometry("900x700")
         self.minsize(800, 600)
-
-        self.transient(parent)
-        self.grab_set()
 
         self.show_model_selector_var = ctk.BooleanVar()
 
         self.create_widgets()
         self.load_current_settings()
         self.apply_theme()
-        # self.refresh_prompt_index() # No longer needed here
 
     def open_theme_builder(self):
         """Opens the theme builder popup."""
@@ -1948,27 +1996,23 @@ class TabbedSettingsDialog(ctk.CTkToplevel):
             print(f"Error saving settings: {e}")
 
 
-class PromptBuilderPopup(ctk.CTkToplevel):
+class PromptBuilderPopup(ThemedPopup):
     """A popup window for building and managing the system prompt."""
     def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
-        super().__init__(parent)
-        self.theme_manager = theme_manager
+        super().__init__(parent=parent, theme_manager=theme_manager)
         self.language_manager = language_manager
         self.snapshot_loader = snapshot_loader
-        self.parent_app = parent
 
         self.title("System Prompt Builder")
         self.geometry("800x700") # Increased height a bit
         self.minsize(600, 500)
 
-        self.transient(parent)
-
         self.on_top_var = ctk.BooleanVar(value=False)
 
         self.create_widgets()
-        self.apply_theme()
         self.update_modes_list()
         self.toggle_on_top() # Set initial state
+        self.apply_theme()
 
     def create_widgets(self):
         """Create the prompt manager tab UI."""
@@ -2040,13 +2084,6 @@ class PromptBuilderPopup(ctk.CTkToplevel):
         """Toggles the always-on-top status of the window."""
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
-
-    def apply_theme(self):
-        """Apply the current theme to the popup's widgets."""
-        # This will be properly implemented later. For now, just a basic background.
-        tm = self.theme_manager
-        frame_bg = tm.get_color("frame_bg")
-        self.configure(fg_color=frame_bg)
 
     def on_prompt_list_reorder(self, new_order: List[dict]):
         """Callback function to save the new prompt order."""
@@ -2249,24 +2286,22 @@ class PromptBuilderPopup(ctk.CTkToplevel):
             self.parent_app.update_status(f"Error deleting mode.", LYRN_ERROR)
 
 
-class ThemeBuilderPopup(ctk.CTkToplevel):
+class ThemeBuilderPopup(ThemedPopup):
     """A popup window for creating and editing themes."""
     def __init__(self, parent, theme_manager, language_manager):
-        super().__init__(parent)
-        self.theme_manager = theme_manager
+        super().__init__(parent=parent.parent_app, theme_manager=theme_manager)
         self.language_manager = language_manager
-        self.parent_app = parent.parent_app # Get the main app reference
 
         self.title("Theme Builder")
         self.geometry("800x650")
         self.minsize(700, 500)
 
-        self.transient(parent)
         self.grab_set()
 
         self.create_theme_builder_widgets()
         self.load_selected_theme(self.theme_manager.get_current_theme_name())
         self.preview_theme()
+        self.apply_theme()
 
 
     def create_theme_builder_widgets(self):
@@ -2503,20 +2538,17 @@ class ThemeBuilderPopup(ctk.CTkToplevel):
             self.parent_app.update_status("Error saving theme", LYRN_ERROR)
 
 
-class JobWatcherPopup(ctk.CTkToplevel):
+class JobWatcherPopup(ThemedPopup):
     """A popup window for managing watcher jobs."""
     def __init__(self, parent, job_watcher_manager: JobWatcherManager, theme_manager: ThemeManager, language_manager: LanguageManager):
-        super().__init__(parent)
-        self.parent_app = parent
+        super().__init__(parent=parent, theme_manager=theme_manager)
         self.job_watcher_manager = job_watcher_manager
-        self.theme_manager = theme_manager
         self.language_manager = language_manager
         self.selected_job_name = None
         self.editing_job_name = None
 
         self.title("Automation")
         self.geometry("900x700")
-        self.transient(parent)
         self.grab_set()
 
         # Main tab view
@@ -2525,12 +2557,95 @@ class JobWatcherPopup(ctk.CTkToplevel):
 
         self.tab_viewer = self.tabview.add("Job Viewer")
         self.tab_builder = self.tabview.add("Job Builder")
+        self.tab_reflection = self.tabview.add("Reflection Cycle")
 
         self.create_viewer_tab()
         self.create_builder_tab()
+        self.create_reflection_tab()
 
         self.refresh_job_list()
         self.tabview.set("Job Viewer")
+        self.apply_theme()
+
+    def create_reflection_tab(self):
+        """Creates the UI for the Reflection Cycle tab."""
+        reflection_frame = ctk.CTkScrollableFrame(self.tab_reflection)
+        reflection_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Reflection Instructions
+        ctk.CTkLabel(reflection_frame, text="Reflection Instructions").pack(anchor="w")
+        self.reflection_instructions_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_instructions_text.pack(fill="x", pady=(0, 10), expand=True)
+
+        # Gold-Standard Example
+        ctk.CTkLabel(reflection_frame, text="Gold-Standard Example").pack(anchor="w")
+        self.reflection_gold_standard_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_gold_standard_text.pack(fill="x", pady=(0, 10), expand=True)
+
+        # Reflection Iterations
+        iterations_frame = ctk.CTkFrame(reflection_frame, fg_color="transparent")
+        iterations_frame.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(iterations_frame, text="Reflection Iterations:").pack(side="left")
+        self.reflection_iterations_entry = ctk.CTkEntry(iterations_frame, width=50)
+        self.reflection_iterations_entry.pack(side="left", padx=5)
+
+        # Reflection Batch Size
+        batch_size_frame = ctk.CTkFrame(reflection_frame, fg_color="transparent")
+        batch_size_frame.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(batch_size_frame, text="Reflect after N outputs:").pack(side="left")
+        self.reflection_batch_size_entry = ctk.CTkEntry(batch_size_frame, width=50)
+        self.reflection_batch_size_entry.pack(side="left", padx=5)
+
+        # Checkboxes
+        self.reflection_auto_update_prompt_var = ctk.BooleanVar()
+        self.reflection_auto_continue_var = ctk.BooleanVar()
+
+        auto_update_checkbox = ctk.CTkCheckBox(reflection_frame, text="Automatically update job prompt", variable=self.reflection_auto_update_prompt_var)
+        auto_update_checkbox.pack(anchor="w", pady=5)
+
+        auto_continue_checkbox = ctk.CTkCheckBox(reflection_frame, text="Auto-continue job after prompt update", variable=self.reflection_auto_continue_var)
+        auto_continue_checkbox.pack(anchor="w", pady=5)
+
+        # Manual Trigger Button
+        manual_trigger_button = ctk.CTkButton(reflection_frame, text="Run Reflection Manually", command=self.run_reflection_manually)
+        manual_trigger_button.pack(pady=20)
+
+    def run_reflection_manually(self):
+        """Triggers the reflection process manually based on the UI settings."""
+        instructions = self.reflection_instructions_text.get("1.0", "end-1c")
+        gold_standard = self.reflection_gold_standard_text.get("1.0", "end-1c")
+        iterations = self.reflection_iterations_entry.get()
+        auto_update = self.reflection_auto_update_prompt_var.get()
+        auto_continue = self.reflection_auto_continue_var.get()
+
+        if not instructions:
+            self.parent_app.update_status("Reflection instructions are required.", LYRN_WARNING)
+            return
+
+        # For manual triggering, we'll use the content of the main chat window as the "job output".
+        job_output = self.parent_app.chat_display.get("1.0", "end-1c")
+        if not job_output.strip():
+            self.parent_app.update_status("Chat display is empty, nothing to reflect on.", LYRN_WARNING)
+            return
+
+        # The 'reflection_cycle_job' expects these arguments.
+        job_args = {
+            "instructions": instructions,
+            "gold_standard": gold_standard,
+            "job_output": job_output,
+            "iterations": iterations,
+            "auto_update": auto_update,
+            "auto_continue": auto_continue,
+            "original_job_name": self.selected_job_name or "manual" # Track which job this reflection is for
+        }
+
+        # Add the reflection job to the queue
+        self.parent_app.automation_controller.add_job(
+            name="reflection_cycle_job",
+            args=job_args
+        )
+
+        self.parent_app.update_status(f"Reflection job for '{job_args['original_job_name']}' added to the queue.", LYRN_SUCCESS)
 
     def create_viewer_tab(self):
         self.tab_viewer.grid_columnconfigure(0, weight=1)
@@ -2725,6 +2840,220 @@ class JobWatcherPopup(ctk.CTkToplevel):
         self.editing_job_name = None
 
 
+class AffordancePopup(ThemedPopup):
+    """A popup window for managing internal affordances."""
+    def __init__(self, parent, affordance_manager: AffordanceManager, theme_manager: ThemeManager, language_manager: LanguageManager):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.affordance_manager = affordance_manager
+        self.language_manager = language_manager
+        self.selected_affordance_name = None
+        self.editing_affordance_name = None
+
+        self.title("Affordance Editor")
+        self.geometry("800x600")
+        self.grab_set()
+
+        self.tabview = ctk.CTkTabview(self, width=750, height=500)
+        self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
+
+        self.tab_viewer = self.tabview.add("Affordance Viewer")
+        self.tab_editor = self.tabview.add("Affordance Editor")
+
+        self.create_viewer_tab()
+        self.create_editor_tab()
+
+        self.refresh_affordance_list()
+        self.tabview.set("Affordance Viewer")
+        self.apply_theme()
+
+    def create_viewer_tab(self):
+        self.tab_viewer.grid_columnconfigure(0, weight=1)
+        self.tab_viewer.grid_rowconfigure(0, weight=1)
+
+        viewer_content_frame = ctk.CTkFrame(self.tab_viewer)
+        viewer_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        viewer_content_frame.grid_columnconfigure(0, weight=1)
+        viewer_content_frame.grid_rowconfigure(0, weight=1)
+
+        self.affordance_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Affordances")
+        self.affordance_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        button_frame = ctk.CTkFrame(viewer_content_frame)
+        button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
+
+        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_affordance)
+        edit_button.pack(padx=10, pady=10, anchor="n")
+
+        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_affordance)
+        delete_button.pack(padx=10, pady=10, anchor="n")
+
+        new_button = ctk.CTkButton(button_frame, text="New", command=self.new_affordance)
+        new_button.pack(padx=10, pady=10, anchor="n")
+
+
+    def refresh_affordance_list(self):
+        for widget in self.affordance_list_frame.winfo_children():
+            widget.destroy()
+
+        all_affordances = self.affordance_manager.get_all_affordances()
+        self.selected_affordance_name = None
+
+        if not all_affordances:
+            ctk.CTkLabel(self.affordance_list_frame, text="No affordances created yet.").pack()
+            return
+
+        for affordance in sorted(all_affordances, key=lambda a: a.name):
+            label = ctk.CTkLabel(self.affordance_list_frame, text=affordance.name, anchor="w", cursor="hand2")
+            label.pack(fill="x", padx=10, pady=2)
+            label.bind("<Button-1>", lambda e, name=affordance.name: self.on_affordance_selected(name))
+
+    def on_affordance_selected(self, name):
+        self.selected_affordance_name = name
+        for child in self.affordance_list_frame.winfo_children():
+            if isinstance(child, ctk.CTkLabel):
+                if child.cget("text") == name:
+                    child.configure(fg_color=self.theme_manager.get_color("accent"))
+                else:
+                    child.configure(fg_color="transparent")
+
+    def edit_selected_affordance(self):
+        if not self.selected_affordance_name:
+            self.parent_app.update_status("No affordance selected to edit.", LYRN_WARNING)
+            return
+
+        affordance = self.affordance_manager.get_affordance(self.selected_affordance_name)
+        if not affordance:
+            self.parent_app.update_status(f"Affordance '{self.selected_affordance_name}' not found.", LYRN_ERROR)
+            return
+
+        self.editing_affordance_name = affordance.name
+
+        self.affordance_name_entry.delete(0, "end")
+        self.affordance_name_entry.insert(0, affordance.name)
+        self.affordance_name_entry.configure(state="disabled")
+
+        self.start_trigger_entry.delete(0, "end")
+        self.start_trigger_entry.insert(0, affordance.start_trigger)
+
+        self.end_trigger_entry.delete(0, "end")
+        self.end_trigger_entry.insert(0, affordance.end_trigger)
+
+        self.output_path_label.configure(text=affordance.output_path)
+
+        self.output_filename_entry.delete(0, "end")
+        self.output_filename_entry.insert(0, affordance.output_filename)
+
+        self.tabview.set("Affordance Editor")
+
+    def delete_selected_affordance(self):
+        if not self.selected_affordance_name:
+            self.parent_app.update_status("No affordance selected to delete.", LYRN_WARNING)
+            return
+
+        dialog = ctk.CTkInputDialog(text=f"Type DELETE to confirm deleting affordance '{self.selected_affordance_name}':", title="Confirm Deletion")
+        confirmation = dialog.get_input()
+
+        if confirmation == "DELETE":
+            self.affordance_manager.delete_affordance(self.selected_affordance_name)
+            self.parent_app.update_status(f"Affordance '{self.selected_affordance_name}' deleted.", LYRN_SUCCESS)
+            self.refresh_affordance_list()
+        else:
+            self.parent_app.update_status("Deletion cancelled.", LYRN_INFO)
+
+    def clear_builder_fields(self):
+        self.editing_affordance_name = None
+        self.affordance_name_entry.configure(state="normal")
+        self.affordance_name_entry.delete(0, "end")
+        self.start_trigger_entry.delete(0, "end")
+        self.end_trigger_entry.delete(0, "end")
+        self.output_path_label.configure(text="No directory selected")
+        self.output_filename_entry.delete(0, "end")
+
+    def new_affordance(self):
+        self.clear_builder_fields()
+        self.tabview.set("Affordance Editor")
+
+    def create_editor_tab(self):
+        editor_frame = ctk.CTkScrollableFrame(self.tab_editor)
+        editor_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Affordance Name
+        ctk.CTkLabel(editor_frame, text="Affordance Name").pack(anchor="w")
+        self.affordance_name_entry = ctk.CTkEntry(editor_frame)
+        self.affordance_name_entry.pack(fill="x", pady=(0, 10))
+        Tooltip(self.affordance_name_entry, "A unique name for this affordance (e.g., 'extract_code_block').")
+
+        # Start Trigger
+        ctk.CTkLabel(editor_frame, text="Start Trigger").pack(anchor="w")
+        self.start_trigger_entry = ctk.CTkEntry(editor_frame)
+        self.start_trigger_entry.pack(fill="x", pady=(0, 10))
+        Tooltip(self.start_trigger_entry, "The text that marks the beginning of the content to extract (e.g., '```python').")
+
+        # End Trigger
+        ctk.CTkLabel(editor_frame, text="End Trigger").pack(anchor="w")
+        self.end_trigger_entry = ctk.CTkEntry(editor_frame)
+        self.end_trigger_entry.pack(fill="x", pady=(0, 10))
+        Tooltip(self.end_trigger_entry, "The text that marks the end of the content to extract (e.g., '```').")
+
+        # Output Path
+        ctk.CTkLabel(editor_frame, text="Output Path").pack(anchor="w")
+        path_frame = ctk.CTkFrame(editor_frame, fg_color="transparent")
+        path_frame.pack(fill="x", pady=(0, 10))
+        self.output_path_label = ctk.CTkLabel(path_frame, text="No directory selected", anchor="w")
+        self.output_path_label.pack(side="left", expand=True, fill="x")
+        select_path_button = ctk.CTkButton(path_frame, text="Select...", width=80, command=self.select_output_path)
+        select_path_button.pack(side="right")
+        Tooltip(select_path_button, "Choose the folder where the output file will be saved.")
+
+        # Output Filename
+        ctk.CTkLabel(editor_frame, text="Output Filename").pack(anchor="w")
+        self.output_filename_entry = ctk.CTkEntry(editor_frame)
+        self.output_filename_entry.pack(fill="x", pady=(0, 10))
+        Tooltip(self.output_filename_entry, "The name of the file to save the extracted content to (e.g., 'extracted_code.py').")
+
+        # Save Button
+        save_button = ctk.CTkButton(self.tab_editor, text="Save Affordance", command=self.save_affordance)
+        save_button.pack(pady=20)
+
+    def select_output_path(self):
+        path = filedialog.askdirectory(title="Select Output Directory for Affordance")
+        if path:
+            self.output_path_label.configure(text=path)
+
+    def save_affordance(self):
+        name = self.affordance_name_entry.get().strip()
+        start_trigger = self.start_trigger_entry.get().strip()
+        end_trigger = self.end_trigger_entry.get().strip()
+        output_path = self.output_path_label.cget("text")
+        output_filename = self.output_filename_entry.get().strip()
+
+        if not all([name, start_trigger, end_trigger, output_path, output_filename]):
+            self.parent_app.update_status("All fields must be filled for an affordance.", LYRN_ERROR)
+            return
+
+        if output_path == "No directory selected":
+            self.parent_app.update_status("Please select an output directory.", LYRN_ERROR)
+            return
+
+        if self.editing_affordance_name is None and name in self.affordance_manager.affordances:
+            self.parent_app.update_status(f"Affordance name '{name}' already exists.", LYRN_ERROR)
+            return
+
+        affordance = Affordance(
+            name=name,
+            start_trigger=start_trigger,
+            end_trigger=end_trigger,
+            output_path=output_path,
+            output_filename=output_filename
+        )
+
+        self.affordance_manager.add_affordance(affordance)
+        self.parent_app.update_status(f"Affordance '{name}' saved.", LYRN_SUCCESS)
+        self.refresh_affordance_list()
+        self.clear_builder_fields()
+        self.tabview.set("Affordance Viewer")
+
+
 class LyrnAIInterface(ctk.CTkToplevel):
     """Main LYRN-AI interface with enhanced features"""
 
@@ -2791,6 +3120,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.toggle_log_viewer()
 
         self.initialize_application()
+
+        # Load heartbeat setting
+        self.heartbeat_enabled_var.set(self.settings_manager.ui_settings.get("heartbeat_enabled", False))
 
         # Model Status Indicator
         self.model_status = "Off"
@@ -2917,7 +3249,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Interface v7.2.8")
+        self.title("LYRN-AI v3.0")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -2956,6 +3288,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.metrics = EnhancedPerformanceMetrics()
         self.chat_logger = StructuredChatLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
         self.job_watcher_manager = JobWatcherManager()
+        self.affordance_manager = AffordanceManager()
 
         # Start background services
         self.resource_monitor.start()
@@ -3158,10 +3491,45 @@ class LyrnAIInterface(ctk.CTkToplevel):
         Tooltip(self.job_dropdown, self.tooltips.get("job_dropdown", ""))
 
         self.job_watcher_button = ctk.CTkButton(self.job_frame, text="Automation", command=self.open_job_watcher_popup)
-        self.job_watcher_button.pack(fill="x", padx=10, pady=10)
+        self.job_watcher_button.pack(fill="x", padx=10, pady=5)
         Tooltip(self.job_watcher_button, "Open the Job Automation Watcher popup.")
 
+        self.affordance_button = ctk.CTkButton(self.job_frame, text="Affordances", command=self.open_affordance_popup)
+        self.affordance_button.pack(fill="x", padx=10, pady=5)
+        Tooltip(self.affordance_button, "Open the Affordance Editor to manage internal triggers.")
+
+        # Heartbeat Toggle Switch
+        heartbeat_frame = ctk.CTkFrame(self.job_frame, fg_color="transparent")
+        heartbeat_frame.pack(fill="x", padx=10, pady=10)
+        self.heartbeat_enabled_var = ctk.BooleanVar()
+        self.heartbeat_switch = ctk.CTkSwitch(heartbeat_frame, text="Heartbeat Cycle", variable=self.heartbeat_enabled_var, command=self.toggle_heartbeat)
+        self.heartbeat_switch.pack(side="left", anchor="w")
+        Tooltip(self.heartbeat_switch, "Enable the autonomous cognitive heartbeat cycle.")
+
+        self.open_heartbeat_logs_button = ctk.CTkButton(heartbeat_frame, text="📂", width=40, command=self.open_heartbeat_logs_folder)
+        self.open_heartbeat_logs_button.pack(side="right", padx=(0, 5))
+        Tooltip(self.open_heartbeat_logs_button, "Open heartbeat logs folder in file explorer.")
+
         return self.right_sidebar
+
+    def open_heartbeat_logs_folder(self):
+        """Opens the heartbeat logs directory in the system's file explorer."""
+        logs_dir = os.path.join(SCRIPT_DIR, "automation", "heartbeat_outputs")
+        if not os.path.isdir(logs_dir):
+            os.makedirs(logs_dir, exist_ok=True)
+            self.update_status("Heartbeat logs directory created.", LYRN_INFO)
+
+        try:
+            if sys.platform == "win32":
+                os.startfile(os.path.realpath(logs_dir))
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", logs_dir])
+            else:
+                subprocess.Popen(["xdg-open", logs_dir])
+            self.update_status("Opened heartbeat logs folder.", LYRN_INFO)
+        except Exception as e:
+            self.update_status(f"Error opening folder: {e}", LYRN_ERROR)
+            print(f"Error opening folder: {e}")
 
     def create_enhanced_metrics(self):
         """Create enhanced performance metrics with gauges"""
@@ -3550,7 +3918,7 @@ Enhanced LYRN-AI system with advanced features active.
                 (ctk.CTkComboBox, {"button_color": primary_color, "button_hover_color": button_hover_color}),
                 (ctk.CTkFrame, {"fg_color": frame_bg, "border_color": border_color}),
                 (ctk.CTkLabel, {"text_color": label_text}),
-                (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": accent_color}),
+                (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
                 (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color})
             ]:
                 for widget in self.find_widgets_recursively(self, widget_type):
@@ -3665,6 +4033,15 @@ Enhanced LYRN-AI system with advanced features active.
             self.job_watcher_popup.lift()
             self.job_watcher_popup.focus()
 
+    def open_affordance_popup(self):
+        """Opens the affordance editor popup window."""
+        if not hasattr(self, 'affordance_popup') or not self.affordance_popup.winfo_exists():
+            self.affordance_popup = AffordancePopup(self, self.affordance_manager, self.theme_manager, self.language_manager)
+            self.affordance_popup.focus()
+        else:
+            self.affordance_popup.lift()
+            self.affordance_popup.focus()
+
     def toggle_log_viewer(self):
         """Creates, shows, or focuses the LLM log viewer window."""
         # If the popup doesn't exist or has been destroyed, create it.
@@ -3772,6 +4149,103 @@ Enhanced LYRN-AI system with advanced features active.
                 self.insert_job_text(job_prompt)
                 self.update_status(f"Manual job loaded: {job_name}", LYRN_ACCENT)
 
+    def _execute_reflection_job(self, job: Job):
+        """Executes the reflection job, handling file saving and versioning."""
+        args = job.args
+        original_job_name = args.get("original_job_name", "unknown_job")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # 1. Create the reflections directory
+        reflections_dir = Path(SCRIPT_DIR) / "reflections" / f"{original_job_name}_{timestamp}"
+        reflections_dir.mkdir(parents=True, exist_ok=True)
+
+        # 2. Save original outputs and reflection notes
+        try:
+            # Save the original job output that was reflected upon
+            with open(reflections_dir / "original_output.txt", "w", encoding="utf-8") as f:
+                f.write(args.get("job_output", ""))
+
+            # The 'reflection_cycle_job' itself is run by the main generation logic.
+            # We need to get the *result* of that job here. For now, we'll simulate this
+            # by running the LLM again. In a future refactor, this should be more integrated.
+            self.display_colored_message(f"\n--- Running Reflection For: {original_job_name} ---\n", "system_text")
+
+            # This is where we call the LLM to perform the reflection.
+            # We'll construct a prompt similar to how the main chat works.
+            reflection_prompt = self.automation_controller.get_job_prompt("reflection_cycle_job", args)
+
+            messages = [
+                {"role": "system", "content": self.snapshot_loader.load_base_prompt()},
+                {"role": "user", "content": reflection_prompt}
+            ]
+
+            active = self.settings_manager.settings["active"]
+            handler = StreamHandler(self.stream_queue, self.metrics)
+
+            stream = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=active["max_tokens"],
+                temperature=active["temperature"],
+                top_p=active["top_p"],
+                stream=True
+            )
+
+            response_parts = []
+            for token_data in stream:
+                if 'choices' in token_data and len(token_data['choices']) > 0:
+                    delta = token_data['choices'][0].get('delta', {})
+                    content = delta.get('content', '')
+                    if content:
+                        response_parts.append(content)
+
+            reflection_result = ''.join(response_parts)
+
+            with open(reflections_dir / "reflection_notes.txt", "w", encoding="utf-8") as f:
+                f.write(reflection_result)
+
+            self.display_colored_message(f"Reflection complete. Notes saved to {reflections_dir}\n", "system_text")
+
+        except Exception as e:
+            print(f"Error during reflection file saving: {e}")
+            self.update_status("Error saving reflection files.", LYRN_ERROR)
+
+        # 3. Handle automatic prompt updates
+        if args.get("auto_update", False):
+            self.display_colored_message("Attempting to automatically update prompt...\n", "system_text")
+
+            # This would be another LLM call to generate a new prompt.
+            # For now, we'll simulate it.
+            new_prompt_content = f"# Prompt for {original_job_name} v2\n" + self.automation_controller.job_definitions.get(original_job_name, "") + "\n# Updated by reflection."
+
+            # Save new prompt with versioning
+            jobs_dir = Path(SCRIPT_DIR) / "automation" / "jobs"
+            new_prompt_path = jobs_dir / f"{original_job_name}_v2.txt" # Simplified versioning
+
+            try:
+                with open(new_prompt_path, "w", encoding="utf-8") as f:
+                    f.write(new_prompt_content)
+
+                # Save changelog
+                changelog_path = Path(SCRIPT_DIR) / "reflections" / "reflection_changelog.txt"
+                with open(changelog_path, "a", encoding="utf-8") as f:
+                    f.write(f"[{timestamp}] Job '{original_job_name}' updated to v2. See folder: {reflections_dir.name}\n")
+
+                self.display_colored_message(f"Prompt updated and saved to {new_prompt_path.name}\n", "success")
+
+                # 4. Handle auto-continuation
+                if args.get("auto_continue", False):
+                    self.display_colored_message("Auto-continuing job with updated prompt...\n", "system_text")
+                    # Re-add the original job to the queue, which will now use the new prompt if named correctly.
+                    # This part needs careful implementation to ensure the right version is picked up.
+                    # For now, we assume the system will just use the latest file for a given job name.
+                    self.automation_controller.add_job(name=original_job_name)
+
+
+            except Exception as e:
+                print(f"Error updating prompt: {e}")
+                self.update_status("Error updating prompt.", LYRN_ERROR)
+
+
     def _maybe_run_automated_job(self):
         """Checks for and runs the next job in the queue if the system is idle."""
         if self.is_thinking: # Don't run a job if the model is already running
@@ -3782,14 +4256,69 @@ Enhanced LYRN-AI system with advanced features active.
             if next_job:
                 print(f"Executing automated job: {next_job.name}")
 
-                # For now, this just displays the job prompt for verification.
-                # Later, this will trigger a full LLM cycle for the job.
-                self.display_colored_message(f"\n--- Running Automated Job: {next_job.name} ---\n", "system_text")
-                self.display_colored_message(next_job.prompt, "system_text")
-                self.display_colored_message(f"\n--- Job Complete: {next_job.name} ---\n", "system_text")
+                if next_job.name == "reflection_cycle_job":
+                    self._execute_reflection_job(next_job)
+                else:
+                    # For now, this just displays the job prompt for verification.
+                    # Later, this will trigger a full LLM cycle for the job.
+                    self.display_colored_message(f"\n--- Running Automated Job: {next_job.name} ---\n", "system_text")
+                    self.display_colored_message(next_job.prompt, "system_text")
+                    self.display_colored_message(f"\n--- Job Complete: {next_job.name} ---\n", "system_text")
+                    self._handle_job_completion(next_job.name)
 
                 # Check if more jobs are pending and run them if so
                 self.after(100, self._maybe_run_automated_job)
+
+    def _get_job_run_counts(self) -> Dict[str, int]:
+        """Reads the job run counts from the JSON file."""
+        counts_path = Path(SCRIPT_DIR) / "automation" / "job_run_counts.json"
+        if not counts_path.exists():
+            return {}
+        try:
+            with open(counts_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+
+    def _save_job_run_counts(self, counts: Dict[str, int]):
+        """Saves the job run counts to the JSON file."""
+        counts_path = Path(SCRIPT_DIR) / "automation" / "job_run_counts.json"
+        try:
+            with open(counts_path, 'w', encoding='utf-8') as f:
+                json.dump(counts, f, indent=2)
+        except IOError as e:
+            print(f"Error saving job run counts: {e}")
+
+    def _handle_job_completion(self, job_name: str):
+        """Increments the run count for a job and triggers reflection if the batch size is met."""
+        # This function should only be called for non-reflection jobs.
+        if job_name == "reflection_cycle_job":
+            return
+
+        counts = self._get_job_run_counts()
+        new_count = counts.get(job_name, 0) + 1
+        counts[job_name] = new_count
+        self._save_job_run_counts(counts)
+
+        try:
+            batch_size_str = self.job_watcher_popup.reflection_batch_size_entry.get()
+            batch_size = int(batch_size_str)
+        except (ValueError, AttributeError):
+            # If the entry is invalid or the popup isn't open, don't trigger reflection.
+            return
+
+        if batch_size > 0 and new_count >= batch_size:
+            print(f"Job '{job_name}' has reached its batch size of {batch_size}. Triggering reflection.")
+            # Reset the counter
+            counts[job_name] = 0
+            self._save_job_run_counts(counts)
+
+            # Queue the reflection job
+            # We need to gather the necessary data from the UI again.
+            if hasattr(self, 'job_watcher_popup') and self.job_watcher_popup.winfo_exists():
+                self.job_watcher_popup.run_reflection_manually()
+            else:
+                print("Warning: Job watcher popup is not open. Cannot trigger automated reflection.")
 
     def insert_job_text(self, text: str):
         """Insert job text into input box"""
@@ -3805,11 +4334,22 @@ Enhanced LYRN-AI system with advanced features active.
         else:
             self.update_status("No response to copy yet", LYRN_WARNING)
 
+    def toggle_heartbeat(self):
+        """Saves the state of the heartbeat toggle to settings."""
+        is_enabled = self.heartbeat_enabled_var.get()
+        self.settings_manager.ui_settings["heartbeat_enabled"] = is_enabled
+        self.settings_manager.save_settings()
+        status_msg = "Heartbeat cycle enabled." if is_enabled else "Heartbeat cycle disabled."
+        color = LYRN_SUCCESS if is_enabled else LYRN_INFO
+        self.update_status(status_msg, color)
+
     def send_message(self):
         """Send user message and generate response"""
         user_text = self.input_box.get("0.0", "end").strip()
         if not user_text:
             return
+
+        self.last_user_input = user_text
 
         if not self.llm:
             self.update_status("No model loaded", LYRN_ERROR)
@@ -3977,6 +4517,14 @@ Enhanced LYRN-AI system with advanced features active.
                             # The newline is now handled by the 'token_count_info' message
                             delattr(self, '_assistant_started')
 
+                        # Trigger heartbeat cycle if enabled
+                        if self.heartbeat_enabled_var.get():
+                            print("Heartbeat enabled, triggering cycle.")
+                            if hasattr(self, 'last_user_input') and hasattr(self, 'last_assistant_response'):
+                                threading.Thread(target=self._run_heartbeat_cycle, args=(self.last_user_input, self.last_assistant_response), daemon=True).start()
+                            else:
+                                print("Warning: Could not trigger heartbeat, missing last input/response.")
+
                         # Check for pending jobs now that the model is idle
                         self._maybe_run_automated_job()
 
@@ -4025,13 +4573,55 @@ Enhanced LYRN-AI system with advanced features active.
 
     def _run_heartbeat_cycle(self, user_input: str, assistant_output: str):
         """
-        Runs the LLM's "internal dialog" pass and saves the raw output
+        Runs the LLM's 'internal dialog' pass and saves the raw output
         to a file for the heartbeat_watcher to process.
-        NOTE: This function is temporarily disabled pending a refactor to support the new IPC model.
         """
-        if True:
-            print("Heartbeat cycle is temporarily disabled.")
+        if not self.llm:
+            print("Heartbeat Error: Model not loaded.")
             return
+
+        self.stream_queue.put(('status_update', 'Running Heartbeat Cycle...', LYRN_ACCENT))
+        self.set_model_status("HB CYCLE")
+
+        try:
+            heartbeat_prompt = get_heartbeat_job_prompt(user_input, assistant_output)
+
+            messages = [
+                {"role": "system", "content": self.snapshot_loader.load_base_prompt()},
+                {"role": "user", "content": heartbeat_prompt}
+            ]
+
+            active = self.settings_manager.settings["active"]
+
+            response = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=active["max_tokens"],
+                temperature=0.1,
+                top_p=active["top_p"],
+                top_k=active.get("top_k", 40),
+                stream=False
+            )
+
+            heartbeat_output = response['choices'][0]['message']['content']
+
+            output_dir = Path(SCRIPT_DIR) / "automation" / "heartbeat_outputs"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            output_filename = f"hb_{timestamp}.txt"
+            output_filepath = output_dir / output_filename
+
+            with open(output_filepath, 'w', encoding='utf-8') as f:
+                f.write(heartbeat_output)
+
+            print(f"Heartbeat output saved to: {output_filepath}")
+            self.stream_queue.put(('status_update', 'Heartbeat cycle complete.', LYRN_SUCCESS))
+
+        except Exception as e:
+            print(f"Error during heartbeat cycle: {e}")
+            self.stream_queue.put(('status_update', 'Heartbeat cycle failed.', LYRN_ERROR))
+        finally:
+            self.set_model_status("Ready")
 
 
     def update_enhanced_metrics(self):

@@ -1,3 +1,137 @@
+# LYRN-AI v3.4 Build Notes
+
+## v3.4 - Popup Theming and Icon Consistency (2025-08-12)
+
+This update focuses on improving the visual consistency of all popup windows by ensuring they use the application's theme and icon correctly.
+
+- **Popup Icon Standardization:**
+    - All popup windows now correctly display the main application icon (`favicon.ico`).
+    - This was achieved by adding the icon-setting logic to the `ThemedPopup` base class, from which all other popups inherit.
+
+- **Popup Theming and Title Bar Color:**
+    - Fixed a major visual bug where most popups would appear with a jarring, un-themed (often white) title bar.
+    - All popups are now correctly set as "transient" for the main window, which allows the operating system to manage them more closely and apply the correct title bar theme.
+    - Fixed a bug where the "System Prompt Builder" popup was completely un-themed. Its broken, overriding `apply_theme` method was removed, allowing it to inherit the correct theming from its parent class.
+
+- **Versioning:**
+    - Renamed `lyrn_sad_v3.3.pyw` to `lyrn_sad_v3.4.pyw`.
+    - Archived the previous version in `deprecated/Old/`.
+
+# LYRN-AI v3.3 Build Notes
+
+## v3.3 - UI Cleanup and Theming (2025-08-12)
+
+This update addresses several UI issues, improves theming consistency for popups, and adds a convenience feature for accessing heartbeat logs.
+
+- **Automation Popup Fixes:**
+    - Corrected a major bug where the "Automation" popup's tabs ("Job Viewer", "Job Builder", "Reflection Cycle") were empty. The methods to create the tab content were incorrectly placed in the `AffordancePopup` class and have been moved to the correct `JobWatcherPopup` class.
+    - Removed the "Open Affordance Editor" button from the "Automation" popup to streamline the UI, as it is already accessible from the main window.
+
+- **Theming Engine for Popups:**
+    - Created a new `ThemedPopup` base class to standardize theming across all popup windows.
+    - All popups, including `JobWatcherPopup`, `AffordancePopup`, and `LogViewerPopup`, now inherit from this class and apply the application's current theme, ensuring a consistent look and feel.
+
+- **Settings Window Modality:**
+    - Fixed an issue where the "Settings" window would block interaction with all other application windows (modal behavior). The `grab_set()` call was removed, so it no longer blocks other windows from being closed.
+
+- **Heartbeat Log Access:**
+    - Added a new folder icon button next to the "Heartbeat Cycle" switch on the main UI.
+    - Clicking this button opens the `automation/heartbeat_outputs` directory directly in the system's file explorer, providing quick access to the logs.
+
+- **Versioning:**
+    - Renamed `lyrn_sad_v3.2.pyw` to `lyrn_sad_v3.3.pyw`.
+    - Archived the previous version in `deprecated/Old/`.
+
+# LYRN-AI v3.2 Build Notes
+
+## v3.2 - Heartbeat and Affordance GUI (2025-08-11)
+
+This update focuses on fixing the heartbeat system to respect the global automation flag and implementing a full-featured GUI for managing internal affordances.
+
+- **Heartbeat Watcher Fixes:**
+    - The `heartbeat_watcher.py` script now correctly checks the `global_flags/automation.txt` file. The watcher will now only process heartbeat files when this flag is set to "on", preventing it from running when automation is disabled.
+    - Cleaned up verbose logging from the watcher script to only show essential messages and errors.
+    - Improved the parsing of the `CHAT_PAIR_ID` from heartbeat files to be more robust.
+
+- **New Affordance Editor GUI:**
+    - Implemented a new, full-featured "Affordance Editor" popup window.
+    - The editor is accessible from the main UI via a new "Affordances" button in the "Job Automation" section, making it a first-class feature.
+    - The popup has a two-tab layout:
+        - **Viewer Tab:** Lists all saved affordances, with options to "Edit" or "Delete" them.
+        - **Editor Tab:** A form for creating and editing affordances with fields for name, start/end triggers, output path, and filename.
+    - All changes made in the GUI are saved to `automation/affordances.json` via the existing `AffordanceManager`.
+
+- **Versioning:**
+    - Renamed `lyrn_sad_v3.1.pyw` to `lyrn_sad_v3.2.pyw` to reflect the updates.
+    - The previous version has been archived in `deprecated/Old/`.
+
+# LYRN-AI v3.1 Build Notes
+
+## v3.1 - Heartbeat and Internal Affordances (2025-08-11)
+
+This is a major update that introduces the "Heartbeat," a toggleable, autonomous cognitive loop for the AI, and a system for "Internal Affordances," which are internal-only jobs triggered by the AI's reasoning during a heartbeat.
+
+- **New Heartbeat System:**
+    - A "Heartbeat Cycle" switch has been added to the "Automation" section of the right sidebar, allowing the user to toggle the autonomous loop on or off. The state is saved in settings.
+    - When enabled, after every chat response, the AI performs an internal "heartbeat" cycle. It analyzes the preceding conversation and generates a structured output containing summaries, keywords, insights, and potential actions.
+    - This output is saved to `automation/heartbeat_outputs/` for processing.
+
+- **Heartbeat Watcher Enhancements:**
+    - The `heartbeat_watcher.py` script has been updated to be the central processor for the new Heartbeat system.
+    - It now parses the full heartbeat output, creates memory deltas, and adds jobs to the queue as instructed by the AI.
+
+- **New Internal Affordance System:**
+    - Implemented a new class of internal-only jobs called "Affordances." These are simple, trigger-based parsers that the AI can activate to extract specific information from a conversation.
+    - The `heartbeat_watcher.py` can now process `AFFORD|` commands from a heartbeat file, find the relevant chat log, and execute the affordance to save the extracted data.
+    - A new `affordance_manager.py` module and `automation/affordances.json` file have been created to manage these new objects.
+
+- **New Affordance Editor GUI:**
+    - A new "Affordance Editor" popup has been created, accessible from the "Automation" window.
+    - This editor, modeled on the Job Watcher, allows users to easily create, view, edit, and delete affordances through a user-friendly interface.
+
+# LYRN-AI v3.0 Build Notes
+
+## v3.0 - Reflection Cycle and Autonomous Refinement (2025-08-11)
+
+This is a major update that introduces the "Reflection Cycle," a new system for evaluating and refining job outputs using LLM-based reflection. This feature allows for autonomous improvement of job prompts over time.
+
+- **New "Reflection Cycle" Tab:**
+    - A new tab has been added to the "Automation" window to configure the reflection process.
+    - Users can provide custom instructions for the LLM on how to evaluate job outputs.
+    - A "gold-standard" example output can be provided for comparison.
+    - The number of reflection iterations can be set.
+
+- **Automated Prompt Refinement:**
+    - A checkbox allows the LLM to automatically rewrite a job's prompt based on its reflection of the outputs.
+    - Updated prompts are saved with versioning (e.g., `jobname_v2.txt`) to the `automation/jobs/` directory.
+
+- **Autonomous Job Continuation:**
+    - A checkbox enables the job to automatically continue running with the newly refined prompt, creating a self-improving loop of execution → reflection → refinement.
+
+- **Traceability and Logging:**
+    - All reflection outputs, including scores, notes, and any generated prompts, are saved to a new `reflections/` directory.
+    - Each reflection run is stored in a timestamped subfolder (e.g., `/reflections/jobname_timestamp/`).
+    - A `reflection_changelog.txt` file tracks all prompt updates for full traceability.
+
+- **Batch Reflection:**
+    - Reflection can be configured to run automatically after a set number of job outputs are generated, allowing for batch analysis and refinement.
+
+# LYRN-AI v2.9 Build Notes
+
+## v2.9 - Versioning Cleanup and Deprecation (2025-08-11)
+
+This update officially moves the project to a `v2.x` versioning scheme, dropping the legacy `v7` prefix which was a remnant from a previous development branch. This is a maintenance and cleanup release.
+
+- **Version Renumbering:**
+    - The main application file has been renamed from `lyrn_sad_v7.2.9.pyw` to `lyrn_sad_v2.9.pyw`.
+    - The project's official version is now `v2.9`.
+
+- **Deprecation of Multi-Agent Components:**
+    - All files and folders related to the deprecated multi-agent dashboard have been moved into a `deprecated/` directory for future review. This includes the `Old/` and `ipc/` directories, and the `multi_model_manager.py` script.
+
+- **Architectural Rules Update:**
+    - The `AGENTS.md` file has been updated to reflect the new location for storing old GUI versions (`deprecated/Old/`).
+
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
 ## v7.2.9 - UI Polish and Combobox Fix (2025-08-11)

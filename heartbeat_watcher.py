@@ -6,14 +6,18 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 import uuid
+from typing import Optional
 from file_lock import SimpleFileLock
+from affordance_manager import AffordanceManager
 
 # --- Configuration ---
 WATCH_DIR = Path("automation/heartbeat_outputs")
+CHAT_LOG_DIR = Path("chat") # Directory where structured chat logs are saved
 SUMMARY_FILE = Path("memory/conversation_summary.txt")
 DELTAS_DIR = Path("deltas")
 JOB_QUEUE_FILE = Path("automation/job_queue.json")
 WATCH_INTERVAL_SECONDS = 2
+AUTOMATION_FLAG_PATH = Path("global_flags/automation.txt")
 
 # --- Helper Functions ---
 
@@ -40,7 +44,6 @@ def create_delta_file(scope: str, target: str, op: str, path: str, value: str, v
             f.flush()
             os.fsync(f.fileno())
         os.rename(temp_filepath, delta_filepath)
-        print(f"[Watcher] Created delta: {delta_filepath}")
     except Exception as e:
         print(f"[Watcher] Error creating delta file: {e}")
         if os.path.exists(temp_filepath):
@@ -76,17 +79,51 @@ def add_job_to_queue(name: str, priority: str, when: str, args: str):
                 json.dump(queue_data, f, indent=2)
             shutil.move(temp_queue_file, JOB_QUEUE_FILE)
 
-            print(f"[Watcher] Added job to queue: {name}")
-
     except (TimeoutError, IOError) as e:
         print(f"[Watcher] Error adding job to queue: {e}")
 
 
-def process_heartbeat_file(filepath: Path):
+def run_affordance(affordance_name: str, text_content: str, affordance_manager: AffordanceManager) -> Optional[str]:
+    """
+    Runs a specific affordance, parsing the text_content to find the block
+    between start and end triggers and saves it to the specified file.
+    Returns the path to the output file on success, None on failure.
+    """
+    affordance = affordance_manager.get_affordance(affordance_name)
+    if not affordance:
+        print(f"[Watcher] Error: Affordance '{affordance_name}' not found.")
+        return None
+
+    try:
+        start_index = text_content.find(affordance.start_trigger)
+        if start_index == -1:
+            return None
+        start_index += len(affordance.start_trigger)
+
+        end_index = text_content.find(affordance.end_trigger, start_index)
+        if end_index == -1:
+            return None
+
+        extracted_content = text_content[start_index:end_index].strip()
+
+        output_dir = Path(affordance.output_path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        output_filepath = output_dir / affordance.output_filename
+        with open(output_filepath, 'w', encoding='utf-8') as f:
+            f.write(extracted_content)
+
+        print(f"[Watcher] Ran affordance '{affordance_name}'. Output: {output_filepath}")
+        return str(output_filepath)
+
+    except Exception as e:
+        print(f"[Watcher] Error running affordance '{affordance_name}': {e}")
+        return None
+
+def process_heartbeat_file(filepath: Path, affordance_manager: AffordanceManager):
     """
     Reads a heartbeat file, parses it, and performs the required file operations.
     """
-    print(f"[Watcher] Processing heartbeat file: {filepath.name}")
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -102,7 +139,6 @@ def process_heartbeat_file(filepath: Path):
             SUMMARY_FILE.parent.mkdir(exist_ok=True)
             with open(SUMMARY_FILE, 'a', encoding='utf-8') as f:
                 f.write(summary_delta + "\n")
-            print(f"[Watcher] Appended to {SUMMARY_FILE}")
 
         # --- Process Memory Deltas ---
         memory_key = "HB_MEMORY_DELTAS_START"
@@ -123,24 +159,64 @@ def process_heartbeat_file(filepath: Path):
                     create_delta_file(scope, target, op, path, value, "RAW") # Mode is simplified for now
 
         # --- Process Automation Triggers ---
-        automation_key = "HB_AUTOMATION_TRIGGERS_START"
-        if "HB_ACTIONS_START" in blocks: # Also check for generic actions block
-            automation_key = "HB_ACTIONS_START"
-
+        automation_key = "HB_ACTIONS_START"
         if automation_key in blocks and blocks[automation_key]:
             automation_triggers = blocks[automation_key]
+            meta_block = blocks.get("HB_META_START", "")
+            chat_pair_id_match = re.search(r'CHAT_PAIR_ID:\s*"(.*?)"', meta_block)
+            chat_pair_id = chat_pair_id_match.group(1) if chat_pair_id_match else None
+
             for line in automation_triggers.split('\n'):
                 line = line.strip()
-                if not line.upper().startswith("JOB|"):
-                    continue
-                parts = [p.strip() for p in line.split('|')]
-                if len(parts) == 4: # JOB|name|priority|when|args - simplify for now
-                    _, name, priority, args_str = parts
-                    add_job_to_queue(name, priority, "now", args_str)
+                if line.upper().startswith("JOB|"):
+                    parts = [p.strip() for p in line.split('|')]
+                    if len(parts) == 4: # JOB|name|priority|when|args - simplify for now
+                        _, name, priority, args_str = parts
+                        add_job_to_queue(name, priority, "now", args_str)
+                elif line.upper().startswith("AFFORD|"):
+                    parts = [p.strip() for p in line.split('|')]
+                    if len(parts) >= 2:
+                        affordance_name = parts[1]
+                        if not chat_pair_id:
+                            print(f"[Watcher] Cannot run affordance '{affordance_name}', CHAT_PAIR_ID not found in heartbeat.")
+                            continue
+
+                        # The chat pair ID is like "cp_YYYY-MM-DDTHH-MM-SSZ_xxxx"
+                        # The structured logger is like "chat_YYYYMMDD_HHMMSS_ffffff.txt"
+                        # We need to find the corresponding file.
+                        # This is a simplification; a real system might need a more robust lookup.
+                        try:
+                            # Extract timestamp from cp_YYYY-MM-DDTHH-MM-SSZ_xxxx
+                            hb_timestamp_str = chat_pair_id.split('_')[1].split('Z')[0]
+                            hb_dt = datetime.strptime(hb_timestamp_str, "%Y-%m-%dT%H-%M-%S")
+
+                            # Look for a file in that same second
+                            best_match = None
+                            min_diff = float('inf')
+                            for log_file in CHAT_LOG_DIR.glob("chat_*.txt"):
+                                try:
+                                    log_ts_str = log_file.stem.split('_')[1] + '_' + log_file.stem.split('_')[2]
+                                    log_dt = datetime.strptime(log_ts_str, "%Y%m%d_%H%M%S_%f")
+                                    time_diff = abs((log_dt - hb_dt).total_seconds())
+                                    if time_diff < min_diff and time_diff < 5: # Allow a 5-second window
+                                        min_diff = time_diff
+                                        best_match = log_file
+                                except (IndexError, ValueError):
+                                    continue # Ignore malformed filenames
+
+                            if best_match:
+                                with open(best_match, 'r', encoding='utf-8') as f_chat:
+                                    chat_content = f_chat.read()
+                                run_affordance(affordance_name, chat_content, affordance_manager)
+                            else:
+                                print(f"[Watcher] Could not find a matching chat log for CHAT_PAIR_ID: {chat_pair_id}")
+
+                        except Exception as e:
+                            print(f"[Watcher] Error processing affordance trigger: {e}")
+
 
         # Finally, delete the processed file
         os.remove(filepath)
-        print(f"[Watcher] Deleted processed file: {filepath.name}")
 
     except Exception as e:
         print(f"[Watcher] Failed to process {filepath.name}: {e}")
@@ -153,17 +229,30 @@ def main():
     """Main watch loop."""
     print("[Watcher] Starting Heartbeat Watcher...")
     WATCH_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"[Watcher] Watching directory: {WATCH_DIR.resolve()}")
+    CHAT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    affordance_manager = AffordanceManager()
 
     while True:
         try:
+            # Check the automation flag
+            flag_on = False
+            if AUTOMATION_FLAG_PATH.exists():
+                with open(AUTOMATION_FLAG_PATH, 'r', encoding='utf-8') as f:
+                    if f.read().strip().lower() == 'on':
+                        flag_on = True
+
+            if not flag_on:
+                time.sleep(WATCH_INTERVAL_SECONDS)
+                continue # Skip the rest of the loop if automation is off
+
             files = sorted(
                 (p for p in WATCH_DIR.glob("*.txt")),
                 key=lambda p: p.stat().st_mtime
             )
 
             if files:
-                process_heartbeat_file(files[0])
+                process_heartbeat_file(files[0], affordance_manager)
 
             time.sleep(WATCH_INTERVAL_SECONDS)
 
