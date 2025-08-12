@@ -2,7 +2,7 @@
     "name": "LYRN Light",
     "appearance_mode": "light",
     "colors": {
-        "primary": "#880ed4",
+        "primary": "#7552bf",
         "accent": "#1A202C",
         "button_hover": "#8B66D1",
         "success": "#48BB78",

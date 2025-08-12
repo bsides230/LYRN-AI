@@ -61,7 +61,7 @@ SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.json")
 THEME_PATH = os.path.join(SCRIPT_DIR, "lyrn-theme.json")
 
 # LYRN-AI Brand Colors
-LYRN_PURPLE = "#880ED4"
+LYRN_PURPLE = "#7552bf"
 LYRN_ACCENT = "#A855F7"
 LYRN_SUCCESS = "#10B981"
 LYRN_WARNING = "#F59E0B"

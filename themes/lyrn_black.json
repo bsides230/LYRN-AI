@@ -2,7 +2,7 @@
     "name": "LYRN Black",
     "appearance_mode": "dark",
     "colors": {
-        "primary": "#880ED4",
+        "primary": "#7552bf",
         "accent": "#A855F7",
         "button_hover": "#A042F4",
         "success": "#48BB78",
@@ -18,7 +18,7 @@
         "assistant_text": "#34D399",
         "thinking_text": "#F472B6",
         "display_text_color": "#FFFFFF",
-        "border_color": "#880ED4",
+        "border_color": "#7552bf",
         "status_bg_color": "#3A475A"
     }
 }
