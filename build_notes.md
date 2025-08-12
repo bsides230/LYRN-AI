@@ -1,3 +1,30 @@
+# LYRN-AI v3.0 Build Notes
+
+## v3.0 - Reflection Cycle and Autonomous Refinement (2025-08-11)
+
+This is a major update that introduces the "Reflection Cycle," a new system for evaluating and refining job outputs using LLM-based reflection. This feature allows for autonomous improvement of job prompts over time.
+
+- **New "Reflection Cycle" Tab:**
+    - A new tab has been added to the "Automation" window to configure the reflection process.
+    - Users can provide custom instructions for the LLM on how to evaluate job outputs.
+    - A "gold-standard" example output can be provided for comparison.
+    - The number of reflection iterations can be set.
+
+- **Automated Prompt Refinement:**
+    - A checkbox allows the LLM to automatically rewrite a job's prompt based on its reflection of the outputs.
+    - Updated prompts are saved with versioning (e.g., `jobname_v2.txt`) to the `automation/jobs/` directory.
+
+- **Autonomous Job Continuation:**
+    - A checkbox enables the job to automatically continue running with the newly refined prompt, creating a self-improving loop of execution → reflection → refinement.
+
+- **Traceability and Logging:**
+    - All reflection outputs, including scores, notes, and any generated prompts, are saved to a new `reflections/` directory.
+    - Each reflection run is stored in a timestamped subfolder (e.g., `/reflections/jobname_timestamp/`).
+    - A `reflection_changelog.txt` file tracks all prompt updates for full traceability.
+
+- **Batch Reflection:**
+    - Reflection can be configured to run automatically after a set number of job outputs are generated, allowing for batch analysis and refinement.
+
 # LYRN-AI v2.9 Build Notes
 
 ## v2.9 - Versioning Cleanup and Deprecation (2025-08-11)
