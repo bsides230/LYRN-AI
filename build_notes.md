@@ -1,3 +1,28 @@
+# LYRN-AI v3.3 Build Notes
+
+## v3.3 - UI Cleanup and Theming (2025-08-12)
+
+This update addresses several UI issues, improves theming consistency for popups, and adds a convenience feature for accessing heartbeat logs.
+
+- **Automation Popup Fixes:**
+    - Corrected a major bug where the "Automation" popup's tabs ("Job Viewer", "Job Builder", "Reflection Cycle") were empty. The methods to create the tab content were incorrectly placed in the `AffordancePopup` class and have been moved to the correct `JobWatcherPopup` class.
+    - Removed the "Open Affordance Editor" button from the "Automation" popup to streamline the UI, as it is already accessible from the main window.
+
+- **Theming Engine for Popups:**
+    - Created a new `ThemedPopup` base class to standardize theming across all popup windows.
+    - All popups, including `JobWatcherPopup`, `AffordancePopup`, and `LogViewerPopup`, now inherit from this class and apply the application's current theme, ensuring a consistent look and feel.
+
+- **Settings Window Modality:**
+    - Fixed an issue where the "Settings" window would block interaction with all other application windows (modal behavior). The `grab_set()` call was removed, so it no longer blocks other windows from being closed.
+
+- **Heartbeat Log Access:**
+    - Added a new folder icon button next to the "Heartbeat Cycle" switch on the main UI.
+    - Clicking this button opens the `automation/heartbeat_outputs` directory directly in the system's file explorer, providing quick access to the logs.
+
+- **Versioning:**
+    - Renamed `lyrn_sad_v3.2.pyw` to `lyrn_sad_v3.3.pyw`.
+    - Archived the previous version in `deprecated/Old/`.
+
 # LYRN-AI v3.2 Build Notes
 
 ## v3.2 - Heartbeat and Affordance GUI (2025-08-11)
