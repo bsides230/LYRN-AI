@@ -1,3 +1,22 @@
+# LYRN-AI v3.5 Build Notes
+
+## v3.5 - Theming and Versioning Fixes (2025-08-12)
+
+This update addresses several small but important UI and versioning issues to improve visual consistency and correctness.
+
+- **Settings Border Theming:**
+    - Fixed a bug where the borders around text boxes and entries in the Settings window were not using the correct color from the loaded theme. They now correctly apply the theme's `border_color`.
+
+- **Icon Application:**
+    - Changed the method for setting the application icon from `iconbitmap` to `wm_iconbitmap` to improve consistency across different window managers and platforms.
+
+- **Title Bar Versioning:**
+    - The main application window's title bar now correctly displays the current version, `v3.5`.
+
+- **Versioning:**
+    - Renamed `lyrn_sad_v3.4.pyw` to `lyrn_sad_v3.5.pyw`.
+    - Archived the previous version in `deprecated/Old/`.
+
 # LYRN-AI v3.4 Build Notes
 
 ## v3.4 - Popup Theming and Icon Consistency (2025-08-12)
