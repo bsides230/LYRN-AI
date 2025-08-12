@@ -1,3 +1,19 @@
+# LYRN-AI v2.9 Build Notes
+
+## v2.9 - Versioning Cleanup and Deprecation (2025-08-11)
+
+This update officially moves the project to a `v2.x` versioning scheme, dropping the legacy `v7` prefix which was a remnant from a previous development branch. This is a maintenance and cleanup release.
+
+- **Version Renumbering:**
+    - The main application file has been renamed from `lyrn_sad_v7.2.9.pyw` to `lyrn_sad_v2.9.pyw`.
+    - The project's official version is now `v2.9`.
+
+- **Deprecation of Multi-Agent Components:**
+    - All files and folders related to the deprecated multi-agent dashboard have been moved into a `deprecated/` directory for future review. This includes the `Old/` and `ipc/` directories, and the `multi_model_manager.py` script.
+
+- **Architectural Rules Update:**
+    - The `AGENTS.md` file has been updated to reflect the new location for storing old GUI versions (`deprecated/Old/`).
+
 # LYRN-AI v7 Cognition Upgrade Build Notes
 
 ## v7.2.9 - UI Polish and Combobox Fix (2025-08-11)
