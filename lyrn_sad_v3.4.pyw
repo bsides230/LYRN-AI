@@ -984,6 +984,18 @@ class ThemedPopup(ctk.CTkToplevel):
         frame_bg = self.theme_manager.get_color("frame_bg")
         super().__init__(parent, fg_color=frame_bg, **kwargs)
 
+        # Set taskbar icon for all popups
+        try:
+            icon_path = os.path.join(SCRIPT_DIR, "images", "favicon.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"Error setting popup icon: {e}")
+
+        # Make the popup transient for the parent, which can help with window management
+        # and theming on some platforms.
+        self.transient(parent)
+
     def apply_theme(self):
         """Applies the current theme colors to all widgets in this popup."""
         tm = self.theme_manager
@@ -1138,7 +1150,6 @@ class ModelSelectorPopup(ThemedPopup):
         self.title("LYRN-AI Model Selector")
         self.geometry("600x450")
         self.minsize(500, 400)
-        self.transient(parent) # Keep popup on top of main window
         self.grab_set() # Modal - prevent interaction with main window
 
         self.model_path = ""
@@ -1287,7 +1298,6 @@ class CommandPalette(ThemedPopup):
         self.title("Command Palette")
         self.geometry("600x350")
         self.minsize(400, 300)
-        self.transient(parent)
         self.grab_set()
 
         self.grid_rowconfigure(1, weight=1)
@@ -1356,8 +1366,6 @@ class TabbedSettingsDialog(ThemedPopup):
         self.title(self.language_manager.get("settings_window_title"))
         self.geometry("900x700")
         self.minsize(800, 600)
-
-        self.transient(parent)
 
         self.show_model_selector_var = ctk.BooleanVar()
 
@@ -1999,8 +2007,6 @@ class PromptBuilderPopup(ThemedPopup):
         self.geometry("800x700") # Increased height a bit
         self.minsize(600, 500)
 
-        self.transient(parent)
-
         self.on_top_var = ctk.BooleanVar(value=False)
 
         self.create_widgets()
@@ -2078,13 +2084,6 @@ class PromptBuilderPopup(ThemedPopup):
         """Toggles the always-on-top status of the window."""
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
-
-    def apply_theme(self):
-        """Apply the current theme to the popup's widgets."""
-        # This will be properly implemented later. For now, just a basic background.
-        tm = self.theme_manager
-        frame_bg = tm.get_color("frame_bg")
-        self.configure(fg_color=frame_bg)
 
     def on_prompt_list_reorder(self, new_order: List[dict]):
         """Callback function to save the new prompt order."""
@@ -2297,7 +2296,6 @@ class ThemeBuilderPopup(ThemedPopup):
         self.geometry("800x650")
         self.minsize(700, 500)
 
-        self.transient(parent)
         self.grab_set()
 
         self.create_theme_builder_widgets()
@@ -2551,7 +2549,6 @@ class JobWatcherPopup(ThemedPopup):
 
         self.title("Automation")
         self.geometry("900x700")
-        self.transient(parent)
         self.grab_set()
 
         # Main tab view
@@ -2854,7 +2851,6 @@ class AffordancePopup(ThemedPopup):
 
         self.title("Affordance Editor")
         self.geometry("800x600")
-        self.transient(parent)
         self.grab_set()
 
         self.tabview = ctk.CTkTabview(self, width=750, height=500)

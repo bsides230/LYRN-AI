@@ -1,3 +1,22 @@
+# LYRN-AI v3.4 Build Notes
+
+## v3.4 - Popup Theming and Icon Consistency (2025-08-12)
+
+This update focuses on improving the visual consistency of all popup windows by ensuring they use the application's theme and icon correctly.
+
+- **Popup Icon Standardization:**
+    - All popup windows now correctly display the main application icon (`favicon.ico`).
+    - This was achieved by adding the icon-setting logic to the `ThemedPopup` base class, from which all other popups inherit.
+
+- **Popup Theming and Title Bar Color:**
+    - Fixed a major visual bug where most popups would appear with a jarring, un-themed (often white) title bar.
+    - All popups are now correctly set as "transient" for the main window, which allows the operating system to manage them more closely and apply the correct title bar theme.
+    - Fixed a bug where the "System Prompt Builder" popup was completely un-themed. Its broken, overriding `apply_theme` method was removed, allowing it to inherit the correct theming from its parent class.
+
+- **Versioning:**
+    - Renamed `lyrn_sad_v3.3.pyw` to `lyrn_sad_v3.4.pyw`.
+    - Archived the previous version in `deprecated/Old/`.
+
 # LYRN-AI v3.3 Build Notes
 
 ## v3.3 - UI Cleanup and Theming (2025-08-12)
