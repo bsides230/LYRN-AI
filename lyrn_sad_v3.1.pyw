@@ -32,6 +32,7 @@ from automation_controller import AutomationController, Job
 from heartbeat import get_heartbeat_job_prompt
 from file_lock import SimpleFileLock
 from job_watcher_manager import JobWatcherManager, WatcherJob
+from affordance_manager import AffordanceManager, Affordance
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -2519,6 +2520,14 @@ class JobWatcherPopup(ctk.CTkToplevel):
         self.transient(parent)
         self.grab_set()
 
+        # --- Top-level buttons ---
+        top_button_frame = ctk.CTkFrame(self, fg_color="transparent")
+        top_button_frame.pack(pady=5)
+
+        affordance_button = ctk.CTkButton(top_button_frame, text="Open Affordance Editor", command=self.parent_app.open_affordance_popup)
+        affordance_button.pack()
+        Tooltip(affordance_button, "Open the editor for internal affordances triggered by the heartbeat.")
+
         # Main tab view
         self.tabview = ctk.CTkTabview(self, width=850, height=600)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
@@ -2533,6 +2542,205 @@ class JobWatcherPopup(ctk.CTkToplevel):
 
         self.refresh_job_list()
         self.tabview.set("Job Viewer")
+
+
+class AffordancePopup(ctk.CTkToplevel):
+    """A popup window for managing internal affordances."""
+    def __init__(self, parent, affordance_manager: AffordanceManager, theme_manager: ThemeManager, language_manager: LanguageManager):
+        super().__init__(parent)
+        self.parent_app = parent
+        self.affordance_manager = affordance_manager
+        self.theme_manager = theme_manager
+        self.language_manager = language_manager
+        self.selected_affordance_name = None
+        self.editing_affordance_name = None
+
+        self.title("Affordance Editor")
+        self.geometry("800x600")
+        self.transient(parent)
+        self.grab_set()
+
+        self.tabview = ctk.CTkTabview(self, width=750, height=500)
+        self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
+
+        self.tab_viewer = self.tabview.add("Affordance Viewer")
+        self.tab_editor = self.tabview.add("Affordance Editor")
+
+        self.create_viewer_tab()
+        self.create_editor_tab()
+
+        self.refresh_affordance_list()
+        self.tabview.set("Affordance Viewer")
+
+    def create_viewer_tab(self):
+        self.tab_viewer.grid_columnconfigure(0, weight=1)
+        self.tab_viewer.grid_rowconfigure(0, weight=1)
+
+        viewer_content_frame = ctk.CTkFrame(self.tab_viewer)
+        viewer_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        viewer_content_frame.grid_columnconfigure(0, weight=1)
+        viewer_content_frame.grid_rowconfigure(0, weight=1)
+
+        self.affordance_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Affordances")
+        self.affordance_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        button_frame = ctk.CTkFrame(viewer_content_frame)
+        button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
+
+        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_affordance)
+        edit_button.pack(padx=10, pady=10, anchor="n")
+
+        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_affordance)
+        delete_button.pack(padx=10, pady=10, anchor="n")
+
+    def refresh_affordance_list(self):
+        for widget in self.affordance_list_frame.winfo_children():
+            widget.destroy()
+
+        all_affordances = self.affordance_manager.get_all_affordances()
+        self.selected_affordance_name = None
+
+        if not all_affordances:
+            ctk.CTkLabel(self.affordance_list_frame, text="No affordances created yet.").pack()
+            return
+
+        for affordance in sorted(all_affordances, key=lambda a: a.name):
+            label = ctk.CTkLabel(self.affordance_list_frame, text=affordance.name, anchor="w", cursor="hand2")
+            label.pack(fill="x", padx=10, pady=2)
+            label.bind("<Button-1>", lambda e, name=affordance.name: self.on_affordance_selected(name))
+
+    def on_affordance_selected(self, name):
+        self.selected_affordance_name = name
+        for child in self.affordance_list_frame.winfo_children():
+            if isinstance(child, ctk.CTkLabel):
+                if child.cget("text") == name:
+                    child.configure(fg_color=self.theme_manager.get_color("accent"))
+                else:
+                    child.configure(fg_color="transparent")
+
+    def edit_selected_affordance(self):
+        if not self.selected_affordance_name:
+            self.parent_app.update_status("No affordance selected to edit.", LYRN_WARNING)
+            return
+
+        affordance = self.affordance_manager.get_affordance(self.selected_affordance_name)
+        if not affordance:
+            self.parent_app.update_status(f"Affordance '{self.selected_affordance_name}' not found.", LYRN_ERROR)
+            return
+
+        self.editing_affordance_name = affordance.name
+
+        self.affordance_name_entry.delete(0, "end")
+        self.affordance_name_entry.insert(0, affordance.name)
+        self.affordance_name_entry.configure(state="disabled")
+
+        self.start_trigger_entry.delete(0, "end")
+        self.start_trigger_entry.insert(0, affordance.start_trigger)
+
+        self.end_trigger_entry.delete(0, "end")
+        self.end_trigger_entry.insert(0, affordance.end_trigger)
+
+        self.output_path_label.configure(text=affordance.output_path)
+
+        self.output_filename_entry.delete(0, "end")
+        self.output_filename_entry.insert(0, affordance.output_filename)
+
+        self.tabview.set("Affordance Editor")
+
+    def delete_selected_affordance(self):
+        if not self.selected_affordance_name:
+            self.parent_app.update_status("No affordance selected to delete.", LYRN_WARNING)
+            return
+
+        dialog = ctk.CTkInputDialog(text=f"Type DELETE to confirm deleting affordance '{self.selected_affordance_name}':", title="Confirm Deletion")
+        confirmation = dialog.get_input()
+
+        if confirmation == "DELETE":
+            self.affordance_manager.delete_affordance(self.selected_affordance_name)
+            self.parent_app.update_status(f"Affordance '{self.selected_affordance_name}' deleted.", LYRN_SUCCESS)
+            self.refresh_affordance_list()
+        else:
+            self.parent_app.update_status("Deletion cancelled.", LYRN_INFO)
+
+    def clear_builder_fields(self):
+        self.affordance_name_entry.configure(state="normal")
+        self.affordance_name_entry.delete(0, "end")
+        self.start_trigger_entry.delete(0, "end")
+        self.end_trigger_entry.delete(0, "end")
+        self.output_path_label.configure(text="No directory selected")
+        self.output_filename_entry.delete(0, "end")
+        self.editing_affordance_name = None
+
+    def create_editor_tab(self):
+        editor_frame = ctk.CTkScrollableFrame(self.tab_editor)
+        editor_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Affordance Name
+        ctk.CTkLabel(editor_frame, text="Affordance Name").pack(anchor="w")
+        self.affordance_name_entry = ctk.CTkEntry(editor_frame)
+        self.affordance_name_entry.pack(fill="x", pady=(0, 10))
+
+        # Start Trigger
+        ctk.CTkLabel(editor_frame, text="Start Trigger").pack(anchor="w")
+        self.start_trigger_entry = ctk.CTkEntry(editor_frame)
+        self.start_trigger_entry.pack(fill="x", pady=(0, 10))
+
+        # End Trigger
+        ctk.CTkLabel(editor_frame, text="End Trigger").pack(anchor="w")
+        self.end_trigger_entry = ctk.CTkEntry(editor_frame)
+        self.end_trigger_entry.pack(fill="x", pady=(0, 10))
+
+        # Output Path
+        ctk.CTkLabel(editor_frame, text="Output Path").pack(anchor="w")
+        path_frame = ctk.CTkFrame(editor_frame, fg_color="transparent")
+        path_frame.pack(fill="x", pady=(0, 10))
+        self.output_path_label = ctk.CTkLabel(path_frame, text="No directory selected", anchor="w")
+        self.output_path_label.pack(side="left", expand=True, fill="x")
+        select_path_button = ctk.CTkButton(path_frame, text="Select...", width=80, command=self.select_output_path)
+        select_path_button.pack(side="right")
+
+        # Output Filename
+        ctk.CTkLabel(editor_frame, text="Output Filename").pack(anchor="w")
+        self.output_filename_entry = ctk.CTkEntry(editor_frame)
+        self.output_filename_entry.pack(fill="x", pady=(0, 10))
+
+        # Save Button
+        save_button = ctk.CTkButton(self.tab_editor, text="Save Affordance", command=self.save_affordance)
+        save_button.pack(pady=20)
+
+    def select_output_path(self):
+        path = filedialog.askdirectory(title="Select Output Directory for Affordance")
+        if path:
+            self.output_path_label.configure(text=path)
+
+    def save_affordance(self):
+        name = self.affordance_name_entry.get().strip()
+        start_trigger = self.start_trigger_entry.get().strip()
+        end_trigger = self.end_trigger_entry.get().strip()
+        output_path = self.output_path_label.cget("text")
+        output_filename = self.output_filename_entry.get().strip()
+
+        if not all([name, start_trigger, end_trigger, output_path, output_filename]):
+            self.parent_app.update_status("All fields must be filled for an affordance.", LYRN_ERROR)
+            return
+
+        if output_path == "No directory selected":
+            self.parent_app.update_status("Please select an output directory.", LYRN_ERROR)
+            return
+
+        affordance = Affordance(
+            name=name,
+            start_trigger=start_trigger,
+            end_trigger=end_trigger,
+            output_path=output_path,
+            output_filename=output_filename
+        )
+
+        self.affordance_manager.add_affordance(affordance)
+        self.parent_app.update_status(f"Affordance '{name}' saved.", LYRN_SUCCESS)
+        self.refresh_affordance_list()
+        self.clear_builder_fields()
+        self.tabview.set("Affordance Viewer")
 
     def create_reflection_tab(self):
         """Creates the UI for the Reflection Cycle tab."""
@@ -2874,6 +3082,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         self.initialize_application()
 
+        # Load heartbeat setting
+        self.heartbeat_enabled_var.set(self.settings_manager.ui_settings.get("heartbeat_enabled", False))
+
         # Model Status Indicator
         self.model_status = "Off"
         self.status_animation_after_id = None
@@ -3038,6 +3249,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.metrics = EnhancedPerformanceMetrics()
         self.chat_logger = StructuredChatLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
         self.job_watcher_manager = JobWatcherManager()
+        self.affordance_manager = AffordanceManager()
 
         # Start background services
         self.resource_monitor.start()
@@ -3240,8 +3452,14 @@ class LyrnAIInterface(ctk.CTkToplevel):
         Tooltip(self.job_dropdown, self.tooltips.get("job_dropdown", ""))
 
         self.job_watcher_button = ctk.CTkButton(self.job_frame, text="Automation", command=self.open_job_watcher_popup)
-        self.job_watcher_button.pack(fill="x", padx=10, pady=10)
+        self.job_watcher_button.pack(fill="x", padx=10, pady=5)
         Tooltip(self.job_watcher_button, "Open the Job Automation Watcher popup.")
+
+        # Heartbeat Toggle Switch
+        self.heartbeat_enabled_var = ctk.BooleanVar()
+        self.heartbeat_switch = ctk.CTkSwitch(self.job_frame, text="Heartbeat Cycle", variable=self.heartbeat_enabled_var, command=self.toggle_heartbeat)
+        self.heartbeat_switch.pack(fill="x", padx=10, pady=10, anchor="w")
+        Tooltip(self.heartbeat_switch, "Enable the autonomous cognitive heartbeat cycle.")
 
         return self.right_sidebar
 
@@ -3747,6 +3965,15 @@ Enhanced LYRN-AI system with advanced features active.
             self.job_watcher_popup.lift()
             self.job_watcher_popup.focus()
 
+    def open_affordance_popup(self):
+        """Opens the affordance editor popup window."""
+        if not hasattr(self, 'affordance_popup') or not self.affordance_popup.winfo_exists():
+            self.affordance_popup = AffordancePopup(self, self.affordance_manager, self.theme_manager, self.language_manager)
+            self.affordance_popup.focus()
+        else:
+            self.affordance_popup.lift()
+            self.affordance_popup.focus()
+
     def toggle_log_viewer(self):
         """Creates, shows, or focuses the LLM log viewer window."""
         # If the popup doesn't exist or has been destroyed, create it.
@@ -4039,11 +4266,22 @@ Enhanced LYRN-AI system with advanced features active.
         else:
             self.update_status("No response to copy yet", LYRN_WARNING)
 
+    def toggle_heartbeat(self):
+        """Saves the state of the heartbeat toggle to settings."""
+        is_enabled = self.heartbeat_enabled_var.get()
+        self.settings_manager.ui_settings["heartbeat_enabled"] = is_enabled
+        self.settings_manager.save_settings()
+        status_msg = "Heartbeat cycle enabled." if is_enabled else "Heartbeat cycle disabled."
+        color = LYRN_SUCCESS if is_enabled else LYRN_INFO
+        self.update_status(status_msg, color)
+
     def send_message(self):
         """Send user message and generate response"""
         user_text = self.input_box.get("0.0", "end").strip()
         if not user_text:
             return
+
+        self.last_user_input = user_text
 
         if not self.llm:
             self.update_status("No model loaded", LYRN_ERROR)
@@ -4211,6 +4449,14 @@ Enhanced LYRN-AI system with advanced features active.
                             # The newline is now handled by the 'token_count_info' message
                             delattr(self, '_assistant_started')
 
+                        # Trigger heartbeat cycle if enabled
+                        if self.heartbeat_enabled_var.get():
+                            print("Heartbeat enabled, triggering cycle.")
+                            if hasattr(self, 'last_user_input') and hasattr(self, 'last_assistant_response'):
+                                threading.Thread(target=self._run_heartbeat_cycle, args=(self.last_user_input, self.last_assistant_response), daemon=True).start()
+                            else:
+                                print("Warning: Could not trigger heartbeat, missing last input/response.")
+
                         # Check for pending jobs now that the model is idle
                         self._maybe_run_automated_job()
 
@@ -4259,13 +4505,55 @@ Enhanced LYRN-AI system with advanced features active.
 
     def _run_heartbeat_cycle(self, user_input: str, assistant_output: str):
         """
-        Runs the LLM's "internal dialog" pass and saves the raw output
+        Runs the LLM's 'internal dialog' pass and saves the raw output
         to a file for the heartbeat_watcher to process.
-        NOTE: This function is temporarily disabled pending a refactor to support the new IPC model.
         """
-        if True:
-            print("Heartbeat cycle is temporarily disabled.")
+        if not self.llm:
+            print("Heartbeat Error: Model not loaded.")
             return
+
+        self.stream_queue.put(('status_update', 'Running Heartbeat Cycle...', LYRN_ACCENT))
+        self.set_model_status("HB CYCLE")
+
+        try:
+            heartbeat_prompt = get_heartbeat_job_prompt(user_input, assistant_output)
+
+            messages = [
+                {"role": "system", "content": self.snapshot_loader.load_base_prompt()},
+                {"role": "user", "content": heartbeat_prompt}
+            ]
+
+            active = self.settings_manager.settings["active"]
+
+            response = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=active["max_tokens"],
+                temperature=0.1,
+                top_p=active["top_p"],
+                top_k=active.get("top_k", 40),
+                stream=False
+            )
+
+            heartbeat_output = response['choices'][0]['message']['content']
+
+            output_dir = Path(SCRIPT_DIR) / "automation" / "heartbeat_outputs"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            output_filename = f"hb_{timestamp}.txt"
+            output_filepath = output_dir / output_filename
+
+            with open(output_filepath, 'w', encoding='utf-8') as f:
+                f.write(heartbeat_output)
+
+            print(f"Heartbeat output saved to: {output_filepath}")
+            self.stream_queue.put(('status_update', 'Heartbeat cycle complete.', LYRN_SUCCESS))
+
+        except Exception as e:
+            print(f"Error during heartbeat cycle: {e}")
+            self.stream_queue.put(('status_update', 'Heartbeat cycle failed.', LYRN_ERROR))
+        finally:
+            self.set_model_status("Ready")
 
 
     def update_enhanced_metrics(self):

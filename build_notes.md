@@ -1,3 +1,27 @@
+# LYRN-AI v3.1 Build Notes
+
+## v3.1 - Heartbeat and Internal Affordances (2025-08-11)
+
+This is a major update that introduces the "Heartbeat," a toggleable, autonomous cognitive loop for the AI, and a system for "Internal Affordances," which are internal-only jobs triggered by the AI's reasoning during a heartbeat.
+
+- **New Heartbeat System:**
+    - A "Heartbeat Cycle" switch has been added to the "Automation" section of the right sidebar, allowing the user to toggle the autonomous loop on or off. The state is saved in settings.
+    - When enabled, after every chat response, the AI performs an internal "heartbeat" cycle. It analyzes the preceding conversation and generates a structured output containing summaries, keywords, insights, and potential actions.
+    - This output is saved to `automation/heartbeat_outputs/` for processing.
+
+- **Heartbeat Watcher Enhancements:**
+    - The `heartbeat_watcher.py` script has been updated to be the central processor for the new Heartbeat system.
+    - It now parses the full heartbeat output, creates memory deltas, and adds jobs to the queue as instructed by the AI.
+
+- **New Internal Affordance System:**
+    - Implemented a new class of internal-only jobs called "Affordances." These are simple, trigger-based parsers that the AI can activate to extract specific information from a conversation.
+    - The `heartbeat_watcher.py` can now process `AFFORD|` commands from a heartbeat file, find the relevant chat log, and execute the affordance to save the extracted data.
+    - A new `affordance_manager.py` module and `automation/affordances.json` file have been created to manage these new objects.
+
+- **New Affordance Editor GUI:**
+    - A new "Affordance Editor" popup has been created, accessible from the "Automation" window.
+    - This editor, modeled on the Job Watcher, allows users to easily create, view, edit, and delete affordances through a user-friendly interface.
+
 # LYRN-AI v3.0 Build Notes
 
 ## v3.0 - Reflection Cycle and Autonomous Refinement (2025-08-11)
