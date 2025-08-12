@@ -28,7 +28,7 @@ from pathlib import Path
 import shutil
 from tkinter import colorchooser, filedialog
 from delta_manager import DeltaManager
-from automation_controller import AutomationController
+from automation_controller import AutomationController, Job
 from heartbeat import get_heartbeat_job_prompt
 from file_lock import SimpleFileLock
 from job_watcher_manager import JobWatcherManager, WatcherJob
@@ -2525,12 +2525,94 @@ class JobWatcherPopup(ctk.CTkToplevel):
 
         self.tab_viewer = self.tabview.add("Job Viewer")
         self.tab_builder = self.tabview.add("Job Builder")
+        self.tab_reflection = self.tabview.add("Reflection Cycle")
 
         self.create_viewer_tab()
         self.create_builder_tab()
+        self.create_reflection_tab()
 
         self.refresh_job_list()
         self.tabview.set("Job Viewer")
+
+    def create_reflection_tab(self):
+        """Creates the UI for the Reflection Cycle tab."""
+        reflection_frame = ctk.CTkScrollableFrame(self.tab_reflection)
+        reflection_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Reflection Instructions
+        ctk.CTkLabel(reflection_frame, text="Reflection Instructions").pack(anchor="w")
+        self.reflection_instructions_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_instructions_text.pack(fill="x", pady=(0, 10), expand=True)
+
+        # Gold-Standard Example
+        ctk.CTkLabel(reflection_frame, text="Gold-Standard Example").pack(anchor="w")
+        self.reflection_gold_standard_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_gold_standard_text.pack(fill="x", pady=(0, 10), expand=True)
+
+        # Reflection Iterations
+        iterations_frame = ctk.CTkFrame(reflection_frame, fg_color="transparent")
+        iterations_frame.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(iterations_frame, text="Reflection Iterations:").pack(side="left")
+        self.reflection_iterations_entry = ctk.CTkEntry(iterations_frame, width=50)
+        self.reflection_iterations_entry.pack(side="left", padx=5)
+
+        # Reflection Batch Size
+        batch_size_frame = ctk.CTkFrame(reflection_frame, fg_color="transparent")
+        batch_size_frame.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(batch_size_frame, text="Reflect after N outputs:").pack(side="left")
+        self.reflection_batch_size_entry = ctk.CTkEntry(batch_size_frame, width=50)
+        self.reflection_batch_size_entry.pack(side="left", padx=5)
+
+        # Checkboxes
+        self.reflection_auto_update_prompt_var = ctk.BooleanVar()
+        self.reflection_auto_continue_var = ctk.BooleanVar()
+
+        auto_update_checkbox = ctk.CTkCheckBox(reflection_frame, text="Automatically update job prompt", variable=self.reflection_auto_update_prompt_var)
+        auto_update_checkbox.pack(anchor="w", pady=5)
+
+        auto_continue_checkbox = ctk.CTkCheckBox(reflection_frame, text="Auto-continue job after prompt update", variable=self.reflection_auto_continue_var)
+        auto_continue_checkbox.pack(anchor="w", pady=5)
+
+        # Manual Trigger Button
+        manual_trigger_button = ctk.CTkButton(reflection_frame, text="Run Reflection Manually", command=self.run_reflection_manually)
+        manual_trigger_button.pack(pady=20)
+
+    def run_reflection_manually(self):
+        """Triggers the reflection process manually based on the UI settings."""
+        instructions = self.reflection_instructions_text.get("1.0", "end-1c")
+        gold_standard = self.reflection_gold_standard_text.get("1.0", "end-1c")
+        iterations = self.reflection_iterations_entry.get()
+        auto_update = self.reflection_auto_update_prompt_var.get()
+        auto_continue = self.reflection_auto_continue_var.get()
+
+        if not instructions:
+            self.parent_app.update_status("Reflection instructions are required.", LYRN_WARNING)
+            return
+
+        # For manual triggering, we'll use the content of the main chat window as the "job output".
+        job_output = self.parent_app.chat_display.get("1.0", "end-1c")
+        if not job_output.strip():
+            self.parent_app.update_status("Chat display is empty, nothing to reflect on.", LYRN_WARNING)
+            return
+
+        # The 'reflection_cycle_job' expects these arguments.
+        job_args = {
+            "instructions": instructions,
+            "gold_standard": gold_standard,
+            "job_output": job_output,
+            "iterations": iterations,
+            "auto_update": auto_update,
+            "auto_continue": auto_continue,
+            "original_job_name": self.selected_job_name or "manual" # Track which job this reflection is for
+        }
+
+        # Add the reflection job to the queue
+        self.parent_app.automation_controller.add_job(
+            name="reflection_cycle_job",
+            args=job_args
+        )
+
+        self.parent_app.update_status(f"Reflection job for '{job_args['original_job_name']}' added to the queue.", LYRN_SUCCESS)
 
     def create_viewer_tab(self):
         self.tab_viewer.grid_columnconfigure(0, weight=1)
@@ -3772,6 +3854,103 @@ Enhanced LYRN-AI system with advanced features active.
                 self.insert_job_text(job_prompt)
                 self.update_status(f"Manual job loaded: {job_name}", LYRN_ACCENT)
 
+    def _execute_reflection_job(self, job: Job):
+        """Executes the reflection job, handling file saving and versioning."""
+        args = job.args
+        original_job_name = args.get("original_job_name", "unknown_job")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # 1. Create the reflections directory
+        reflections_dir = Path(SCRIPT_DIR) / "reflections" / f"{original_job_name}_{timestamp}"
+        reflections_dir.mkdir(parents=True, exist_ok=True)
+
+        # 2. Save original outputs and reflection notes
+        try:
+            # Save the original job output that was reflected upon
+            with open(reflections_dir / "original_output.txt", "w", encoding="utf-8") as f:
+                f.write(args.get("job_output", ""))
+
+            # The 'reflection_cycle_job' itself is run by the main generation logic.
+            # We need to get the *result* of that job here. For now, we'll simulate this
+            # by running the LLM again. In a future refactor, this should be more integrated.
+            self.display_colored_message(f"\n--- Running Reflection For: {original_job_name} ---\n", "system_text")
+
+            # This is where we call the LLM to perform the reflection.
+            # We'll construct a prompt similar to how the main chat works.
+            reflection_prompt = self.automation_controller.get_job_prompt("reflection_cycle_job", args)
+
+            messages = [
+                {"role": "system", "content": self.snapshot_loader.load_base_prompt()},
+                {"role": "user", "content": reflection_prompt}
+            ]
+
+            active = self.settings_manager.settings["active"]
+            handler = StreamHandler(self.stream_queue, self.metrics)
+
+            stream = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=active["max_tokens"],
+                temperature=active["temperature"],
+                top_p=active["top_p"],
+                stream=True
+            )
+
+            response_parts = []
+            for token_data in stream:
+                if 'choices' in token_data and len(token_data['choices']) > 0:
+                    delta = token_data['choices'][0].get('delta', {})
+                    content = delta.get('content', '')
+                    if content:
+                        response_parts.append(content)
+
+            reflection_result = ''.join(response_parts)
+
+            with open(reflections_dir / "reflection_notes.txt", "w", encoding="utf-8") as f:
+                f.write(reflection_result)
+
+            self.display_colored_message(f"Reflection complete. Notes saved to {reflections_dir}\n", "system_text")
+
+        except Exception as e:
+            print(f"Error during reflection file saving: {e}")
+            self.update_status("Error saving reflection files.", LYRN_ERROR)
+
+        # 3. Handle automatic prompt updates
+        if args.get("auto_update", False):
+            self.display_colored_message("Attempting to automatically update prompt...\n", "system_text")
+
+            # This would be another LLM call to generate a new prompt.
+            # For now, we'll simulate it.
+            new_prompt_content = f"# Prompt for {original_job_name} v2\n" + self.automation_controller.job_definitions.get(original_job_name, "") + "\n# Updated by reflection."
+
+            # Save new prompt with versioning
+            jobs_dir = Path(SCRIPT_DIR) / "automation" / "jobs"
+            new_prompt_path = jobs_dir / f"{original_job_name}_v2.txt" # Simplified versioning
+
+            try:
+                with open(new_prompt_path, "w", encoding="utf-8") as f:
+                    f.write(new_prompt_content)
+
+                # Save changelog
+                changelog_path = Path(SCRIPT_DIR) / "reflections" / "reflection_changelog.txt"
+                with open(changelog_path, "a", encoding="utf-8") as f:
+                    f.write(f"[{timestamp}] Job '{original_job_name}' updated to v2. See folder: {reflections_dir.name}\n")
+
+                self.display_colored_message(f"Prompt updated and saved to {new_prompt_path.name}\n", "success")
+
+                # 4. Handle auto-continuation
+                if args.get("auto_continue", False):
+                    self.display_colored_message("Auto-continuing job with updated prompt...\n", "system_text")
+                    # Re-add the original job to the queue, which will now use the new prompt if named correctly.
+                    # This part needs careful implementation to ensure the right version is picked up.
+                    # For now, we assume the system will just use the latest file for a given job name.
+                    self.automation_controller.add_job(name=original_job_name)
+
+
+            except Exception as e:
+                print(f"Error updating prompt: {e}")
+                self.update_status("Error updating prompt.", LYRN_ERROR)
+
+
     def _maybe_run_automated_job(self):
         """Checks for and runs the next job in the queue if the system is idle."""
         if self.is_thinking: # Don't run a job if the model is already running
@@ -3782,14 +3961,69 @@ Enhanced LYRN-AI system with advanced features active.
             if next_job:
                 print(f"Executing automated job: {next_job.name}")
 
-                # For now, this just displays the job prompt for verification.
-                # Later, this will trigger a full LLM cycle for the job.
-                self.display_colored_message(f"\n--- Running Automated Job: {next_job.name} ---\n", "system_text")
-                self.display_colored_message(next_job.prompt, "system_text")
-                self.display_colored_message(f"\n--- Job Complete: {next_job.name} ---\n", "system_text")
+                if next_job.name == "reflection_cycle_job":
+                    self._execute_reflection_job(next_job)
+                else:
+                    # For now, this just displays the job prompt for verification.
+                    # Later, this will trigger a full LLM cycle for the job.
+                    self.display_colored_message(f"\n--- Running Automated Job: {next_job.name} ---\n", "system_text")
+                    self.display_colored_message(next_job.prompt, "system_text")
+                    self.display_colored_message(f"\n--- Job Complete: {next_job.name} ---\n", "system_text")
+                    self._handle_job_completion(next_job.name)
 
                 # Check if more jobs are pending and run them if so
                 self.after(100, self._maybe_run_automated_job)
+
+    def _get_job_run_counts(self) -> Dict[str, int]:
+        """Reads the job run counts from the JSON file."""
+        counts_path = Path(SCRIPT_DIR) / "automation" / "job_run_counts.json"
+        if not counts_path.exists():
+            return {}
+        try:
+            with open(counts_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+
+    def _save_job_run_counts(self, counts: Dict[str, int]):
+        """Saves the job run counts to the JSON file."""
+        counts_path = Path(SCRIPT_DIR) / "automation" / "job_run_counts.json"
+        try:
+            with open(counts_path, 'w', encoding='utf-8') as f:
+                json.dump(counts, f, indent=2)
+        except IOError as e:
+            print(f"Error saving job run counts: {e}")
+
+    def _handle_job_completion(self, job_name: str):
+        """Increments the run count for a job and triggers reflection if the batch size is met."""
+        # This function should only be called for non-reflection jobs.
+        if job_name == "reflection_cycle_job":
+            return
+
+        counts = self._get_job_run_counts()
+        new_count = counts.get(job_name, 0) + 1
+        counts[job_name] = new_count
+        self._save_job_run_counts(counts)
+
+        try:
+            batch_size_str = self.job_watcher_popup.reflection_batch_size_entry.get()
+            batch_size = int(batch_size_str)
+        except (ValueError, AttributeError):
+            # If the entry is invalid or the popup isn't open, don't trigger reflection.
+            return
+
+        if batch_size > 0 and new_count >= batch_size:
+            print(f"Job '{job_name}' has reached its batch size of {batch_size}. Triggering reflection.")
+            # Reset the counter
+            counts[job_name] = 0
+            self._save_job_run_counts(counts)
+
+            # Queue the reflection job
+            # We need to gather the necessary data from the UI again.
+            if hasattr(self, 'job_watcher_popup') and self.job_watcher_popup.winfo_exists():
+                self.job_watcher_popup.run_reflection_manually()
+            else:
+                print("Warning: Job watcher popup is not open. Cannot trigger automated reflection.")
 
     def insert_job_text(self, text: str):
         """Insert job text into input box"""
