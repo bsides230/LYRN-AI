@@ -1,3 +1,26 @@
+# LYRN-AI v3.2 Build Notes
+
+## v3.2 - Heartbeat and Affordance GUI (2025-08-11)
+
+This update focuses on fixing the heartbeat system to respect the global automation flag and implementing a full-featured GUI for managing internal affordances.
+
+- **Heartbeat Watcher Fixes:**
+    - The `heartbeat_watcher.py` script now correctly checks the `global_flags/automation.txt` file. The watcher will now only process heartbeat files when this flag is set to "on", preventing it from running when automation is disabled.
+    - Cleaned up verbose logging from the watcher script to only show essential messages and errors.
+    - Improved the parsing of the `CHAT_PAIR_ID` from heartbeat files to be more robust.
+
+- **New Affordance Editor GUI:**
+    - Implemented a new, full-featured "Affordance Editor" popup window.
+    - The editor is accessible from the main UI via a new "Affordances" button in the "Job Automation" section, making it a first-class feature.
+    - The popup has a two-tab layout:
+        - **Viewer Tab:** Lists all saved affordances, with options to "Edit" or "Delete" them.
+        - **Editor Tab:** A form for creating and editing affordances with fields for name, start/end triggers, output path, and filename.
+    - All changes made in the GUI are saved to `automation/affordances.json` via the existing `AffordanceManager`.
+
+- **Versioning:**
+    - Renamed `lyrn_sad_v3.1.pyw` to `lyrn_sad_v3.2.pyw` to reflect the updates.
+    - The previous version has been archived in `deprecated/Old/`.
+
 # LYRN-AI v3.1 Build Notes
 
 ## v3.1 - Heartbeat and Internal Affordances (2025-08-11)
