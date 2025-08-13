@@ -986,7 +986,7 @@ class ThemedPopup(ctk.CTkToplevel):
 
         # Make the popup transient for the parent, which can help with window management
         # and theming on some platforms.
-        self.transient(parent)
+        # self.transient(parent) # Disabled: This forces the window to stay on top of its parent, breaking the "Keep on Top" feature.
 
     def apply_theme(self):
         """Applies the current theme colors to all widgets in this popup."""
@@ -1139,7 +1139,7 @@ class ModelSelectorPopup(ThemedPopup):
         super().__init__(parent=parent, theme_manager=theme_manager)
         self.settings_manager = settings_manager
 
-        self.title("LYRN-AI Model Selector")
+        self.title("Model Settings")
         self.geometry("600x450")
         self.minsize(500, 400)
         self.grab_set() # Modal - prevent interaction with main window
@@ -1195,9 +1195,20 @@ class ModelSelectorPopup(ThemedPopup):
             entry.grid(row=row, column=col+1, padx=10, pady=5, sticky="w")
             self.model_entries[key] = entry
 
+        # Warning Label
+        warning_label = ctk.CTkLabel(
+            main_frame,
+            text="Warning: You must reload the model for any changes to take effect.",
+            text_color=LYRN_WARNING,
+            font=font,
+            wraplength=550, # Ensure text wraps nicely
+            justify="center"
+        )
+        warning_label.pack(pady=(15, 0), padx=20)
+
         # Bottom frame for checkbox and buttons
         bottom_frame = ctk.CTkFrame(main_frame)
-        bottom_frame.pack(fill="x", padx=10, pady=(20, 0))
+        bottom_frame.pack(fill="x", padx=10, pady=(15, 0))
 
         self.dont_show_checkbox = ctk.CTkCheckBox(
             bottom_frame, text="Don't show this again on startup",
@@ -1236,10 +1247,14 @@ class ModelSelectorPopup(ThemedPopup):
         active_settings = self.settings_manager.settings.get("active", {})
         for key, entry in self.model_entries.items():
             entry.delete(0, "end")
-            default_value = ""
             if key == "chat_format":
-                default_value = "none"
-            entry.insert(0, str(active_settings.get(key, default_value)))
+                # Default to None if missing. Show empty string for None, otherwise the value.
+                val = active_settings.get(key, None)
+                entry.insert(0, "" if val is None else str(val))
+            else:
+                # Keep original behavior for other settings for now
+                default_value = ""
+                entry.insert(0, str(active_settings.get(key, default_value)))
 
         # Pre-select model in dropdown if it exists
         current_model_path = active_settings.get("model_path", "")
@@ -1271,7 +1286,8 @@ class ModelSelectorPopup(ThemedPopup):
                     print(f"Warning: Could not parse '{value}' for '{key}'. Using 0.")
                     new_active_settings[key] = 0
             elif key == "chat_format":
-                new_active_settings[key] = value if value else "none"
+                # If the value is an empty string, save None. Otherwise, save the string.
+                new_active_settings[key] = None if not value else value
             else:
                 new_active_settings[key] = value
 
@@ -3323,7 +3339,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
                 n_gpu_layers=active["n_gpu_layers"],
                 use_mlock=True,
                 use_mmap=False,
-                chat_format=active.get("chat_format", "qwen"),
+                chat_format=active.get("chat_format"),
                 add_bos=True,
                 add_eos=True,
                 verbose=True
@@ -3687,9 +3703,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         Tooltip(self.load_model_button, self.tooltips.get("load_model_button", ""))
 
         # --- Relocated Controls ---
-        self.change_model_button = ctk.CTkButton(self.status_frame, text="🔄 Change Model", command=self.open_model_selector)
+        self.change_model_button = ctk.CTkButton(self.status_frame, text="⚙️ Model Settings", command=self.open_model_selector)
         self.change_model_button.pack(fill="x", padx=10, pady=(10, 5))
-        Tooltip(self.change_model_button, "Open the model selector to change the loaded model.")
+        Tooltip(self.change_model_button, "Open the model settings to change the loaded model.")
 
         mode_frame = ctk.CTkFrame(self.status_frame)
         mode_frame.pack(fill="x", padx=10, pady=5)

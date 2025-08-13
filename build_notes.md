@@ -1,3 +1,28 @@
+# LYRN-AI v3.7 Build Notes
+
+## v3.7 - UI and Configuration Fixes (2025-08-12)
+
+This update addresses several bugs and UI inconsistencies related to model configuration and window behavior.
+
+- **Model Chat Format Configuration:**
+    - Fixed a bug in the "Model Settings" popup where the `chat_format` could not be set to `None` (no format).
+    - The UI now correctly saves an empty input as `None` in the settings, allowing a clear distinction between no format and an explicitly named format like `"none"`.
+    - The model loader now correctly defaults to `None` if the `chat_format` setting is missing, improving initial setup.
+
+- **"Keep on Top" Toggle Fix:**
+    - Fixed a bug where the "Keep on Top" checkbox on popups (like the Log Viewer and Prompt Builder) had no effect.
+    - The underlying window property (`transient`) that forced popups to always stay on top of the main window has been removed, allowing the toggle to function as expected.
+
+- **Model Settings UI Enhancements:**
+    - Renamed the "Change Model" button on the main UI to "Model Settings" for better clarity.
+    - The corresponding popup window title has also been updated to "Model Settings".
+    - A warning label has been added to the "Model Settings" popup to remind users that the model must be reloaded for changes to take effect.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.7.pyw`.
+    - The window title now correctly displays `v3.7`.
+    - The previous version `lyrn_sad_v3.6.pyw` has been archived.
+
 # LYRN-AI v3.6 Build Notes
 
 ## v3.6 - Generation Control and Model Configuration (2025-08-12)
@@ -227,7 +252,7 @@ This update introduces a new structured logging system specifically for job auto
 - **Tagged Log Content:**
     - The logger saves the interaction in three distinct, tagged sections within the same file:
         - The user's input is saved under `#USER_START#` and `#USER_END#`.
-        - The model's internal "thinking" process (text between `<thinking>` tags) is saved under `#THINKING_START#` and `#THINKING_END#`.
+        - The's internal "thinking" process (text between `<thinking>` tags) is saved under `#THINKING_START#` and `#THINKING_END#`.
         - The final, complete response from the assistant is saved under `#RESPONSE_START#` and `#RESPONSE_END#`.
     - This structured format allows an external script to easily parse the different components of the conversation for automation purposes.
 
