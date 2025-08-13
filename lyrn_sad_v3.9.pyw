@@ -1633,6 +1633,15 @@ class TabbedSettingsDialog(ThemedPopup):
         font_increase_button.pack(side="left", padx=2)
 
 
+        # --- Moved Buttons ---
+        moved_buttons_frame = ctk.CTkFrame(self.tab_ui_settings)
+        moved_buttons_frame.pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(moved_buttons_frame, text="Chat Controls", font=title_font).pack(pady=10, anchor="w", padx=10)
+
+        clear_chat_button = ctk.CTkButton(moved_buttons_frame, text="🗑️ Clear Display Text",
+                                             font=font, command=self.parent_app.clear_chat)
+        clear_chat_button.pack(padx=10, pady=5, anchor="w")
+        Tooltip(clear_chat_button, self.parent_app.tooltips.get("clear_chat_button", ""))
 
         # --- Terminal Settings ---
         terminal_frame = ctk.CTkFrame(self.tab_ui_settings)
@@ -4144,9 +4153,10 @@ Enhanced LYRN-AI system with advanced features active.
 
     def open_terminal(self):
         """Opens a new terminal window in the specified path."""
-        start_path = self.settings_manager.ui_settings.get("terminal_start_path", "")
-        if not start_path or not os.path.isdir(start_path):
+        start_path = self.settings_manager.ui_settings.get("terminal_start_path", SCRIPT_DIR)
+        if not os.path.isdir(start_path):
             start_path = SCRIPT_DIR
+            self.update_status(f"Terminal path not found, defaulting to script dir.", LYRN_WARNING)
 
         try:
             if sys.platform == "win32":
