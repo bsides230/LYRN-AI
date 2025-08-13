@@ -3597,6 +3597,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.terminal_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.terminal_button, "Opens a new terminal in the specified directory.")
 
+        self.clear_chat_button = ctk.CTkButton(self.quick_frame, text="🗑️ Clear Display", command=self.clear_chat)
+        self.clear_chat_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.clear_chat_button, "Clears the main chat display.")
+
         self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
         self.settings_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
