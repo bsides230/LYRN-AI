@@ -1,3 +1,27 @@
+# LYRN-AI v3.9.1 Build Notes
+
+## v3.9.1 - Theming and Confirmation Dialogs (2025-08-13)
+
+This update focuses on improving user experience by ensuring all popups are non-modal, fixing theme inconsistencies, and adding standardized confirmation dialogs for all destructive actions.
+
+- **Standardized Confirmation Dialogs:**
+    - Implemented a new, reusable `ConfirmationDialog` class for all actions that require user confirmation (e.g., deleting modes, themes, jobs, or clearing directories).
+    - This dialog includes a "Don't ask me again" checkbox, which saves the user's preference to `settings.json` to prevent future prompts for that specific action.
+    - Replaced all previous `CTkInputDialog` confirmation prompts with the new standardized dialog for a consistent look and feel.
+
+- **Non-Modal Popups:**
+    - All secondary windows (like the Theme Builder, Automation, and Affordance Editor) are now non-modal. They no longer block interaction with the main application window, allowing for a more flexible workflow.
+    - This was achieved by removing the `grab_set()` call from the respective popup classes.
+
+- **Theming Fixes:**
+    - Addressed an issue where the "Model Settings" (preset picker) popup might not have been themed correctly after loading a preset. The theme is now explicitly reapplied to ensure visual consistency.
+    - As part of the fix, the core `ThemedPopup` and `ThemeManager` classes were refactored into a separate `themed_popup.py` file to resolve a circular dependency and improve code organization.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.9.1.pyw`.
+    - The window title now correctly displays `v3.9.1`.
+    - The previous version `lyrn_sad_v3.9.pyw` has been archived.
+
 # LYRN-AI v3.9 Build Notes
 
 ## v3.9 - Custom Color Picker and Theme Builder Enhancements (2025-08-12)
