@@ -4209,7 +4209,7 @@ Enhanced LYRN-AI system with advanced features active.
             handler = StreamHandler(self.stream_queue, self.metrics)
 
             stream = self.llm.create_chat_completion(
-                messages=messages,
+                prompt=your_prompt,
                 max_tokens=active["max_tokens"],
                 temperature=active["temperature"],
                 top_p=active["top_p"],
@@ -4634,7 +4634,7 @@ Enhanced LYRN-AI system with advanced features active.
             active = self.settings_manager.settings["active"]
 
             response = self.llm.create_chat_completion(
-                messages=messages,
+                prompt=your_prompt,
                 max_tokens=active["max_tokens"],
                 temperature=0.1,
                 top_p=active["top_p"],
