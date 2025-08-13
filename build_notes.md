@@ -1,3 +1,24 @@
+# LYRN-AI v3.6 Build Notes
+
+## v3.6 - Generation Control and Model Configuration (2025-08-12)
+
+This update introduces critical user control features for model generation and enhances model configuration options.
+
+- **Stop Generation Button:**
+    - A "Stop" button has been added to the main chat interface next to the "Send" and "Copy" buttons.
+    - This allows the user to immediately interrupt the model while it is generating a response, preventing runaway generation and providing more control.
+    - The underlying logic uses a flag to gracefully exit the generation loop in the background thread.
+
+- **Enhanced Model Settings:**
+    - The "Change Model" popup has been updated with two new configuration fields:
+        - **Chat Style:** A text input that allows the user to specify the `chat_format` for the model (e.g., `qwen`, `chatml`). It defaults to "none".
+        - **Max Output Tokens:** A text input for the user to set the `max_tokens` parameter for the model's output.
+    - These settings are now saved to and loaded from `settings.json`, allowing for persistent configuration.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.6.pyw`.
+    - The window title now correctly displays `v3.6`.
+
 # LYRN-AI v3.5 Build Notes
 
 ## v3.5 - Theming and Versioning Fixes (2025-08-12)
