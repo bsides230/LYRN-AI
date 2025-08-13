@@ -1192,7 +1192,8 @@ class ModelSelectorPopup(ThemedPopup):
 
         params = [
             ("Context Size:", "n_ctx", 0, 0), ("Threads:", "n_threads", 0, 2),
-            ("GPU Layers:", "n_gpu_layers", 1, 0)
+            ("GPU Layers:", "n_gpu_layers", 1, 0), ("Max Tokens:", "max_tokens", 1, 2),
+            ("Chat Format:", "chat_format", 2, 0)
         ]
 
         self.model_entries = {}
@@ -1243,7 +1244,10 @@ class ModelSelectorPopup(ThemedPopup):
         active_settings = self.settings_manager.settings.get("active", {})
         for key, entry in self.model_entries.items():
             entry.delete(0, "end")
-            entry.insert(0, str(active_settings.get(key, "")))
+            default_value = ""
+            if key == "chat_format":
+                default_value = "none"
+            entry.insert(0, str(active_settings.get(key, default_value)))
 
         # Pre-select model in dropdown if it exists
         current_model_path = active_settings.get("model_path", "")
@@ -1268,11 +1272,16 @@ class ModelSelectorPopup(ThemedPopup):
 
         for key, entry in self.model_entries.items():
             value = entry.get()
-            try:
-                new_active_settings[key] = int(value)
-            except (ValueError, TypeError):
-                print(f"Warning: Could not parse '{value}' for '{key}'. Using 0.")
-                new_active_settings[key] = 0
+            if key in ["n_ctx", "n_threads", "n_gpu_layers", "max_tokens"]:
+                try:
+                    new_active_settings[key] = int(value)
+                except (ValueError, TypeError):
+                    print(f"Warning: Could not parse '{value}' for '{key}'. Using 0.")
+                    new_active_settings[key] = 0
+            elif key == "chat_format":
+                new_active_settings[key] = value if value else "none"
+            else:
+                new_active_settings[key] = value
 
         # 2. Save settings
         self.settings_manager.settings["active"] = new_active_settings
@@ -3076,6 +3085,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.first_boot_complete = False
         self.is_thinking = False
         self.is_minimized = False
+        self.stop_generation = False
         self.current_assistant_message_label = None
         self.stream_queue = queue.Queue()
         self.resource_monitor = SystemResourceMonitor(self.stream_queue)
@@ -3249,7 +3259,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI v3.5")
+        self.title("LYRN-AI v3.6")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -3321,7 +3331,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
                 n_gpu_layers=active["n_gpu_layers"],
                 use_mlock=True,
                 use_mmap=False,
-                chat_format="qwen",
+                chat_format=active.get("chat_format", "qwen"),
                 add_bos=True,
                 add_eos=True,
                 verbose=True
@@ -3765,6 +3775,14 @@ class LyrnAIInterface(ctk.CTkToplevel):
                                      command=self.copy_last_response)
         self.copy_btn.pack(pady=(5, 0), fill="x")
         Tooltip(self.copy_btn, "Copies the last assistant response to the clipboard.")
+
+        # Stop button
+        self.stop_btn = ctk.CTkButton(button_vframe, text="Stop", width=80,
+                                     font=chat_font,
+                                     command=self.stop_generation_process,
+                                     state="disabled")
+        self.stop_btn.pack(pady=(5, 0), fill="x")
+        Tooltip(self.stop_btn, "Stops the current generation.")
 
         # Bind keyboard shortcut
         self.input_box.bind("<Control-Return>", lambda e: self.send_message())
@@ -4365,6 +4383,8 @@ Enhanced LYRN-AI system with advanced features active.
         # Clear input and disable send
         self.input_box.delete("0.0", "end")
         self.send_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.stop_generation = False # Reset flag at the start of a new generation
 
         # The old save_chat_message is now deprecated.
         # self.save_chat_message("user", user_text)
@@ -4375,6 +4395,11 @@ Enhanced LYRN-AI system with advanced features active.
         self.set_model_status("Thinking") # Blue for generating
         threading.Thread(target=self.generate_response, args=(user_text,), daemon=True).start()
         self.update_status("Generating response...", LYRN_INFO)
+
+    def stop_generation_process(self):
+        """Sets the flag to stop the generation thread."""
+        self.stop_generation = True
+        self.update_status("Stopping generation...", LYRN_WARNING)
 
     def remove_thinking_message(self):
         """Finds and removes the 'Thinking...' message from the chat display."""
@@ -4408,7 +4433,7 @@ Enhanced LYRN-AI system with advanced features active.
                 # Start streaming with enhanced metrics capture
                 stream = self.llm.create_chat_completion(
                     messages=messages,
-                    max_tokens=active["max_tokens"],
+                    max_tokens=active.get("max_tokens", 2048),
                     temperature=active["temperature"],
                     top_p=active["top_p"],
                     top_k=active.get("top_k", 40),
@@ -4417,6 +4442,9 @@ Enhanced LYRN-AI system with advanced features active.
 
                 response_parts = []
                 for token_data in stream:
+                    if self.stop_generation:
+                        print("Generation stopped by user.")
+                        break
                     handler.handle_token(token_data)
                     if 'choices' in token_data and len(token_data['choices']) > 0:
                         delta = token_data['choices'][0].get('delta', {})
@@ -4553,6 +4581,10 @@ Enhanced LYRN-AI system with advanced features active.
 
                     elif message[0] == 'enable_send':
                         self.send_btn.configure(state="normal")
+                        self.stop_btn.configure(state="disabled")
+                        if self.stop_generation:
+                             self.update_status("Generation stopped.", LYRN_WARNING)
+                             self.set_model_status("Ready")
                         # Also check for jobs when the send button is re-enabled
                         self._maybe_run_automated_job()
 
