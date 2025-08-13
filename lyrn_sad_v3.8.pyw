@@ -263,17 +263,14 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         # Hide indicator
         self.drop_indicator.place_forget()
 
-        # Reset visual state of the dragged item
-        is_pinned = self.item_map[self.dragged_item].get("pinned", False)
-        if is_pinned:
-            self.dragged_item.configure(fg_color=("#E8D5F9", "#402354"))
-        else:
-            self.dragged_item.configure(fg_color="transparent")
+        # The visual state of the selected item is now managed in _on_press to make it persistent.
+        # We only handle the reordering logic here.
 
         # Use the calculated target_index from the indicator
         target_index = self.drop_indicator_index
 
         # Constrain the drop to respect pinning boundaries
+        is_pinned = self.item_map[self.dragged_item].get("pinned", False)
         num_pinned = sum(1 for item in self.items if self.item_map[item].get("pinned", False) and item != self.dragged_item)
         if is_pinned:
             target_index = min(target_index, num_pinned)
