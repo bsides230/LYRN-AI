@@ -1,14 +1,6 @@
 """
-LYRN-AI Interface v6.5 - GUI UPDATE
+LYRN-AI Interface
 
-Major Updates:
-- GUI UPDATE v6.4 to v6.5
-- Update the perform updates
-- always check the AGENTS.md for system messages
-- use the feature_suggestions.md for the to build this update
-- use the images/lyrn_logo.jpg to create a logo and replace the brain emoji
-- system status needs to have more information and be arranged a little cleaner
-- the theme settings
 """
 
 import os
