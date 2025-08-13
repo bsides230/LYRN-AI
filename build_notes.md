@@ -1,3 +1,32 @@
+# LYRN-AI v3.8 Build Notes
+
+## v3.8 - Preset and Prompt Management Overhaul (2025-08-12)
+
+This update introduces significant improvements to user workflow by adding model setting presets and enhanced control over the system prompt building process.
+
+- **Model Settings Presets:**
+    - The "Model Settings" popup now features a preset system.
+    - Users can save the current model configuration (model path, context size, GPU layers, etc.) into one of five numbered preset slots.
+    - Added a "Save" button and five preset buttons (1-5) to the popup.
+    - Clicking a preset button instantly loads the saved configuration into the UI fields.
+    - Presets are stored in `settings.json` under the `model_presets` key.
+
+- **UI Reorganization:**
+    - To improve contextual grouping, several controls have been relocated.
+    - The "System Prompt" button has been moved from the "Quick Controls" section to the "System Status" section, directly under the "Mode" dropdown.
+    - The "Heartbeat Cycle" switch and its associated "Open Logs" button have been moved from the right sidebar's "Job Automation" section to the same location under the "Mode" dropdown.
+
+- **Prompt Builder Enhancements:**
+    - **Remove from Index:** A "Remove File" button has been added to the "Prompt Builder" popup. This allows a user to select a file in the build list and remove it from the `build_prompt_index.json` without deleting the actual file.
+    - **Index and Prompt Refresh Control:**
+        - The button for re-scanning subfolders has been renamed to "Rebuild Master Index from Folders" for clarity.
+        - A new "Refresh Prompt from Index" button has been added. This rebuilds the `master_prompt.txt` using only the files currently visible in the UI list, respecting any files that have been manually removed from the index. This allows for quick prompt updates without a full file system re-scan.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.8.pyw`.
+    - The window title now correctly displays `v3.8`.
+    - The previous version `lyrn_sad_v3.7.pyw` has been archived.
+
 # LYRN-AI v3.7 Build Notes
 
 ## v3.7 - UI and Configuration Fixes (2025-08-12)

@@ -104,9 +104,14 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.items = []
         self.item_map = {}
         self.dragged_item = None
+        self.selected_item = None
         self.drop_indicator = ctk.CTkFrame(self, height=2, fg_color=LYRN_ACCENT, corner_radius=0)
         self.drop_indicator_index = -1
         self.drag_offset_y = 0
+
+    def get_selected_item(self):
+        """Returns the currently selected item's frame."""
+        return self.selected_item
 
     def add_item(self, item_data: dict, **kwargs):
         """Adds a new draggable item to the list."""
@@ -178,11 +183,24 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         """Callback for when a mouse button is pressed on an item."""
         # Find the actual frame to drag from the widget that was clicked
         if isinstance(widget, (ctk.CTkLabel, ctk.CTkButton)):
-            self.dragged_item = widget.master
+            frame_to_select = widget.master
         else:
-            self.dragged_item = widget
+            frame_to_select = widget
 
-        self.dragged_item.configure(fg_color=LYRN_PURPLE)
+        # Update selection
+        self.selected_item = frame_to_select
+        self.dragged_item = frame_to_select
+
+        # Visual feedback for selection and drag
+        for item in self.items:
+            is_pinned = self.item_map[item].get("pinned", False)
+            if item == self.selected_item:
+                item.configure(fg_color=LYRN_PURPLE) # Drag color
+            elif is_pinned:
+                item.configure(fg_color=("#E8D5F9", "#402354")) # Pinned color
+            else:
+                item.configure(fg_color="transparent") # Default color
+
         self.dragged_item.lift()
         self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
 
@@ -1219,6 +1237,92 @@ class ModelSelectorPopup(ThemedPopup):
         self.load_button = ctk.CTkButton(bottom_frame, text="Load Model", font=font, command=self.load_model)
         self.load_button.pack(side="right", padx=10)
 
+        # --- Preset Management ---
+        preset_frame = ctk.CTkFrame(main_frame)
+        preset_frame.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(preset_frame, text="Presets:", font=font).pack(side="left", padx=10)
+
+        save_preset_button = ctk.CTkButton(preset_frame, text="Save", width=50, font=font, command=self.save_preset)
+        save_preset_button.pack(side="left", padx=5)
+
+        for i in range(1, 6):
+            preset_button = ctk.CTkButton(preset_frame, text=str(i), width=30, font=font, command=lambda num=i: self.load_preset(num))
+            preset_button.pack(side="left", padx=5)
+
+    def save_preset(self):
+        """Saves the current model settings as a numbered preset."""
+        dialog = ctk.CTkInputDialog(text="Enter preset number to save (1-5):", title="Save Preset")
+        preset_num_str = dialog.get_input()
+
+        if not preset_num_str or not preset_num_str.isdigit() or not 1 <= int(preset_num_str) <= 5:
+            print("Invalid preset number. Please enter a number between 1 and 5.")
+            # Optionally, show a message to the user
+            return
+
+        preset_num = preset_num_str
+
+        # Gather current settings from the UI
+        selected_model_file = self.model_dropdown.get()
+        if not selected_model_file:
+            print("Cannot save preset without a selected model.")
+            return
+
+        preset_data = {
+            "model_path": os.path.join(SCRIPT_DIR, "models", selected_model_file)
+        }
+        for key, entry in self.model_entries.items():
+            value = entry.get()
+            if key in ["n_ctx", "n_threads", "n_gpu_layers", "max_tokens"]:
+                try:
+                    preset_data[key] = int(value)
+                except (ValueError, TypeError):
+                    preset_data[key] = 0
+            elif key == "chat_format":
+                preset_data[key] = None if not value else value
+            else:
+                preset_data[key] = value
+
+        # Save to settings.json
+        if "model_presets" not in self.settings_manager.settings:
+            self.settings_manager.settings["model_presets"] = {}
+
+        self.settings_manager.settings["model_presets"][preset_num] = preset_data
+        self.settings_manager.save_settings()
+        print(f"Preset '{preset_num}' saved successfully.")
+        # Optionally, update a status label in the popup
+        self.parent_app.update_status(f"Preset {preset_num} saved.", LYRN_SUCCESS)
+
+
+    def load_preset(self, preset_num: int):
+        """Loads a model settings preset and populates the UI."""
+        preset_num_str = str(preset_num)
+        presets = self.settings_manager.settings.get("model_presets", {})
+
+        if preset_num_str not in presets:
+            print(f"Preset '{preset_num_str}' not found.")
+            self.parent_app.update_status(f"Preset {preset_num_str} not found.", LYRN_WARNING)
+            return
+
+        preset_data = presets[preset_num_str]
+
+        # Populate UI fields
+        for key, entry in self.model_entries.items():
+            entry.delete(0, "end")
+            value = preset_data.get(key)
+            if key == "chat_format":
+                 entry.insert(0, "" if value is None else str(value))
+            elif value is not None:
+                entry.insert(0, str(value))
+
+        model_path = preset_data.get("model_path", "")
+        if model_path:
+            model_filename = os.path.basename(model_path)
+            if model_filename in self.model_dropdown.cget("values"):
+                self.model_dropdown.set(model_filename)
+
+        print(f"Preset '{preset_num_str}' loaded.")
+        self.parent_app.update_status(f"Preset {preset_num_str} loaded.", LYRN_INFO)
+
     def load_models(self):
         """Scan the models directory and populate the dropdown."""
         models_dir = os.path.join(SCRIPT_DIR, "models")
@@ -2046,10 +2150,15 @@ class PromptBuilderPopup(ThemedPopup):
         button_frame = ctk.CTkFrame(self)
         button_frame.pack(fill="x", padx=20, pady=10)
 
-        refresh_button = ctk.CTkButton(button_frame, text="🔄 Refresh Index from Subfolders",
+        refresh_button = ctk.CTkButton(button_frame, text="Rebuild Master Index from Folders",
                         font=font, command=self.refresh_prompt_index)
         refresh_button.pack(side="left", padx=10)
-        Tooltip(refresh_button, self.parent_app.tooltips.get("refresh_prompt_index_button", ""))
+        Tooltip(refresh_button, "Re-scans all subfolders and rebuilds the master index file.")
+
+        build_prompt_button = ctk.CTkButton(button_frame, text="Refresh Prompt from Index",
+                                             font=font, command=self.refresh_prompt_from_index)
+        build_prompt_button.pack(side="left", padx=10)
+        Tooltip(build_prompt_button, "Rebuilds the master_prompt.txt using only the files currently listed below.")
 
         save_mode_button = ctk.CTkButton(button_frame, text="💾 Save as Mode",
                         font=font, command=self.save_as_mode)
@@ -2096,6 +2205,40 @@ class PromptBuilderPopup(ThemedPopup):
         delete_mode_button = ctk.CTkButton(mode_button_frame, text="Delete Mode", command=self.delete_selected_mode)
         delete_mode_button.pack(padx=10, pady=10, anchor="n")
         Tooltip(delete_mode_button, "Deletes the selected mode file.")
+
+        remove_file_button = ctk.CTkButton(mode_button_frame, text="Remove File", command=self.remove_selected_file)
+        remove_file_button.pack(padx=10, pady=10, anchor="n")
+        Tooltip(remove_file_button, "Removes the selected file from the index, but does not delete the file itself.")
+
+    def remove_selected_file(self):
+        """Removes the selected file from the draggable list and updates the index."""
+        selected_frame = self.prompt_dnd_list.get_selected_item()
+        if not selected_frame:
+            self.parent_app.update_status("No file selected to remove.", LYRN_WARNING)
+            return
+
+        # Remove from internal lists
+        self.prompt_dnd_list.items.remove(selected_frame)
+        del self.prompt_dnd_list.item_map[selected_frame]
+
+        # Destroy the widget
+        selected_frame.destroy()
+        self.prompt_dnd_list.selected_item = None
+
+        # Get the new order and save it
+        new_order = self.prompt_dnd_list.get_item_objects()
+        self.on_prompt_list_reorder(new_order)
+        self.parent_app.update_status("File removed from index.", LYRN_SUCCESS)
+
+    def refresh_prompt_from_index(self):
+        """Rebuilds the master prompt file using only the files currently in the UI list."""
+        current_items = self.prompt_dnd_list.get_item_objects()
+        if not current_items:
+            self.parent_app.update_status("Index is empty. Cannot build prompt.", LYRN_WARNING)
+            return
+
+        self.snapshot_loader._build_master_prompt_file(current_items)
+        self.parent_app.update_status("Prompt rebuilt from current index.", LYRN_SUCCESS)
 
     def toggle_on_top(self):
         """Toggles the always-on-top status of the window."""
@@ -3267,7 +3410,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI v3.7")
+        self.title("LYRN-AI v3.8")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -3454,10 +3597,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.terminal_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.terminal_button, "Opens a new terminal in the specified directory.")
 
-        self.prompt_builder_button = ctk.CTkButton(self.quick_frame, text="📝 System Prompt", command=self.open_prompt_builder)
-        self.prompt_builder_button.pack(fill="x", padx=10, pady=3)
-        Tooltip(self.prompt_builder_button, "Open the System Prompt Builder window.")
-
         self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
         self.settings_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
@@ -3515,18 +3654,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.affordance_button = ctk.CTkButton(self.job_frame, text="Affordances", command=self.open_affordance_popup)
         self.affordance_button.pack(fill="x", padx=10, pady=5)
         Tooltip(self.affordance_button, "Open the Affordance Editor to manage internal triggers.")
-
-        # Heartbeat Toggle Switch
-        heartbeat_frame = ctk.CTkFrame(self.job_frame, fg_color="transparent")
-        heartbeat_frame.pack(fill="x", padx=10, pady=10)
-        self.heartbeat_enabled_var = ctk.BooleanVar()
-        self.heartbeat_switch = ctk.CTkSwitch(heartbeat_frame, text="Heartbeat Cycle", variable=self.heartbeat_enabled_var, command=self.toggle_heartbeat)
-        self.heartbeat_switch.pack(side="left", anchor="w")
-        Tooltip(self.heartbeat_switch, "Enable the autonomous cognitive heartbeat cycle.")
-
-        self.open_heartbeat_logs_button = ctk.CTkButton(heartbeat_frame, text="📂", width=40, command=self.open_heartbeat_logs_folder)
-        self.open_heartbeat_logs_button.pack(side="right", padx=(0, 5))
-        Tooltip(self.open_heartbeat_logs_button, "Open heartbeat logs folder in file explorer.")
 
         return self.right_sidebar
 
@@ -3724,6 +3851,23 @@ class LyrnAIInterface(ctk.CTkToplevel):
                                          command=self.refresh_prompt_from_mode)
         self.refresh_prompt_button.pack(side="right", padx=2)
         Tooltip(self.refresh_prompt_button, self.tooltips.get("refresh_prompt_button", ""))
+
+        self.prompt_builder_button = ctk.CTkButton(self.status_frame, text="📝 System Prompt", command=self.open_prompt_builder)
+        self.prompt_builder_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.prompt_builder_button, "Open the System Prompt Builder window.")
+
+        # Heartbeat Toggle Switch
+        heartbeat_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
+        heartbeat_frame.pack(fill="x", padx=10, pady=10)
+        self.heartbeat_enabled_var = ctk.BooleanVar()
+        self.heartbeat_switch = ctk.CTkSwitch(heartbeat_frame, text="Heartbeat Cycle", variable=self.heartbeat_enabled_var, command=self.toggle_heartbeat)
+        self.heartbeat_switch.pack(side="left", anchor="w")
+        Tooltip(self.heartbeat_switch, "Enable the autonomous cognitive heartbeat cycle.")
+
+        self.open_heartbeat_logs_button = ctk.CTkButton(heartbeat_frame, text="📂", width=40, command=self.open_heartbeat_logs_folder)
+        self.open_heartbeat_logs_button.pack(side="right", padx=(0, 5))
+        Tooltip(self.open_heartbeat_logs_button, "Open heartbeat logs folder in file explorer.")
+
         # --- End Relocated Controls ---
 
         # Loading Progress Bar (hidden by default)
