@@ -1,11 +1,11 @@
 {
   "settings": {
     "active": {
-      "model_path": "D:\\LYRN-SAD\\models\\Qwen.Qwen3-4B-Thinking-2507.Q4_K_M.gguf",
-      "n_ctx": 32000,
+      "model_path": "D:\\LYRN-SAD\\models\\llm_reasoner_gemma3.gguf",
+      "n_ctx": 84000,
       "n_threads": 22,
       "n_gpu_layers": 36,
-      "max_tokens": 2048,
+      "max_tokens": 1024,
       "temperature": 0.7,
       "top_p": 0.95,
       "top_k": 40,
@@ -31,6 +31,40 @@
       "chat_parsed_dir": "D:\\LYRN-SAD\\chat_parsed",
       "audit_dir": "D:\\LYRN-SAD\\automation/job_audit",
       "metrics_logs": "D:\\LYRN-SAD\\metrics_logs"
+    },
+    "model_presets": {
+      "1": {
+        "model_path": "D:\\LYRN-SAD\\models\\Qwen.Qwen3-4B-Thinking-2507.Q4_K_M.gguf",
+        "n_ctx": 32000,
+        "n_threads": 22,
+        "n_gpu_layers": 36,
+        "max_tokens": 2048,
+        "chat_format": "qwen"
+      },
+      "2": {
+        "model_path": "D:\\LYRN-SAD\\models\\openai_gpt-oss-20b-Q4_K_M.gguf",
+        "n_ctx": 16000,
+        "n_threads": 22,
+        "n_gpu_layers": 36,
+        "max_tokens": 1024,
+        "chat_format": null
+      },
+      "3": {
+        "model_path": "D:\\LYRN-SAD\\models\\llm_reasoner_gemma3.gguf",
+        "n_ctx": 48000,
+        "n_threads": 22,
+        "n_gpu_layers": 36,
+        "max_tokens": 1024,
+        "chat_format": null
+      },
+      "4": {
+        "model_path": "D:\\LYRN-SAD\\models\\llm_reasoner_gemma3.gguf",
+        "n_ctx": 84000,
+        "n_threads": 22,
+        "n_gpu_layers": 36,
+        "max_tokens": 1024,
+        "chat_format": null
+      }
     }
   },
   "ui_settings": {
