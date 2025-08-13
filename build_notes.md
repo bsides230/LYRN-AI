@@ -1,3 +1,23 @@
+# LYRN-AI v3.9 Build Notes
+
+## v3.9 - Custom Color Picker and Theme Builder Enhancements (2025-08-12)
+
+This update introduces a new custom color picker for the theme builder, allowing for more flexible and user-friendly theme customization.
+
+- **New Custom Color Picker:**
+    - Replaced the default `tkinter.colorchooser` with a custom color picker popup.
+    - The new picker is implemented in a separate `color_picker.py` module for better organization.
+- **Color Grid Display:**
+    - The custom color picker displays a grid of colors loaded from `color_grid.json`, organized by section.
+- **Custom Color Input and Saving:**
+    - Users can now directly input a hex color code into the picker.
+    - A "Save Custom" button allows users to save their custom colors, which are stored in `custom_colors.json` and displayed in a separate section within the picker.
+- **Bug Fixes:**
+    - Fixed a bug in `gui_designer.py` where it was attempting to load a non-existent GUI file (`lyrn_gui_v6.8.pyw`). It now correctly loads `lyrn_sad_v3.9.pyw`.
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.9.pyw`.
+    - The previous version `lyrn_sad_v3.8.pyw` has been archived.
+
 # LYRN-AI v3.8 Build Notes
 
 ## v3.8 - Preset and Prompt Management Overhaul (2025-08-12)

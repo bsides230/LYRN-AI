@@ -3,6 +3,7 @@ import os
 import json
 from tkinter import colorchooser
 from typing import List, Dict
+from color_picker import CustomColorPickerPopup
 import importlib.util
 import sys
 import tkinter as tk
@@ -235,9 +236,9 @@ class ThemeBuilderPopup(ctk.CTkToplevel):
 
     def choose_color(self, key):
         initial_color = self.color_widgets[key]['label'].cget("text")
-        color_code = colorchooser.askcolor(initialcolor=initial_color, title="Choose color")
-        if color_code and color_code[1]:
-            new_color = color_code[1]
+        picker = CustomColorPickerPopup(self, initial_color=initial_color)
+        new_color = picker.get_color()
+        if new_color:
             self.color_widgets[key]['label'].configure(text=new_color)
             self.color_widgets[key]['swatch'].configure(fg_color=new_color)
             self.preview_theme()
@@ -415,7 +416,7 @@ class GUIDesigner(ctk.CTk):
     def load_gui_for_editing(self):
         """Loads the target GUI, walks its widget tree, and populates the hierarchy view."""
         try:
-            gui_path = os.path.join(SCRIPT_DIR, "lyrn_gui_v6.8.pyw")
+            gui_path = os.path.join(SCRIPT_DIR, "lyrn_sad_v3.9.pyw")
             gui_module = load_gui_module(gui_path)
 
             log_queue = queue.Queue()
