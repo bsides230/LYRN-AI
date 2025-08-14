@@ -1,3 +1,19 @@
+# LYRN-AI v3.9.2 Build Notes
+
+## v3.9.2 - Feature Polish (2025-08-13)
+
+This is a minor update to disable an unfinished feature and improve user feedback.
+
+- **Disabled Theme Builder:**
+    - The "Theme Builder" button, previously accessible from the Advanced tab in Settings, has been temporarily disabled.
+    - Clicking the button now opens a popup informing the user that the feature is unfinished and will be coming in a future update.
+    - This prevents users from accessing a non-functional part of the application.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.9.2.pyw`.
+    - The window title now correctly displays `v3.9.2`.
+    - The previous version `lyrn_sad_v3.9.1.pyw` has been archived.
+
 # LYRN-AI v3.9.1 Build Notes
 
 ## v3.9.1 - Theming and Confirmation Dialogs (2025-08-13)
