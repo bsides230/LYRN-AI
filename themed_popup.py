@@ -2,6 +2,11 @@ import os
 import json
 import customtkinter as ctk
 from typing import List
+try:
+    from PIL import Image, ImageTk
+except ImportError:
+    Image = None
+    ImageTk = None
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -82,9 +87,10 @@ class ThemedPopup(ctk.CTkToplevel):
         self.after(10, self.lift)
 
         try:
-            icon_path = os.path.join(SCRIPT_DIR, "images", "favicon.ico")
-            if os.path.exists(icon_path):
-                self.wm_iconbitmap(icon_path)
+            ICON_PATH = os.path.join(SCRIPT_DIR, "images", "favicon.ico")
+            if os.path.exists(ICON_PATH) and Image and ImageTk:
+                icon = ImageTk.PhotoImage(Image.open(ICON_PATH))
+                self.iconphoto(False, icon)
         except Exception as e:
             print(f"Error setting popup icon: {e}")
 
