@@ -76,6 +76,11 @@ class ThemedPopup(ctk.CTkToplevel):
         frame_bg = self.theme_manager.get_color("frame_bg")
         super().__init__(parent, fg_color=frame_bg, **kwargs)
 
+        # Lift the window to the top after a short delay.
+        # This is more robust than a direct call to self.lift(), as it gives
+        # the window manager time to draw the window first.
+        self.after(10, self.lift)
+
         try:
             icon_path = os.path.join(SCRIPT_DIR, "images", "favicon.ico")
             if os.path.exists(icon_path):
