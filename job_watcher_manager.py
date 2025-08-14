@@ -12,6 +12,7 @@ class WatcherJob:
     end_trigger: str
     output_path: str
     output_filename: str
+    instructions: str = ""
 
 class JobWatcherManager:
     """Manages watcher jobs that parse text between triggers."""
