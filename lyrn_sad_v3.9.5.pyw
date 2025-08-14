@@ -2745,7 +2745,7 @@ class DaySchedulePopup(ThemedPopup):
         time_frame.pack(fill="x", padx=10, pady=10)
 
         self.time_entries = {}
-        for unit in ["Hour", "Minute", "Second", "Millisecond"]:
+        for unit in ["Hour", "Minute", "Second"]:
             ctk.CTkLabel(time_frame, text=unit).pack(side="left", padx=5)
             entry = ctk.CTkEntry(time_frame, width=60)
             entry.pack(side="left", padx=5)
@@ -2793,9 +2793,8 @@ class DaySchedulePopup(ThemedPopup):
             hour = int(self.time_entries["Hour"].get() or 0)
             minute = int(self.time_entries["Minute"].get() or 0)
             second = int(self.time_entries["Second"].get() or 0)
-            ms = int(self.time_entries["Millisecond"].get() or 0)
 
-            scheduled_dt = self.date_obj.replace(hour=hour, minute=minute, second=second, microsecond=ms * 1000)
+            scheduled_dt = self.date_obj.replace(hour=hour, minute=minute, second=second, microsecond=0)
 
             self.scheduler_manager.add_schedule(job_name, scheduled_dt)
             self.refresh_schedule_list()
@@ -3055,8 +3054,7 @@ class JobWatcherPopup(ThemedPopup):
 
         self.month_year_label.configure(text=self.current_date.strftime('%B %Y'))
 
-        calendar.setfirstweekday(calendar.SUNDAY)
-        cal = calendar.Calendar()
+        cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
         month_days = cal.monthdatescalendar(self.current_date.year, self.current_date.month)
 
         # Day headers

@@ -55,7 +55,7 @@ class SchedulerManager:
         """Adds a new schedule to the file."""
         new_schedule = Schedule(
             job_name=job_name,
-            scheduled_datetime_iso=scheduled_datetime.isoformat()
+            scheduled_datetime_iso=scheduled_datetime.replace(microsecond=0).isoformat()
         )
         schedule_dict = {
             "id": new_schedule.id,
