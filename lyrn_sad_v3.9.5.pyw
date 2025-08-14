@@ -3060,12 +3060,20 @@ class JobWatcherPopup(ThemedPopup):
         # Day headers
         days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         for i, day in enumerate(days):
-            ctk.CTkLabel(self.grid_frame, text=day, font=("", 10, "bold")).grid(row=0, column=i, padx=1, pady=1)
+            ctk.CTkLabel(self.grid_frame, text=day, font=("", 10, "bold"), text_color=label_text_color).grid(row=0, column=i, padx=1, pady=1)
             self.grid_frame.grid_columnconfigure(i, weight=1)
 
         # Get all schedules to check for highlights
         all_schedules = self.parent_app.scheduler_manager.get_all_schedules()
         scheduled_dates = {s.scheduled_datetime.date() for s in all_schedules}
+
+        # Get theme colors
+        tm = self.theme_manager
+        label_text_color = tm.get_color("label_text")
+        button_color = tm.get_color("primary")
+        today_color = tm.get_color("info")
+        other_month_color = tm.get_color("border_color")
+        schedule_border_color = tm.get_color("success")
 
         for r, week in enumerate(month_days):
             self.grid_frame.grid_rowconfigure(r + 1, weight=1)
@@ -3079,13 +3087,16 @@ class JobWatcherPopup(ThemedPopup):
                     command=lambda d=date_obj: self.open_day_schedule_popup(d)
                 )
 
+                # Set default button color
+                day_button.configure(fg_color=button_color)
+
                 if date_obj.month != self.current_date.month:
-                    day_button.configure(fg_color="gray") # Other month
+                    day_button.configure(fg_color=other_month_color)
                 elif is_today:
-                    day_button.configure(fg_color="blue") # Today
+                    day_button.configure(fg_color=today_color)
 
                 if has_schedule:
-                    day_button.configure(border_width=2, border_color="green")
+                    day_button.configure(border_width=2, border_color=schedule_border_color)
 
                 day_button.grid(row=r + 1, column=c, sticky="nsew", padx=1, pady=1)
 
