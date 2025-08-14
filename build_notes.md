@@ -6,7 +6,7 @@ This update introduces a new "Scheduler" tab in the Automation popup, allowing f
 
 - **New Scheduler Tab:**
     - A new "Scheduler" tab has been added to the "Automation" window.
-    - This tab features a full calendar view, allowing users to select a specific day to schedule jobs.
+    - This tab features a full calendar view, with weeks starting on Sunday, allowing users to select a specific day to schedule jobs.
     - Days with scheduled jobs are highlighted in the calendar view.
 
 - **Day-Specific Scheduling:**

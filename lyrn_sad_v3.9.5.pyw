@@ -3055,11 +3055,12 @@ class JobWatcherPopup(ThemedPopup):
 
         self.month_year_label.configure(text=self.current_date.strftime('%B %Y'))
 
+        calendar.setfirstweekday(calendar.SUNDAY)
         cal = calendar.Calendar()
         month_days = cal.monthdatescalendar(self.current_date.year, self.current_date.month)
 
         # Day headers
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         for i, day in enumerate(days):
             ctk.CTkLabel(self.grid_frame, text=day, font=("", 10, "bold")).grid(row=0, column=i, padx=1, pady=1)
             self.grid_frame.grid_columnconfigure(i, weight=1)
