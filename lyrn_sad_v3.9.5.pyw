@@ -14,7 +14,7 @@ import threading
 import io
 import contextlib
 import gc
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 from pathlib import Path
 import shutil
@@ -27,6 +27,8 @@ from file_lock import SimpleFileLock
 from job_watcher_manager import JobWatcherManager, WatcherJob
 from affordance_manager import AffordanceManager, Affordance
 from themed_popup import ThemedPopup, ThemeManager
+from automation.scheduler_manager import SchedulerManager
+import calendar
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -2693,6 +2695,127 @@ class ComingSoonPopup(ThemedPopup):
         self.apply_theme()
 
 
+class DaySchedulePopup(ThemedPopup):
+    """A popup to manage schedules for a specific day."""
+    def __init__(self, parent, theme_manager, language_manager, scheduler_manager, job_watcher_manager, date_obj: datetime, calendar_refresh_callback):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.language_manager = language_manager
+        self.scheduler_manager = scheduler_manager
+        self.job_watcher_manager = job_watcher_manager
+        self.date_obj = date_obj
+        self.calendar_refresh_callback = calendar_refresh_callback
+        self.selected_schedule_id = None
+
+        self.title(f"Schedules for {self.date_obj.strftime('%Y-%m-%d')}")
+        self.geometry("700x500")
+        self.grab_set()
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Left pane for existing schedules
+        left_frame = ctk.CTkFrame(self)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        left_frame.grid_rowconfigure(0, weight=1)
+        left_frame.grid_columnconfigure(0, weight=1)
+
+        self.schedule_list_frame = ctk.CTkScrollableFrame(left_frame, label_text=f"Scheduled Jobs")
+        self.schedule_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        delete_button = ctk.CTkButton(left_frame, text="Delete Selected", command=self.delete_schedule)
+        delete_button.grid(row=1, column=0, padx=5, pady=10)
+
+        # Right pane for adding new schedules
+        right_frame = ctk.CTkFrame(self)
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+        ctk.CTkLabel(right_frame, text="Add New Schedule").pack(pady=5)
+
+        # Job selection
+        ctk.CTkLabel(right_frame, text="Job:").pack(anchor="w", padx=10)
+        job_names = [job.name for job in self.job_watcher_manager.get_all_jobs()]
+        self.job_selector = ctk.CTkComboBox(right_frame, values=job_names if job_names else ["No jobs available"])
+        if job_names:
+            self.job_selector.set(job_names[0])
+        self.job_selector.pack(fill="x", padx=10, pady=(0, 10))
+
+        # Time inputs
+        time_frame = ctk.CTkFrame(right_frame)
+        time_frame.pack(fill="x", padx=10, pady=10)
+
+        self.time_entries = {}
+        for unit in ["Hour", "Minute", "Second", "Millisecond"]:
+            ctk.CTkLabel(time_frame, text=unit).pack(side="left", padx=5)
+            entry = ctk.CTkEntry(time_frame, width=60)
+            entry.pack(side="left", padx=5)
+            self.time_entries[unit] = entry
+
+        schedule_button = ctk.CTkButton(right_frame, text="Schedule Job", command=self.schedule_job)
+        schedule_button.pack(pady=20)
+
+        self.refresh_schedule_list()
+        self.apply_theme()
+
+    def refresh_schedule_list(self):
+        for widget in self.schedule_list_frame.winfo_children():
+            widget.destroy()
+
+        self.selected_schedule_id = None
+        all_schedules = self.scheduler_manager.get_all_schedules()
+        day_schedules = [s for s in all_schedules if s.scheduled_datetime.date() == self.date_obj.date()]
+
+        if not day_schedules:
+            ctk.CTkLabel(self.schedule_list_frame, text="No jobs scheduled for this day.").pack()
+            return
+
+        for schedule in sorted(day_schedules, key=lambda s: s.scheduled_datetime):
+            time_str = schedule.scheduled_datetime.strftime('%H:%M:%S.%f')[:-3]
+            label_text = f"{time_str} - {schedule.job_name}"
+            label = ctk.CTkLabel(self.schedule_list_frame, text=label_text, anchor="w", cursor="hand2")
+            label.pack(fill="x", padx=5, pady=2)
+            label.bind("<Button-1>", lambda e, s_id=schedule.id, l=label: self.on_schedule_selected(s_id, l))
+
+    def on_schedule_selected(self, schedule_id: str, selected_label: ctk.CTkLabel):
+        self.selected_schedule_id = schedule_id
+        for child in self.schedule_list_frame.winfo_children():
+            if isinstance(child, ctk.CTkLabel):
+                child.configure(fg_color="transparent")
+        selected_label.configure(fg_color=self.theme_manager.get_color("accent"))
+
+    def schedule_job(self):
+        job_name = self.job_selector.get()
+        if "No jobs available" in job_name:
+            # Show error
+            return
+
+        try:
+            hour = int(self.time_entries["Hour"].get() or 0)
+            minute = int(self.time_entries["Minute"].get() or 0)
+            second = int(self.time_entries["Second"].get() or 0)
+            ms = int(self.time_entries["Millisecond"].get() or 0)
+
+            scheduled_dt = self.date_obj.replace(hour=hour, minute=minute, second=second, microsecond=ms * 1000)
+
+            self.scheduler_manager.add_schedule(job_name, scheduled_dt)
+            self.refresh_schedule_list()
+            self.calendar_refresh_callback()
+
+        except ValueError:
+            # Show error popup for invalid time
+            print("Invalid time format")
+            pass
+
+    def delete_schedule(self):
+        if not self.selected_schedule_id:
+            # Show error
+            return
+
+        self.scheduler_manager.delete_schedule(self.selected_schedule_id)
+        self.refresh_schedule_list()
+        self.calendar_refresh_callback()
+
+
 class JobWatcherPopup(ThemedPopup):
     """A popup window for managing watcher jobs."""
     def __init__(self, parent, job_watcher_manager: JobWatcherManager, theme_manager: ThemeManager, language_manager: LanguageManager):
@@ -2717,10 +2840,12 @@ class JobWatcherPopup(ThemedPopup):
 
         self.tab_viewer = self.tabview.add("Job Viewer")
         self.tab_builder = self.tabview.add("Job Builder")
+        self.tab_scheduler = self.tabview.add("Scheduler")
         self.tab_reflection = self.tabview.add("Reflection Cycle")
 
         self.create_viewer_tab()
         self.create_builder_tab()
+        self.create_scheduler_tab()
         self.create_reflection_tab()
 
         self.refresh_job_list()
@@ -2895,6 +3020,100 @@ class JobWatcherPopup(ThemedPopup):
         )
 
         self.parent_app.update_status(f"Reflection job for '{job_args['original_job_name']}' added to the queue.", LYRN_SUCCESS)
+
+    def create_scheduler_tab(self):
+        """Creates the UI for the Scheduler tab."""
+        self.current_date = datetime.now()
+
+        # Main frame for the calendar
+        calendar_frame = ctk.CTkFrame(self.tab_scheduler)
+        calendar_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Header for navigation
+        header_frame = ctk.CTkFrame(calendar_frame)
+        header_frame.pack(fill="x", pady=5)
+
+        prev_month_button = ctk.CTkButton(header_frame, text="<", width=30, command=self.prev_month)
+        prev_month_button.pack(side="left", padx=10)
+
+        self.month_year_label = ctk.CTkLabel(header_frame, text="", font=("", 16, "bold"))
+        self.month_year_label.pack(side="left", expand=True)
+
+        next_month_button = ctk.CTkButton(header_frame, text=">", width=30, command=self.next_month)
+        next_month_button.pack(side="right", padx=10)
+
+        # Frame for the calendar grid
+        self.grid_frame = ctk.CTkFrame(calendar_frame)
+        self.grid_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.update_calendar()
+
+    def update_calendar(self):
+        """Renders the calendar for the current month and year."""
+        for widget in self.grid_frame.winfo_children():
+            widget.destroy()
+
+        self.month_year_label.configure(text=self.current_date.strftime('%B %Y'))
+
+        cal = calendar.Calendar()
+        month_days = cal.monthdatescalendar(self.current_date.year, self.current_date.month)
+
+        # Day headers
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        for i, day in enumerate(days):
+            ctk.CTkLabel(self.grid_frame, text=day, font=("", 10, "bold")).grid(row=0, column=i, padx=1, pady=1)
+            self.grid_frame.grid_columnconfigure(i, weight=1)
+
+        # Get all schedules to check for highlights
+        all_schedules = self.parent_app.scheduler_manager.get_all_schedules()
+        scheduled_dates = {s.scheduled_datetime.date() for s in all_schedules}
+
+        for r, week in enumerate(month_days):
+            self.grid_frame.grid_rowconfigure(r + 1, weight=1)
+            for c, date_obj in enumerate(week):
+                is_today = (date_obj == datetime.now().date())
+                has_schedule = date_obj in scheduled_dates
+
+                day_button = ctk.CTkButton(
+                    self.grid_frame,
+                    text=str(date_obj.day),
+                    command=lambda d=date_obj: self.open_day_schedule_popup(d)
+                )
+
+                if date_obj.month != self.current_date.month:
+                    day_button.configure(fg_color="gray") # Other month
+                elif is_today:
+                    day_button.configure(fg_color="blue") # Today
+
+                if has_schedule:
+                    day_button.configure(border_width=2, border_color="green")
+
+                day_button.grid(row=r + 1, column=c, sticky="nsew", padx=1, pady=1)
+
+    def prev_month(self):
+        self.current_date = self.current_date.replace(day=1) - timedelta(days=1)
+        self.update_calendar()
+
+    def next_month(self):
+        _, num_days = calendar.monthrange(self.current_date.year, self.current_date.month)
+        self.current_date = self.current_date.replace(day=1) + timedelta(days=num_days)
+        self.update_calendar()
+
+    def open_day_schedule_popup(self, date_obj):
+        """Opens the popup for managing a specific day's schedule."""
+        # We need to pass a datetime object, not just a date
+        dt_obj = datetime.combine(date_obj, datetime.min.time())
+
+        popup = DaySchedulePopup(
+            parent=self,
+            theme_manager=self.theme_manager,
+            language_manager=self.language_manager,
+            scheduler_manager=self.parent_app.scheduler_manager,
+            job_watcher_manager=self.job_watcher_manager,
+            date_obj=dt_obj,
+            calendar_refresh_callback=self.update_calendar
+        )
+        popup.focus()
 
     def create_viewer_tab(self):
         self.tab_viewer.grid_columnconfigure(0, weight=1)
@@ -3759,7 +3978,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard")
+        self.title("LYRN-AI Dashboard v3.9.5")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -3789,17 +4008,26 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.chat_logger = StructuredChatLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
         self.job_watcher_manager = JobWatcherManager()
         self.affordance_manager = AffordanceManager()
+        self.scheduler_manager = SchedulerManager()
 
         # Start background services
         self.resource_monitor.start()
 
-        # Start the task/goal watcher script
-        try:
-            watcher_path = os.path.join(SCRIPT_DIR, "automation", "task_goal_watcher.py")
-            subprocess.Popen([sys.executable, watcher_path])
-            print("Task/Goal watcher script started.")
-        except Exception as e:
-            print(f"Failed to start Task/Goal watcher script: {e}")
+        # Start watcher scripts
+        watcher_scripts = [
+            "task_goal_watcher.py",
+            "scheduler_watcher.py"
+        ]
+        for script_name in watcher_scripts:
+            try:
+                watcher_path = os.path.join(SCRIPT_DIR, "automation", script_name)
+                if os.path.exists(watcher_path):
+                    subprocess.Popen([sys.executable, watcher_path])
+                    print(f"{script_name} started.")
+                else:
+                    print(f"Warning: Watcher script not found: {script_name}")
+            except Exception as e:
+                print(f"Failed to start {script_name}: {e}")
 
         self.after(100, self.process_queue)
 
@@ -4298,7 +4526,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Welcome message with LYRN branding
         welcome_msg = f"""
 ╔═══════════════════════════════════════════════════════╗
-║                    LYRN-AI v6.5                       ║
+║                   LYRN-AI v3.9.5                      ║
 ║              Advanced Language Interface              ║
 ║                                                       ║
 ║ • Enhanced performance monitoring                     ║
