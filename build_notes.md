@@ -1,20 +1,3 @@
-# LYRN-AI v3.9.6 Build Notes
-
-## v3.9.6 - UI Polish and Theming Fixes (2025-08-14)
-
-This update focuses on minor UI adjustments and theme consistency improvements based on user feedback.
-
-- **UI Element Relocation:**
-    - The "Tasks/Goals" button has been moved from the left sidebar's "Quick Controls" to the right sidebar's "Job Automation" section, placing it directly under the "Automation" button for better contextual grouping.
-
-- **Theming Enhancements:**
-    - The hover color for tabs and toggles (switches) now correctly uses the `button_hover` color defined in the active theme.
-    - This was fixed by adding `CTkTabview` and `CTkSwitch` to the `apply_color_theme` method, ensuring their hover states are consistent with other themed widgets like buttons.
-
-- **Versioning:**
-    - The main application file has been versioned to `lyrn_sad_v3.9.6.pyw`.
-    - The previous version `lyrn_sad_v3.9.5.pyw` has been archived.
-
 # LYRN-AI v3.9.5 Build Notes
 
 ## v3.9.5 - Granular Job Scheduler (2025-08-14)
