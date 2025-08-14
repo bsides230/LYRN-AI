@@ -1,3 +1,27 @@
+# LYRN-AI v3.9.5 Build Notes
+
+## v3.9.5 - Granular Job Scheduler (2025-08-14)
+
+This update introduces a new "Scheduler" tab in the Automation popup, allowing for granular, calendar-based job scheduling.
+
+- **New Scheduler Tab:**
+    - A new "Scheduler" tab has been added to the "Automation" window.
+    - This tab features a full calendar view, with weeks starting on Sunday, allowing users to select a specific day to schedule jobs.
+    - Days with scheduled jobs are highlighted in the calendar view.
+
+- **Day-Specific Scheduling:**
+    - Clicking on a day in the calendar opens a new popup window dedicated to that day's schedule.
+    - Users can select a pre-existing job and schedule it to run at a precise time, with inputs for hour, minute, second, and millisecond.
+    - The popup also lists all jobs already scheduled for that day.
+
+- **New Backend Components:**
+    - **`automation/scheduler_manager.py`**: A new manager class to handle saving and loading schedules to and from `automation/schedules.json`.
+    - **`automation/scheduler_watcher.py`**: A new background watcher script that continuously checks for due schedules and adds them to the main job queue for execution.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.9.5.pyw`.
+    - The previous version `lyrn_sad_v3.9.4.pyw` has been archived.
+
 # LYRN-AI v3.9.4 Build Notes
 
 ## v3.9.4 - Task and Goal Management (2025-08-13)
