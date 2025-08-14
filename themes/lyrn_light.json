@@ -1,6 +1,6 @@
 {
     "name": "LYRN Light",
-    "appearance_mode": "light",
+    "appearance_mode": "dark",
     "colors": {
         "primary": "#7552bf",
         "accent": "#1A202C",
