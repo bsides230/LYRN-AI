@@ -1,3 +1,19 @@
+# LYRN-AI v3.9.3 Build Notes
+
+## v3.9.3 - Icon Loading Hotfix (2025-08-13)
+
+This is a hotfix to address an issue with the application icon not displaying correctly on certain platforms.
+
+- **Improved Icon Loading:**
+    - Replaced the `wm_iconbitmap` method with the more robust `iconphoto` method for setting the application icon.
+    - This change applies to both the main application window and all popup windows (via the `ThemedPopup` base class).
+    - This ensures consistent and reliable icon display across different operating systems.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.9.3.pyw`.
+    - The window title now correctly displays `v3.9.3`.
+    - The previous version `lyrn_sad_v3.9.2.pyw` has been archived.
+
 # LYRN-AI v3.9.2 Build Notes
 
 ## v3.9.2 - Feature Polish (2025-08-13)
