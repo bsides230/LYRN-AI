@@ -2679,6 +2679,11 @@ class JobWatcherPopup(ThemedPopup):
         self.language_manager = language_manager
         self.selected_job_name = None
         self.editing_job_name = None
+        self.job_checkboxes = {}
+
+        self.active_jobs_index_path = Path(SCRIPT_DIR) / "build_prompt" / "active_jobs" / "_index.json"
+        self.active_jobs_dir = self.active_jobs_index_path.parent
+        self._ensure_active_jobs_index()
 
         self.title("Automation")
         self.geometry("900x700")
@@ -2699,6 +2704,95 @@ class JobWatcherPopup(ThemedPopup):
         self.refresh_job_list()
         self.tabview.set("Job Viewer")
         self.apply_theme()
+
+    def _ensure_active_jobs_index(self):
+        """Ensures the active jobs directory and index file exist."""
+        self.active_jobs_dir.mkdir(parents=True, exist_ok=True)
+        if not self.active_jobs_index_path.exists():
+            with open(self.active_jobs_index_path, 'w', encoding='utf-8') as f:
+                json.dump([], f)
+
+    def _load_active_jobs(self) -> List[str]:
+        """Loads the list of active (pinned) job names from the index file."""
+        if not self.active_jobs_index_path.exists():
+            return []
+        try:
+            with open(self.active_jobs_index_path, 'r', encoding='utf-8') as f:
+                # The index contains file paths, e.g., "active_jobs/some_job/instructions.txt"
+                paths = json.load(f)
+            job_names = []
+            if isinstance(paths, list):
+                for path_str in paths:
+                    # Extract the job name, which is the directory name
+                    parts = Path(path_str).parts
+                    if len(parts) > 1:
+                        job_names.append(parts[-2])
+            return job_names
+        except (json.JSONDecodeError, IOError):
+            return []
+
+    def toggle_job_pin(self, job_name: str):
+        """Handles the logic when a job's pin checkbox is toggled."""
+        is_active = self.job_checkboxes[job_name][1].get()
+        active_jobs = self._load_active_jobs()
+
+        if is_active:
+            if job_name not in active_jobs:
+                active_jobs.append(job_name)
+        else:
+            if job_name in active_jobs:
+                active_jobs.remove(job_name)
+
+        self.update_active_job_files(active_jobs)
+        self.parent_app.update_status(f"Job '{job_name}' toggled {'on' if is_active else 'off'}.", LYRN_INFO)
+
+    def update_active_job_files(self, active_job_names: List[str]):
+        """
+        Synchronizes the files in the build_prompt/active_jobs directory
+        with the list of active jobs.
+        """
+        # Ensure the active jobs directory exists
+        self.active_jobs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Remove files/dirs for jobs that are no longer active
+        for item in self.active_jobs_dir.iterdir():
+            if item.name == "_index.json":
+                continue
+            if item.is_dir() and item.name not in active_job_names:
+                print(f"Removing inactive job directory: {item.name}")
+                shutil.rmtree(item)
+
+        # Add files for newly activated jobs
+        for job_name in active_job_names:
+            job = self.job_watcher_manager.get_job(job_name)
+            if not job:
+                continue
+
+            job_dir = self.active_jobs_dir / job_name
+            job_dir.mkdir(exist_ok=True)
+
+            instructions_path = job_dir / "instructions.txt"
+            with open(instructions_path, 'w', encoding='utf-8') as f:
+                f.write(job.instructions or "")
+
+        # Update the local index for the active_jobs directory
+        active_job_files = []
+        for job_name in active_job_names:
+            # We assume the file is always named instructions.txt inside the job's folder
+            relative_path = Path("active_jobs") / job_name / "instructions.txt"
+            active_job_files.append(str(relative_path).replace("\\", "/"))
+
+        local_index_path = self.active_jobs_dir / "_index.json"
+        try:
+            with open(local_index_path, 'w', encoding='utf-8') as f:
+                json.dump(sorted(active_job_files), f, indent=2)
+            print("Active jobs index updated.")
+        except IOError as e:
+            print(f"Error writing active jobs index: {e}")
+
+        # Trigger a rebuild of the master prompt
+        if hasattr(self.parent_app, 'snapshot_loader'):
+            self.parent_app.snapshot_loader.generate_master_index()
 
     def create_reflection_tab(self):
         """Creates the UI for the Reflection Cycle tab."""
@@ -2839,6 +2933,11 @@ class JobWatcherPopup(ThemedPopup):
         self.output_filename_entry = ctk.CTkEntry(builder_frame)
         self.output_filename_entry.pack(fill="x", pady=(0, 10))
 
+        # Job Instructions
+        ctk.CTkLabel(builder_frame, text="Job Instructions").pack(anchor="w")
+        self.job_instructions_text = ctk.CTkTextbox(builder_frame, height=150)
+        self.job_instructions_text.pack(fill="x", pady=(0, 10), expand=True)
+
         # Save Button
         save_button = ctk.CTkButton(self.tab_builder, text="Save Job", command=self.save_job)
         save_button.pack(pady=20)
@@ -2847,6 +2946,8 @@ class JobWatcherPopup(ThemedPopup):
         for widget in self.job_list_frame.winfo_children():
             widget.destroy()
 
+        self.job_checkboxes.clear()
+        active_jobs = self._load_active_jobs()
         all_jobs = self.job_watcher_manager.get_all_jobs()
         self.selected_job_name = None
 
@@ -2855,18 +2956,33 @@ class JobWatcherPopup(ThemedPopup):
             return
 
         for job in sorted(all_jobs, key=lambda j: j.name):
-            label = ctk.CTkLabel(self.job_list_frame, text=job.name, anchor="w", cursor="hand2")
-            label.pack(fill="x", padx=10, pady=2)
-            label.bind("<Button-1>", lambda e, name=job.name: self.on_job_selected(name))
+            var = ctk.BooleanVar(value=(job.name in active_jobs))
+
+            # A frame to hold the checkbox and the selection label
+            job_frame = ctk.CTkFrame(self.job_list_frame, fg_color="transparent")
+            job_frame.pack(fill="x", padx=5, pady=2)
+
+            checkbox = ctk.CTkCheckBox(
+                job_frame,
+                text=job.name,
+                variable=var,
+                command=lambda name=job.name: self.toggle_job_pin(name)
+            )
+            checkbox.pack(side="left")
+
+            # We bind the selection for edit/delete to the frame itself
+            job_frame.bind("<Button-1>", lambda e, name=job.name: self.on_job_selected(name))
+
+            self.job_checkboxes[job.name] = (checkbox, var, job_frame)
 
     def on_job_selected(self, job_name):
         self.selected_job_name = job_name
-        for child in self.job_list_frame.winfo_children():
-            if isinstance(child, ctk.CTkLabel):
-                if child.cget("text") == job_name:
-                    child.configure(fg_color=self.theme_manager.get_color("accent"))
-                else:
-                    child.configure(fg_color="transparent")
+        for name, (_, _, frame) in self.job_checkboxes.items():
+            # Highlight the entire frame for selection
+            if name == job_name:
+                frame.configure(fg_color=self.theme_manager.get_color("accent"))
+            else:
+                frame.configure(fg_color="transparent")
 
     def edit_selected_job(self):
         if not self.selected_job_name:
@@ -2895,6 +3011,9 @@ class JobWatcherPopup(ThemedPopup):
 
         self.output_filename_entry.delete(0, "end")
         self.output_filename_entry.insert(0, job.output_filename)
+
+        self.job_instructions_text.delete("1.0", "end")
+        self.job_instructions_text.insert("1.0", job.instructions or "")
 
         self.tabview.set("Job Builder")
 
@@ -2957,6 +3076,7 @@ class JobWatcherPopup(ThemedPopup):
         end_trigger = self.end_trigger_entry.get().strip()
         output_path = self.output_path_label.cget("text")
         output_filename = self.output_filename_entry.get().strip()
+        instructions = self.job_instructions_text.get("1.0", "end-1c").strip()
 
         if not all([job_name, start_trigger, end_trigger, output_path, output_filename]):
             self.parent_app.update_status("All fields must be filled.", LYRN_ERROR)
@@ -2971,7 +3091,8 @@ class JobWatcherPopup(ThemedPopup):
             start_trigger=start_trigger,
             end_trigger=end_trigger,
             output_path=output_path,
-            output_filename=output_filename
+            output_filename=output_filename,
+            instructions=instructions
         )
 
         self.job_watcher_manager.add_job(job)
@@ -2987,6 +3108,7 @@ class JobWatcherPopup(ThemedPopup):
         self.end_trigger_entry.delete(0, "end")
         self.output_path_label.configure(text="No directory selected")
         self.output_filename_entry.delete(0, "end")
+        self.job_instructions_text.delete("1.0", "end")
         self.editing_job_name = None
 
 
