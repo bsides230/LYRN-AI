@@ -1,3 +1,23 @@
+# LYRN-AI v3.9.4 Build Notes
+
+## v3.9.4 - Task and Goal Management (2025-08-13)
+
+This update introduces a new Task and Goal management system, allowing the AI to autonomously track and manage its objectives.
+
+- **New Task/Goal Watcher:**
+    - A new watcher script, `automation/task_goal_watcher.py`, runs in the background to monitor chat logs.
+    - The watcher parses chat logs for specially formatted blocks (`###TASK_START###` and `###GOAL_START###`).
+    - Extracted tasks and goals are saved as individual files in the `build_prompt/tasks/` and `build_prompt/goals/` directories, respectively.
+
+- **New Tasks/Goals GUI:**
+    - A new "Tasks/Goals" button has been added to the main UI.
+    - This button opens a new popup window with a two-tab layout for managing tasks and goals.
+    - The GUI allows users to view, add, edit, and delete tasks and goals, which correspond to files in the respective directories.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v3.9.4.pyw`.
+    - The previous version `lyrn_sad_v3.9.3.pyw` has been archived.
+
 # LYRN-AI v3.9.3 Build Notes
 
 ## v3.9.3 - Icon Loading Hotfix (2025-08-13)
