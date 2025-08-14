@@ -3057,6 +3057,14 @@ class JobWatcherPopup(ThemedPopup):
         cal = calendar.Calendar(firstweekday=calendar.SUNDAY)
         month_days = cal.monthdatescalendar(self.current_date.year, self.current_date.month)
 
+        # Get theme colors
+        tm = self.theme_manager
+        label_text_color = tm.get_color("label_text")
+        button_color = tm.get_color("primary")
+        today_color = tm.get_color("info")
+        other_month_color = tm.get_color("border_color")
+        schedule_border_color = tm.get_color("success")
+
         # Day headers
         days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         for i, day in enumerate(days):
@@ -3066,14 +3074,6 @@ class JobWatcherPopup(ThemedPopup):
         # Get all schedules to check for highlights
         all_schedules = self.parent_app.scheduler_manager.get_all_schedules()
         scheduled_dates = {s.scheduled_datetime.date() for s in all_schedules}
-
-        # Get theme colors
-        tm = self.theme_manager
-        label_text_color = tm.get_color("label_text")
-        button_color = tm.get_color("primary")
-        today_color = tm.get_color("info")
-        other_month_color = tm.get_color("border_color")
-        schedule_border_color = tm.get_color("success")
 
         for r, week in enumerate(month_days):
             self.grid_frame.grid_rowconfigure(r + 1, weight=1)
