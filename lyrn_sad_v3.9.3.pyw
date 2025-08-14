@@ -3372,6 +3372,19 @@ class LyrnAIInterface(ctk.CTkToplevel):
         super().__init__(master)
 
         self.log_queue = log_queue
+        
+        
+        # Set taskbar icon
+        try:
+            ICON_PATH = os.path.join(SCRIPT_DIR, "favicon.ico")
+            if os.path.exists(ICON_PATH):
+                icon = ImageTk.PhotoImage(Image.open(ICON_PATH))
+                self.iconphoto(False, icon)
+            else:
+                print("Warning: favicon.ico not found.")
+        except Exception as e:
+            print(f"Error setting taskbar icon: {e}")
+
 
         # Initialize core components
         self.settings_manager = SettingsManager()
@@ -3561,21 +3574,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI v3.9.3")
+        self.title("LYRN-AI Dashboard")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
-
-        # Set taskbar icon
-        try:
-            ICON_PATH = os.path.join(SCRIPT_DIR, "images", "favicon.ico")
-            if os.path.exists(ICON_PATH):
-                icon = ImageTk.PhotoImage(Image.open(ICON_PATH))
-                self.iconphoto(False, icon)
-            else:
-                print("Warning: favicon.ico not found.")
-        except Exception as e:
-            print(f"Error setting taskbar icon: {e}")
 
     def handle_first_boot(self):
         """Handle first boot scenario"""
