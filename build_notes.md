@@ -25,6 +25,10 @@ This update introduces the **Cycle Manager**, a powerful new automation feature 
     - A dropdown menu allows the user to select one of the created cycles to be the "active" cycle.
     - A "Start/Stop" button allows the user to toggle the execution of the selected cycle.
 
+- **Bug Fixes:**
+    - Fixed a critical startup crash (`AttributeError: 'LyrnAIInterface' object has no attribute 'cycle_manager'`).
+    - The `CycleManager` is now initialized earlier in the application's startup sequence, ensuring it is available before the UI widgets that depend on it are created.
+
 - **Versioning:**
     - The main application file has been versioned to `lyrn_sad_v4.0.1.pyw`.
     - The previous version `lyrn_sad_v4.0.0.pyw` has been archived.

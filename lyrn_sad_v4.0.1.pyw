@@ -3925,6 +3925,8 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Initialize font size
         self.current_font_size = self.settings_manager.ui_settings.get("font_size", 12)
 
+        self.cycle_manager = CycleManager()
+
         # Setup GUI
         self.setup_window()
         self.load_tooltips()
@@ -4119,7 +4121,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.job_watcher_manager = JobWatcherManager()
         self.affordance_manager = AffordanceManager()
         self.scheduler_manager = SchedulerManager()
-        self.cycle_manager = CycleManager()
 
         # Start background services
         self.resource_monitor.start()
