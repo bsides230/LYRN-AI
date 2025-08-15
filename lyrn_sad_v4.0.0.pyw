@@ -530,10 +530,11 @@ class SnapshotLoader:
     def __init__(self, settings_manager: SettingsManager):
         self.settings_manager = settings_manager
         self.build_prompt_dir = os.path.join(SCRIPT_DIR, "build_prompt")
-        self.master_index_path = os.path.join(self.build_prompt_dir, "build_prompt_index.json")
         self.master_prompt_path = os.path.join(self.build_prompt_dir, "master_prompt.txt")
+        self.config_path = os.path.join(self.build_prompt_dir, "builder_config.json")
+        self.prompt_order_path = os.path.join(self.build_prompt_dir, "prompt_order.json")
 
-    def _load_json_file(self, path: str) -> Optional[List[str]]:
+    def _load_json_file(self, path: str) -> Optional[list or dict]:
         """Safely loads a JSON file and returns its content."""
         if not os.path.exists(path):
             return None
@@ -543,15 +544,6 @@ class SnapshotLoader:
         except (json.JSONDecodeError, IOError) as e:
             print(f"Error reading JSON file {path}: {e}")
             return None
-
-    def _save_json_file(self, path: str, data: List[str]):
-        """Safely saves data to a JSON file."""
-        try:
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2)
-            print(f"Master index saved to {path}")
-        except IOError as e:
-            print(f"Error writing JSON file {path}: {e}")
 
     def _load_text_file(self, path: str) -> str:
         """Safely loads a text file and returns its content."""
@@ -565,87 +557,42 @@ class SnapshotLoader:
             print(f"Error reading text file {path}: {e}")
             return ""
 
-    def _build_master_prompt_file(self, master_index: List[dict]):
-        """Builds the master prompt file from the index."""
-        print(f"Building master prompt file at {self.master_prompt_path}")
+    def build_master_prompt_from_components(self) -> str:
+        """Builds the master prompt by concatenating enabled components."""
+        print("Building master prompt from components...")
+        config = self._load_json_file(self.config_path) or {}
+        order = self._load_json_file(self.prompt_order_path) or []
+
         prompt_parts = []
-        for item in master_index:
-            relative_path = item["path"]
-            full_path = os.path.join(self.build_prompt_dir, relative_path)
-            content = self._load_text_file(full_path)
-            if content:
-                header = f"--- START OF {relative_path} ---\n"
-                footer = f"\n--- END OF {relative_path} ---"
-                prompt_parts.append(header + content + footer)
+        for component_name in order:
+            if config.get(component_name, False):
+                component_dir = os.path.join(self.build_prompt_dir, component_name)
+                if os.path.isdir(component_dir):
+                    for filename in sorted(os.listdir(component_dir)):
+                        if filename.endswith(".txt"):
+                            filepath = os.path.join(component_dir, filename)
+                            content = self._load_text_file(filepath)
+                            if content:
+                                header = f"--- START OF {component_name}/{filename} ---\n"
+                                footer = f"\n--- END OF {component_name}/{filename} ---"
+                                prompt_parts.append(header + content + footer)
 
         full_prompt_text = "\n\n".join(prompt_parts)
         try:
             with open(self.master_prompt_path, 'w', encoding='utf-8') as f:
                 f.write(full_prompt_text)
-            print("Master prompt file built successfully.")
+            print("Master prompt file built successfully from components.")
         except IOError as e:
             print(f"Error writing master prompt file: {e}")
 
-    def generate_master_index(self) -> List[dict]:
-        """
-        Scans for local indexes, aggregates them, preserves pinning, saves the master index,
-        and then builds the master prompt file.
-        """
-        print("Generating master prompt index...")
-
-        # 1. Load existing pinned statuses
-        existing_pinned_statuses = {}
-        if os.path.exists(self.master_index_path):
-            existing_index = self._load_json_file(self.master_index_path)
-            if existing_index and isinstance(existing_index, list) and existing_index:
-                # Handle both old (str) and new (dict) formats
-                if isinstance(existing_index[0], dict):
-                    existing_pinned_statuses = {item['path']: item.get('pinned', False) for item in existing_index}
-                else: # Old format, no pinned data to preserve
-                    pass
-
-        # 2. Scan for all current files from sub-indexes
-        found_files = set()
-        if not os.path.exists(self.build_prompt_dir):
-            os.makedirs(self.build_prompt_dir)
-            print(f"Created 'build_prompt' directory at {self.build_prompt_dir}")
-
-        for root, _, files in os.walk(self.build_prompt_dir):
-            if "_index.json" in files:
-                index_path = os.path.join(root, "_index.json")
-                local_index = self._load_json_file(index_path)
-
-                if local_index and isinstance(local_index, list):
-                    relative_dir = os.path.relpath(root, self.build_prompt_dir)
-                    for item in local_index:
-                        if relative_dir == ".":
-                            full_item_path = item
-                        else:
-                            full_item_path = os.path.join(relative_dir, item)
-                        found_files.add(full_item_path.replace('\\', '/'))
-
-        # 3. Create the new master index, preserving pinning
-        new_master_index = []
-        for file_path in sorted(list(found_files)): # Sort for consistent order
-            is_pinned = existing_pinned_statuses.get(file_path, False)
-            new_master_index.append({"path": file_path, "pinned": is_pinned})
-
-        # 4. Save and build
-        self._save_json_file(self.master_index_path, new_master_index)
-        self._build_master_prompt_file(new_master_index)
-        return new_master_index
+        return full_prompt_text
 
     def load_base_prompt(self) -> str:
         """
-        Loads the master prompt file. If it doesn't exist, generates it first.
-        This represents the static part of the context.
+        Builds and loads the master prompt file from components.
         """
         print("Loading base prompt...")
-        if not os.path.exists(self.master_prompt_path):
-            print("Master prompt file not found. Generating a new one.")
-            self.generate_master_index()
-
-        return self._load_text_file(self.master_prompt_path)
+        return self.build_master_prompt_from_components()
 
 # JobProcessor class removed, its functionality is being replaced by AutomationController.
 
@@ -2056,348 +2003,145 @@ class TabbedSettingsDialog(ThemedPopup):
             print(f"Error saving settings: {e}")
 
 
-class PromptBuilderPopup(ThemedPopup):
-    """A popup window for building and managing the system prompt."""
+class SystemPromptBuilderPopup(ThemedPopup):
+    """A popup window for building and managing the system prompt with a tabbed interface."""
     def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
         super().__init__(parent=parent, theme_manager=theme_manager)
         self.language_manager = language_manager
         self.snapshot_loader = snapshot_loader
+        self.build_prompt_dir = Path(SCRIPT_DIR) / "build_prompt"
+        self.config_path = self.build_prompt_dir / "builder_config.json"
 
         self.title("System Prompt Builder")
-        self.geometry("800x700") # Increased height a bit
+        self.geometry("800x700")
         self.minsize(600, 500)
 
         self.on_top_var = ctk.BooleanVar(value=False)
+        self.config = self._load_json(self.config_path)
 
         self.create_widgets()
-        self.update_modes_list()
         self.toggle_on_top() # Set initial state
         self.apply_theme()
 
-    def create_widgets(self):
-        """Create the prompt manager tab UI."""
+    def _load_json(self, path: Path) -> dict:
+        """Loads a JSON file."""
+        if path.exists():
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Error loading {path}: {e}")
+        return {}
+
+    def _save_json(self, path: Path, data: dict):
+        """Saves data to a JSON file."""
         try:
-            font = ctk.CTkFont(family="Consolas", size=12)
-            title_font = ctk.CTkFont(family="Consolas", size=14, weight="bold")
-        except:
-            font = ("Consolas", 12)
-            title_font = ("Consolas", 14, "bold")
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        except IOError as e:
+            print(f"Error saving {path}: {e}")
 
-        ctk.CTkLabel(self, text="Prompt Build Order", font=title_font).pack(pady=10)
+    def _load_text(self, path: Path) -> str:
+        """Loads a text file."""
+        if path.exists():
+            try:
+                return path.read_text(encoding='utf-8')
+            except IOError as e:
+                print(f"Error loading {path}: {e}")
+        return ""
 
-        # Frame for buttons
-        button_frame = ctk.CTkFrame(self)
-        button_frame.pack(fill="x", padx=20, pady=10)
+    def _save_text(self, path: Path, content: str):
+        """Saves content to a text file."""
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding='utf-8')
+        except IOError as e:
+            print(f"Error saving {path}: {e}")
 
-        refresh_button = ctk.CTkButton(button_frame, text="Rebuild Master Index from Folders",
-                        font=font, command=self.refresh_prompt_index)
-        refresh_button.pack(side="left", padx=10)
-        Tooltip(refresh_button, "Re-scans all subfolders and rebuilds the master index file.")
+    def create_widgets(self):
+        """Create the tabbed interface."""
+        self.tabview = ctk.CTkTabview(self, width=750, height=650)
+        self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
-        build_prompt_button = ctk.CTkButton(button_frame, text="Refresh Prompt from Index",
-                                             font=font, command=self.refresh_prompt_from_index)
-        build_prompt_button.pack(side="left", padx=10)
-        Tooltip(build_prompt_button, "Rebuilds the master_prompt.txt using only the files currently listed below.")
+        self.tab_personality = self.tabview.add("Personality")
+        self.tab_heartbeat = self.tabview.add("Heartbeat")
+        self.tab_prompt_order = self.tabview.add("Prompt Build Order")
+        self.tab_user_prefs = self.tabview.add("User Preferences")
+        self.tab_ai_prefs = self.tabview.add("AI Preferences")
+        self.tab_system_rules = self.tabview.add("System Rules & Toggles")
 
-        save_mode_button = ctk.CTkButton(button_frame, text="💾 Save as Mode",
-                        font=font, command=self.save_as_mode)
-        save_mode_button.pack(side="left", padx=10)
-        Tooltip(save_mode_button, self.parent_app.tooltips.get("save_as_mode_button", ""))
+        # Create content for each tab
+        self.create_editor_tab(self.tab_personality, "personality", "default.txt")
+        self.create_editor_tab(self.tab_heartbeat, "heartbeat", "config.txt")
+        self.create_editor_tab(self.tab_user_prefs, "user_preferences", "tone.txt")
+        self.create_editor_tab(self.tab_ai_prefs, "ai_preferences", "verbosity.txt")
+        self.create_editor_tab(self.tab_system_rules, "system_rules", "safety.txt")
 
-        self.on_top_checkbox = ctk.CTkCheckBox(button_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
-        self.on_top_checkbox.pack(side="right", padx=10)
+        # Create content for the prompt order tab
+        self.create_prompt_order_tab()
 
-        # Frame for the list
-        list_frame = ctk.CTkFrame(self)
-        list_frame.pack(expand=True, fill="both", padx=20, pady=10)
+    def create_prompt_order_tab(self):
+        """Creates the UI for the Prompt Build Order tab."""
+        self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.on_prompt_list_reorder)
+        self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
+        self.update_prompt_order_list()
 
-        self.prompt_dnd_list = DraggableListbox(list_frame, label_text="Indexed Files (drag to reorder)", command=self.on_prompt_list_reorder)
-        self.prompt_dnd_list.pack(expand=True, fill="both", padx=5, pady=5)
+    def update_prompt_order_list(self):
+        """Populates the draggable list with the current prompt order."""
+        self.prompt_order_list.clear()
+        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
+        order = self._load_json(prompt_order_path)
+        if isinstance(order, list):
+            for item_name in order:
+                # The "path" key is what DraggableListbox expects
+                self.prompt_order_list.add_item({"path": item_name, "pinned": False})
 
-        self.update_prompt_file_list()
+    def on_prompt_list_reorder(self, new_item_objects: List[dict]):
+        """Callback to save the new prompt order."""
+        new_order = [item["path"] for item in new_item_objects]
+        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
+        self._save_json(prompt_order_path, new_order)
+        self.parent_app.update_status("Prompt order saved.", LYRN_SUCCESS)
 
-        # --- Mode Management ---
-        mode_management_frame = ctk.CTkFrame(self)
-        mode_management_frame.pack(expand=True, fill="both", padx=20, pady=10)
+    def create_editor_tab(self, tab, config_key: str, filename: str):
+        """Creates a generic editor tab with a textbox and a toggle switch."""
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(mode_management_frame, text="Mode Management", font=title_font).pack(pady=10)
+        # Top frame for the toggle switch
+        top_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
 
-        # Frame for the list of modes and buttons
-        mode_content_frame = ctk.CTkFrame(mode_management_frame)
-        mode_content_frame.pack(expand=True, fill="both", padx=10, pady=5)
-        mode_content_frame.grid_columnconfigure(0, weight=1)
-        mode_content_frame.grid_rowconfigure(0, weight=1)
+        toggle_var = ctk.BooleanVar(value=self.config.get(config_key, True))
+        toggle = ctk.CTkSwitch(
+            top_frame,
+            text=f"Enable {config_key.replace('_', ' ').title()}",
+            variable=toggle_var,
+            command=lambda: self.toggle_component(config_key, toggle_var.get())
+        )
+        toggle.pack(side="left")
 
-        # Listbox for modes
-        self.modes_listbox = ctk.CTkScrollableFrame(mode_content_frame, label_text="Saved Modes")
-        self.modes_listbox.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        self.selected_mode_label = None
+        # Textbox for content
+        textbox = ctk.CTkTextbox(tab, wrap="word")
+        textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 
-        # Frame for mode buttons
-        mode_button_frame = ctk.CTkFrame(mode_content_frame, fg_color="transparent")
-        mode_button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
+        # Load initial content
+        filepath = self.build_prompt_dir / config_key / filename
+        textbox.insert("1.0", self._load_text(filepath))
 
-        load_mode_button = ctk.CTkButton(mode_button_frame, text="Load Mode", command=self.load_selected_mode)
-        load_mode_button.pack(padx=10, pady=10, anchor="n")
-        Tooltip(load_mode_button, "Loads the selected mode, overwriting the current prompt build order.")
+        # Bind save on text change
+        textbox.bind("<KeyRelease>", lambda event, p=filepath, t=textbox: self._save_text(p, t.get("1.0", "end-1c")))
 
-        delete_mode_button = ctk.CTkButton(mode_button_frame, text="Delete Mode", command=self.delete_selected_mode)
-        delete_mode_button.pack(padx=10, pady=10, anchor="n")
-        Tooltip(delete_mode_button, "Deletes the selected mode file.")
-
-        remove_file_button = ctk.CTkButton(mode_button_frame, text="Remove File", command=self.remove_selected_file)
-        remove_file_button.pack(padx=10, pady=10, anchor="n")
-        Tooltip(remove_file_button, "Removes the selected file from the index, but does not delete the file itself.")
-
-    def remove_selected_file(self):
-        """Removes the selected file from the draggable list and updates the index."""
-        selected_frame = self.prompt_dnd_list.get_selected_item()
-        if not selected_frame:
-            self.parent_app.update_status("No file selected to remove.", LYRN_WARNING)
-            return
-
-        # Remove from internal lists
-        self.prompt_dnd_list.items.remove(selected_frame)
-        del self.prompt_dnd_list.item_map[selected_frame]
-
-        # Destroy the widget
-        selected_frame.destroy()
-        self.prompt_dnd_list.selected_item = None
-
-        # Get the new order and save it
-        new_order = self.prompt_dnd_list.get_item_objects()
-        self.on_prompt_list_reorder(new_order)
-        self.parent_app.update_status("File removed from index.", LYRN_SUCCESS)
-
-    def refresh_prompt_from_index(self):
-        """Rebuilds the master prompt file using only the files currently in the UI list."""
-        current_items = self.prompt_dnd_list.get_item_objects()
-        if not current_items:
-            self.parent_app.update_status("Index is empty. Cannot build prompt.", LYRN_WARNING)
-            return
-
-        self.snapshot_loader._build_master_prompt_file(current_items)
-        self.parent_app.update_status("Prompt rebuilt from current index.", LYRN_SUCCESS)
+    def toggle_component(self, key: str, value: bool):
+        """Updates the builder config file when a toggle is switched."""
+        self.config[key] = value
+        self._save_json(self.config_path, self.config)
+        self.parent_app.update_status(f"{key.title()} {'enabled' if value else 'disabled'}", LYRN_INFO)
 
     def toggle_on_top(self):
         """Toggles the always-on-top status of the window."""
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
-
-    def on_prompt_list_reorder(self, new_order: List[dict]):
-        """Callback function to save the new prompt order."""
-        print(f"New prompt order: {new_order}")
-        # Save the new order to the master index file
-        master_index_path = self.parent_app.snapshot_loader.master_index_path
-        try:
-            with open(master_index_path, 'w', encoding='utf-8') as f:
-                json.dump(new_order, f, indent=2)
-            print(f"Master index saved to {master_index_path}")
-            # Rebuild the master prompt file using the new order
-            self.parent_app.snapshot_loader._build_master_prompt_file(new_order)
-            self.parent_app.update_status("Prompt order saved and rebuilt", LYRN_SUCCESS)
-        except IOError as e:
-            print(f"Error writing master index file {master_index_path}: {e}")
-            self.parent_app.update_status("Error saving prompt order", LYRN_ERROR)
-
-    def update_prompt_file_list(self):
-        """Reads the master index, handles migration, and displays it in the draggable list."""
-        self.prompt_dnd_list.clear()
-
-        master_index_path = self.parent_app.snapshot_loader.master_index_path
-        try:
-            with open(master_index_path, 'r', encoding='utf-8') as f:
-                index_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            index_data = []
-
-        # Migration logic for old format (list of strings)
-        if index_data and isinstance(index_data[0], str):
-            print("Migrating prompt index to new format...")
-            index_data = [{"path": path, "pinned": False} for path in index_data]
-            try:
-                with open(master_index_path, 'w', encoding='utf-8') as f:
-                    json.dump(index_data, f, indent=2)
-                print("Migration successful.")
-            except IOError as e:
-                print(f"Error saving migrated index: {e}")
-
-        if not index_data:
-            ctk.CTkLabel(self.prompt_dnd_list, text="No files in index. Click Refresh to generate.").pack(pady=10)
-            return
-
-        # Sort by pinned status first
-        index_data.sort(key=lambda x: not x.get("pinned", False))
-
-        for item_data in index_data:
-            self.prompt_dnd_list.add_item(item_data)
-
-    def refresh_prompt_index(self):
-        """Calls the prompt builder to regenerate the index and updates the UI."""
-        print("UI triggered prompt index refresh.")
-        self.parent_app.snapshot_loader.generate_master_index()
-        self.update_prompt_file_list()
-        self.parent_app.update_status("Prompt index refreshed", LYRN_SUCCESS)
-
-    def save_as_mode(self):
-        """Saves the current master prompt as a new mode."""
-        dialog = ctk.CTkInputDialog(text="Enter a name for this mode:", title="Save Mode")
-        mode_name = dialog.get_input()
-
-        if mode_name:
-            # Sanitize the mode name to be a valid filename
-            safe_mode_name = "".join(c for c in mode_name if c.isalnum() or c in (' ', '_')).rstrip()
-            if not safe_mode_name:
-                print("Invalid mode name provided.")
-                # Optionally, show an error to the user
-                return
-
-            modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-            os.makedirs(modes_dir, exist_ok=True)
-
-            master_prompt_path = self.parent_app.snapshot_loader.master_prompt_path
-            mode_filepath = os.path.join(modes_dir, f"{safe_mode_name}.txt")
-
-            try:
-                with open(master_prompt_path, 'r', encoding='utf-8') as f_read:
-                    content = f_read.read()
-
-                with open(mode_filepath, 'w', encoding='utf-8') as f_write:
-                    f_write.write(content)
-
-                print(f"Mode '{safe_mode_name}' saved successfully to {mode_filepath}")
-                self.parent_app.update_status(f"Mode '{safe_mode_name}' saved", LYRN_SUCCESS)
-
-                # Refresh the mode dropdown in the main GUI
-                if hasattr(self.parent_app, 'update_modes_dropdown'):
-                    self.parent_app.update_modes_dropdown()
-
-            except FileNotFoundError:
-                print(f"Error: Master prompt file not found at {master_prompt_path}")
-                self.parent_app.update_status("Error: Master prompt not found", LYRN_ERROR)
-            except Exception as e:
-                print(f"Error saving mode: {e}")
-                self.parent_app.update_status(f"Error saving mode", LYRN_ERROR)
-
-    def update_modes_list(self):
-        """Scans the modes directory and populates the listbox."""
-        for widget in self.modes_listbox.winfo_children():
-            widget.destroy()
-
-        self.selected_mode_label = None
-        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-        if not os.path.exists(modes_dir):
-            ctk.CTkLabel(self.modes_listbox, text="No 'modes' directory found.").pack()
-            return
-
-        try:
-            mode_files = [f for f in os.listdir(modes_dir) if f.endswith(".txt")]
-            mode_names = [os.path.splitext(f)[0] for f in mode_files]
-
-            if not mode_names:
-                ctk.CTkLabel(self.modes_listbox, text="No modes saved yet.").pack()
-                return
-
-            for mode_name in sorted(mode_names):
-                label = ctk.CTkLabel(self.modes_listbox, text=mode_name, anchor="w", cursor="hand2")
-                label.pack(fill="x", padx=10, pady=2)
-                label.bind("<Button-1>", lambda e, l=label: self._on_mode_selected(l))
-
-        except Exception as e:
-            print(f"Error loading modes: {e}")
-            ctk.CTkLabel(self.modes_listbox, text="Error loading modes.").pack()
-
-    def _on_mode_selected(self, selected_label):
-        """Handles the selection of a mode in the list."""
-        # Reset color of previously selected label
-        for child in self.modes_listbox.winfo_children():
-            if isinstance(child, ctk.CTkLabel):
-                 child.configure(fg_color="transparent")
-
-        # Highlight the new selection
-        selected_label.configure(fg_color=self.theme_manager.get_color("accent"))
-        self.selected_mode_label = selected_label
-
-    def load_selected_mode(self):
-        """Loads the content of the selected mode into the master prompt."""
-        if not self.selected_mode_label:
-            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
-            return
-
-        mode_name = self.selected_mode_label.cget("text")
-        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
-
-        if not os.path.exists(mode_filepath):
-            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
-            self.update_modes_list()
-            return
-
-        try:
-            with open(mode_filepath, 'r', encoding='utf-8') as f:
-                mode_content = f.read()
-
-            master_prompt_path = self.parent_app.snapshot_loader.master_prompt_path
-            with open(master_prompt_path, 'w', encoding='utf-8') as f:
-                f.write(mode_content)
-
-            # After loading, we need to refresh the prompt index and the draggable list
-            self.refresh_prompt_index()
-
-            self.parent_app.update_status(f"Mode '{mode_name}' loaded successfully.", LYRN_SUCCESS)
-
-        except Exception as e:
-            print(f"Error loading mode '{mode_name}': {e}")
-            self.parent_app.update_status(f"Error loading mode.", LYRN_ERROR)
-
-    def delete_selected_mode(self):
-        """Deletes the selected mode file after confirmation."""
-        from confirmation_dialog import ConfirmationDialog
-
-        if not self.selected_mode_label:
-            self.parent_app.update_status("No mode selected.", LYRN_WARNING)
-            return
-
-        mode_name = self.selected_mode_label.cget("text")
-
-        # Check settings for confirmation preference
-        prefs = self.parent_app.settings_manager.ui_settings.get("confirmation_preferences", {})
-        if prefs.get("delete_mode"):
-            confirmed = True
-        else:
-            confirmed, dont_ask_again = ConfirmationDialog.show(
-                self, # Pass self as parent
-                self.theme_manager,
-                title="Confirm Deletion",
-                message=f"Are you sure you want to permanently delete the mode '{mode_name}'?"
-            )
-            if dont_ask_again:
-                prefs["delete_mode"] = True
-                self.parent_app.settings_manager.ui_settings["confirmation_preferences"] = prefs
-                self.parent_app.settings_manager.save_settings()
-
-        if not confirmed:
-            self.parent_app.update_status("Mode deletion cancelled.", LYRN_INFO)
-            return
-
-        # Proceed with deletion
-        modes_dir = os.path.join(SCRIPT_DIR, "build_prompt", "modes")
-        mode_filepath = os.path.join(modes_dir, f"{mode_name}.txt")
-
-        if not os.path.exists(mode_filepath):
-            self.parent_app.update_status(f"Mode file for '{mode_name}' not found.", LYRN_ERROR)
-            self.update_modes_list()
-            return
-
-        try:
-            os.remove(mode_filepath)
-            self.parent_app.update_status(f"Mode '{mode_name}' deleted.", LYRN_SUCCESS)
-            self.update_modes_list()
-            if hasattr(self.parent_app, 'update_modes_dropdown'):
-                self.parent_app.update_modes_dropdown()
-        except Exception as e:
-            print(f"Error deleting mode '{mode_name}': {e}")
-            self.parent_app.update_status(f"Error deleting mode.", LYRN_ERROR)
 
 
 class ThemeBuilderPopup(ThemedPopup):
@@ -4144,7 +3888,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v3.9.6")
+        self.title("LYRN-AI Dashboard v4.0.0")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -4938,7 +4682,7 @@ Enhanced LYRN-AI system with advanced features active.
     def open_prompt_builder(self):
         """Opens the prompt builder popup window."""
         if not hasattr(self, 'prompt_builder_popup') or not self.prompt_builder_popup.winfo_exists():
-            self.prompt_builder_popup = PromptBuilderPopup(self, self.theme_manager, self.language_manager, self.snapshot_loader)
+            self.prompt_builder_popup = SystemPromptBuilderPopup(self, self.theme_manager, self.language_manager, self.snapshot_loader)
             self.prompt_builder_popup.focus()
         else:
             self.prompt_builder_popup.lift()

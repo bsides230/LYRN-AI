@@ -1,3 +1,37 @@
+# LYRN-AI v4.0.0 Build Notes
+
+## v4.0.0 - Prompt Builder Restructure (2025-08-15)
+
+This major update modularizes the entire prompt building system for clarity, flexibility, and user control. The old system has been replaced with a new tabbed interface in a dedicated popup window.
+
+- **New Modular Prompt Fragments:**
+    - The prompt is no longer built from a single index file. Instead, it is constructed from modular fragments that are concatenated at runtime.
+    - Each fragment is stored in its own file in a new directory structure under `build_prompt/`.
+    - The new components are: Personality, Heartbeat, User Preferences, AI Preferences, and System Rules.
+
+- **New System Prompt Builder UI:**
+    - The old "System Prompt Builder" has been replaced with a new `SystemPromptBuilderPopup` window.
+    - This new window features a tabbed interface with the following tabs:
+        - **Personality:** Controls the LLM's personality settings and output tone.
+        - **Heartbeat:** Manages when and how the heartbeat cycle is injected.
+        - **Prompt Build Order:** A drag-and-drop list to control the order of prompt construction.
+        - **User Preferences:** Fields for entering user preferences.
+        - **AI Preferences:** Optional behaviors for the AI agent.
+        - **System Rules & Toggles:** A GUI wrapper around system flags and hard constraints.
+
+- **Toggle Logic and Configuration:**
+    - Each prompt component can be toggled ON or OFF. If OFF, the component is skipped during the prompt build.
+    - The toggle states are stored in a new `build_prompt/builder_config.json` file.
+    - The order of the prompt components is defined in a new `build_prompt/prompt_order.json` file.
+
+- **Refactored Prompt Loading Logic:**
+    - The `SnapshotLoader` class has been refactored to use the new modular system.
+    - It now reads the `builder_config.json` and `prompt_order.json` to build the `master_prompt.txt` file at runtime.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.0.pyw`.
+    - The previous version `lyrn_sad_v3.9.6.pyw` has been archived.
+
 # LYRN-AI v3.9.6 Build Notes
 
 ## v3.9.6 - Windows Environment Interaction System (2025-08-15)
