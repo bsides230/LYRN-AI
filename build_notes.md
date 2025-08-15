@@ -27,7 +27,8 @@ This update introduces the **Cycle Manager**, a powerful new automation feature 
 
 - **Bug Fixes:**
     - Fixed a critical startup crash (`AttributeError: 'LyrnAIInterface' object has no attribute 'cycle_manager'`).
-    - The `CycleManager` is now initialized earlier in the application's startup sequence, ensuring it is available before the UI widgets that depend on it are created.
+    - Fixed a subsequent startup hang and performance issue caused by blocking file I/O on the main UI thread. `CycleManager` initialization is now deferred until after the main window is loaded.
+    - Fixed a race condition on `automation/cycles.json`. All read/write operations on this file are now protected by a file lock to prevent corruption from concurrent access by the GUI and background watchers.
 
 - **Versioning:**
     - The main application file has been versioned to `lyrn_sad_v4.0.1.pyw`.

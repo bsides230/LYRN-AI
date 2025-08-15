@@ -3921,11 +3921,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.last_assistant_response = ""
         self._maximized = False
         self._geom_before_maximize = ""
+        self.cycle_manager = None
 
         # Initialize font size
         self.current_font_size = self.settings_manager.ui_settings.get("font_size", 12)
-
-        self.cycle_manager = CycleManager()
 
         # Setup GUI
         self.setup_window()
@@ -3961,6 +3960,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.toggle_log_viewer()
 
         self.initialize_application()
+        self.refresh_active_cycle_selector()
 
         # Load heartbeat setting
         self.heartbeat_enabled_var.set(self.settings_manager.ui_settings.get("heartbeat_enabled", False))
@@ -4121,6 +4121,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.job_watcher_manager = JobWatcherManager()
         self.affordance_manager = AffordanceManager()
         self.scheduler_manager = SchedulerManager()
+        self.cycle_manager = CycleManager()
 
         # Start background services
         self.resource_monitor.start()
@@ -5690,11 +5691,18 @@ Enhanced LYRN-AI system with advanced features active.
 
     def refresh_active_cycle_selector(self):
         """Refreshes the active cycle selector dropdown in the main UI."""
-        if hasattr(self, 'active_cycle_selector'):
+        if not hasattr(self, 'active_cycle_selector'):
+            return
+
+        if self.cycle_manager:
             cycle_names = self.cycle_manager.get_cycle_names()
             self.active_cycle_selector.configure(values=cycle_names if cycle_names else [""])
             if not cycle_names:
                 self.active_cycle_selector.set("")
+        else:
+            # Handle case where manager is not yet initialized
+            self.active_cycle_selector.configure(values=["Loading..."])
+            self.active_cycle_selector.set("Loading...")
 
     def toggle_cycle(self):
         """Starts or stops the selected cycle."""
