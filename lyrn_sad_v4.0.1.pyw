@@ -4316,14 +4316,12 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         # Job selection dropdown for manual testing
         ctk.CTkLabel(self.job_frame, text="Manual Job Selection", font=ctk.CTkFont(family="Consolas", size=self.current_font_size)).pack(pady=(10, 5))
-        job_names = list(self.automation_controller.job_definitions.keys()) if hasattr(self, 'automation_controller') else []
         self.job_dropdown = ctk.CTkComboBox(
-            self.job_frame, values=job_names,
+            self.job_frame, values=["Loading..."],
             command=self.on_job_selected, font=ctk.CTkFont(family="Consolas", size=self.current_font_size),
             button_color=LYRN_PURPLE, button_hover_color=LYRN_ACCENT
         )
-        if not job_names:
-            self.job_dropdown.set("")
+        self.job_dropdown.set("Loading...")
         self.job_dropdown.pack(padx=10, pady=(0, 15), fill="x")
         Tooltip(self.job_dropdown, self.tooltips.get("job_dropdown", ""))
 
