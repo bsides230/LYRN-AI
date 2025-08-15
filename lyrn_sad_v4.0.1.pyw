@@ -4313,7 +4313,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.active_cycle_selector.pack(side="left", expand=True, fill="x")
         self.cycle_toggle_button = ctk.CTkButton(cycle_frame, text="Start", width=60, command=self.toggle_cycle)
         self.cycle_toggle_button.pack(side="left", padx=5)
-        self.refresh_active_cycle_selector()
 
         # Job selection dropdown for manual testing
         ctk.CTkLabel(self.job_frame, text="Manual Job Selection", font=ctk.CTkFont(family="Consolas", size=self.current_font_size)).pack(pady=(10, 5))
