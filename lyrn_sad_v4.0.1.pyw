@@ -3396,6 +3396,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Apply saved theme or default before creating widgets
         self.theme_manager.apply_theme(self.settings_manager.ui_settings.get("theme", "LYRN Dark"))
 
+        # Initialize font size before creating widgets
+        self.current_font_size = self.settings_manager.ui_settings.get("font_size", 12)
+
         # Basic window setup
         self.setup_window()
         self.load_tooltips()
