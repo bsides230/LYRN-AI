@@ -1,35 +1,39 @@
 import json
 from pathlib import Path
 from typing import List, Dict, Optional, Any
+from file_lock import SimpleFileLock
 
 class CycleManager:
     """Manages the creation, modification, and storage of automation cycles."""
 
     def __init__(self, cycles_path: str = "automation/cycles.json"):
         self.cycles_path = Path(cycles_path)
+        self.lock_path = self.cycles_path.with_suffix('.json.lock')
         self.cycles = self._load_cycles()
 
     def _load_cycles(self) -> Dict[str, Dict[str, Any]]:
-        """Loads the cycles from the JSON file."""
-        if self.cycles_path.exists():
-            try:
+        """Loads the cycles from the JSON file in a process-safe way."""
+        if not self.cycles_path.exists():
+            return {}
+        try:
+            with SimpleFileLock(self.lock_path):
                 with open(self.cycles_path, 'r', encoding='utf-8') as f:
-                    # Handle case where file might be empty
                     content = f.read()
                     if not content:
                         return {}
                     return json.loads(content)
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading cycles file: {e}. Starting with an empty set.")
-                return {}
+        except (json.JSONDecodeError, IOError, TimeoutError) as e:
+            print(f"Error loading cycles file: {e}. Starting with an empty set.")
+            return {}
         return {}
 
     def _save_cycles(self):
-        """Saves the current cycles to the JSON file."""
+        """Saves the current cycles to the JSON file in a process-safe way."""
         try:
-            with open(self.cycles_path, 'w', encoding='utf-8') as f:
-                json.dump(self.cycles, f, indent=2)
-        except IOError as e:
+            with SimpleFileLock(self.lock_path):
+                with open(self.cycles_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.cycles, f, indent=2)
+        except (IOError, TimeoutError) as e:
             print(f"Error saving cycles file: {e}")
 
     def get_cycle_names(self) -> List[str]:

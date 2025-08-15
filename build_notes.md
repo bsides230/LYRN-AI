@@ -17,8 +17,7 @@ This is a major stability and architectural update that resolves a critical appl
 
 - **Improved Stability:**
     - Fixed a critical race condition by implementing file locking (`SimpleFileLock`) in the `CycleManager`. This prevents data corruption when the main GUI and background watchers access the `automation/cycles.json` file concurrently.
-- **Hotfix:**
-    - Fixed a secondary startup crash (`AttributeError: 'LyrnAIInterface' object has no attribute 'current_font_size'`) that was introduced during the refactor.
+    - Fixed multiple `AttributeError` crashes on startup related to `cycle_manager`, `resource_monitor`, and `current_font_size` that occurred during the refactoring process.
 
 - **Versioning:**
     - The main application file has been versioned to `lyrn_sad_v4.0.2.pyw`.
