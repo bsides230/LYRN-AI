@@ -1,3 +1,28 @@
+# LYRN-AI v4.0.2 Build Notes
+
+## v4.0.2 - Startup and Automation Refactor (2025-08-15)
+
+This is a major stability and architectural update that resolves a critical application hang on startup and unifies the two separate automation systems into a single, more robust framework.
+
+- **Asynchronous Initialization:**
+    - Fixed a critical bug that caused the application to freeze ("Not Responding") after loading.
+    - The entire application initialization sequence has been refactored to be non-blocking. All managers that perform file I/O (`CycleManager`, `AutomationController`, etc.) are now loaded in a background thread.
+    - The UI now loads instantly and displays "Loading..." placeholders, which are populated with data once the background initialization is complete. This ensures the application is always responsive to the user.
+
+- **Unified Automation System:**
+    - The separate and redundant `JobWatcherManager` system has been completely removed.
+    - Its functionality has been merged into the `CycleManager`. Simple text-parsing "Watcher Jobs" are now represented as a "parser" type of Cycle.
+    - The `AutomationManagerPopup` (formerly `JobWatcherPopup`) has been refactored to provide a single, unified interface for managing all types of cycles.
+    - The `automation/watcher_jobs.json` file is now obsolete and has been removed from the project.
+
+- **Improved Stability:**
+    - Fixed a critical race condition by implementing file locking (`SimpleFileLock`) in the `CycleManager`. This prevents data corruption when the main GUI and background watchers access the `automation/cycles.json` file concurrently.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.2.pyw`.
+    - The previous version `lyrn_sad_v4.0.1.pyw` has been archived.
+
+
 # LYRN-AI v4.0.1 Build Notes
 
 ## v4.0.1 - Cycle Manager & Automated Cognitive Cycling (2025-08-15)
@@ -24,10 +49,6 @@ This update introduces the **Cycle Manager**, a powerful new automation feature 
     - A new set of controls has been added to the right sidebar in the "Job Automation" section.
     - A dropdown menu allows the user to select one of the created cycles to be the "active" cycle.
     - A "Start/Stop" button allows the user to toggle the execution of the selected cycle.
-
-- **Bug Fixes:**
-    - Fixed a critical startup hang caused by blocking file I/O on the main UI thread. The application's initialization sequence has been refactored to be asynchronous, allowing the UI to load instantly while components are loaded in the background.
-    - Fixed a file race condition on `automation/cycles.json`. All read/write operations are now protected by a file lock to prevent data corruption from concurrent access by the GUI and background watcher scripts.
 
 - **Versioning:**
     - The main application file has been versioned to `lyrn_sad_v4.0.1.pyw`.
