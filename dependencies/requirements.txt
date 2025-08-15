@@ -3,3 +3,7 @@ llama-cpp-python
 Pillow
 psutil
 pynvml
+pyautogui
+pygetwindow
+keyboard
+pywin32

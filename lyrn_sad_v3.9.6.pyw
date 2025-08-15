@@ -3364,7 +3364,7 @@ class JobWatcherPopup(ThemedPopup):
 
 
 class AffordancePopup(ThemedPopup):
-    """A popup window for managing internal affordances."""
+    """A popup window for managing internal affordances with dynamic UI."""
     def __init__(self, parent, affordance_manager: AffordanceManager, theme_manager: ThemeManager, language_manager: LanguageManager):
         super().__init__(parent=parent, theme_manager=theme_manager)
         self.affordance_manager = affordance_manager
@@ -3372,9 +3372,13 @@ class AffordancePopup(ThemedPopup):
         self.selected_affordance_name = None
         self.editing_affordance_name = None
 
+        # --- UI Widgets ---
+        self.editor_widgets = {}
+        self.system_action_frames = {}
+        self.system_action_widgets = {}
+
         self.title("Affordance Editor")
         self.geometry("800x600")
-        # self.grab_set() # Removed to make non-modal
 
         self.tabview = ctk.CTkTabview(self, width=750, height=500)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
@@ -3413,7 +3417,6 @@ class AffordancePopup(ThemedPopup):
         new_button = ctk.CTkButton(button_frame, text="New", command=self.new_affordance)
         new_button.pack(padx=10, pady=10, anchor="n")
 
-
     def refresh_affordance_list(self):
         for widget in self.affordance_list_frame.winfo_children():
             widget.destroy()
@@ -3449,42 +3452,58 @@ class AffordancePopup(ThemedPopup):
             self.parent_app.update_status(f"Affordance '{self.selected_affordance_name}' not found.", LYRN_ERROR)
             return
 
+        self.clear_builder_fields()
         self.editing_affordance_name = affordance.name
 
-        self.affordance_name_entry.delete(0, "end")
-        self.affordance_name_entry.insert(0, affordance.name)
-        self.affordance_name_entry.configure(state="disabled")
+        # --- Populate common fields ---
+        self.editor_widgets["name_entry"].insert(0, affordance.name)
+        self.editor_widgets["name_entry"].configure(state="disabled")
+        self.editor_widgets["type_selector"].set(affordance.type)
 
-        self.start_trigger_entry.delete(0, "end")
-        self.start_trigger_entry.insert(0, affordance.start_trigger)
+        # --- Populate type-specific fields ---
+        if affordance.type == "text_parser":
+            self.editor_widgets["start_trigger_entry"].insert(0, affordance.params.get("start_trigger", ""))
+            self.editor_widgets["end_trigger_entry"].insert(0, affordance.params.get("end_trigger", ""))
+            self.editor_widgets["output_path_label"].configure(text=affordance.params.get("output_path", "No directory selected"))
+            self.editor_widgets["output_filename_entry"].insert(0, affordance.params.get("output_filename", ""))
 
-        self.end_trigger_entry.delete(0, "end")
-        self.end_trigger_entry.insert(0, affordance.end_trigger)
+        elif affordance.type == "system_action":
+            action = affordance.params.get("action", "")
+            self.system_action_widgets["action_selector"].set(action)
 
-        self.output_path_label.configure(text=affordance.output_path)
+            target = affordance.params.get("target", "")
+            self.system_action_widgets["target_entry"].insert(0, target)
 
-        self.output_filename_entry.delete(0, "end")
-        self.output_filename_entry.insert(0, affordance.output_filename)
+            action_params = affordance.params.get("params", {})
+            if action == "send_keys":
+                self.system_action_widgets["send_keys_keys_entry"].insert(0, action_params.get("keys", ""))
+                self.system_action_widgets["send_keys_delay_entry"].insert(0, str(action_params.get("delay", "0.0")))
+            elif action in ["click", "move_mouse", "window_resize"]:
+                self.system_action_widgets["x_entry"].insert(0, str(action_params.get("x", "")))
+                self.system_action_widgets["y_entry"].insert(0, str(action_params.get("y", "")))
+                if action == "window_resize":
+                    self.system_action_widgets["width_entry"].insert(0, str(action_params.get("width", "")))
+                    self.system_action_widgets["height_entry"].insert(0, str(action_params.get("height", "")))
 
+        # Switch to editor tab and update UI
+        self.on_type_selected(affordance.type)
+        if affordance.type == "system_action":
+            self.on_system_action_selected(action)
         self.tabview.set("Affordance Editor")
 
     def delete_selected_affordance(self):
-        """Deletes the selected affordance after confirmation."""
         from confirmation_dialog import ConfirmationDialog
-
         if not self.selected_affordance_name:
             self.parent_app.update_status("No affordance selected to delete.", LYRN_WARNING)
             return
 
         affordance_name = self.selected_affordance_name
-
         prefs = self.parent_app.settings_manager.ui_settings.get("confirmation_preferences", {})
         if prefs.get("delete_affordance"):
             confirmed = True
         else:
             confirmed, dont_ask_again = ConfirmationDialog.show(
-                self,
-                self.theme_manager,
+                self, self.theme_manager,
                 title="Confirm Deletion",
                 message=f"Are you sure you want to permanently delete the affordance '{affordance_name}'?"
             )
@@ -3500,93 +3519,230 @@ class AffordancePopup(ThemedPopup):
         else:
             self.parent_app.update_status("Deletion cancelled.", LYRN_INFO)
 
-    def clear_builder_fields(self):
-        self.editing_affordance_name = None
-        self.affordance_name_entry.configure(state="normal")
-        self.affordance_name_entry.delete(0, "end")
-        self.start_trigger_entry.delete(0, "end")
-        self.end_trigger_entry.delete(0, "end")
-        self.output_path_label.configure(text="No directory selected")
-        self.output_filename_entry.delete(0, "end")
-
     def new_affordance(self):
         self.clear_builder_fields()
         self.tabview.set("Affordance Editor")
+
+    def clear_builder_fields(self):
+        self.editing_affordance_name = None
+        self.editor_widgets["name_entry"].configure(state="normal")
+        self.editor_widgets["name_entry"].delete(0, "end")
+        self.editor_widgets["type_selector"].set("text_parser")
+
+        # Clear text_parser fields
+        self.editor_widgets["start_trigger_entry"].delete(0, "end")
+        self.editor_widgets["end_trigger_entry"].delete(0, "end")
+        self.editor_widgets["output_path_label"].configure(text="No directory selected")
+        self.editor_widgets["output_filename_entry"].delete(0, "end")
+
+        # Clear system_action fields
+        self.system_action_widgets["action_selector"].set("open_app")
+        self.system_action_widgets["target_entry"].delete(0, "end")
+        self.system_action_widgets["send_keys_keys_entry"].delete(0, "end")
+        self.system_action_widgets["send_keys_delay_entry"].delete(0, "end")
+        self.system_action_widgets["x_entry"].delete(0, "end")
+        self.system_action_widgets["y_entry"].delete(0, "end")
+        self.system_action_widgets["width_entry"].delete(0, "end")
+        self.system_action_widgets["height_entry"].delete(0, "end")
+
+        self.on_type_selected("text_parser")
 
     def create_editor_tab(self):
         editor_frame = ctk.CTkScrollableFrame(self.tab_editor)
         editor_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # Affordance Name
+        # --- Common Fields ---
         ctk.CTkLabel(editor_frame, text="Affordance Name").pack(anchor="w")
-        self.affordance_name_entry = ctk.CTkEntry(editor_frame)
-        self.affordance_name_entry.pack(fill="x", pady=(0, 10))
-        Tooltip(self.affordance_name_entry, "A unique name for this affordance (e.g., 'extract_code_block').")
+        self.editor_widgets["name_entry"] = ctk.CTkEntry(editor_frame)
+        self.editor_widgets["name_entry"].pack(fill="x", pady=(0, 10))
+        Tooltip(self.editor_widgets["name_entry"], "A unique name for this affordance.")
 
-        # Start Trigger
-        ctk.CTkLabel(editor_frame, text="Start Trigger").pack(anchor="w")
-        self.start_trigger_entry = ctk.CTkEntry(editor_frame)
-        self.start_trigger_entry.pack(fill="x", pady=(0, 10))
-        Tooltip(self.start_trigger_entry, "The text that marks the beginning of the content to extract (e.g., '```python').")
+        ctk.CTkLabel(editor_frame, text="Affordance Type").pack(anchor="w")
+        self.editor_widgets["type_selector"] = ctk.CTkComboBox(
+            editor_frame,
+            values=["text_parser", "system_action"],
+            command=self.on_type_selected
+        )
+        self.editor_widgets["type_selector"].pack(fill="x", pady=(0, 15))
+        self.editor_widgets["type_selector"].set("text_parser")
 
-        # End Trigger
-        ctk.CTkLabel(editor_frame, text="End Trigger").pack(anchor="w")
-        self.end_trigger_entry = ctk.CTkEntry(editor_frame)
-        self.end_trigger_entry.pack(fill="x", pady=(0, 10))
-        Tooltip(self.end_trigger_entry, "The text that marks the end of the content to extract (e.g., '```').")
+        # --- Frame for Text Parser ---
+        self.editor_widgets["text_parser_frame"] = ctk.CTkFrame(editor_frame, fg_color="transparent")
+        self.editor_widgets["text_parser_frame"].pack(fill="x", expand=True)
 
-        # Output Path
-        ctk.CTkLabel(editor_frame, text="Output Path").pack(anchor="w")
-        path_frame = ctk.CTkFrame(editor_frame, fg_color="transparent")
+        ctk.CTkLabel(self.editor_widgets["text_parser_frame"], text="Start Trigger").pack(anchor="w")
+        self.editor_widgets["start_trigger_entry"] = ctk.CTkEntry(self.editor_widgets["text_parser_frame"])
+        self.editor_widgets["start_trigger_entry"].pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(self.editor_widgets["text_parser_frame"], text="End Trigger").pack(anchor="w")
+        self.editor_widgets["end_trigger_entry"] = ctk.CTkEntry(self.editor_widgets["text_parser_frame"])
+        self.editor_widgets["end_trigger_entry"].pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(self.editor_widgets["text_parser_frame"], text="Output Path").pack(anchor="w")
+        path_frame = ctk.CTkFrame(self.editor_widgets["text_parser_frame"], fg_color="transparent")
         path_frame.pack(fill="x", pady=(0, 10))
-        self.output_path_label = ctk.CTkLabel(path_frame, text="No directory selected", anchor="w")
-        self.output_path_label.pack(side="left", expand=True, fill="x")
+        self.editor_widgets["output_path_label"] = ctk.CTkLabel(path_frame, text="No directory selected", anchor="w")
+        self.editor_widgets["output_path_label"].pack(side="left", expand=True, fill="x")
         select_path_button = ctk.CTkButton(path_frame, text="Select...", width=80, command=self.select_output_path)
         select_path_button.pack(side="right")
-        Tooltip(select_path_button, "Choose the folder where the output file will be saved.")
 
-        # Output Filename
-        ctk.CTkLabel(editor_frame, text="Output Filename").pack(anchor="w")
-        self.output_filename_entry = ctk.CTkEntry(editor_frame)
-        self.output_filename_entry.pack(fill="x", pady=(0, 10))
-        Tooltip(self.output_filename_entry, "The name of the file to save the extracted content to (e.g., 'extracted_code.py').")
+        ctk.CTkLabel(self.editor_widgets["text_parser_frame"], text="Output Filename").pack(anchor="w")
+        self.editor_widgets["output_filename_entry"] = ctk.CTkEntry(self.editor_widgets["text_parser_frame"])
+        self.editor_widgets["output_filename_entry"].pack(fill="x", pady=(0, 10))
 
-        # Save Button
+        # --- Frame for System Action ---
+        self.editor_widgets["system_action_frame"] = ctk.CTkFrame(editor_frame, fg_color="transparent")
+        # Packed/unpacked in on_type_selected
+
+        ctk.CTkLabel(self.editor_widgets["system_action_frame"], text="Action").pack(anchor="w")
+        action_values = ["open_app", "send_keys", "click", "move_mouse", "window_focus", "window_resize"]
+        self.system_action_widgets["action_selector"] = ctk.CTkComboBox(self.editor_widgets["system_action_frame"], values=action_values, command=self.on_system_action_selected)
+        self.system_action_widgets["action_selector"].pack(fill="x", pady=(0, 10))
+        self.system_action_widgets["action_selector"].set("open_app")
+
+        ctk.CTkLabel(self.editor_widgets["system_action_frame"], text="Target (App Name or Window Title)").pack(anchor="w")
+        self.system_action_widgets["target_entry"] = ctk.CTkEntry(self.editor_widgets["system_action_frame"])
+        self.system_action_widgets["target_entry"].pack(fill="x", pady=(0, 15))
+
+        # --- Parameter Frames for each System Action ---
+        self.create_system_action_param_frames(self.editor_widgets["system_action_frame"])
+
+        # --- Save Button ---
         save_button = ctk.CTkButton(self.tab_editor, text="Save Affordance", command=self.save_affordance)
         save_button.pack(pady=20)
+
+        # Initial UI state
+        self.on_type_selected("text_parser")
+
+    def create_system_action_param_frames(self, parent_frame):
+        # Frame for send_keys
+        sk_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        ctk.CTkLabel(sk_frame, text="Keys to Send:").pack(anchor="w")
+        self.system_action_widgets["send_keys_keys_entry"] = ctk.CTkEntry(sk_frame)
+        self.system_action_widgets["send_keys_keys_entry"].pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(sk_frame, text="Delay (seconds):").pack(anchor="w")
+        self.system_action_widgets["send_keys_delay_entry"] = ctk.CTkEntry(sk_frame)
+        self.system_action_widgets["send_keys_delay_entry"].pack(fill="x", pady=(0, 5))
+        self.system_action_frames["send_keys"] = sk_frame
+
+        # Frame for click, move_mouse, window_resize (coordinates)
+        coords_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        ctk.CTkLabel(coords_frame, text="X Coordinate:").pack(anchor="w")
+        self.system_action_widgets["x_entry"] = ctk.CTkEntry(coords_frame)
+        self.system_action_widgets["x_entry"].pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(coords_frame, text="Y Coordinate:").pack(anchor="w")
+        self.system_action_widgets["y_entry"] = ctk.CTkEntry(coords_frame)
+        self.system_action_widgets["y_entry"].pack(fill="x", pady=(0, 5))
+        self.system_action_frames["click"] = coords_frame
+        self.system_action_frames["move_mouse"] = coords_frame
+
+        # Frame for window_resize (size)
+        resize_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        # It shares the coords_frame, so we just need to add width/height
+        ctk.CTkLabel(resize_frame, text="Width:").pack(anchor="w")
+        self.system_action_widgets["width_entry"] = ctk.CTkEntry(resize_frame)
+        self.system_action_widgets["width_entry"].pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(resize_frame, text="Height:").pack(anchor="w")
+        self.system_action_widgets["height_entry"] = ctk.CTkEntry(resize_frame)
+        self.system_action_widgets["height_entry"].pack(fill="x", pady=(0, 5))
+        # This frame will be packed alongside the coords_frame for resize action
+        self.system_action_frames["window_resize"] = resize_frame
+
+
+    def on_type_selected(self, selected_type: str):
+        if selected_type == "text_parser":
+            self.editor_widgets["text_parser_frame"].pack(fill="x", expand=True)
+            self.editor_widgets["system_action_frame"].pack_forget()
+        elif selected_type == "system_action":
+            self.editor_widgets["text_parser_frame"].pack_forget()
+            self.editor_widgets["system_action_frame"].pack(fill="x", expand=True)
+            self.on_system_action_selected(self.system_action_widgets["action_selector"].get())
+        else:
+            self.editor_widgets["text_parser_frame"].pack_forget()
+            self.editor_widgets["system_action_frame"].pack_forget()
+
+    def on_system_action_selected(self, selected_action: str):
+        # Hide all parameter frames first
+        for frame in self.system_action_frames.values():
+            frame.pack_forget()
+
+        # Show the relevant frame(s)
+        if selected_action == "send_keys":
+            self.system_action_frames["send_keys"].pack(fill="x", expand=True, pady=5)
+        elif selected_action in ["click", "move_mouse"]:
+            self.system_action_frames["click"].pack(fill="x", expand=True, pady=5)
+        elif selected_action == "window_resize":
+            # Show both coordinate and size frames
+            self.system_action_frames["click"].pack(fill="x", expand=True, pady=5)
+            self.system_action_frames["window_resize"].pack(fill="x", expand=True, pady=5)
 
     def select_output_path(self):
         path = filedialog.askdirectory(title="Select Output Directory for Affordance")
         if path:
-            self.output_path_label.configure(text=path)
+            self.editor_widgets["output_path_label"].configure(text=path)
 
     def save_affordance(self):
-        name = self.affordance_name_entry.get().strip()
-        start_trigger = self.start_trigger_entry.get().strip()
-        end_trigger = self.end_trigger_entry.get().strip()
-        output_path = self.output_path_label.cget("text")
-        output_filename = self.output_filename_entry.get().strip()
+        name = self.editor_widgets["name_entry"].get().strip()
+        aff_type = self.editor_widgets["type_selector"].get()
+        params = {}
 
-        if not all([name, start_trigger, end_trigger, output_path, output_filename]):
-            self.parent_app.update_status("All fields must be filled for an affordance.", LYRN_ERROR)
-            return
-
-        if output_path == "No directory selected":
-            self.parent_app.update_status("Please select an output directory.", LYRN_ERROR)
+        if not name:
+            self.parent_app.update_status("Affordance Name is required.", LYRN_ERROR)
             return
 
         if self.editing_affordance_name is None and name in self.affordance_manager.affordances:
             self.parent_app.update_status(f"Affordance name '{name}' already exists.", LYRN_ERROR)
             return
 
-        affordance = Affordance(
-            name=name,
-            start_trigger=start_trigger,
-            end_trigger=end_trigger,
-            output_path=output_path,
-            output_filename=output_filename
-        )
+        if aff_type == "text_parser":
+            params = {
+                "start_trigger": self.editor_widgets["start_trigger_entry"].get(),
+                "end_trigger": self.editor_widgets["end_trigger_entry"].get(),
+                "output_path": self.editor_widgets["output_path_label"].cget("text"),
+                "output_filename": self.editor_widgets["output_filename_entry"].get()
+            }
+            if not all(params.values()) or params["output_path"] == "No directory selected":
+                 self.parent_app.update_status("All fields must be filled for text_parser.", LYRN_ERROR)
+                 return
 
+        elif aff_type == "system_action":
+            action = self.system_action_widgets["action_selector"].get()
+            target = self.system_action_widgets["target_entry"].get()
+            action_params = {}
+
+            params["action"] = action
+            params["target"] = target
+
+            if action == "open_app":
+                if not target:
+                    self.parent_app.update_status("Target application path is required for open_app.", LYRN_ERROR)
+                    return
+            elif action == "send_keys":
+                action_params["keys"] = self.system_action_widgets["send_keys_keys_entry"].get()
+                try:
+                    action_params["delay"] = float(self.system_action_widgets["send_keys_delay_entry"].get() or 0.0)
+                except ValueError:
+                    self.parent_app.update_status("Invalid delay value for send_keys.", LYRN_ERROR)
+                    return
+            elif action in ["click", "move_mouse", "window_resize"]:
+                try:
+                    x = self.system_action_widgets["x_entry"].get()
+                    y = self.system_action_widgets["y_entry"].get()
+                    if x: action_params["x"] = int(x)
+                    if y: action_params["y"] = int(y)
+
+                    if action == "window_resize":
+                        width = self.system_action_widgets["width_entry"].get()
+                        height = self.system_action_widgets["height_entry"].get()
+                        if width: action_params["width"] = int(width)
+                        if height: action_params["height"] = int(height)
+                except ValueError:
+                    self.parent_app.update_status("Invalid coordinate/size value.", LYRN_ERROR)
+                    return
+
+            params["params"] = action_params
+
+        affordance = Affordance(name=name, type=aff_type, params=params)
         self.affordance_manager.add_affordance(affordance)
         self.parent_app.update_status(f"Affordance '{name}' saved.", LYRN_SUCCESS)
         self.refresh_affordance_list()
@@ -3988,7 +4144,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v3.9.5")
+        self.title("LYRN-AI Dashboard v3.9.6")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -4536,7 +4692,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Welcome message with LYRN branding
         welcome_msg = f"""
 ╔═══════════════════════════════════════════════════════╗
-║                   LYRN-AI v3.9.5                      ║
+║                   LYRN-AI v3.9.6                      ║
 ║              Advanced Language Interface              ║
 ║                                                       ║
 ║ • Enhanced performance monitoring                     ║

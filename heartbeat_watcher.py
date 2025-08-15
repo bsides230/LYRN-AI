@@ -9,6 +9,7 @@ import uuid
 from typing import Optional
 from file_lock import SimpleFileLock
 from affordance_manager import AffordanceManager
+from system_interaction_service import run_system_affordance
 
 # --- Configuration ---
 WATCH_DIR = Path("automation/heartbeat_outputs")
@@ -83,42 +84,68 @@ def add_job_to_queue(name: str, priority: str, when: str, args: str):
         print(f"[Watcher] Error adding job to queue: {e}")
 
 
-def run_affordance(affordance_name: str, text_content: str, affordance_manager: AffordanceManager) -> Optional[str]:
+def run_text_parser_affordance(affordance: "Affordance", text_content: str) -> Optional[str]:
     """
-    Runs a specific affordance, parsing the text_content to find the block
-    between start and end triggers and saves it to the specified file.
+    Runs a 'text_parser' affordance, extracting text between triggers.
     Returns the path to the output file on success, None on failure.
     """
-    affordance = affordance_manager.get_affordance(affordance_name)
-    if not affordance:
-        print(f"[Watcher] Error: Affordance '{affordance_name}' not found.")
-        return None
-
     try:
-        start_index = text_content.find(affordance.start_trigger)
+        params = affordance.params
+        start_trigger = params.get("start_trigger")
+        end_trigger = params.get("end_trigger")
+
+        if not all([start_trigger, end_trigger]):
+            print(f"[Watcher] Error: 'text_parser' affordance '{affordance.name}' is missing triggers.")
+            return None
+
+        start_index = text_content.find(start_trigger)
         if start_index == -1:
             return None
-        start_index += len(affordance.start_trigger)
+        start_index += len(start_trigger)
 
-        end_index = text_content.find(affordance.end_trigger, start_index)
+        end_index = text_content.find(end_trigger, start_index)
         if end_index == -1:
             return None
 
         extracted_content = text_content[start_index:end_index].strip()
 
-        output_dir = Path(affordance.output_path)
+        output_path = params.get("output_path")
+        output_filename = params.get("output_filename")
+        if not all([output_path, output_filename]):
+            print(f"[Watcher] Error: 'text_parser' affordance '{affordance.name}' is missing output path/filename.")
+            return None
+
+        output_dir = Path(output_path)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        output_filepath = output_dir / affordance.output_filename
+        output_filepath = output_dir / output_filename
         with open(output_filepath, 'w', encoding='utf-8') as f:
             f.write(extracted_content)
 
-        print(f"[Watcher] Ran affordance '{affordance_name}'. Output: {output_filepath}")
+        print(f"[Watcher] Ran text_parser affordance '{affordance.name}'. Output: {output_filepath}")
         return str(output_filepath)
 
     except Exception as e:
-        print(f"[Watcher] Error running affordance '{affordance_name}': {e}")
+        print(f"[Watcher] Error running text_parser affordance '{affordance.name}': {e}")
         return None
+
+def run_affordance(affordance_name: str, text_content: str, affordance_manager: AffordanceManager):
+    """
+    Dispatcher function to run the correct affordance type based on its definition.
+    """
+    affordance = affordance_manager.get_affordance(affordance_name)
+    if not affordance:
+        print(f"[Watcher] Error: Affordance '{affordance_name}' not found.")
+        return
+
+    if affordance.type == 'text_parser':
+        # This type requires the chat log content to parse.
+        run_text_parser_affordance(affordance, text_content)
+    elif affordance.type == 'system_action':
+        # This type runs independently of the chat log content.
+        run_system_affordance(affordance.params)
+    else:
+        print(f"[Watcher] Unknown affordance type '{affordance.type}' for '{affordance_name}'.")
 
 def process_heartbeat_file(filepath: Path, affordance_manager: AffordanceManager):
     """
