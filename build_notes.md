@@ -1,3 +1,34 @@
+# LYRN-AI v4.0.1 Build Notes
+
+## v4.0.1 - Cycle Manager & Automated Cognitive Cycling (2025-08-15)
+
+This update introduces the **Cycle Manager**, a powerful new automation feature that allows for the creation and execution of custom, multi-step cognitive cycles. This enables the AI to perform sequences of actions autonomously.
+
+- **New Cycle Builder UI:**
+    - A new "Cycle Builder" tab has been added to the "Automation" window (`JobWatcherPopup`).
+    - This UI allows users to create multiple, named cycles.
+    - For each cycle, users can add a sequence of named "triggers," which are custom prompts that will be executed in order.
+    - A drag-and-drop list allows for easy reordering of triggers within a cycle.
+
+- **New Backend Components:**
+    - **`cycle_manager.py`**: A new manager class to handle saving and loading cycle definitions to and from `automation/cycles.json`.
+    - **`automation/cycle_watcher.py`**: A new background watcher script that runs the active cycle. It monitors the LLM's status and injects the next trigger in the sequence only when the LLM is idle.
+
+- **IPC and State Management:**
+    - The watcher and the main GUI communicate using a system of flag files:
+        - `global_flags/active_cycle.json`: Stores the currently active cycle and its progress (e.g., current step).
+        - `global_flags/llm_status.txt`: Indicates whether the LLM is "busy" or "idle".
+        - `ipc/cycle_trigger.txt`: Used by the watcher to send the next trigger prompt to the GUI for execution.
+
+- **Main UI Integration:**
+    - A new set of controls has been added to the right sidebar in the "Job Automation" section.
+    - A dropdown menu allows the user to select one of the created cycles to be the "active" cycle.
+    - A "Start/Stop" button allows the user to toggle the execution of the selected cycle.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.1.pyw`.
+    - The previous version `lyrn_sad_v4.0.0.pyw` has been archived.
+
 # LYRN-AI v4.0.0 Build Notes
 
 ## v4.0.0 - Prompt Builder Restructure (2025-08-15)
