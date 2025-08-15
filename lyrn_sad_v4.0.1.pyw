@@ -24,7 +24,6 @@ from automation_controller import AutomationController, Job
 from color_picker import CustomColorPickerPopup
 from heartbeat import get_heartbeat_job_prompt
 from file_lock import SimpleFileLock
-from job_watcher_manager import JobWatcherManager, WatcherJob
 from affordance_manager import AffordanceManager, Affordance
 from themed_popup import ThemedPopup, ThemeManager
 from automation.scheduler_manager import SchedulerManager
