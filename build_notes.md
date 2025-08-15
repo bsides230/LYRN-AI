@@ -1,3 +1,36 @@
+# LYRN-AI v3.9.6 Build Notes
+
+## v3.9.6 - Windows Environment Interaction System (2025-08-15)
+
+This update introduces a powerful new "System Action" affordance type, allowing the AI to perform system-level actions on the Windows OS, similar to automation tools like AutoHotKey.
+
+- **New 'system_action' Affordance Type:**
+    - The core affordance system has been refactored to be type-based.
+    - A new `system_action` type is now available, alongside the existing `text_parser` type.
+    - This allows for greater flexibility and extensibility in creating new capabilities for the AI.
+
+- **System Interaction Service:**
+    - A new `system_interaction_service.py` module has been created to handle all OS-level interactions.
+    - The `heartbeat_watcher.py` now dispatches `system_action` affordances to this new service.
+
+- **Supported System Actions:**
+    - **`open_app`**: Launch any application by its path.
+    - **`send_keys`**: Send keystrokes to a specific application window.
+    - **`click`**: Perform a mouse click at given coordinates.
+    - **`move_mouse`**: Move the mouse cursor to a specific position on the screen.
+    - **`window_focus`**: Bring a target window to the foreground.
+    - **`window_resize`**: Resize and/or move a target window.
+
+- **Dynamic Affordance Editor GUI:**
+    - The "Affordance Editor" popup has been completely overhauled.
+    - The UI now dynamically changes based on the selected affordance type (`text_parser` or `system_action`).
+    - When creating a `system_action` affordance, the editor provides a nested, dynamic UI to select a specific action and configure its unique parameters.
+
+- **Dependencies & Versioning:**
+    - The following dependencies have been added to `dependencies/requirements.txt`: `pyautogui`, `pygetwindow`, `keyboard`, `pywin32`.
+    - The main application file has been versioned to `lyrn_sad_v3.9.6.pyw`.
+    - The previous version `lyrn_sad_v3.9.5.pyw` has been archived.
+
 # LYRN-AI v3.9.5 Build Notes
 
 ## v3.9.5 - Granular Job Scheduler (2025-08-14)

@@ -1,17 +1,15 @@
 import os
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 
 @dataclass
 class Affordance:
-    """Represents a single internal-only job called an Affordance."""
+    """Represents a single executable action or trigger."""
     name: str
-    start_trigger: str
-    end_trigger: str
-    output_path: str
-    output_filename: str
+    type: str  # e.g., 'text_parser', 'system_action'
+    params: Dict[str, Any]
 
 class AffordanceManager:
     """Manages affordances that can be triggered by the Heartbeat's reasoning."""
@@ -22,24 +20,57 @@ class AffordanceManager:
         self.load_affordances()
 
     def load_affordances(self):
-        """Loads affordances from the JSON file."""
+        """
+        Loads affordances from the JSON file.
+        Includes backward compatibility for the old format.
+        """
         if not self.affordances_path.exists():
             self.affordances = {}
             return
 
+        needs_resave = False
         try:
             with open(self.affordances_path, 'r', encoding='utf-8') as f:
-                affordances_data = json.load(f)
-                for name, data in affordances_data.items():
-                    self.affordances[name] = Affordance(**data)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Error loading affordances: {e}")
+                # Handle empty file case
+                content = f.read()
+                if not content:
+                    affordances_data = {}
+                else:
+                    affordances_data = json.loads(content)
+
+            migrated_affordances = {}
+            for name, data in affordances_data.items():
+                if "type" not in data: # Old format detection
+                    needs_resave = True
+                    params = {
+                        "start_trigger": data.get("start_trigger", ""),
+                        "end_trigger": data.get("end_trigger", ""),
+                        "output_path": data.get("output_path", ""),
+                        "output_filename": data.get("output_filename", "")
+                    }
+                    migrated_affordances[name] = Affordance(
+                        name=data.get("name", name),
+                        type="text_parser",
+                        params=params
+                    )
+                else: # New format
+                     migrated_affordances[name] = Affordance(**data)
+
+            self.affordances = migrated_affordances
+
+            if needs_resave:
+                print("Old affordance format detected, migrating and resaving.")
+                self.save_affordances()
+
+        except (json.JSONDecodeError, IOError, TypeError) as e:
+            print(f"Error loading or migrating affordances: {e}")
             self.affordances = {}
 
     def save_affordances(self):
-        """Saves all current affordances to the JSON file."""
+        """Saves all current affordances to the JSON file in the new format."""
         try:
-            affordances_data = {name: affordance.__dict__ for name, affordance in self.affordances.items()}
+            # Use asdict to properly serialize the dataclass, including nested dicts
+            affordances_data = {name: asdict(affordance) for name, affordance in self.affordances.items()}
             with open(self.affordances_path, 'w', encoding='utf-8') as f:
                 json.dump(affordances_data, f, indent=2)
         except IOError as e:
