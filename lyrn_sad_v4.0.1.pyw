@@ -3936,6 +3936,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Control-Shift-P>", self.open_command_palette)
 
+        # Schedule the rest of the initialization to run after the main loop starts
+        self.after(100, self.start_application_logic)
+
     def show_loading_indicator(self):
         """Shows the indeterminate loading progress bar."""
         if hasattr(self, 'loading_progressbar'):
@@ -3960,7 +3963,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.toggle_log_viewer()
 
         self.initialize_application()
-        self.refresh_active_cycle_selector()
 
         # Load heartbeat setting
         self.heartbeat_enabled_var.set(self.settings_manager.ui_settings.get("heartbeat_enabled", False))
@@ -5757,7 +5759,6 @@ def main():
         root.withdraw()
 
         app = LyrnAIInterface(master=root, log_queue=log_queue)
-        app.start_application_logic()
         root.mainloop()
 
     except ImportError as e:
