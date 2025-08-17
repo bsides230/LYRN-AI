@@ -2572,6 +2572,88 @@ class DaySchedulePopup(ThemedPopup):
         self.calendar_refresh_callback()
 
 
+class JobBuilderPopup(ThemedPopup):
+    """A popup for creating and editing jobs."""
+    def __init__(self, parent, automation_controller: AutomationController, theme_manager: ThemeManager, language_manager: LanguageManager, refresh_callback, job_name: Optional[str] = None):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.automation_controller = automation_controller
+        self.language_manager = language_manager
+        self.refresh_callback = refresh_callback
+        self.editing_job_name = job_name
+
+        # This needs to be fixed in the next step. It currently gets a string, but will get a dict.
+        job_definition = self.automation_controller.job_definitions.get(self.editing_job_name) if self.editing_job_name else {}
+        if isinstance(job_definition, str): # Temp backwards compatibility
+            self.job_data = {"instructions": job_definition, "trigger": ""}
+        else:
+            self.job_data = job_definition or {}
+
+
+        self.title("Job Editor" if self.editing_job_name else "Create New Job")
+        self.geometry("700x600")
+        self.grab_set()
+
+        self.create_widgets()
+        if self.job_data:
+            self.load_job_data()
+
+        self.apply_theme()
+
+    def create_widgets(self):
+        """Create the UI elements for the popup."""
+        main_frame = ctk.CTkScrollableFrame(self)
+        main_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # Job Name
+        ctk.CTkLabel(main_frame, text="Job Name").pack(anchor="w")
+        self.job_name_entry = ctk.CTkEntry(main_frame)
+        self.job_name_entry.pack(fill="x", pady=(0, 10))
+        if self.editing_job_name:
+            self.job_name_entry.insert(0, self.editing_job_name)
+            self.job_name_entry.configure(state="disabled")
+
+        # Job Instructions
+        ctk.CTkLabel(main_frame, text="Job Instructions (for build_prompt)").pack(anchor="w")
+        self.job_instructions_text = ctk.CTkTextbox(main_frame, height=200)
+        self.job_instructions_text.pack(fill="both", pady=(0, 10), expand=True)
+
+        # Trigger Prompt
+        ctk.CTkLabel(main_frame, text="Trigger Prompt (for LLM execution)").pack(anchor="w")
+        self.trigger_prompt_text = ctk.CTkTextbox(main_frame, height=100)
+        self.trigger_prompt_text.pack(fill="both", pady=(0, 10), expand=True)
+
+        # Save Button
+        save_button = ctk.CTkButton(self, text="Save Job", command=self.save_job)
+        save_button.pack(pady=15, padx=15)
+
+    def load_job_data(self):
+        """Populates the fields with data from an existing job."""
+        if not self.job_data:
+            return
+        self.job_instructions_text.insert("1.0", self.job_data.get("instructions", ""))
+        self.trigger_prompt_text.insert("1.0", self.job_data.get("trigger", ""))
+
+    def save_job(self):
+        """Saves the job data to the central jobs.json file."""
+        job_name = self.job_name_entry.get().strip()
+        instructions = self.job_instructions_text.get("1.0", "end-1c").strip()
+        trigger = self.trigger_prompt_text.get("1.0", "end-1c").strip()
+
+        if not all([job_name, instructions, trigger]):
+            self.parent.parent_app.update_status("Job Name, Instructions, and Trigger must be filled.", LYRN_ERROR)
+            return
+
+        # Call the new method in the automation controller to handle saving.
+        self.automation_controller.save_job_definition(job_name, instructions, trigger)
+
+        self.parent.parent_app.update_status(f"Job '{job_name}' saved.", LYRN_SUCCESS)
+
+        if self.refresh_callback:
+            self.refresh_callback()
+
+        self.destroy()
+
 class JobWatcherPopup(ThemedPopup):
     """A popup window for managing watcher jobs."""
     def __init__(self, parent, automation_controller: AutomationController, theme_manager: ThemeManager, language_manager: LanguageManager, cycle_manager: CycleManager):
@@ -2580,7 +2662,6 @@ class JobWatcherPopup(ThemedPopup):
         self.language_manager = language_manager
         self.cycle_manager = cycle_manager
         self.selected_job_name = None
-        self.editing_job_name = None
         self.job_checkboxes = {}
         self.selected_cycle_name = None
         self.selected_trigger_name = None
@@ -2591,29 +2672,78 @@ class JobWatcherPopup(ThemedPopup):
 
         self.title("Automation")
         self.geometry("900x700")
-        # self.grab_set() # Removed to make non-modal
 
         # Main tab view
         self.tabview = ctk.CTkTabview(self, width=850, height=600)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
 
         self.tab_viewer = self.tabview.add("Job Viewer")
-        self.tab_builder = self.tabview.add("Job Builder")
         self.tab_scheduler = self.tabview.add("Scheduler")
         self.tab_reflection = self.tabview.add("Reflection Cycle")
         self.tab_cycle_builder = self.tabview.add("Cycle Builder")
 
-
         self.create_viewer_tab()
-        self.create_builder_tab()
         self.create_scheduler_tab()
         self.create_reflection_tab()
         self.create_cycle_builder_tab()
 
-
         self.refresh_job_list()
         self.tabview.set("Job Viewer")
         self.apply_theme()
+
+    def create_viewer_tab(self):
+        self.tab_viewer.grid_columnconfigure(0, weight=1)
+        self.tab_viewer.grid_rowconfigure(0, weight=1)
+
+        viewer_content_frame = ctk.CTkFrame(self.tab_viewer)
+        viewer_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        viewer_content_frame.grid_columnconfigure(0, weight=1)
+        viewer_content_frame.grid_rowconfigure(0, weight=1)
+
+        self.job_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Jobs")
+        self.job_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        button_frame = ctk.CTkFrame(viewer_content_frame)
+        button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
+
+        new_button = ctk.CTkButton(button_frame, text="New Job", command=self.open_new_job_popup)
+        new_button.pack(padx=10, pady=10, anchor="n")
+
+        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_job)
+        edit_button.pack(padx=10, pady=10, anchor="n")
+
+        run_button = ctk.CTkButton(button_frame, text="Run", command=self.run_selected_job)
+        run_button.pack(padx=10, pady=10, anchor="n")
+
+        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_job)
+        delete_button.pack(padx=10, pady=10, anchor="n")
+
+    def open_new_job_popup(self):
+        """Opens the job builder popup for creating a new job."""
+        popup = JobBuilderPopup(
+            parent=self,
+            automation_controller=self.automation_controller,
+            theme_manager=self.theme_manager,
+            language_manager=self.language_manager,
+            refresh_callback=self.refresh_job_list
+        )
+        popup.focus()
+
+    def edit_selected_job(self):
+        """Opens the job builder popup for editing the selected job."""
+        if not self.selected_job_name:
+            self.parent_app.update_status("No job selected to edit.", LYRN_WARNING)
+            return
+
+        popup = JobBuilderPopup(
+            parent=self,
+            automation_controller=self.automation_controller,
+            theme_manager=self.theme_manager,
+            language_manager=self.language_manager,
+            refresh_callback=self.refresh_job_list,
+            job_name=self.selected_job_name
+        )
+        popup.focus()
 
     def create_cycle_builder_tab(self):
         """Creates the UI for the Cycle Builder tab."""
@@ -2853,8 +2983,15 @@ class JobWatcherPopup(ThemedPopup):
 
         # Add files for newly activated jobs
         for job_name in active_job_names:
-            job = self.job_watcher_manager.get_job(job_name)
-            if not job:
+            job_definition = self.automation_controller.job_definitions.get(job_name)
+            if not job_definition:
+                print(f"Warning: Could not find definition for active job '{job_name}'.")
+                continue
+
+            # Instructions are now in a dictionary
+            instructions = job_definition.get("instructions", "")
+            if not instructions:
+                print(f"Warning: Job '{job_name}' has no instructions to write to build_prompt.")
                 continue
 
             job_dir = self.active_jobs_dir / job_name
@@ -2862,7 +2999,7 @@ class JobWatcherPopup(ThemedPopup):
 
             instructions_path = job_dir / "instructions.txt"
             with open(instructions_path, 'w', encoding='utf-8') as f:
-                f.write(job.instructions or "")
+                f.write(instructions) # Write verbatim instructions as requested
 
         # Update the local index for the active_jobs directory
         active_job_files = []
@@ -3068,58 +3205,6 @@ class JobWatcherPopup(ThemedPopup):
         )
         popup.focus()
 
-    def create_viewer_tab(self):
-        self.tab_viewer.grid_columnconfigure(0, weight=1)
-        self.tab_viewer.grid_rowconfigure(0, weight=1)
-
-        # Frame for the list and buttons
-        viewer_content_frame = ctk.CTkFrame(self.tab_viewer)
-        viewer_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        viewer_content_frame.grid_columnconfigure(0, weight=1)
-        viewer_content_frame.grid_rowconfigure(0, weight=1)
-
-        self.job_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Jobs")
-        self.job_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-
-        # Frame for buttons
-        button_frame = ctk.CTkFrame(viewer_content_frame)
-        button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
-
-        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_job)
-        edit_button.pack(padx=10, pady=10, anchor="n")
-
-        run_button = ctk.CTkButton(button_frame, text="Run", command=self.run_selected_job)
-        run_button.pack(padx=10, pady=10, anchor="n")
-
-        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_job)
-        delete_button.pack(padx=10, pady=10, anchor="n")
-
-    def create_builder_tab(self):
-        builder_frame = ctk.CTkScrollableFrame(self.tab_builder)
-        builder_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        # Job Name
-        ctk.CTkLabel(builder_frame, text="Job Name").pack(anchor="w")
-        self.job_name_entry = ctk.CTkEntry(builder_frame)
-        self.job_name_entry.pack(fill="x", pady=(0, 10))
-
-        # The fields for start/end trigger and output path are deprecated
-        # and will be removed from the UI. For now, we will just leave the widgets
-        # but they will not be used. A future refactor can remove them fully.
-        self.start_trigger_entry = ctk.CTkEntry(builder_frame)
-        self.end_trigger_entry = ctk.CTkEntry(builder_frame)
-        self.output_path_label = ctk.CTkLabel(builder_frame, text="")
-        self.output_filename_entry = ctk.CTkEntry(builder_frame)
-
-        # Job Instructions
-        ctk.CTkLabel(builder_frame, text="Job Instructions").pack(anchor="w")
-        self.job_instructions_text = ctk.CTkTextbox(builder_frame, height=150)
-        self.job_instructions_text.pack(fill="x", pady=(0, 10), expand=True)
-
-        # Save Button
-        save_button = ctk.CTkButton(self.tab_builder, text="Save Job", command=self.save_job)
-        save_button.pack(pady=20)
-
     def refresh_job_list(self):
         for widget in self.job_list_frame.winfo_children():
             widget.destroy()
@@ -3162,39 +3247,17 @@ class JobWatcherPopup(ThemedPopup):
             else:
                 frame.configure(fg_color="transparent")
 
-    def edit_selected_job(self):
-        if not self.selected_job_name:
-            self.parent_app.update_status("No job selected to edit.", LYRN_WARNING)
-            return
-
-        job_prompt = self.automation_controller.job_definitions.get(self.selected_job_name)
-        if job_prompt is None:
-            self.parent_app.update_status(f"Job '{self.selected_job_name}' not found.", LYRN_ERROR)
-            return
-
-        self.editing_job_name = self.selected_job_name
-
-        # Populate builder fields
-        self.job_name_entry.delete(0, "end")
-        self.job_name_entry.insert(0, self.selected_job_name)
-        self.job_name_entry.configure(state="disabled") # Don't allow renaming for simplicity
-
-        self.job_instructions_text.delete("1.0", "end")
-        self.job_instructions_text.insert("1.0", job_prompt or "")
-
-        self.tabview.set("Job Builder")
-
     def run_selected_job(self):
         if not self.selected_job_name:
             self.parent_app.update_status("No job selected to run.", LYRN_WARNING)
             return
 
-        job_prompt = self.automation_controller.get_job_prompt(self.selected_job_name, args={})
-        if job_prompt:
-            self.parent_app.insert_job_text(job_prompt)
-            self.parent_app.update_status(f"Manual job loaded: {self.selected_job_name}", LYRN_ACCENT)
+        trigger_prompt = self.automation_controller.get_job_trigger(self.selected_job_name)
+        if trigger_prompt:
+            self.parent_app.insert_job_text(trigger_prompt)
+            self.parent_app.update_status(f"Manual job trigger loaded: {self.selected_job_name}", LYRN_ACCENT)
         else:
-            self.parent_app.update_status(f"Could not load job prompt for '{self.selected_job_name}'.", LYRN_ERROR)
+            self.parent_app.update_status(f"Could not load trigger for job '{self.selected_job_name}'.", LYRN_ERROR)
 
     def delete_selected_job(self):
         """Deletes the selected job after confirmation."""
@@ -3241,37 +3304,6 @@ class JobWatcherPopup(ThemedPopup):
         path = filedialog.askdirectory(title="Select Output Directory")
         if path:
             self.output_path_label.configure(text=path)
-
-    def save_job(self):
-        job_name = self.job_name_entry.get().strip()
-        instructions = self.job_instructions_text.get("1.0", "end-1c").strip()
-
-        if not all([job_name, instructions]):
-            self.parent_app.update_status("Job Name and Instructions must be filled.", LYRN_ERROR)
-            return
-
-        job_path = self.automation_controller.job_definitions_path / f"{job_name}.txt"
-        try:
-            with open(job_path, 'w', encoding='utf-8') as f:
-                f.write(instructions)
-
-            # Add to in-memory definitions
-            self.automation_controller.job_definitions[job_name] = instructions
-
-        except Exception as e:
-            self.parent_app.update_status(f"Error saving job file: {e}", LYRN_ERROR)
-            return
-
-        self.parent_app.update_status(f"Job '{job_name}' saved.", LYRN_SUCCESS)
-        self.refresh_job_list()
-        self.clear_builder_fields()
-        self.tabview.set("Job Viewer")
-
-    def clear_builder_fields(self):
-        self.job_name_entry.configure(state="normal")
-        self.job_name_entry.delete(0, "end")
-        self.job_instructions_text.delete("1.0", "end")
-        self.editing_job_name = None
 
 
 class AffordancePopup(ThemedPopup):

@@ -33,39 +33,46 @@ class AutomationController:
 
     def _load_job_definitions(self):
         """
-        Loads job definitions from .txt files in the specified directory.
-        The filename (without extension) is the job name.
+        Loads job definitions from the jobs.json file.
         """
-        self.job_definitions_path.mkdir(parents=True, exist_ok=True)
-        for job_file in self.job_definitions_path.glob("*.txt"):
-            job_name = job_file.stem
-            try:
-                with open(job_file, 'r', encoding='utf-8') as f:
-                    self.job_definitions[job_name] = f.read().strip()
-            except Exception as e:
-                print(f"Error loading job definition for '{job_name}': {e}")
-
-        if not self.job_definitions:
-            print("No job definitions found. Creating default examples.")
+        jobs_json_path = self.job_definitions_path / "jobs.json"
+        if not jobs_json_path.exists():
+            print("No jobs.json found. Creating default examples.")
             self._create_default_jobs()
+            return
 
-        print(f"Loaded {len(self.job_definitions)} job definitions: {list(self.job_definitions.keys())}")
+        try:
+            with open(jobs_json_path, 'r', encoding='utf-8') as f:
+                self.job_definitions = json.load(f)
+            print(f"Loaded {len(self.job_definitions)} job definitions from jobs.json: {list(self.job_definitions.keys())}")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Error loading job definitions from {jobs_json_path}: {e}")
+            self.job_definitions = {}
 
     def _create_default_jobs(self):
-        """Creates some default job files if none are found."""
+        """Creates a default jobs.json file if none is found."""
         default_jobs = {
-            "summary_job": "Create a concise, factual summary of the provided text. Focus on key decisions, outcomes, and open items.",
-            "keyword_job": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\"]",
-            "reflection_job": "Reflect on the conversation so far. Identify key insights, contradictions, or areas for future exploration. Propose next steps if applicable."
+            "summary_job": {
+                "instructions": "Create a concise, factual summary of the provided text. Focus on key decisions, outcomes, and open items.",
+                "trigger": "Summarize the previous text."
+            },
+            "keyword_job": {
+                "instructions": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\"]",
+                "trigger": "Extract keywords from the previous text."
+            },
+            "reflection_job": {
+                "instructions": "Reflect on the conversation so far. Identify key insights, contradictions, or areas for future exploration. Propose next steps if applicable.",
+                "trigger": "Reflect on the conversation."
+            }
         }
-        for name, prompt in default_jobs.items():
-            try:
-                filepath = self.job_definitions_path / f"{name}.txt"
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(prompt)
-                self.job_definitions[name] = prompt
-            except Exception as e:
-                print(f"Could not create default job '{name}': {e}")
+        self.job_definitions = default_jobs
+        jobs_json_path = self.job_definitions_path / "jobs.json"
+        try:
+            with open(jobs_json_path, 'w', encoding='utf-8') as f:
+                json.dump(self.job_definitions, f, indent=2)
+            print(f"Created default jobs file at {jobs_json_path}")
+        except IOError as e:
+            print(f"Could not create default jobs file: {e}")
 
     def _read_queue_unsafe(self) -> List[Dict]:
         """Unsafely reads the job queue from the JSON file. Assumes lock is held."""
@@ -86,6 +93,40 @@ class AutomationController:
             shutil.move(temp_path, self.queue_path)
         except (IOError, OSError) as e:
             print(f"Error writing job queue file: {e}")
+
+    def save_job_definition(self, job_name: str, instructions: str, trigger: str):
+        """Saves a job's instructions and trigger to the jobs.json file."""
+        job_data = {
+            "instructions": instructions,
+            "trigger": trigger
+        }
+
+        # This is a placeholder path. The actual path should be managed properly.
+        jobs_json_path = Path("automation/jobs/jobs.json")
+        jobs_lock_path = jobs_json_path.with_suffix('.json.lock')
+
+        try:
+            with SimpleFileLock(jobs_lock_path):
+                # Read existing jobs
+                if jobs_json_path.exists():
+                    with open(jobs_json_path, 'r', encoding='utf-8') as f:
+                        all_jobs = json.load(f)
+                else:
+                    all_jobs = {}
+
+                # Update or add the new job
+                all_jobs[job_name] = job_data
+
+                # Write back to the file
+                with open(jobs_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(all_jobs, f, indent=2)
+
+            # Update the in-memory dictionary as well
+            self.job_definitions[job_name] = job_data
+            print(f"Job definition for '{job_name}' saved successfully.")
+
+        except (IOError, TimeoutError, json.JSONDecodeError) as e:
+            print(f"Error saving job definition for '{job_name}': {e}")
 
     def add_job(self, name: str, priority: int = 100, when: str = "now", args: Optional[Dict[str, Any]] = None):
         """Adds a new job to the file-based execution queue in a thread-safe manner."""
@@ -118,9 +159,9 @@ class AutomationController:
             print(f"Error getting next job: {e}")
             return None
 
-        job_prompt = self.get_job_prompt(next_job_dict["name"], next_job_dict.get("args", {}))
-        if not job_prompt:
-            print(f"Warning: Could not get prompt for job '{next_job_dict['name']}'. Skipping.")
+        instruction_prompt = self.get_job_instructions_prompt(next_job_dict["name"], next_job_dict.get("args", {}))
+        if not instruction_prompt:
+            print(f"Warning: Could not get instruction prompt for job '{next_job_dict['name']}'. Skipping.")
             return None
 
         return Job(
@@ -128,7 +169,7 @@ class AutomationController:
             priority=next_job_dict.get("priority", 100),
             when=next_job_dict.get("when", "now"),
             args=next_job_dict.get("args", {}),
-            prompt=job_prompt
+            prompt=instruction_prompt
         )
 
     def has_pending_jobs(self) -> bool:
@@ -140,15 +181,24 @@ class AutomationController:
         queue_data = self._read_queue_unsafe()
         return len(queue_data) > 0
 
-    def get_job_prompt(self, job_name: str, args: Dict[str, Any]) -> Optional[str]:
+    def get_job_trigger(self, job_name: str) -> Optional[str]:
         """
-        Constructs the full prompt for a given job, including the standardized header.
+        Gets the trigger prompt for a given job.
         """
         if job_name not in self.job_definitions:
-            print(f"Error: Cannot get prompt for undefined job '{job_name}'.")
+            print(f"Error: Cannot get trigger for undefined job '{job_name}'.")
+            return None
+        return self.job_definitions[job_name].get("trigger")
+
+    def get_job_instructions_prompt(self, job_name: str, args: Dict[str, Any]) -> Optional[str]:
+        """
+        Constructs the full instruction prompt for a given job, including the standardized header.
+        """
+        if job_name not in self.job_definitions:
+            print(f"Error: Cannot get instructions for undefined job '{job_name}'.")
             return None
 
-        job_instructions = self.job_definitions[job_name]
+        job_instructions = self.job_definitions[job_name].get("instructions", "")
 
         for key, value in args.items():
             placeholder = f"{{{key}}}"
