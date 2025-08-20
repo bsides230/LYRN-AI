@@ -1,3 +1,33 @@
+# LYRN-AI v4.0.3 Build Notes
+
+## v4.0.3 - Heartbeat System Simplification (2025-08-20)
+
+This update completely refactors the "Heartbeat" system, replacing a complex, job-based background process with a simple and direct system prompt injection, as per user request for simplification.
+
+- **New Prompt-Based Heartbeat:**
+    - The old system, which ran a separate job and was parsed by a `heartbeat_watcher.py` script, has been entirely removed.
+    - The new system works by directly injecting a user-defined block of text into the system prompt.
+    - This aligns with the project's philosophy of using the LLM for heavy lifting and keeping the application logic simple.
+
+- **New Heartbeat Configuration:**
+    - The old `config.txt` has been replaced with a new `build_prompt/heartbeat/heartbeat_config.json` file.
+    - This JSON file stores the on/off state, begin/end brackets, instruction body, and a trigger phrase for user reference.
+
+- **Redesigned GUI:**
+    - The "Heartbeat" tab in the "System Prompt Builder" popup has been completely redesigned.
+    - It now features a full editor for all the values in the new JSON config file, including a toggle switch and text boxes for the brackets, body, and trigger.
+    - A "Save" button allows users to persist their changes directly from the UI.
+
+- **Code Deprecation and Cleanup:**
+    - The `heartbeat_watcher.py` script has been deleted.
+    - The `heartbeat.py` module was rewritten to contain a single function that reads the new JSON config and returns the formatted prompt string.
+    - All obsolete code for running the old heartbeat cycle, including the toggle switch on the main UI, has been removed from `lyrn_sad_v4.0.1.pyw`.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.3.pyw`.
+    - The previous version `lyrn_sad_v4.0.2.pyw` will be archived upon completion.
+
+
 # LYRN-AI v4.0.2 Build Notes
 
 ## v4.0.2 - Startup and Automation Refactor (2025-08-15)

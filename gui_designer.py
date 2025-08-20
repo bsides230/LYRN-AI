@@ -416,7 +416,7 @@ class GUIDesigner(ctk.CTk):
     def load_gui_for_editing(self):
         """Loads the target GUI, walks its widget tree, and populates the hierarchy view."""
         try:
-            gui_path = os.path.join(SCRIPT_DIR, "lyrn_sad_v3.9.pyw")
+            gui_path = os.path.join(SCRIPT_DIR, "lyrn_sad_v4.0.3.pyw")
             gui_module = load_gui_module(gui_path)
 
             log_queue = queue.Queue()
