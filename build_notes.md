@@ -1,3 +1,35 @@
+# LYRN-AI v4.0.4 Build Notes
+
+## v4.0.4 - Episodic Memory Manager (2025-08-20)
+
+This update introduces a comprehensive new Episodic Memory system, moving away from a simple chat log to a structured, file-based memory architecture. This allows for more advanced searching, filtering, and context management.
+
+- **New Episodic Memory Manager:**
+    - A new `episodic_memory_manager.py` module has been created to handle all aspects of the new memory system.
+    - It manages the creation and parsing of "Verbatim Chat Entry Pair" files, which store detailed information about each interaction.
+
+- **Structured Chat Entries:**
+    - Each chat interaction is now saved as a separate, structured text file in the `episodic_memory/` directory.
+    - These files follow a detailed block format, including fields for ID, timestamp, mode, user input, model output, summaries, keywords, and topics.
+
+- **New Episodic Memory Popup:**
+    - A new "Episodic Memory" button has been added to the main UI, which opens a new popup window for managing memories.
+    - The popup features a searchable and scrollable list of all past chat entries.
+    - Each entry in the list displays a one-liner summary, timestamp, mode, and any associated tags.
+
+- **Context Management:**
+    - Users can select multiple entries from the list using checkboxes.
+    - An "Add Selected to Context" button appends the full content of the selected entries to a `chat_review.txt` file, allowing them to be easily loaded into the model's context.
+
+- **Quoting Feature:**
+    - A new right-click context menu has been added to the main chat display.
+    - Users can highlight any text in the chat, right-click, and select "Quote to Context".
+    - This action appends the selected text to a `quotes.txt` file for easy reference and injection into the prompt.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.4.pyw`.
+
+
 # LYRN-AI v4.0.3 Build Notes
 
 ## v4.0.3 - Heartbeat System Simplification (2025-08-20)
