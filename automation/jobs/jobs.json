@@ -1,0 +1,18 @@
+{
+  "summary_job": {
+    "instructions": "Create a concise, factual summary of the provided text. Focus on key decisions, outcomes, and open items.",
+    "trigger": "Execute the summary job."
+  },
+  "reflection_cycle_job": {
+    "instructions": "Analyze the provided job output.\nInstructions for evaluation are given in [INSTRUCTIONS].\nA gold-standard example is provided in [GOLD_STANDARD].\n\nBased on your analysis, provide a score and detailed notes on the output's quality, accuracy, and adherence to the instructions.\n\n[JOB_OUTPUT]\n<|EOT|>\n<|start_header_id|>user\n[INSTRUCTIONS]\n{instructions}\n<|EOT|>\n<|start_header_id|>user\n[GOLD_STANDARD]\n{gold_standard}\n<|EOT|>\n<|start_header_id|>user\n[JOB_OUTPUT]\n{job_output}\n<|EOT|>\n<|start_header_id|>assistant",
+    "trigger": "Execute the reflection cycle job."
+  },
+  "reflection_job": {
+    "instructions": "Reflect on the conversation so far. Identify key insights, contradictions, or areas for future exploration. Propose next steps if applicable.",
+    "trigger": "Execute the reflection job."
+  },
+  "keyword_job": {
+    "instructions": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\"]",
+    "trigger": "Execute the keyword job."
+  }
+}

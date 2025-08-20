@@ -24,11 +24,11 @@ from automation_controller import AutomationController, Job
 from color_picker import CustomColorPickerPopup
 from heartbeat import get_heartbeat_job_prompt
 from file_lock import SimpleFileLock
-from job_watcher_manager import JobWatcherManager, WatcherJob
 from affordance_manager import AffordanceManager, Affordance
 from themed_popup import ThemedPopup, ThemeManager
 from automation.scheduler_manager import SchedulerManager
 import calendar
+from cycle_manager import CycleManager
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -381,6 +381,7 @@ class SettingsManager:
                 print("Settings loaded successfully")
                 self.ensure_automation_flag()
                 self.ensure_next_job_flag()
+                self.ensure_llm_status_flag()
             except Exception as e:
                 print(f"Error loading settings: {e}. Assuming first boot.")
                 self.first_boot = True
@@ -421,6 +422,7 @@ class SettingsManager:
 
             self.ensure_automation_flag()
             self.ensure_next_job_flag()
+            self.ensure_llm_status_flag()
 
     def create_empty_settings_structure(self) -> dict:
         """Create empty settings structure for first boot"""
@@ -508,6 +510,17 @@ class SettingsManager:
             print("Next job flag initialized to 'false'")
         except Exception as e:
             print(f"Warning: Could not initialize next job flag: {e}")
+
+    def ensure_llm_status_flag(self):
+        """Ensure LLM status flag is initialized to 'idle' on startup."""
+        llm_status_path = os.path.join(SCRIPT_DIR, "global_flags", "llm_status.txt")
+        os.makedirs(os.path.dirname(llm_status_path), exist_ok=True)
+        try:
+            with open(llm_status_path, 'w', encoding='utf-8') as f:
+                f.write("idle")
+            print("LLM status flag initialized to 'idle'")
+        except Exception as e:
+            print(f"Warning: Could not initialize LLM status flag: {e}")
 
     def set_automation_flag(self, state: str):
         """Set automation flag to 'on' or 'off'"""
@@ -2441,11 +2454,11 @@ class ComingSoonPopup(ThemedPopup):
 
 class DaySchedulePopup(ThemedPopup):
     """A popup to manage schedules for a specific day."""
-    def __init__(self, parent, theme_manager, language_manager, scheduler_manager, job_watcher_manager, date_obj: datetime, calendar_refresh_callback):
+    def __init__(self, parent, theme_manager, language_manager, scheduler_manager, automation_controller: AutomationController, date_obj: datetime, calendar_refresh_callback):
         super().__init__(parent=parent, theme_manager=theme_manager)
         self.language_manager = language_manager
         self.scheduler_manager = scheduler_manager
-        self.job_watcher_manager = job_watcher_manager
+        self.automation_controller = automation_controller
         self.date_obj = date_obj
         self.calendar_refresh_callback = calendar_refresh_callback
         self.selected_schedule_id = None
@@ -2478,7 +2491,7 @@ class DaySchedulePopup(ThemedPopup):
 
         # Job selection
         ctk.CTkLabel(right_frame, text="Job:").pack(anchor="w", padx=10)
-        job_names = [job.name for job in self.job_watcher_manager.get_all_jobs()]
+        job_names = list(self.automation_controller.job_definitions.keys())
         self.job_selector = ctk.CTkComboBox(right_frame, values=job_names if job_names else ["No jobs available"])
         if job_names:
             self.job_selector.set(job_names[0])
@@ -2559,15 +2572,100 @@ class DaySchedulePopup(ThemedPopup):
         self.calendar_refresh_callback()
 
 
+class JobBuilderPopup(ThemedPopup):
+    """A popup for creating and editing jobs."""
+    def __init__(self, parent, automation_controller: AutomationController, theme_manager: ThemeManager, language_manager: LanguageManager, refresh_callback, job_name: Optional[str] = None):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.automation_controller = automation_controller
+        self.language_manager = language_manager
+        self.refresh_callback = refresh_callback
+        self.editing_job_name = job_name
+
+        # This needs to be fixed in the next step. It currently gets a string, but will get a dict.
+        job_definition = self.automation_controller.job_definitions.get(self.editing_job_name) if self.editing_job_name else {}
+        if isinstance(job_definition, str): # Temp backwards compatibility
+            self.job_data = {"instructions": job_definition, "trigger": ""}
+        else:
+            self.job_data = job_definition or {}
+
+
+        self.title("Job Editor" if self.editing_job_name else "Create New Job")
+        self.geometry("700x600")
+        self.grab_set()
+
+        self.create_widgets()
+        if self.job_data:
+            self.load_job_data()
+
+        self.apply_theme()
+
+    def create_widgets(self):
+        """Create the UI elements for the popup."""
+        main_frame = ctk.CTkScrollableFrame(self)
+        main_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # Job Name
+        ctk.CTkLabel(main_frame, text="Job Name").pack(anchor="w")
+        self.job_name_entry = ctk.CTkEntry(main_frame)
+        self.job_name_entry.pack(fill="x", pady=(0, 10))
+        if self.editing_job_name:
+            self.job_name_entry.insert(0, self.editing_job_name)
+            self.job_name_entry.configure(state="disabled")
+
+        # Job Instructions
+        ctk.CTkLabel(main_frame, text="Job Instructions (for build_prompt)").pack(anchor="w")
+        self.job_instructions_text = ctk.CTkTextbox(main_frame, height=200)
+        self.job_instructions_text.pack(fill="both", pady=(0, 10), expand=True)
+
+        # Trigger Prompt
+        ctk.CTkLabel(main_frame, text="Trigger Prompt (for LLM execution)").pack(anchor="w")
+        self.trigger_prompt_text = ctk.CTkTextbox(main_frame, height=100)
+        self.trigger_prompt_text.pack(fill="both", pady=(0, 10), expand=True)
+
+        # Save Button
+        save_button = ctk.CTkButton(self, text="Save Job", command=self.save_job)
+        save_button.pack(pady=15, padx=15)
+
+    def load_job_data(self):
+        """Populates the fields with data from an existing job."""
+        if not self.job_data:
+            return
+        self.job_instructions_text.insert("1.0", self.job_data.get("instructions", ""))
+        self.trigger_prompt_text.insert("1.0", self.job_data.get("trigger", ""))
+
+    def save_job(self):
+        """Saves the job data to the central jobs.json file."""
+        job_name = self.job_name_entry.get().strip()
+        instructions = self.job_instructions_text.get("1.0", "end-1c").strip()
+        trigger = self.trigger_prompt_text.get("1.0", "end-1c").strip()
+
+        if not all([job_name, instructions, trigger]):
+            self.parent.parent_app.update_status("Job Name, Instructions, and Trigger must be filled.", LYRN_ERROR)
+            return
+
+        # Call the new method in the automation controller to handle saving.
+        self.automation_controller.save_job_definition(job_name, instructions, trigger)
+
+        self.parent.parent_app.update_status(f"Job '{job_name}' saved.", LYRN_SUCCESS)
+
+        if self.refresh_callback:
+            self.refresh_callback()
+
+        self.destroy()
+
 class JobWatcherPopup(ThemedPopup):
     """A popup window for managing watcher jobs."""
-    def __init__(self, parent, job_watcher_manager: JobWatcherManager, theme_manager: ThemeManager, language_manager: LanguageManager):
+    def __init__(self, parent, automation_controller: AutomationController, theme_manager: ThemeManager, language_manager: LanguageManager, cycle_manager: CycleManager):
         super().__init__(parent=parent, theme_manager=theme_manager)
-        self.job_watcher_manager = job_watcher_manager
+        self.automation_controller = automation_controller
         self.language_manager = language_manager
+        self.cycle_manager = cycle_manager
         self.selected_job_name = None
-        self.editing_job_name = None
         self.job_checkboxes = {}
+        self.selected_cycle_name = None
+        self.selected_trigger_name = None
+        self.reflection_job_output = ""
 
         self.active_jobs_index_path = Path(SCRIPT_DIR) / "build_prompt" / "active_jobs" / "_index.json"
         self.active_jobs_dir = self.active_jobs_index_path.parent
@@ -2575,25 +2673,257 @@ class JobWatcherPopup(ThemedPopup):
 
         self.title("Automation")
         self.geometry("900x700")
-        # self.grab_set() # Removed to make non-modal
 
         # Main tab view
         self.tabview = ctk.CTkTabview(self, width=850, height=600)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
 
         self.tab_viewer = self.tabview.add("Job Viewer")
-        self.tab_builder = self.tabview.add("Job Builder")
         self.tab_scheduler = self.tabview.add("Scheduler")
         self.tab_reflection = self.tabview.add("Reflection Cycle")
+        self.tab_cycle_builder = self.tabview.add("Cycle Builder")
 
         self.create_viewer_tab()
-        self.create_builder_tab()
         self.create_scheduler_tab()
         self.create_reflection_tab()
+        self.create_cycle_builder_tab()
 
         self.refresh_job_list()
         self.tabview.set("Job Viewer")
         self.apply_theme()
+
+    def create_viewer_tab(self):
+        self.tab_viewer.grid_columnconfigure(0, weight=1)
+        self.tab_viewer.grid_rowconfigure(0, weight=1)
+
+        viewer_content_frame = ctk.CTkFrame(self.tab_viewer)
+        viewer_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        viewer_content_frame.grid_columnconfigure(0, weight=1)
+        viewer_content_frame.grid_rowconfigure(0, weight=1)
+
+        self.job_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Jobs")
+        self.job_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        button_frame = ctk.CTkFrame(viewer_content_frame)
+        button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
+
+        new_button = ctk.CTkButton(button_frame, text="New Job", command=self.open_new_job_popup)
+        new_button.pack(padx=10, pady=10, anchor="n")
+
+        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_job)
+        edit_button.pack(padx=10, pady=10, anchor="n")
+
+        run_button = ctk.CTkButton(button_frame, text="Run", command=self.run_selected_job)
+        run_button.pack(padx=10, pady=10, anchor="n")
+
+        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_job)
+        delete_button.pack(padx=10, pady=10, anchor="n")
+
+    def open_new_job_popup(self):
+        """Opens the job builder popup for creating a new job."""
+        popup = JobBuilderPopup(
+            parent=self,
+            automation_controller=self.automation_controller,
+            theme_manager=self.theme_manager,
+            language_manager=self.language_manager,
+            refresh_callback=self.refresh_job_list
+        )
+        popup.focus()
+
+    def edit_selected_job(self):
+        """Opens the job builder popup for editing the selected job."""
+        if not self.selected_job_name:
+            self.parent_app.update_status("No job selected to edit.", LYRN_WARNING)
+            return
+
+        popup = JobBuilderPopup(
+            parent=self,
+            automation_controller=self.automation_controller,
+            theme_manager=self.theme_manager,
+            language_manager=self.language_manager,
+            refresh_callback=self.refresh_job_list,
+            job_name=self.selected_job_name
+        )
+        popup.focus()
+
+    def create_cycle_builder_tab(self):
+        """Creates the UI for the Cycle Builder tab."""
+        self.tab_cycle_builder.grid_columnconfigure(0, weight=1)
+        self.tab_cycle_builder.grid_columnconfigure(1, weight=2)
+        self.tab_cycle_builder.grid_rowconfigure(1, weight=1)
+
+        # --- Left Pane: Cycle Management and Trigger List ---
+        left_pane = ctk.CTkFrame(self.tab_cycle_builder)
+        left_pane.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=10)
+        left_pane.grid_rowconfigure(1, weight=1)
+        left_pane.grid_columnconfigure(0, weight=1)
+
+        # Cycle selection and management
+        cycle_manage_frame = ctk.CTkFrame(left_pane)
+        cycle_manage_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        self.cycle_selector = ctk.CTkComboBox(cycle_manage_frame, values=[], command=self.on_cycle_selected)
+        self.cycle_selector.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        new_cycle_button = ctk.CTkButton(cycle_manage_frame, text="New", width=50, command=self.new_cycle)
+        new_cycle_button.pack(side="left", padx=(0, 5))
+        delete_cycle_button = ctk.CTkButton(cycle_manage_frame, text="Delete", width=60, command=self.delete_cycle)
+        delete_cycle_button.pack(side="left")
+
+        # Draggable list for triggers
+        self.trigger_list = DraggableListbox(left_pane, command=self.on_trigger_list_reorder)
+        self.trigger_list.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+        # --- Right Pane: Trigger Editor ---
+        right_pane = ctk.CTkFrame(self.tab_cycle_builder)
+        right_pane.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=10, pady=10)
+        right_pane.grid_rowconfigure(1, weight=1)
+        right_pane.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(right_pane, text="Trigger Editor").grid(row=0, column=0, pady=5)
+
+        editor_frame = ctk.CTkFrame(right_pane)
+        editor_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        editor_frame.grid_columnconfigure(0, weight=1)
+        editor_frame.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(editor_frame, text="Trigger Name:").pack(anchor="w", padx=5)
+        self.trigger_name_entry = ctk.CTkEntry(editor_frame)
+        self.trigger_name_entry.pack(fill="x", padx=5, pady=(0, 10))
+
+        ctk.CTkLabel(editor_frame, text="Trigger Prompt:").pack(anchor="w", padx=5)
+        self.trigger_prompt_text = ctk.CTkTextbox(editor_frame, wrap="word")
+        self.trigger_prompt_text.pack(expand=True, fill="both", padx=5, pady=(0, 10))
+
+        # Buttons for the editor
+        button_frame = ctk.CTkFrame(right_pane)
+        button_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        add_trigger_button = ctk.CTkButton(button_frame, text="Add/Update Trigger", command=self.save_trigger)
+        add_trigger_button.pack(side="left", padx=5)
+        delete_trigger_button = ctk.CTkButton(button_frame, text="Delete Trigger", command=self.delete_trigger)
+        delete_trigger_button.pack(side="right", padx=5)
+
+        self.refresh_cycle_list()
+
+    def refresh_cycle_list(self):
+        """Refreshes the list of available cycles in the combobox."""
+        cycle_names = self.cycle_manager.get_cycle_names()
+        self.cycle_selector.configure(values=cycle_names if cycle_names else [""])
+        if cycle_names:
+            self.cycle_selector.set(cycle_names[0])
+            self.on_cycle_selected(cycle_names[0])
+        else:
+            self.cycle_selector.set("")
+            self.on_cycle_selected(None)
+
+    def on_cycle_selected(self, cycle_name: Optional[str]):
+        """Callback when a cycle is selected from the dropdown."""
+        self.selected_cycle_name = cycle_name
+        self.refresh_trigger_list()
+        self.clear_trigger_editor()
+
+    def refresh_trigger_list(self):
+        """Refreshes the draggable list of triggers for the selected cycle."""
+        self.trigger_list.clear()
+        if self.selected_cycle_name:
+            cycle_data = self.cycle_manager.get_cycle(self.selected_cycle_name)
+            if cycle_data:
+                for trigger in cycle_data.get("triggers", []):
+                    # DraggableListbox expects a dict with a "path" key for the text
+                    self.trigger_list.add_item({"path": trigger["name"], "pinned": False})
+
+    def on_trigger_list_reorder(self, new_item_objects: List[dict]):
+        """Saves the new order of triggers when the list is reordered."""
+        if not self.selected_cycle_name:
+            return
+
+        cycle_data = self.cycle_manager.get_cycle(self.selected_cycle_name)
+        if not cycle_data:
+            return
+
+        # Create a map of trigger names to their prompts to preserve them
+        prompt_map = {t["name"]: t["prompt"] for t in cycle_data.get("triggers", [])}
+
+        new_triggers = []
+        for item in new_item_objects:
+            trigger_name = item["path"]
+            if trigger_name in prompt_map:
+                new_triggers.append({"name": trigger_name, "prompt": prompt_map[trigger_name]})
+
+        self.cycle_manager.update_cycle_triggers(self.selected_cycle_name, new_triggers)
+        self.parent_app.update_status(f"Trigger order for '{self.selected_cycle_name}' saved.", LYRN_SUCCESS)
+
+    def new_cycle(self):
+        """Prompts for a new cycle name and creates it."""
+        dialog = ctk.CTkInputDialog(text="Enter name for the new cycle:", title="New Cycle")
+        name = dialog.get_input()
+        if name:
+            if self.cycle_manager.create_cycle(name):
+                self.parent_app.update_status(f"Cycle '{name}' created.", LYRN_SUCCESS)
+                self.refresh_cycle_list()
+                self.cycle_selector.set(name)
+            else:
+                self.parent_app.update_status(f"Cycle '{name}' already exists.", LYRN_ERROR)
+
+    def delete_cycle(self):
+        """Deletes the selected cycle after confirmation."""
+        if not self.selected_cycle_name:
+            self.parent_app.update_status("No cycle selected to delete.", LYRN_WARNING)
+            return
+
+        from confirmation_dialog import ConfirmationDialog
+        confirmed, _ = ConfirmationDialog.show(
+            self, self.theme_manager,
+            title="Confirm Deletion",
+            message=f"Are you sure you want to permanently delete the cycle '{self.selected_cycle_name}'?"
+        )
+        if confirmed:
+            self.cycle_manager.delete_cycle(self.selected_cycle_name)
+            self.parent_app.update_status(f"Cycle '{self.selected_cycle_name}' deleted.", LYRN_SUCCESS)
+            self.refresh_cycle_list()
+
+    def save_trigger(self):
+        """Saves the trigger from the editor to the selected cycle."""
+        if not self.selected_cycle_name:
+            self.parent_app.update_status("No cycle selected to add a trigger to.", LYRN_WARNING)
+            return
+
+        trigger_name = self.trigger_name_entry.get().strip()
+        trigger_prompt = self.trigger_prompt_text.get("1.0", "end-1c").strip()
+
+        if not trigger_name or not trigger_prompt:
+            self.parent_app.update_status("Trigger name and prompt cannot be empty.", LYRN_ERROR)
+            return
+
+        self.cycle_manager.add_trigger_to_cycle(self.selected_cycle_name, trigger_name, trigger_prompt)
+        self.parent_app.update_status(f"Trigger '{trigger_name}' saved to cycle '{self.selected_cycle_name}'.", LYRN_SUCCESS)
+        self.refresh_trigger_list()
+        self.clear_trigger_editor()
+
+    def delete_trigger(self):
+        """Deletes the selected trigger from the current cycle."""
+        selected_item_frame = self.trigger_list.get_selected_item()
+        if not selected_item_frame:
+            self.parent_app.update_status("No trigger selected to delete.", LYRN_WARNING)
+            return
+
+        # The text is on a label which is a child of the frame
+        trigger_name = selected_item_frame.winfo_children()[1].cget("text")
+
+        from confirmation_dialog import ConfirmationDialog
+        confirmed, _ = ConfirmationDialog.show(
+            self, self.theme_manager,
+            title="Confirm Deletion",
+            message=f"Are you sure you want to delete the trigger '{trigger_name}' from this cycle?"
+        )
+        if confirmed:
+            self.cycle_manager.delete_trigger_from_cycle(self.selected_cycle_name, trigger_name)
+            self.parent_app.update_status(f"Trigger '{trigger_name}' deleted.", LYRN_SUCCESS)
+            self.refresh_trigger_list()
+
+
+    def clear_trigger_editor(self):
+        """Clears the trigger name and prompt fields."""
+        self.trigger_name_entry.delete(0, "end")
+        self.trigger_prompt_text.delete("1.0", "end")
 
     def _ensure_active_jobs_index(self):
         """Ensures the active jobs directory and index file exist."""
@@ -2654,8 +2984,15 @@ class JobWatcherPopup(ThemedPopup):
 
         # Add files for newly activated jobs
         for job_name in active_job_names:
-            job = self.job_watcher_manager.get_job(job_name)
-            if not job:
+            job_definition = self.automation_controller.job_definitions.get(job_name)
+            if not job_definition:
+                print(f"Warning: Could not find definition for active job '{job_name}'.")
+                continue
+
+            # Instructions are now in a dictionary
+            instructions = job_definition.get("instructions", "")
+            if not instructions:
+                print(f"Warning: Job '{job_name}' has no instructions to write to build_prompt.")
                 continue
 
             job_dir = self.active_jobs_dir / job_name
@@ -2663,7 +3000,7 @@ class JobWatcherPopup(ThemedPopup):
 
             instructions_path = job_dir / "instructions.txt"
             with open(instructions_path, 'w', encoding='utf-8') as f:
-                f.write(job.instructions or "")
+                f.write(instructions) # Write verbatim instructions as requested
 
         # Update the local index for the active_jobs directory
         active_job_files = []
@@ -2688,6 +3025,20 @@ class JobWatcherPopup(ThemedPopup):
         """Creates the UI for the Reflection Cycle tab."""
         reflection_frame = ctk.CTkScrollableFrame(self.tab_reflection)
         reflection_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Job selection for reflection
+        job_selection_frame = ctk.CTkFrame(reflection_frame, fg_color="transparent")
+        job_selection_frame.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(job_selection_frame, text="Job to Reflect On:").pack(anchor="w")
+        job_names = list(self.automation_controller.job_definitions.keys())
+        self.reflection_job_selector = ctk.CTkComboBox(job_selection_frame, values=job_names if job_names else ["No jobs available"])
+        if job_names:
+            self.reflection_job_selector.set(job_names[0])
+        self.reflection_job_selector.pack(side="left", expand=True, fill="x")
+
+        run_job_button = ctk.CTkButton(job_selection_frame, text="Run Job", command=self.run_job_for_reflection)
+        run_job_button.pack(side="left", padx=5)
 
         # Reflection Instructions
         ctk.CTkLabel(reflection_frame, text="Reflection Instructions").pack(anchor="w")
@@ -2727,6 +3078,27 @@ class JobWatcherPopup(ThemedPopup):
         manual_trigger_button = ctk.CTkButton(reflection_frame, text="Run Reflection Manually", command=self.run_reflection_manually)
         manual_trigger_button.pack(pady=20)
 
+    def run_job_for_reflection(self):
+        """Runs the selected job and stores its output for reflection."""
+        selected_job_name = self.reflection_job_selector.get()
+        if "No jobs available" in selected_job_name:
+            self.parent_app.update_status("No job selected to run.", LYRN_WARNING)
+            return
+
+        trigger_prompt = self.automation_controller.get_job_trigger(selected_job_name)
+        if not trigger_prompt:
+            self.parent_app.update_status(f"Could not load trigger for job '{selected_job_name}'.", LYRN_ERROR)
+            return
+
+        self.parent_app.update_status(f"Running job '{selected_job_name}' for reflection...", LYRN_INFO)
+
+        # This will block, which is ok for this button.
+        response = self.parent_app.get_response_for_job(trigger_prompt)
+
+        self.reflection_job_output = response
+
+        self.parent_app.update_status(f"Job '{selected_job_name}' finished. Output is ready for reflection.", LYRN_SUCCESS)
+
     def run_reflection_manually(self):
         """Triggers the reflection process manually based on the UI settings."""
         instructions = self.reflection_instructions_text.get("1.0", "end-1c")
@@ -2734,15 +3106,19 @@ class JobWatcherPopup(ThemedPopup):
         iterations = self.reflection_iterations_entry.get()
         auto_update = self.reflection_auto_update_prompt_var.get()
         auto_continue = self.reflection_auto_continue_var.get()
+        selected_job_for_reflection = self.reflection_job_selector.get()
 
         if not instructions:
             self.parent_app.update_status("Reflection instructions are required.", LYRN_WARNING)
             return
 
-        # For manual triggering, we'll use the content of the main chat window as the "job output".
-        job_output = self.parent_app.chat_display.get("1.0", "end-1c")
+        if "No jobs available" in selected_job_for_reflection:
+            self.parent_app.update_status("No job selected for reflection.", LYRN_WARNING)
+            return
+
+        job_output = self.reflection_job_output
         if not job_output.strip():
-            self.parent_app.update_status("Chat display is empty, nothing to reflect on.", LYRN_WARNING)
+            self.parent_app.update_status("Job output is empty. Run a job first.", LYRN_WARNING)
             return
 
         # The 'reflection_cycle_job' expects these arguments.
@@ -2753,7 +3129,7 @@ class JobWatcherPopup(ThemedPopup):
             "iterations": iterations,
             "auto_update": auto_update,
             "auto_continue": auto_continue,
-            "original_job_name": self.selected_job_name or "manual" # Track which job this reflection is for
+            "original_job_name": selected_job_for_reflection or "manual" # Track which job this reflection is for
         }
 
         # Add the reflection job to the queue
@@ -2863,79 +3239,11 @@ class JobWatcherPopup(ThemedPopup):
             theme_manager=self.theme_manager,
             language_manager=self.language_manager,
             scheduler_manager=self.parent_app.scheduler_manager,
-            job_watcher_manager=self.job_watcher_manager,
+            automation_controller=self.parent_app.automation_controller,
             date_obj=dt_obj,
             calendar_refresh_callback=self.update_calendar
         )
         popup.focus()
-
-    def create_viewer_tab(self):
-        self.tab_viewer.grid_columnconfigure(0, weight=1)
-        self.tab_viewer.grid_rowconfigure(0, weight=1)
-
-        # Frame for the list and buttons
-        viewer_content_frame = ctk.CTkFrame(self.tab_viewer)
-        viewer_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        viewer_content_frame.grid_columnconfigure(0, weight=1)
-        viewer_content_frame.grid_rowconfigure(0, weight=1)
-
-        self.job_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Jobs")
-        self.job_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-
-        # Frame for buttons
-        button_frame = ctk.CTkFrame(viewer_content_frame)
-        button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
-
-        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_job)
-        edit_button.pack(padx=10, pady=10, anchor="n")
-
-        run_button = ctk.CTkButton(button_frame, text="Run", command=self.run_selected_job)
-        run_button.pack(padx=10, pady=10, anchor="n")
-
-        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_job)
-        delete_button.pack(padx=10, pady=10, anchor="n")
-
-    def create_builder_tab(self):
-        builder_frame = ctk.CTkScrollableFrame(self.tab_builder)
-        builder_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        # Job Name
-        ctk.CTkLabel(builder_frame, text="Job Name").pack(anchor="w")
-        self.job_name_entry = ctk.CTkEntry(builder_frame)
-        self.job_name_entry.pack(fill="x", pady=(0, 10))
-
-        # Start Trigger
-        ctk.CTkLabel(builder_frame, text="Start Trigger").pack(anchor="w")
-        self.start_trigger_entry = ctk.CTkEntry(builder_frame)
-        self.start_trigger_entry.pack(fill="x", pady=(0, 10))
-
-        # End Trigger
-        ctk.CTkLabel(builder_frame, text="End Trigger").pack(anchor="w")
-        self.end_trigger_entry = ctk.CTkEntry(builder_frame)
-        self.end_trigger_entry.pack(fill="x", pady=(0, 10))
-
-        # Output Path
-        ctk.CTkLabel(builder_frame, text="Output Path").pack(anchor="w")
-        path_frame = ctk.CTkFrame(builder_frame, fg_color="transparent")
-        path_frame.pack(fill="x", pady=(0, 10))
-        self.output_path_label = ctk.CTkLabel(path_frame, text="No directory selected", anchor="w")
-        self.output_path_label.pack(side="left", expand=True, fill="x")
-        select_path_button = ctk.CTkButton(path_frame, text="Select...", width=80, command=self.select_output_path)
-        select_path_button.pack(side="right")
-
-        # Output Filename
-        ctk.CTkLabel(builder_frame, text="Output Filename").pack(anchor="w")
-        self.output_filename_entry = ctk.CTkEntry(builder_frame)
-        self.output_filename_entry.pack(fill="x", pady=(0, 10))
-
-        # Job Instructions
-        ctk.CTkLabel(builder_frame, text="Job Instructions").pack(anchor="w")
-        self.job_instructions_text = ctk.CTkTextbox(builder_frame, height=150)
-        self.job_instructions_text.pack(fill="x", pady=(0, 10), expand=True)
-
-        # Save Button
-        save_button = ctk.CTkButton(self.tab_builder, text="Save Job", command=self.save_job)
-        save_button.pack(pady=20)
 
     def refresh_job_list(self):
         for widget in self.job_list_frame.winfo_children():
@@ -2943,15 +3251,15 @@ class JobWatcherPopup(ThemedPopup):
 
         self.job_checkboxes.clear()
         active_jobs = self._load_active_jobs()
-        all_jobs = self.job_watcher_manager.get_all_jobs()
+        all_jobs = self.automation_controller.job_definitions
         self.selected_job_name = None
 
         if not all_jobs:
             ctk.CTkLabel(self.job_list_frame, text="No watcher jobs created yet.").pack()
             return
 
-        for job in sorted(all_jobs, key=lambda j: j.name):
-            var = ctk.BooleanVar(value=(job.name in active_jobs))
+        for job_name in sorted(all_jobs.keys()):
+            var = ctk.BooleanVar(value=(job_name in active_jobs))
 
             # A frame to hold the checkbox and the selection label
             job_frame = ctk.CTkFrame(self.job_list_frame, fg_color="transparent")
@@ -2959,16 +3267,16 @@ class JobWatcherPopup(ThemedPopup):
 
             checkbox = ctk.CTkCheckBox(
                 job_frame,
-                text=job.name,
+                text=job_name,
                 variable=var,
-                command=lambda name=job.name: self.toggle_job_pin(name)
+                command=lambda name=job_name: self.toggle_job_pin(name)
             )
             checkbox.pack(side="left")
 
             # We bind the selection for edit/delete to the frame itself
-            job_frame.bind("<Button-1>", lambda e, name=job.name: self.on_job_selected(name))
+            job_frame.bind("<Button-1>", lambda e, name=job_name: self.on_job_selected(name))
 
-            self.job_checkboxes[job.name] = (checkbox, var, job_frame)
+            self.job_checkboxes[job_name] = (checkbox, var, job_frame)
 
     def on_job_selected(self, job_name):
         self.selected_job_name = job_name
@@ -2979,54 +3287,17 @@ class JobWatcherPopup(ThemedPopup):
             else:
                 frame.configure(fg_color="transparent")
 
-    def edit_selected_job(self):
-        if not self.selected_job_name:
-            self.parent_app.update_status("No job selected to edit.", LYRN_WARNING)
-            return
-
-        job = self.job_watcher_manager.get_job(self.selected_job_name)
-        if not job:
-            self.parent_app.update_status(f"Job '{self.selected_job_name}' not found.", LYRN_ERROR)
-            return
-
-        self.editing_job_name = job.name
-
-        # Populate builder fields
-        self.job_name_entry.delete(0, "end")
-        self.job_name_entry.insert(0, job.name)
-        self.job_name_entry.configure(state="disabled") # Don't allow renaming for simplicity
-
-        self.start_trigger_entry.delete(0, "end")
-        self.start_trigger_entry.insert(0, job.start_trigger)
-
-        self.end_trigger_entry.delete(0, "end")
-        self.end_trigger_entry.insert(0, job.end_trigger)
-
-        self.output_path_label.configure(text=job.output_path)
-
-        self.output_filename_entry.delete(0, "end")
-        self.output_filename_entry.insert(0, job.output_filename)
-
-        self.job_instructions_text.delete("1.0", "end")
-        self.job_instructions_text.insert("1.0", job.instructions or "")
-
-        self.tabview.set("Job Builder")
-
     def run_selected_job(self):
         if not self.selected_job_name:
             self.parent_app.update_status("No job selected to run.", LYRN_WARNING)
             return
 
-        text_content = self.parent_app.chat_display.get("1.0", "end")
-        if not text_content.strip():
-            self.parent_app.update_status("Chat display is empty, nothing to run job on.", LYRN_WARNING)
-            return
-
-        output_file = self.job_watcher_manager.run_job(self.selected_job_name, text_content)
-        if output_file:
-            self.parent_app.update_status(f"Job '{self.selected_job_name}' ran successfully. Output: {output_file}", LYRN_SUCCESS)
+        trigger_prompt = self.automation_controller.get_job_trigger(self.selected_job_name)
+        if trigger_prompt:
+            self.parent_app.insert_job_text(trigger_prompt)
+            self.parent_app.update_status(f"Manual job trigger loaded: {self.selected_job_name}", LYRN_ACCENT)
         else:
-            self.parent_app.update_status(f"Job '{self.selected_job_name}' failed to run. Check logs.", LYRN_ERROR)
+            self.parent_app.update_status(f"Could not load trigger for job '{self.selected_job_name}'.", LYRN_ERROR)
 
     def delete_selected_job(self):
         """Deletes the selected job after confirmation."""
@@ -3054,9 +3325,18 @@ class JobWatcherPopup(ThemedPopup):
                 self.parent_app.settings_manager.save_settings()
 
         if confirmed:
-            self.job_watcher_manager.delete_job(job_name)
-            self.parent_app.update_status(f"Job '{job_name}' deleted.", LYRN_SUCCESS)
-            self.refresh_job_list()
+            job_path = self.automation_controller.job_definitions_path / f"{job_name}.txt"
+            try:
+                if job_path.exists():
+                    job_path.unlink()
+                # Also remove from the in-memory dictionary
+                if job_name in self.automation_controller.job_definitions:
+                    del self.automation_controller.job_definitions[job_name]
+
+                self.parent_app.update_status(f"Job '{job_name}' deleted.", LYRN_SUCCESS)
+                self.refresh_job_list()
+            except Exception as e:
+                self.parent_app.update_status(f"Error deleting job file: {e}", LYRN_ERROR)
         else:
             self.parent_app.update_status("Deletion cancelled.", LYRN_INFO)
 
@@ -3064,47 +3344,6 @@ class JobWatcherPopup(ThemedPopup):
         path = filedialog.askdirectory(title="Select Output Directory")
         if path:
             self.output_path_label.configure(text=path)
-
-    def save_job(self):
-        job_name = self.job_name_entry.get().strip()
-        start_trigger = self.start_trigger_entry.get().strip()
-        end_trigger = self.end_trigger_entry.get().strip()
-        output_path = self.output_path_label.cget("text")
-        output_filename = self.output_filename_entry.get().strip()
-        instructions = self.job_instructions_text.get("1.0", "end-1c").strip()
-
-        if not all([job_name, start_trigger, end_trigger, output_path, output_filename]):
-            self.parent_app.update_status("All fields must be filled.", LYRN_ERROR)
-            return
-
-        if output_path == "No directory selected":
-            self.parent_app.update_status("Please select an output directory.", LYRN_ERROR)
-            return
-
-        job = WatcherJob(
-            name=job_name,
-            start_trigger=start_trigger,
-            end_trigger=end_trigger,
-            output_path=output_path,
-            output_filename=output_filename,
-            instructions=instructions
-        )
-
-        self.job_watcher_manager.add_job(job)
-        self.parent_app.update_status(f"Job '{job_name}' saved.", LYRN_SUCCESS)
-        self.refresh_job_list()
-        self.clear_builder_fields()
-        self.tabview.set("Job Viewer")
-
-    def clear_builder_fields(self):
-        self.job_name_entry.configure(state="normal")
-        self.job_name_entry.delete(0, "end")
-        self.start_trigger_entry.delete(0, "end")
-        self.end_trigger_entry.delete(0, "end")
-        self.output_path_label.configure(text="No directory selected")
-        self.output_filename_entry.delete(0, "end")
-        self.job_instructions_text.delete("1.0", "end")
-        self.editing_job_name = None
 
 
 class AffordancePopup(ThemedPopup):
@@ -3687,6 +3926,28 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         self.log_queue = log_queue
 
+        # --- Phase 1: Immediate, Non-Blocking UI Setup ---
+        self.llm = None
+        self.is_thinking = False
+        self.stop_generation = False
+        self.stream_queue = queue.Queue()
+
+        # Initialize only the managers essential for the initial UI
+        self.settings_manager = SettingsManager()
+        self.theme_manager = ThemeManager()
+        self.language_manager = LanguageManager(language=self.settings_manager.ui_settings.get("language", "en"))
+        self.current_font_size = self.settings_manager.ui_settings.get("font_size", 12)
+
+        # Initialize other managers to None. They will be loaded in the background.
+        self.snapshot_loader = None
+        self.delta_manager = None
+        self.automation_controller = None
+        self.metrics = None
+        self.chat_logger = None
+        self.affordance_manager = None
+        self.scheduler_manager = None
+        self.cycle_manager = None
+        self.resource_monitor = None
 
         # Set taskbar icon
         try:
@@ -3694,46 +3955,25 @@ class LyrnAIInterface(ctk.CTkToplevel):
             if os.path.exists(ICON_PATH):
                 icon = ImageTk.PhotoImage(Image.open(ICON_PATH))
                 self.iconphoto(False, icon)
-            else:
-                print("Warning: favicon.ico not found.")
-        except Exception as e:
-            print(f"Error setting taskbar icon: {e}")
+        except Exception:
+            pass
 
+        # Apply saved theme or default before creating widgets
+        self.theme_manager.apply_theme(self.settings_manager.ui_settings.get("theme", "LYRN Dark"))
 
-        # Initialize core components
-        self.settings_manager = SettingsManager()
-        self.theme_manager = ThemeManager()
-        saved_language = self.settings_manager.ui_settings.get("language", "en")
-        self.language_manager = LanguageManager(language=saved_language)
-
-        # Apply saved theme or default
-        saved_theme = self.settings_manager.ui_settings.get("theme", "LYRN Dark")
-        self.theme_manager.apply_theme(saved_theme)
-
-        self.llm = None
-        self.first_boot_complete = False
-        self.is_thinking = False
-        self.is_minimized = False
-        self.stop_generation = False
-        self.current_assistant_message_label = None
-        self.stream_queue = queue.Queue()
-        self.resource_monitor = SystemResourceMonitor(self.stream_queue)
-        self.last_assistant_response = ""
-        self._maximized = False
-        self._geom_before_maximize = ""
-
-        # Initialize font size
-        self.current_font_size = self.settings_manager.ui_settings.get("font_size", 12)
-
-        # Setup GUI
+        # Basic window setup
         self.setup_window()
         self.load_tooltips()
         self.create_widgets()
         self.apply_color_theme()
 
-        # Handle window closing
+        # Handle window closing and keybinds
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Control-Shift-P>", self.open_command_palette)
+
+        # --- Phase 2: Start Background Initialization ---
+        threading.Thread(target=self._initialize_background_services, daemon=True).start()
+        self.after(100, self.process_queue)
 
     def show_loading_indicator(self):
         """Shows the indeterminate loading progress bar."""
@@ -3748,7 +3988,55 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.loading_progressbar.stop()
             self.loading_progressbar.pack_forget()
 
-    def start_application_logic(self):
+    def _initialize_background_services(self):
+        """
+        Initializes all managers and services that involve file I/O or other
+        potentially blocking operations. Runs in a background thread.
+        """
+        print("Starting background initialization...")
+        self.snapshot_loader = SnapshotLoader(self.settings_manager)
+        self.delta_manager = DeltaManager()
+        self.automation_controller = AutomationController()
+        self.metrics = EnhancedPerformanceMetrics()
+        self.chat_logger = StructuredChatLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
+        self.affordance_manager = AffordanceManager()
+        self.scheduler_manager = SchedulerManager()
+        self.cycle_manager = CycleManager()
+        self.resource_monitor = SystemResourceMonitor(self.stream_queue)
+        self.resource_monitor.start()
+
+        # Start watcher scripts
+        watcher_scripts = ["task_goal_watcher.py", "scheduler_watcher.py", "cycle_watcher.py"]
+        for script_name in watcher_scripts:
+            try:
+                watcher_path = os.path.join(SCRIPT_DIR, "automation", script_name)
+                if os.path.exists(watcher_path):
+                    subprocess.Popen([sys.executable, watcher_path])
+                    print(f"{script_name} started.")
+            except Exception as e:
+                print(f"Failed to start {script_name}: {e}")
+
+        # Signal the main thread that initialization is complete
+        self.stream_queue.put(('initialization_complete', None))
+        print("Background initialization complete.")
+
+    def _on_initialization_complete(self):
+        """
+        This method is called on the main UI thread after background services
+        are loaded. It populates the UI with the loaded data.
+        """
+        print("Finalizing UI with loaded data...")
+        self.update_status("Systems loaded.", LYRN_SUCCESS)
+
+        # Show VRAM monitor only if NVML was successfully initialized
+        if self.resource_monitor and self.resource_monitor.nvml_initialized:
+            self.vram_frame.pack(fill="x", padx=10, pady=2)
+
+        # Refresh UI elements that depend on the loaded managers
+        self.refresh_active_cycle_selector()
+        self.update_job_dropdown()
+
+        # Now, handle the logic that was in start_application_logic
         if self.settings_manager.ui_settings.get("autoload_model", False) and self.settings_manager.settings.get("active", {}).get("model_path"):
             self.update_status("Autoloading model...", LYRN_INFO)
             threading.Thread(target=self.setup_model, daemon=True).start()
@@ -3758,9 +4046,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         if self.settings_manager.ui_settings.get("llm_log_visible", False):
             self.toggle_log_viewer()
 
-        self.initialize_application()
-
-        # Load heartbeat setting
         self.heartbeat_enabled_var.set(self.settings_manager.ui_settings.get("heartbeat_enabled", False))
 
         # Model Status Indicator
@@ -3904,42 +4189,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Show simplified first boot dialog (implement as needed)
         self.after(100, lambda: self.initialize_application())
 
-    def initialize_application(self):
-        """Initialize application after settings are configured"""
-        if not self.settings_manager.settings:
-            print("ERROR: No settings available for initialization!")
-            return
-
-        # Initialize remaining components
-        self.snapshot_loader = SnapshotLoader(self.settings_manager)
-        self.delta_manager = DeltaManager()
-        self.automation_controller = AutomationController()
-        self.metrics = EnhancedPerformanceMetrics()
-        self.chat_logger = StructuredChatLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
-        self.job_watcher_manager = JobWatcherManager()
-        self.affordance_manager = AffordanceManager()
-        self.scheduler_manager = SchedulerManager()
-
-        # Start background services
-        self.resource_monitor.start()
-
-        # Start watcher scripts
-        watcher_scripts = [
-            "task_goal_watcher.py",
-            "scheduler_watcher.py"
-        ]
-        for script_name in watcher_scripts:
-            try:
-                watcher_path = os.path.join(SCRIPT_DIR, "automation", script_name)
-                if os.path.exists(watcher_path):
-                    subprocess.Popen([sys.executable, watcher_path])
-                    print(f"{script_name} started.")
-                else:
-                    print(f"Warning: Watcher script not found: {script_name}")
-            except Exception as e:
-                print(f"Failed to start {script_name}: {e}")
-
-        self.after(100, self.process_queue)
 
     def setup_model(self):
         """Initialize LLM model with proper cleanup"""
@@ -4128,16 +4377,23 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         ctk.CTkLabel(self.job_frame, text="Job Automation", font=ctk.CTkFont(family="Consolas", size=14, weight="bold")).pack(pady=10)
 
+        # Cycle Control
+        cycle_frame = ctk.CTkFrame(self.job_frame)
+        cycle_frame.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(cycle_frame, text="Active Cycle:").pack(side="left", padx=(0, 5))
+        self.active_cycle_selector = ctk.CTkComboBox(cycle_frame, values=[], command=None)
+        self.active_cycle_selector.pack(side="left", expand=True, fill="x")
+        self.cycle_toggle_button = ctk.CTkButton(cycle_frame, text="Start", width=60, command=self.toggle_cycle)
+        self.cycle_toggle_button.pack(side="left", padx=5)
+
         # Job selection dropdown for manual testing
         ctk.CTkLabel(self.job_frame, text="Manual Job Selection", font=ctk.CTkFont(family="Consolas", size=self.current_font_size)).pack(pady=(10, 5))
-        job_names = list(self.automation_controller.job_definitions.keys()) if hasattr(self, 'automation_controller') else []
         self.job_dropdown = ctk.CTkComboBox(
-            self.job_frame, values=job_names,
+            self.job_frame, values=["Loading..."],
             command=self.on_job_selected, font=ctk.CTkFont(family="Consolas", size=self.current_font_size),
             button_color=LYRN_PURPLE, button_hover_color=LYRN_ACCENT
         )
-        if not job_names:
-            self.job_dropdown.set("")
+        self.job_dropdown.set("Loading...")
         self.job_dropdown.pack(padx=10, pady=(0, 15), fill="x")
         Tooltip(self.job_dropdown, self.tooltips.get("job_dropdown", ""))
 
@@ -4246,18 +4502,13 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.disk_progress.set(0)
 
         # VRAM (only if NVIDIA GPU is detected)
-        if self.resource_monitor.nvml_initialized:
-            vram_frame = ctk.CTkFrame(self.metrics_frame)
-            vram_frame.pack(fill="x", padx=10, pady=2)
-            self.vram_label = ctk.CTkLabel(vram_frame, text="VRAM: 0.0%", font=normal_font)
-            self.vram_label.pack(pady=(0,2))
-            self.vram_progress = ctk.CTkProgressBar(vram_frame, height=8, progress_color="#EF4444")
-            self.vram_progress.pack(fill="x", padx=5, pady=(0,5))
-            self.vram_progress.set(0)
-        else:
-            # Create dummy attributes so update method doesn't fail
-            self.vram_label = None
-            self.vram_progress = None
+        # Create the widgets but keep them hidden. They will be shown in _on_initialization_complete if needed.
+        self.vram_frame = ctk.CTkFrame(self.metrics_frame)
+        self.vram_label = ctk.CTkLabel(self.vram_frame, text="VRAM: 0.0%", font=normal_font)
+        self.vram_label.pack(pady=(0,2))
+        self.vram_progress = ctk.CTkProgressBar(self.vram_frame, height=8, progress_color="#EF4444")
+        self.vram_progress.pack(fill="x", padx=5, pady=(0,5))
+        self.vram_progress.set(0)
 
     def update_system_gauges(self, stats: Dict[str, any]):
         """Update system resource gauges with new data."""
@@ -4279,7 +4530,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.disk_progress.set(stats['disk_percent'] / 100)
 
         # VRAM
-        if self.resource_monitor.nvml_initialized and self.vram_label is not None:
+        if self.resource_monitor and self.resource_monitor.nvml_initialized:
             vram_text = f"VRAM: {stats['vram_used_gb']:.1f}/{stats['vram_total_gb']:.1f} GB ({stats['vram_percent']:.1f}%)"
             self.vram_label.configure(text=vram_text)
             self.vram_progress.set(stats['vram_percent'] / 100)
@@ -4691,9 +4942,12 @@ Enhanced LYRN-AI system with advanced features active.
     def open_job_watcher_popup(self):
         """Opens the job watcher popup window."""
         if not hasattr(self, 'job_watcher_popup') or not self.job_watcher_popup.winfo_exists():
-            self.job_watcher_popup = JobWatcherPopup(self, self.job_watcher_manager, self.theme_manager, self.language_manager)
+            self.job_watcher_popup = JobWatcherPopup(self, self.automation_controller, self.theme_manager, self.language_manager, self.cycle_manager)
+            # Refresh the cycle list in the main UI when opening the popup
+            self.refresh_active_cycle_selector()
             self.job_watcher_popup.focus()
         else:
+            self.refresh_active_cycle_selector()
             self.job_watcher_popup.lift()
             self.job_watcher_popup.focus()
 
@@ -5040,6 +5294,7 @@ Enhanced LYRN-AI system with advanced features active.
         self.send_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         self.stop_generation = False # Reset flag at the start of a new generation
+        self._write_llm_status("busy")
 
         # The old save_chat_message is now deprecated.
         # self.save_chat_message("user", user_text)
@@ -5050,6 +5305,45 @@ Enhanced LYRN-AI system with advanced features active.
         self.set_model_status("Thinking") # Blue for generating
         threading.Thread(target=self.generate_response, args=(user_text,), daemon=True).start()
         self.update_status("Generating response...", LYRN_INFO)
+
+    def get_response_for_job(self, user_text: str) -> str:
+        """Generate AI response for a job and return it as a string."""
+        try:
+            # Build prompt
+            full_prompt = self.snapshot_loader.load_base_prompt()
+
+            messages = [
+                {"role": "system", "content": full_prompt},
+                {"role": "user", "content": user_text}
+            ]
+
+            active = self.settings_manager.settings["active"]
+
+            # Start streaming with enhanced metrics capture
+            stream = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=active.get("max_tokens", 2048),
+                temperature=active["temperature"],
+                top_p=active["top_p"],
+                top_k=active.get("top_k", 40),
+                stream=True
+            )
+
+            response_parts = []
+            for token_data in stream:
+                if 'choices' in token_data and len(token_data['choices']) > 0:
+                    delta = token_data['choices'][0].get('delta', {})
+                    content = delta.get('content', '')
+                    if content:
+                        response_parts.append(content)
+
+            # Save complete response
+            complete_response = ''.join(response_parts)
+            return complete_response
+
+        except Exception as e:
+            self.stream_queue.put(('error', str(e)))
+            return f"Error generating response: {e}"
 
     def stop_generation_process(self):
         """Sets the flag to stop the generation thread."""
@@ -5240,8 +5534,15 @@ Enhanced LYRN-AI system with advanced features active.
                         if self.stop_generation:
                              self.update_status("Generation stopped.", LYRN_WARNING)
                              self.set_model_status("Ready")
+                        self._write_llm_status("idle")
                         # Also check for jobs when the send button is re-enabled
                         self._maybe_run_automated_job()
+
+                    elif message[0] == 'inject_trigger':
+                        _, content = message
+                        self.input_box.delete("1.0", "end")
+                        self.input_box.insert("1.0", content)
+                        self.send_message()
 
                     elif message[0] == 'status_update':
                         self.update_status(message[1], message[2])
@@ -5250,6 +5551,9 @@ Enhanced LYRN-AI system with advanced features active.
                         if hasattr(self, 'update_system_gauges'):
                             self.update_system_gauges(message[1])
 
+                    elif message[0] == 'initialization_complete':
+                        self._on_initialization_complete()
+
                 except queue.Empty:
                     break
 
@@ -5257,6 +5561,19 @@ Enhanced LYRN-AI system with advanced features active.
             print(f"Error processing queue: {e}")
 
         self.after(50, self.process_queue)
+
+    def update_job_dropdown(self):
+        """Populates the manual job selection dropdown."""
+        if hasattr(self, 'job_dropdown') and self.automation_controller:
+            job_names = list(self.automation_controller.job_definitions.keys())
+            self.job_dropdown.configure(values=job_names if job_names else ["No jobs loaded"])
+            if not job_names:
+                self.job_dropdown.set("No jobs loaded")
+            else:
+                self.job_dropdown.set(job_names[0])
+        elif hasattr(self, 'job_dropdown'):
+            self.job_dropdown.configure(values=["Loading..."])
+            self.job_dropdown.set("Loading...")
 
     def _run_heartbeat_cycle(self, user_input: str, assistant_output: str):
         """
@@ -5441,6 +5758,73 @@ Enhanced LYRN-AI system with advanced features active.
             self.update_status("Error clearing chat folder.", LYRN_ERROR)
             print(f"Error clearing chat directory: {e}")
 
+    def _watch_cycle_trigger_file(self):
+        """Watches for the cycle trigger file and injects its content."""
+        trigger_path = Path(SCRIPT_DIR) / "ipc" / "cycle_trigger.txt"
+        while True:
+            try:
+                if trigger_path.exists():
+                    content = trigger_path.read_text(encoding='utf-8')
+                    trigger_path.unlink()
+                    self.stream_queue.put(('inject_trigger', content))
+            except Exception as e:
+                print(f"Error in cycle trigger watcher: {e}")
+            time.sleep(0.2)
+
+    def _write_llm_status(self, status: str):
+        """Writes the LLM's current status to the flag file."""
+        path = Path(SCRIPT_DIR) / "global_flags" / "llm_status.txt"
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(status)
+        except IOError:
+            pass
+
+    def refresh_active_cycle_selector(self):
+        """Refreshes the active cycle selector dropdown in the main UI."""
+        if hasattr(self, 'active_cycle_selector'):
+            cycle_names = self.cycle_manager.get_cycle_names()
+            self.active_cycle_selector.configure(values=cycle_names if cycle_names else [""])
+            if not cycle_names:
+                self.active_cycle_selector.set("")
+
+    def toggle_cycle(self):
+        """Starts or stops the selected cycle."""
+        selected_cycle = self.active_cycle_selector.get()
+        if not selected_cycle:
+            self.update_status("No cycle selected to start.", LYRN_WARNING)
+            return
+
+        flag_path = Path(SCRIPT_DIR) / "global_flags" / "active_cycle.json"
+
+        # Read current state
+        current_state = {}
+        if flag_path.exists():
+            try:
+                with open(flag_path, 'r', encoding='utf-8') as f:
+                    current_state = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                pass
+
+        # If the selected cycle is running, stop it. Otherwise, start it.
+        if current_state.get("name") == selected_cycle and current_state.get("status") == "running":
+            # Stop the cycle
+            new_state = {"name": selected_cycle, "status": "stopped"}
+            self.cycle_toggle_button.configure(text="Start")
+            self.update_status(f"Cycle '{selected_cycle}' stopped.", LYRN_INFO)
+        else:
+            # Start the cycle
+            new_state = {"name": selected_cycle, "status": "running", "current_step": 0}
+            self.cycle_toggle_button.configure(text="Stop")
+            self.update_status(f"Cycle '{selected_cycle}' started.", LYRN_SUCCESS)
+
+        # Write the new state
+        try:
+            with open(flag_path, 'w', encoding='utf-8') as f:
+                json.dump(new_state, f, indent=2)
+        except IOError as e:
+            self.update_status(f"Error updating cycle state: {e}", LYRN_ERROR)
+
 
 def main():
     """Main entry point for LYRN-AI v7.0"""
@@ -5457,7 +5841,6 @@ def main():
         root.withdraw()
 
         app = LyrnAIInterface(master=root, log_queue=log_queue)
-        app.start_application_logic()
         root.mainloop()
 
     except ImportError as e:

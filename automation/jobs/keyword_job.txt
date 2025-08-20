@@ -1,1 +1,0 @@
-Extract the main keywords from the provided text as a JSON-formatted list. Example: ["keyword1", "keyword2"]

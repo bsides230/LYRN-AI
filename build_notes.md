@@ -1,3 +1,60 @@
+# LYRN-AI v4.0.2 Build Notes
+
+## v4.0.2 - Startup and Automation Refactor (2025-08-15)
+
+This is a major stability and architectural update that resolves a critical application hang on startup and unifies the two separate automation systems into a single, more robust framework.
+
+- **Asynchronous Initialization:**
+    - Fixed a critical bug that caused the application to freeze ("Not Responding") after loading.
+    - The entire application initialization sequence has been refactored to be non-blocking. All managers that perform file I/O (`CycleManager`, `AutomationController`, etc.) are now loaded in a background thread.
+    - The UI now loads instantly and displays "Loading..." placeholders, which are populated with data once the background initialization is complete. This ensures the application is always responsive to the user.
+
+- **Unified Automation System:**
+    - The separate and redundant `JobWatcherManager` system has been completely removed.
+    - Its functionality has been merged into the `CycleManager`. Simple text-parsing "Watcher Jobs" are now represented as a "parser" type of Cycle.
+    - The `AutomationManagerPopup` (formerly `JobWatcherPopup`) has been refactored to provide a single, unified interface for managing all types of cycles.
+    - The `automation/watcher_jobs.json` file is now obsolete and has been removed from the project.
+
+- **Improved Stability:**
+    - Fixed a critical race condition by implementing file locking (`SimpleFileLock`) in the `CycleManager`. This prevents data corruption when the main GUI and background watchers access the `automation/cycles.json` file concurrently.
+    - Fixed multiple `AttributeError` crashes on startup related to `cycle_manager`, `resource_monitor`, and `current_font_size` that occurred during the refactoring process.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.2.pyw`.
+    - The previous version `lyrn_sad_v4.0.1.pyw` has been archived.
+
+
+# LYRN-AI v4.0.1 Build Notes
+
+## v4.0.1 - Cycle Manager & Automated Cognitive Cycling (2025-08-15)
+
+This update introduces the **Cycle Manager**, a powerful new automation feature that allows for the creation and execution of custom, multi-step cognitive cycles. This enables the AI to perform sequences of actions autonomously.
+
+- **New Cycle Builder UI:**
+    - A new "Cycle Builder" tab has been added to the "Automation" window (`JobWatcherPopup`).
+    - This UI allows users to create multiple, named cycles.
+    - For each cycle, users can add a sequence of named "triggers," which are custom prompts that will be executed in order.
+    - A drag-and-drop list allows for easy reordering of triggers within a cycle.
+
+- **New Backend Components:**
+    - **`cycle_manager.py`**: A new manager class to handle saving and loading cycle definitions to and from `automation/cycles.json`.
+    - **`automation/cycle_watcher.py`**: A new background watcher script that runs the active cycle. It monitors the LLM's status and injects the next trigger in the sequence only when the LLM is idle.
+
+- **IPC and State Management:**
+    - The watcher and the main GUI communicate using a system of flag files:
+        - `global_flags/active_cycle.json`: Stores the currently active cycle and its progress (e.g., current step).
+        - `global_flags/llm_status.txt`: Indicates whether the LLM is "busy" or "idle".
+        - `ipc/cycle_trigger.txt`: Used by the watcher to send the next trigger prompt to the GUI for execution.
+
+- **Main UI Integration:**
+    - A new set of controls has been added to the right sidebar in the "Job Automation" section.
+    - A dropdown menu allows the user to select one of the created cycles to be the "active" cycle.
+    - A "Start/Stop" button allows the user to toggle the execution of the selected cycle.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.1.pyw`.
+    - The previous version `lyrn_sad_v4.0.0.pyw` has been archived.
+
 # LYRN-AI v4.0.0 Build Notes
 
 ## v4.0.0 - Prompt Builder Restructure (2025-08-15)
