@@ -22,7 +22,7 @@ from tkinter import colorchooser, filedialog
 from delta_manager import DeltaManager
 from automation_controller import AutomationController, Job
 from color_picker import CustomColorPickerPopup
-from heartbeat import get_heartbeat_job_prompt
+from heartbeat import get_heartbeat_string
 from file_lock import SimpleFileLock
 from affordance_manager import AffordanceManager, Affordance
 from themed_popup import ThemedPopup, ThemeManager
@@ -579,6 +579,13 @@ class SnapshotLoader:
         prompt_parts = []
         for component_name in order:
             if config.get(component_name, False):
+                if component_name == 'heartbeat':
+                    heartbeat_content = get_heartbeat_string()
+                    if heartbeat_content:
+                        # The new function provides the fully formatted string, including brackets.
+                        prompt_parts.append(heartbeat_content)
+                    continue
+
                 component_dir = os.path.join(self.build_prompt_dir, component_name)
                 if os.path.isdir(component_dir):
                     for filename in sorted(os.listdir(component_dir)):
@@ -2117,11 +2124,54 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.parent_app.update_status("Prompt order saved.", LYRN_SUCCESS)
 
     def create_editor_tab(self, tab, config_key: str, filename: str):
-        """Creates a generic editor tab with a textbox and a toggle switch."""
+        """Creates a generic editor tab, with special handling for the heartbeat tab."""
         tab.grid_columnconfigure(0, weight=1)
         tab.grid_rowconfigure(1, weight=1)
 
-        # Top frame for the toggle switch
+        # --- Special UI for the new Heartbeat Tab ---
+        if config_key == 'heartbeat':
+            self.heartbeat_widgets = {}
+            heartbeat_config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
+
+            # Main frame for the new layout
+            main_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+            main_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=5)
+            main_frame.grid_columnconfigure(0, weight=1)
+
+            # Enabled Switch
+            self.heartbeat_widgets['enabled_var'] = ctk.BooleanVar()
+            enabled_switch = ctk.CTkSwitch(main_frame, text="Enable Heartbeat in System Prompt", variable=self.heartbeat_widgets['enabled_var'])
+            enabled_switch.pack(anchor="w", pady=(5, 15))
+
+            # Begin Bracket
+            ctk.CTkLabel(main_frame, text="Begin Bracket Text").pack(anchor="w")
+            self.heartbeat_widgets['begin_bracket_text'] = ctk.CTkTextbox(main_frame, height=30)
+            self.heartbeat_widgets['begin_bracket_text'].pack(fill="x", pady=(0, 10))
+
+            # Body
+            ctk.CTkLabel(main_frame, text="Heartbeat Instruction Body").pack(anchor="w")
+            self.heartbeat_widgets['body_text'] = ctk.CTkTextbox(main_frame, height=150)
+            self.heartbeat_widgets['body_text'].pack(fill="both", expand=True, pady=(0, 10))
+
+            # End Bracket
+            ctk.CTkLabel(main_frame, text="End Bracket Text").pack(anchor="w")
+            self.heartbeat_widgets['end_bracket_text'] = ctk.CTkTextbox(main_frame, height=30)
+            self.heartbeat_widgets['end_bracket_text'].pack(fill="x", pady=(0, 10))
+
+            # Trigger
+            ctk.CTkLabel(main_frame, text="Trigger Phrase (for user reference)").pack(anchor="w")
+            self.heartbeat_widgets['trigger_text'] = ctk.CTkTextbox(main_frame, height=30)
+            self.heartbeat_widgets['trigger_text'].pack(fill="x", pady=(0, 10))
+
+            # Save Button
+            save_button = ctk.CTkButton(main_frame, text="Save Heartbeat Settings", command=self.save_heartbeat_config)
+            save_button.pack(pady=10)
+
+            # Load data into the new widgets
+            self.load_heartbeat_config()
+            return
+
+        # --- Generic UI for all other tabs ---
         top_frame = ctk.CTkFrame(tab, fg_color="transparent")
         top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
 
@@ -2134,16 +2184,47 @@ class SystemPromptBuilderPopup(ThemedPopup):
         )
         toggle.pack(side="left")
 
-        # Textbox for content
         textbox = ctk.CTkTextbox(tab, wrap="word")
         textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 
-        # Load initial content
         filepath = self.build_prompt_dir / config_key / filename
         textbox.insert("1.0", self._load_text(filepath))
-
-        # Bind save on text change
         textbox.bind("<KeyRelease>", lambda event, p=filepath, t=textbox: self._save_text(p, t.get("1.0", "end-1c")))
+
+    def load_heartbeat_config(self):
+        """Loads data from heartbeat_config.json into the UI widgets."""
+        heartbeat_config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
+        config = self._load_json(heartbeat_config_path)
+        if not config: return
+
+        self.heartbeat_widgets['enabled_var'].set(config.get("enabled", False))
+
+        self.heartbeat_widgets['begin_bracket_text'].delete("1.0", "end")
+        self.heartbeat_widgets['begin_bracket_text'].insert("1.0", config.get("begin_bracket", ""))
+
+        self.heartbeat_widgets['body_text'].delete("1.0", "end")
+        self.heartbeat_widgets['body_text'].insert("1.0", config.get("body", ""))
+
+        self.heartbeat_widgets['end_bracket_text'].delete("1.0", "end")
+        self.heartbeat_widgets['end_bracket_text'].insert("1.0", config.get("end_bracket", ""))
+
+        self.heartbeat_widgets['trigger_text'].delete("1.0", "end")
+        self.heartbeat_widgets['trigger_text'].insert("1.0", config.get("trigger", ""))
+
+    def save_heartbeat_config(self):
+        """Saves the current state of the heartbeat UI widgets to the JSON file."""
+        heartbeat_config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
+
+        config_data = {
+            "enabled": self.heartbeat_widgets['enabled_var'].get(),
+            "begin_bracket": self.heartbeat_widgets['begin_bracket_text'].get("1.0", "end-1c"),
+            "body": self.heartbeat_widgets['body_text'].get("1.0", "end-1c"),
+            "end_bracket": self.heartbeat_widgets['end_bracket_text'].get("1.0", "end-1c"),
+            "trigger": self.heartbeat_widgets['trigger_text'].get("1.0", "end-1c")
+        }
+
+        self._save_json(heartbeat_config_path, config_data)
+        self.parent_app.update_status("Heartbeat settings saved.", LYRN_SUCCESS)
 
     def toggle_component(self, key: str, value: bool):
         """Updates the builder config file when a toggle is switched."""
@@ -4046,7 +4127,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         if self.settings_manager.ui_settings.get("llm_log_visible", False):
             self.toggle_log_viewer()
 
-        self.heartbeat_enabled_var.set(self.settings_manager.ui_settings.get("heartbeat_enabled", False))
 
         # Model Status Indicator
         self.model_status = "Off"
@@ -4601,17 +4681,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.prompt_builder_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.prompt_builder_button, "Open the System Prompt Builder window.")
 
-        # Heartbeat Toggle Switch
-        heartbeat_frame = ctk.CTkFrame(self.status_frame, fg_color="transparent")
-        heartbeat_frame.pack(fill="x", padx=10, pady=10)
-        self.heartbeat_enabled_var = ctk.BooleanVar()
-        self.heartbeat_switch = ctk.CTkSwitch(heartbeat_frame, text="Heartbeat Cycle", variable=self.heartbeat_enabled_var, command=self.toggle_heartbeat)
-        self.heartbeat_switch.pack(side="left", anchor="w")
-        Tooltip(self.heartbeat_switch, "Enable the autonomous cognitive heartbeat cycle.")
-
-        self.open_heartbeat_logs_button = ctk.CTkButton(heartbeat_frame, text="📂", width=40, command=self.open_heartbeat_logs_folder)
-        self.open_heartbeat_logs_button.pack(side="right", padx=(0, 5))
-        Tooltip(self.open_heartbeat_logs_button, "Open heartbeat logs folder in file explorer.")
 
         # --- End Relocated Controls ---
 
@@ -5261,14 +5330,6 @@ Enhanced LYRN-AI system with advanced features active.
         else:
             self.update_status("No response to copy yet", LYRN_WARNING)
 
-    def toggle_heartbeat(self):
-        """Saves the state of the heartbeat toggle to settings."""
-        is_enabled = self.heartbeat_enabled_var.get()
-        self.settings_manager.ui_settings["heartbeat_enabled"] = is_enabled
-        self.settings_manager.save_settings()
-        status_msg = "Heartbeat cycle enabled." if is_enabled else "Heartbeat cycle disabled."
-        color = LYRN_SUCCESS if is_enabled else LYRN_INFO
-        self.update_status(status_msg, color)
 
     def send_message(self):
         """Send user message and generate response"""
@@ -5494,13 +5555,6 @@ Enhanced LYRN-AI system with advanced features active.
                             # The newline is now handled by the 'token_count_info' message
                             delattr(self, '_assistant_started')
 
-                        # Trigger heartbeat cycle if enabled
-                        if self.heartbeat_enabled_var.get():
-                            print("Heartbeat enabled, triggering cycle.")
-                            if hasattr(self, 'last_user_input') and hasattr(self, 'last_assistant_response'):
-                                threading.Thread(target=self._run_heartbeat_cycle, args=(self.last_user_input, self.last_assistant_response), daemon=True).start()
-                            else:
-                                print("Warning: Could not trigger heartbeat, missing last input/response.")
 
                         # Check for pending jobs now that the model is idle
                         self._maybe_run_automated_job()
@@ -5575,57 +5629,6 @@ Enhanced LYRN-AI system with advanced features active.
             self.job_dropdown.configure(values=["Loading..."])
             self.job_dropdown.set("Loading...")
 
-    def _run_heartbeat_cycle(self, user_input: str, assistant_output: str):
-        """
-        Runs the LLM's 'internal dialog' pass and saves the raw output
-        to a file for the heartbeat_watcher to process.
-        """
-        if not self.llm:
-            print("Heartbeat Error: Model not loaded.")
-            return
-
-        self.stream_queue.put(('status_update', 'Running Heartbeat Cycle...', LYRN_ACCENT))
-        self.set_model_status("HB CYCLE")
-
-        try:
-            heartbeat_prompt = get_heartbeat_job_prompt(user_input, assistant_output)
-
-            messages = [
-                {"role": "system", "content": self.snapshot_loader.load_base_prompt()},
-                {"role": "user", "content": heartbeat_prompt}
-            ]
-
-            active = self.settings_manager.settings["active"]
-
-            response = self.llm.create_chat_completion(
-                prompt=your_prompt,
-                max_tokens=active["max_tokens"],
-                temperature=0.1,
-                top_p=active["top_p"],
-                top_k=active.get("top_k", 40),
-                stream=False
-            )
-
-            heartbeat_output = response['choices'][0]['message']['content']
-
-            output_dir = Path(SCRIPT_DIR) / "automation" / "heartbeat_outputs"
-            output_dir.mkdir(parents=True, exist_ok=True)
-
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            output_filename = f"hb_{timestamp}.txt"
-            output_filepath = output_dir / output_filename
-
-            with open(output_filepath, 'w', encoding='utf-8') as f:
-                f.write(heartbeat_output)
-
-            print(f"Heartbeat output saved to: {output_filepath}")
-            self.stream_queue.put(('status_update', 'Heartbeat cycle complete.', LYRN_SUCCESS))
-
-        except Exception as e:
-            print(f"Error during heartbeat cycle: {e}")
-            self.stream_queue.put(('status_update', 'Heartbeat cycle failed.', LYRN_ERROR))
-        finally:
-            self.set_model_status("Ready")
 
 
     def update_enhanced_metrics(self):

@@ -1,4 +1,0 @@
-# Heartbeat configuration will go here.
-ENABLED=true
-INTERVAL=60
-MODE=REFLECT
