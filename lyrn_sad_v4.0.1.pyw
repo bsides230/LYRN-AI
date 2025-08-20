@@ -2665,6 +2665,7 @@ class JobWatcherPopup(ThemedPopup):
         self.job_checkboxes = {}
         self.selected_cycle_name = None
         self.selected_trigger_name = None
+        self.reflection_job_output = ""
 
         self.active_jobs_index_path = Path(SCRIPT_DIR) / "build_prompt" / "active_jobs" / "_index.json"
         self.active_jobs_dir = self.active_jobs_index_path.parent
@@ -3025,6 +3026,20 @@ class JobWatcherPopup(ThemedPopup):
         reflection_frame = ctk.CTkScrollableFrame(self.tab_reflection)
         reflection_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # Job selection for reflection
+        job_selection_frame = ctk.CTkFrame(reflection_frame, fg_color="transparent")
+        job_selection_frame.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(job_selection_frame, text="Job to Reflect On:").pack(anchor="w")
+        job_names = list(self.automation_controller.job_definitions.keys())
+        self.reflection_job_selector = ctk.CTkComboBox(job_selection_frame, values=job_names if job_names else ["No jobs available"])
+        if job_names:
+            self.reflection_job_selector.set(job_names[0])
+        self.reflection_job_selector.pack(side="left", expand=True, fill="x")
+
+        run_job_button = ctk.CTkButton(job_selection_frame, text="Run Job", command=self.run_job_for_reflection)
+        run_job_button.pack(side="left", padx=5)
+
         # Reflection Instructions
         ctk.CTkLabel(reflection_frame, text="Reflection Instructions").pack(anchor="w")
         self.reflection_instructions_text = ctk.CTkTextbox(reflection_frame, height=100)
@@ -3063,6 +3078,27 @@ class JobWatcherPopup(ThemedPopup):
         manual_trigger_button = ctk.CTkButton(reflection_frame, text="Run Reflection Manually", command=self.run_reflection_manually)
         manual_trigger_button.pack(pady=20)
 
+    def run_job_for_reflection(self):
+        """Runs the selected job and stores its output for reflection."""
+        selected_job_name = self.reflection_job_selector.get()
+        if "No jobs available" in selected_job_name:
+            self.parent_app.update_status("No job selected to run.", LYRN_WARNING)
+            return
+
+        trigger_prompt = self.automation_controller.get_job_trigger(selected_job_name)
+        if not trigger_prompt:
+            self.parent_app.update_status(f"Could not load trigger for job '{selected_job_name}'.", LYRN_ERROR)
+            return
+
+        self.parent_app.update_status(f"Running job '{selected_job_name}' for reflection...", LYRN_INFO)
+
+        # This will block, which is ok for this button.
+        response = self.parent_app.get_response_for_job(trigger_prompt)
+
+        self.reflection_job_output = response
+
+        self.parent_app.update_status(f"Job '{selected_job_name}' finished. Output is ready for reflection.", LYRN_SUCCESS)
+
     def run_reflection_manually(self):
         """Triggers the reflection process manually based on the UI settings."""
         instructions = self.reflection_instructions_text.get("1.0", "end-1c")
@@ -3070,15 +3106,19 @@ class JobWatcherPopup(ThemedPopup):
         iterations = self.reflection_iterations_entry.get()
         auto_update = self.reflection_auto_update_prompt_var.get()
         auto_continue = self.reflection_auto_continue_var.get()
+        selected_job_for_reflection = self.reflection_job_selector.get()
 
         if not instructions:
             self.parent_app.update_status("Reflection instructions are required.", LYRN_WARNING)
             return
 
-        # For manual triggering, we'll use the content of the main chat window as the "job output".
-        job_output = self.parent_app.chat_display.get("1.0", "end-1c")
+        if "No jobs available" in selected_job_for_reflection:
+            self.parent_app.update_status("No job selected for reflection.", LYRN_WARNING)
+            return
+
+        job_output = self.reflection_job_output
         if not job_output.strip():
-            self.parent_app.update_status("Chat display is empty, nothing to reflect on.", LYRN_WARNING)
+            self.parent_app.update_status("Job output is empty. Run a job first.", LYRN_WARNING)
             return
 
         # The 'reflection_cycle_job' expects these arguments.
@@ -3089,7 +3129,7 @@ class JobWatcherPopup(ThemedPopup):
             "iterations": iterations,
             "auto_update": auto_update,
             "auto_continue": auto_continue,
-            "original_job_name": self.selected_job_name or "manual" # Track which job this reflection is for
+            "original_job_name": selected_job_for_reflection or "manual" # Track which job this reflection is for
         }
 
         # Add the reflection job to the queue
@@ -5265,6 +5305,45 @@ Enhanced LYRN-AI system with advanced features active.
         self.set_model_status("Thinking") # Blue for generating
         threading.Thread(target=self.generate_response, args=(user_text,), daemon=True).start()
         self.update_status("Generating response...", LYRN_INFO)
+
+    def get_response_for_job(self, user_text: str) -> str:
+        """Generate AI response for a job and return it as a string."""
+        try:
+            # Build prompt
+            full_prompt = self.snapshot_loader.load_base_prompt()
+
+            messages = [
+                {"role": "system", "content": full_prompt},
+                {"role": "user", "content": user_text}
+            ]
+
+            active = self.settings_manager.settings["active"]
+
+            # Start streaming with enhanced metrics capture
+            stream = self.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=active.get("max_tokens", 2048),
+                temperature=active["temperature"],
+                top_p=active["top_p"],
+                top_k=active.get("top_k", 40),
+                stream=True
+            )
+
+            response_parts = []
+            for token_data in stream:
+                if 'choices' in token_data and len(token_data['choices']) > 0:
+                    delta = token_data['choices'][0].get('delta', {})
+                    content = delta.get('content', '')
+                    if content:
+                        response_parts.append(content)
+
+            # Save complete response
+            complete_response = ''.join(response_parts)
+            return complete_response
+
+        except Exception as e:
+            self.stream_queue.put(('error', str(e)))
+            return f"Error generating response: {e}"
 
     def stop_generation_process(self):
         """Sets the flag to stop the generation thread."""
