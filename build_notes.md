@@ -1,3 +1,34 @@
+# LYRN-AI v4.0.5 Build Notes
+
+## v4.0.5 - Topic Indexing Engine (2025-08-22)
+
+This update introduces the foundational layer of the Topic Indexing Engine, a new long-term memory system designed to build a personalized web of meaning from conversations.
+
+- **New Topic Memory System:**
+    - A new `topic_memory/` directory has been created to store all topic-related data. This includes indexes, templates, and active topic links.
+    - A `topic_template.txt` file defines the structure for new topic indexes, including summaries, insights, linked topics, and chat references.
+
+- **New Topic Manager Backend:**
+    - A new `topic_manager.py` module has been created to handle all backend logic for the topic system.
+    - The `TopicManager` class provides methods for creating, reading, saving, and searching topic indexes.
+
+- **Automated Topic Discovery:**
+    - A new background watcher script, `automation/topic_watcher.py`, has been added to the automation system.
+    - It monitors chat logs for a `##TIS_START##...##TIS_END##` block containing a list of potential topics.
+    - It logs all searched topics to `searched_topics.txt`.
+    - If a topic is new, it is added to `new_topics.txt` to be fleshed out by the LLM in a future update.
+
+- **New Topic Index GUI:**
+    - A new "Topic Index" button has been added to the main UI, opening a comprehensive management popup.
+    - Users can view all available topic indexes.
+    - Users can select topics and add them to an `active_topics` folder for context injection.
+    - A detailed, tabbed editor allows users to view and edit all sections of a topic index file directly from the GUI.
+    - Controls have been added to configure which parts of a topic (Summary, Insights, Timeline) are injected into context by default, with settings saved to `settings.json`.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.5.pyw`.
+    - The previous version `lyrn_sad_v4.0.4.pyw` has been archived.
+
 # LYRN-AI v4.0.4 Build Notes
 
 ## v4.0.4 - Episodic Memory Manager (2025-08-20)
@@ -366,7 +397,7 @@ This update introduces critical user control features for model generation and e
 
 - **Stop Generation Button:**
     - A "Stop" button has been added to the main chat interface next to the "Send" and "Copy" buttons.
-    - This allows the user to immediately interrupt the model while it is generating a response, preventing runaway generation and providing more control.
+    - This allows the user to immediately interrupt the model while it is generating a response, preventing runaway generation and provide more control.
     - The underlying logic uses a flag to gracefully exit the generation loop in the background thread.
 
 - **Enhanced Model Settings:**

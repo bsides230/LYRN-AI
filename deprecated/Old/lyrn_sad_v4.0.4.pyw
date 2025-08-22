@@ -31,6 +31,7 @@ from automation.scheduler_manager import SchedulerManager
 import calendar
 from cycle_manager import CycleManager
 from episodic_memory_manager import EpisodicMemoryManager
+from topic_index_popup import TopicIndexPopup
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -4243,7 +4244,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.resource_monitor.start()
 
         # Start watcher scripts
-        watcher_scripts = ["task_goal_watcher.py", "scheduler_watcher.py", "cycle_watcher.py"]
+        watcher_scripts = ["task_goal_watcher.py", "scheduler_watcher.py", "cycle_watcher.py", "topic_watcher.py"]
         for script_name in watcher_scripts:
             try:
                 watcher_path = os.path.join(SCRIPT_DIR, "automation", script_name)
@@ -4583,6 +4584,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.episodic_memory_button = ctk.CTkButton(self.quick_frame, text="🧠 Episodic Memory", command=self.open_episodic_memory_popup)
         self.episodic_memory_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.episodic_memory_button, "Open the Episodic Memory manager.")
+
+        self.topic_index_button = ctk.CTkButton(self.quick_frame, text="📚 Topic Index", command=self.open_topic_index_popup)
+        self.topic_index_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.topic_index_button, "Open the Topic Index manager.")
 
         # Add a spacer to push content to the top
         spacer = ctk.CTkFrame(self.left_sidebar, fg_color="transparent")
@@ -5206,6 +5211,15 @@ Enhanced LYRN-AI system with advanced features active.
         else:
             self.episodic_memory_popup.lift()
             self.episodic_memory_popup.focus()
+
+    def open_topic_index_popup(self):
+        """Opens the topic index manager popup window."""
+        if not hasattr(self, 'topic_index_popup') or not self.topic_index_popup.winfo_exists():
+            self.topic_index_popup = TopicIndexPopup(self, self.theme_manager, self.settings_manager)
+            self.topic_index_popup.focus()
+        else:
+            self.topic_index_popup.lift()
+            self.topic_index_popup.focus()
 
     def toggle_log_viewer(self):
         """Creates, shows, or focuses the LLM log viewer window."""
