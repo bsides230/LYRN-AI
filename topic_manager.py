@@ -107,7 +107,7 @@ class TopicManager:
                     if alt_names_str:
                         alt_names = [name.strip() for name in alt_names_str.split(',')]
                 # Stop parsing after the first few lines for efficiency
-                if 'Summary:' in line:
+                if line.startswith('Summary:'):
                     break
 
             search_data[topic_slug] = {

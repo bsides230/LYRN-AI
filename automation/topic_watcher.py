@@ -13,7 +13,8 @@ from topic_manager import TopicManager
 
 # --- Configuration ---
 WATCH_DIR = project_root / "chat"
-NEW_TOPICS_FILE = project_root / "new_topics.txt"
+MASTER_NEW_TOPICS_FILE = project_root / "new_topics.txt"
+CURRENT_NEW_TOPICS_FILE = project_root / "current_new_topics.txt"
 SEARCHED_TOPICS_FILE = project_root / "searched_topics.txt"
 PROCESSED_FILES_LOG = Path(__file__).parent / "topic_watcher_processed.log"
 WATCH_INTERVAL_SECONDS = 3
@@ -21,7 +22,8 @@ WATCH_INTERVAL_SECONDS = 3
 def ensure_files_exist():
     """Ensure the necessary output and log files exist."""
     WATCH_DIR.mkdir(parents=True, exist_ok=True)
-    NEW_TOPICS_FILE.touch(exist_ok=True)
+    MASTER_NEW_TOPICS_FILE.touch(exist_ok=True)
+    CURRENT_NEW_TOPICS_FILE.touch(exist_ok=True)
     SEARCHED_TOPICS_FILE.touch(exist_ok=True)
     PROCESSED_FILES_LOG.touch(exist_ok=True)
 
@@ -78,11 +80,18 @@ def process_chat_file(filepath: Path, tm: TopicManager, existing_search_data: di
                         new_topics_found.append(kw)
 
         if new_topics_found:
-            # Append unique new topics to the file
             unique_new_topics = sorted(list(set(new_topics_found)))
-            with open(NEW_TOPICS_FILE, 'a', encoding='utf-8') as f_new:
+
+            # Overwrite the current/session new topics file
+            with open(CURRENT_NEW_TOPICS_FILE, 'w', encoding='utf-8') as f_current:
                 for topic in unique_new_topics:
-                    f_new.write(topic + "\n")
+                    f_current.write(topic + "\n")
+
+            # Append to the master new topics file
+            with open(MASTER_NEW_TOPICS_FILE, 'a', encoding='utf-8') as f_master:
+                for topic in unique_new_topics:
+                    f_master.write(topic + "\n")
+
             print(f"[TopicWatcher] Found {len(unique_new_topics)} new topics: {unique_new_topics}")
 
         if keywords_processed > 0:
