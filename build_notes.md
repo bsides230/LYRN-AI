@@ -1,3 +1,24 @@
+# LYRN-AI v4.0.6 Build Notes
+
+## v4.0.6 - Startup Robustness and Error Handling (2025-08-22)
+
+This update introduces a new system checker to improve application robustness on startup. It ensures that all necessary files and folders are present, and provides clear feedback to the user if any essential components are missing.
+
+- **New System Checker Module:**
+    - A new `system_checker.py` module has been created to house all startup verification logic.
+    - This module is responsible for checking for the existence of essential files and directories.
+
+- **Automatic Folder Creation:**
+    - On every startup, the application now scans for all directories defined in `settings.json`.
+    - If any of these directories are missing, they are automatically created. This prevents crashes due to accidental deletion of folders like `chat/` or `automation/`.
+
+- **Missing File Detection and Alerting:**
+    - The application now verifies the presence of all critical watcher and handler scripts on startup (e.g., `automation/scheduler_watcher.py`, `automation_controller.py`).
+    - If any of these files are missing, a themed popup window appears, listing the missing files and warning the user that the application may not function correctly.
+
+- **Integration:**
+    - The system checks are integrated into the main application's startup sequence, running immediately after the settings are loaded.
+
 # LYRN-AI v4.0.5 Build Notes
 
 ## v4.0.5 - Topic Indexing Engine (2025-08-22)
