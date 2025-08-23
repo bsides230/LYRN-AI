@@ -6,18 +6,23 @@ This document lists all the essential scripts, files, and folders required to ru
 
 These are the essential Python scripts that make up the LYRN GUI application.
 
--   `lyrn_sad_v4.0.1.pyw` (Main application entry point)
+-   `lyrn_sad_v4.0.3.pyw` (Main application entry point)
+-   `lyrn_sad_v4.0.6.pyw` (Main application entry point)
 -   `affordance_manager.py`
 -   `automation_controller.py`
 -   `color_picker.py`
 -   `confirmation_dialog.py`
 -   `cycle_manager.py`
 -   `delta_manager.py`
+-   `episodic_memory_manager.py`
 -   `file_lock.py`
 -   `heartbeat.py`
 -   `model_loader.py`
+-   `system_checker.py`
 -   `system_interaction_service.py`
 -   `themed_popup.py`
+-   `topic_index_popup.py`
+-   `topic_manager.py`
 
 ## Automation System Scripts
 
@@ -27,6 +32,8 @@ These scripts are part of the automation framework and are executed as subproces
 -   `automation/scheduler_manager.py`
 -   `automation/scheduler_watcher.py`
 -   `automation/task_goal_watcher.py`
+-   `automation/topic_watcher.py`
+-   `automation/chat_gpt_cc.py`
 
 ## Configuration and Data
 
@@ -37,26 +44,26 @@ These files and folders store the application's configuration, data, and assets.
     -   `personality.json`
     -   `hover_tooltip.json`
     -   `favicon.ico`
+    -   `color_grid.json`
+    -   `chat_review.txt`
+    -   `quotes.txt`
 -   **Folders:**
-    -   `images/` (contains `lyrn_logo.png`, etc.)
-    -   `languages/` (contains `en.json`, etc.)
-    -   `themes/` (contains `lyrn_dark.json`, etc.)
-    -   `global_flags/` (contains `automation.txt`, `next_job.txt`, `llm_status.txt`)
+    -   `images/`
+    -   `languages/`
+    -   `themes/`
+    -   `global_flags/`
+    -   `dependencies/`
 
-## Automation, Prompt, and Data Storage Systems
+## Core Data and Memory Systems
 
-These directories are critical for the application's advanced functionalities, including job automation, prompt construction, and data logging.
+These directories are critical for the application's data storage and memory functions.
 
 -   **`build_prompt/`**: Contains all components for constructing the system's master prompt.
-    -   Includes `master_prompt.txt`, `builder_config.json`, `prompt_order.json`, and subdirectories like `personality/`, `heartbeat/`, `system_rules/`, `tasks/`, `goals/`, etc.
--   **`automation/`**: The core of the automation system.
-    -   Includes `jobs/jobs.json`, `scheduler.json`, `cycles.json`, and various queue files.
-    -   Also contains `heartbeat_outputs/` and `queued_chunks/`.
+-   **`automation/`**: The core of the automation system. Includes jobs, queues, schedules, etc.
 -   **`deltas/`**: Stores logs of changes to system configuration or personality.
--   **`chat/`**: Logs user and AI interactions.
--   **`chat_parsed/`**: Stores parsed chat logs.
--   **`output/`**: A general-purpose directory for file outputs.
--   **`metrics_logs/`**: Contains saved performance metrics reports.
+-   **`active_chunk/`**: Holds the currently active chunk of text for processing.
+-   **`topic_memory/`**: Contains the topic index files.
+-   **`episodic_memory/`**: Stores detailed logs of user-AI interactions.
 
 ## Third-Party Dependencies
 
