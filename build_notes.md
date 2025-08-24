@@ -1,3 +1,15 @@
+# LYRN-AI v4.0.8 Build Notes
+
+## v4.0.8 - Prompt Builder UI Fixes (2025-08-23)
+
+This update addresses several UI issues in the "System Prompt Builder" that were introduced during the recent overhaul.
+
+- **Theming Fixed:** Fixed a major bug where the System Prompt Builder popup would appear un-themed. The popup's custom `apply_theme` method was conflicting with the one in its parent `ThemedPopup` class. The redundant method was removed, and the popup now correctly inherits the application's theme.
+
+- **Personality Toggle Restored:** The on/off toggle for the "Personality" component, which was inadvertently removed, has been restored. It is now correctly located at the top of the "Personality" tab.
+
+- **Redundant "Components" Tab Removed:** The "Components" tab has been removed from the prompt builder. With the personality toggle restored, all components now have their own on/off switch within their respective tabs, making the centralized "Components" tab unnecessary.
+
 # LYRN-AI v4.0.7 Build Notes
 
 ## v4.0.7 - System Prompt Builder Overhaul (2025-08-23)
