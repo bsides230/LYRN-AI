@@ -2052,7 +2052,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.config_path = self.build_prompt_dir / "builder_config.json"
 
         self.title("System Prompt Builder")
-        self.geometry("800x700")
+        self.geometry("1200x700")
         self.minsize(600, 500)
 
         self.on_top_var = ctk.BooleanVar(value=False)
@@ -2097,8 +2097,161 @@ class SystemPromptBuilderPopup(ThemedPopup):
         except IOError as e:
             print(f"Error saving {path}: {e}")
 
+    def save_all_changes(self):
+        """Saves all changes from all tabs."""
+        self.save_prompt_order()
+        for config_key in self.editor_tabs.keys():
+            self.save_component_config(config_key)
+        self.save_personality_config()
+        self.save_heartbeat_config()
+        self.parent_app.update_status("All changes saved.", LYRN_SUCCESS)
+
+    def load_mode(self):
+        """Loads a saved mode, overwriting the current component configurations."""
+        mode_name = self.mode_selector.get()
+        if not mode_name or mode_name == "No modes":
+            self.parent_app.update_status("No mode selected to load.", LYRN_WARNING)
+            return
+
+        modes_dir = self.build_prompt_dir / "modes"
+        mode_path = modes_dir / mode_name
+
+        if not mode_path.is_dir():
+            self.parent_app.update_status(f"Mode '{mode_name}' not found.", LYRN_ERROR)
+            return
+
+        try:
+            # List of component items to load
+            component_items = [
+                "system_instructions", "personality", "heartbeat",
+                "user_preferences", "ai_preferences", "system_rules",
+                "prompt_order.json"
+            ]
+
+            for item_name in component_items:
+                source_path = mode_path / item_name
+                dest_path = self.build_prompt_dir / item_name
+
+                # Remove existing destination before copying
+                if dest_path.exists():
+                    if dest_path.is_dir():
+                        shutil.rmtree(dest_path)
+                    else:
+                        dest_path.unlink()
+
+                if source_path.exists():
+                    if source_path.is_dir():
+                        shutil.copytree(source_path, dest_path)
+                    elif source_path.is_file():
+                        shutil.copy2(source_path, dest_path)
+
+            # This part will be implemented in the next step
+            self.refresh_ui_from_loaded_mode()
+
+            self.parent_app.update_status(f"Mode '{mode_name}' loaded successfully.", LYRN_SUCCESS)
+
+        except Exception as e:
+            self.parent_app.update_status(f"Error loading mode: {e}", LYRN_ERROR)
+            print(f"Error loading mode: {e}")
+
+    def refresh_ui_from_loaded_mode(self):
+        """Destroys and recreates all tab content to reflect loaded data."""
+        self.create_prompt_order_tab()
+        self.create_editor_tab(self.tab_system_instructions, "system_instructions", "instructions.txt")
+        self.create_personality_tab()
+        self.create_editor_tab(self.tab_heartbeat, "heartbeat", "config.txt")
+        self.create_editor_tab(self.tab_user_prefs, "user_preferences", "tone.txt")
+        self.create_editor_tab(self.tab_ai_prefs, "ai_preferences", "verbosity.txt")
+        self.create_editor_tab(self.tab_system_rules, "system_rules", "safety.txt")
+        self.apply_theme()
+
+    def save_mode(self):
+        """Saves the current configuration of all components as a new named mode."""
+        # First, ensure all current edits are saved to the base component files
+        self.save_all_changes()
+
+        dialog = ctk.CTkInputDialog(text="Enter a name for the new mode:", title="Save Mode")
+        mode_name = dialog.get_input()
+
+        if not mode_name:
+            self.parent_app.update_status("Mode saving cancelled.", LYRN_INFO)
+            return
+
+        modes_dir = self.build_prompt_dir / "modes"
+        new_mode_path = modes_dir / mode_name
+
+        if new_mode_path.exists():
+            self.parent_app.update_status(f"Mode '{mode_name}' already exists.", LYRN_ERROR)
+            return
+
+        try:
+            new_mode_path.mkdir(parents=True)
+
+            # List of component items (dirs and files) to snapshot
+            component_items = [
+                "system_instructions", "personality", "heartbeat",
+                "user_preferences", "ai_preferences", "system_rules",
+                "prompt_order.json"
+            ]
+
+            for item_name in component_items:
+                source_path = self.build_prompt_dir / item_name
+                dest_path = new_mode_path / item_name
+                if source_path.is_dir():
+                    shutil.copytree(source_path, dest_path)
+                elif source_path.is_file():
+                    shutil.copy2(source_path, dest_path)
+                else:
+                    print(f"Warning: Component item not found, skipping: {source_path}")
+
+            self.populate_modes_dropdown()
+            self.mode_selector.set(mode_name)
+            self.parent_app.update_status(f"Mode '{mode_name}' saved successfully.", LYRN_SUCCESS)
+
+        except Exception as e:
+            self.parent_app.update_status(f"Error saving mode: {e}", LYRN_ERROR)
+            print(f"Error saving mode: {e}")
+
+    def populate_modes_dropdown(self):
+        modes_dir = self.build_prompt_dir / "modes"
+        modes_dir.mkdir(exist_ok=True)
+        mode_names = [d.name for d in modes_dir.iterdir() if d.is_dir()]
+        self.mode_selector.configure(values=mode_names if mode_names else ["No modes"])
+        if mode_names:
+            self.mode_selector.set(mode_names[0])
+        else:
+            self.mode_selector.set("No modes")
+
     def create_widgets(self):
         """Create the tabbed interface."""
+        top_frame = ctk.CTkFrame(self, fg_color="transparent")
+        top_frame.pack(fill="x", padx=10, pady=(10, 0))
+
+        save_all_button = ctk.CTkButton(top_frame, text="Save All Changes", command=self.save_all_changes)
+        save_all_button.pack(side="left", padx=5, pady=5)
+
+        rebuild_prompt_button = ctk.CTkButton(top_frame, text="Rebuild Master Prompt", command=self.parent_app.refresh_prompt_from_mode)
+        rebuild_prompt_button.pack(side="left", padx=5, pady=5)
+
+        # Mode management frame
+        mode_frame = ctk.CTkFrame(top_frame)
+        mode_frame.pack(side="left", padx=20, pady=5)
+
+        ctk.CTkLabel(mode_frame, text="Mode:").pack(side="left", padx=5)
+        self.mode_selector = ctk.CTkComboBox(mode_frame, values=[])
+        self.mode_selector.pack(side="left", padx=5)
+
+        load_mode_button = ctk.CTkButton(mode_frame, text="Load", command=self.load_mode)
+        load_mode_button.pack(side="left", padx=5)
+
+        save_mode_button = ctk.CTkButton(mode_frame, text="Save", command=self.save_mode)
+        save_mode_button.pack(side="left", padx=5)
+
+        on_top_checkbox = ctk.CTkCheckBox(top_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
+        on_top_checkbox.pack(side="right", padx=5, pady=5)
+
+        self.populate_modes_dropdown()
+
         self.tabview = ctk.CTkTabview(self, width=750, height=650)
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -2121,12 +2274,10 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
     def create_prompt_order_tab(self):
         """Creates the UI for the Prompt Build Order tab."""
+        for widget in self.tab_prompt_order.winfo_children():
+            widget.destroy()
         self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.save_prompt_order)
         self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
-
-        save_button = ctk.CTkButton(self.tab_prompt_order, text="Save Order", command=lambda: self.save_prompt_order())
-        save_button.pack(pady=10)
-
         self.update_prompt_order_list()
 
     def update_prompt_order_list(self):
@@ -2151,6 +2302,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
     def create_editor_tab(self, tab, config_key: str, filename: str):
         """Creates a generic editor tab with brackets, content, and save button."""
+        for widget in tab.winfo_children():
+            widget.destroy()
         tab.grid_columnconfigure(0, weight=1)
         tab.grid_rowconfigure(1, weight=1)
 
@@ -2189,9 +2342,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.heartbeat_widgets['trigger_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['trigger_text'].pack(fill="x", pady=(0, 10))
 
-            save_button = ctk.CTkButton(main_frame, text="Save Heartbeat Settings", command=self.save_heartbeat_config)
-            save_button.pack(pady=10)
-
             self.load_heartbeat_config()
             return
 
@@ -2224,10 +2374,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         ctk.CTkLabel(main_frame, text="End Bracket").pack(anchor="w")
         widgets['end_bracket_entry'] = ctk.CTkEntry(main_frame)
         widgets['end_bracket_entry'].pack(fill="x", pady=(0, 10))
-
-        # Save Button
-        save_button = ctk.CTkButton(main_frame, text="Save Settings", command=lambda: self.save_component_config(config_key))
-        save_button.pack(pady=10)
 
         # Load data into the new widgets
         self.load_component_config(config_key)
@@ -2277,6 +2423,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
     def create_personality_tab(self):
         """Creates the UI for the Personality tab with trait text boxes."""
+        for widget in self.tab_personality.winfo_children():
+            widget.destroy()
         self.personality_widgets = {}
         tab = self.tab_personality
         config_key = "personality"
@@ -2312,10 +2460,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         traits_frame.pack(fill="x", expand=True, pady=10)
         self.personality_widgets['traits_frame'] = traits_frame
         self.personality_widgets['trait_entries'] = []
-
-        # Save Button
-        save_button = ctk.CTkButton(main_frame, text="Save Personality", command=self.save_personality_config)
-        save_button.pack(pady=20)
 
         self.load_personality_config()
 
