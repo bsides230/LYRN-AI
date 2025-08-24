@@ -4885,7 +4885,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.set_model_status("Ready")
             # Update toggle button on success
             if hasattr(self, 'model_toggle_button'):
-                self.model_toggle_button.configure(text="Offload Model", fg_color=LYRN_ACCENT)
+                self.model_toggle_button.configure(text="Offload Model", fg_color="#35215f")
 
         except Exception as e:
             print(f"Error loading model: {e}")
@@ -5234,6 +5234,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.status_textbox.insert("end", "System ready.")
         self.status_textbox.configure(state="disabled")
 
+        # Loading Progress Bar (hidden by default)
+        self.loading_progressbar = ctk.CTkProgressBar(self.status_frame, mode='indeterminate')
+
         # Model Control Buttons
         self.model_toggle_button = ctk.CTkButton(self.status_frame, text="Load Model", font=normal_font, command=self.toggle_model_load)
         self.model_toggle_button.pack(fill="x", padx=10, pady=(5, 2))
@@ -5251,9 +5254,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
 
         # --- End Relocated Controls ---
-
-        # Loading Progress Bar (hidden by default)
-        self.loading_progressbar = ctk.CTkProgressBar(self.status_frame, mode='indeterminate')
 
     def create_chat_area(self):
         """Create enhanced chat interface with colored text support"""
