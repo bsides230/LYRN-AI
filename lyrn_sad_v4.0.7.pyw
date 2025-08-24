@@ -2114,6 +2114,9 @@ class SystemPromptBuilderPopup(ThemedPopup):
         save_all_button = ctk.CTkButton(top_frame, text="Save All Changes", command=self.save_all_changes)
         save_all_button.pack(side="left", padx=5, pady=5)
 
+        rebuild_prompt_button = ctk.CTkButton(top_frame, text="Rebuild Master Prompt", command=self.parent_app.refresh_prompt_from_mode)
+        rebuild_prompt_button.pack(side="left", padx=5, pady=5)
+
         on_top_checkbox = ctk.CTkCheckBox(top_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
         on_top_checkbox.pack(side="right", padx=5, pady=5)
 
