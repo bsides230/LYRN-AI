@@ -2481,6 +2481,54 @@ class SystemPromptBuilderPopup(ThemedPopup):
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
 
+    def apply_theme(self):
+        """Applies the current theme colors to all widgets in this dialog."""
+        tm = self.theme_manager
+        primary_color = tm.get_color("primary")
+        accent_color = tm.get_color("accent")
+        frame_bg = tm.get_color("frame_bg")
+        textbox_bg = tm.get_color("textbox_bg")
+        textbox_fg = tm.get_color("textbox_fg")
+        label_text = tm.get_color("label_text")
+        border_color = tm.get_color("border_color")
+
+        # Theme background
+        self.configure(fg_color=frame_bg)
+
+        # Theme the tabview
+        self.tabview.configure(
+            segmented_button_selected_color=primary_color,
+            segmented_button_selected_hover_color=accent_color,
+            fg_color=frame_bg
+        )
+
+        # Theme all widgets recursively
+        for widget_type, config in [
+            (ctk.CTkButton, {"fg_color": primary_color}),
+            (ctk.CTkComboBox, {"button_color": primary_color, "button_hover_color": accent_color}),
+            (ctk.CTkFrame, {"fg_color": frame_bg, "border_color": border_color}),
+            (ctk.CTkLabel, {"text_color": label_text}),
+            (ctk.CTkEntry, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
+            (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
+            (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
+            (ctk.CTkCheckBox, {"fg_color": primary_color}),
+            (ctk.CTkSwitch, {"progress_color": accent_color}),
+        ]:
+            for widget in self.find_widgets_recursively(self, widget_type):
+                try:
+                    widget.configure(**config)
+                except Exception as e:
+                    # print(f"Could not configure {widget} with {config}: {e}")
+                    pass # Ignore if a widget doesn't support a property
+
+    def find_widgets_recursively(self, widget, widget_type):
+        widgets = []
+        if isinstance(widget, widget_type):
+            widgets.append(widget)
+        for child in widget.winfo_children():
+            widgets.extend(self.find_widgets_recursively(child, widget_type))
+        return widgets
+
 
 class ThemeBuilderPopup(ThemedPopup):
     """A popup window for creating and editing themes."""
