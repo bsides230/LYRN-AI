@@ -1,0 +1,52 @@
+{
+  "begin_bracket": "###PERSONALITY_START###",
+  "end_bracket": "###PERSONALITY_END###",
+  "output_file": "personality.txt",
+  "traits": [
+    {
+      "name": "Creativity",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Consistency",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Verbosity",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Assertiveness",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Openness",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Conscientiousness",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Extraversion",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Agreeableness",
+      "value": 500,
+      "instructions": ""
+    },
+    {
+      "name": "Neuroticism",
+      "value": 500,
+      "instructions": ""
+    }
+  ]
+}

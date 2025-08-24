@@ -575,31 +575,46 @@ class SnapshotLoader:
             return ""
 
     def build_master_prompt_from_components(self) -> str:
-        """Builds the master prompt by concatenating enabled components."""
+        """Builds the master prompt by concatenating enabled components based on their new config files."""
         print("Building master prompt from components...")
-        config = self._load_json_file(self.config_path) or {}
         order = self._load_json_file(self.prompt_order_path) or []
 
         prompt_parts = []
         for component_name in order:
-            if config.get(component_name, False):
-                if component_name == 'heartbeat':
+            component_dir = os.path.join(self.build_prompt_dir, component_name)
+            config_path = os.path.join(component_dir, "config.json")
+
+            # Special handling for heartbeat as it has a different config structure
+            if component_name == 'heartbeat':
+                # We only add heartbeat if its own internal config says it's enabled
+                heartbeat_config_path = os.path.join(self.build_prompt_dir, "heartbeat", "heartbeat_config.json")
+                heartbeat_config = self._load_json_file(heartbeat_config_path)
+                if heartbeat_config and heartbeat_config.get("enabled", False):
                     heartbeat_content = get_heartbeat_string()
                     if heartbeat_content:
-                        # The new function provides the fully formatted string, including brackets.
                         prompt_parts.append(heartbeat_content)
-                    continue
+                continue
 
-                component_dir = os.path.join(self.build_prompt_dir, component_name)
-                if os.path.isdir(component_dir):
-                    for filename in sorted(os.listdir(component_dir)):
-                        if filename.endswith(".txt"):
-                            filepath = os.path.join(component_dir, filename)
-                            content = self._load_text_file(filepath)
-                            if content:
-                                header = f"--- START OF {component_name}/{filename} ---\n"
-                                footer = f"\n--- END OF {component_name}/{filename} ---"
-                                prompt_parts.append(header + content + footer)
+            config = self._load_json_file(config_path)
+            if not config:
+                print(f"Warning: Could not load config for component: {component_name}")
+                continue
+
+            begin_bracket = config.get("begin_bracket", "")
+            end_bracket = config.get("end_bracket", "")
+            content_file = config.get("content_file") or config.get("output_file")
+
+            if not content_file:
+                print(f"Warning: No content file specified for component: {component_name}")
+                continue
+
+            content_path = os.path.join(component_dir, content_file)
+            content = self._load_text_file(content_path)
+
+            if content:
+                # Assemble the block using the specified brackets and content
+                formatted_block = f"{begin_bracket}\n{content}\n{end_bracket}"
+                prompt_parts.append(formatted_block)
 
         full_prompt_text = "\n\n".join(prompt_parts)
         try:
@@ -2087,27 +2102,31 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.tabview = ctk.CTkTabview(self, width=750, height=650)
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
+        self.tab_prompt_order = self.tabview.add("Prompt Build Order")
+        self.tab_system_instructions = self.tabview.add("System Instructions")
         self.tab_personality = self.tabview.add("Personality")
         self.tab_heartbeat = self.tabview.add("Heartbeat")
-        self.tab_prompt_order = self.tabview.add("Prompt Build Order")
         self.tab_user_prefs = self.tabview.add("User Preferences")
         self.tab_ai_prefs = self.tabview.add("AI Preferences")
-        self.tab_system_rules = self.tabview.add("System Rules & Toggles")
+        self.tab_system_rules = self.tabview.add("System Rules")
 
         # Create content for each tab
-        self.create_editor_tab(self.tab_personality, "personality", "default.txt")
+        self.create_prompt_order_tab()
+        self.create_editor_tab(self.tab_system_instructions, "system_instructions", "instructions.txt")
+        self.create_personality_tab()
         self.create_editor_tab(self.tab_heartbeat, "heartbeat", "config.txt")
         self.create_editor_tab(self.tab_user_prefs, "user_preferences", "tone.txt")
         self.create_editor_tab(self.tab_ai_prefs, "ai_preferences", "verbosity.txt")
         self.create_editor_tab(self.tab_system_rules, "system_rules", "safety.txt")
 
-        # Create content for the prompt order tab
-        self.create_prompt_order_tab()
-
     def create_prompt_order_tab(self):
         """Creates the UI for the Prompt Build Order tab."""
-        self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.on_prompt_list_reorder)
+        self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.save_prompt_order)
         self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
+
+        save_button = ctk.CTkButton(self.tab_prompt_order, text="Save Order", command=lambda: self.save_prompt_order())
+        save_button.pack(pady=10)
+
         self.update_prompt_order_list()
 
     def update_prompt_order_list(self):
@@ -2120,80 +2139,278 @@ class SystemPromptBuilderPopup(ThemedPopup):
                 # The "path" key is what DraggableListbox expects
                 self.prompt_order_list.add_item({"path": item_name, "pinned": False})
 
-    def on_prompt_list_reorder(self, new_item_objects: List[dict]):
-        """Callback to save the new prompt order."""
+    def save_prompt_order(self, new_item_objects: Optional[List[dict]] = None):
+        """Saves the new prompt order. Can be called from button (no args) or listbox command (with args)."""
+        if new_item_objects is None:
+            new_item_objects = self.prompt_order_list.get_item_objects()
+
         new_order = [item["path"] for item in new_item_objects]
         prompt_order_path = self.build_prompt_dir / "prompt_order.json"
         self._save_json(prompt_order_path, new_order)
         self.parent_app.update_status("Prompt order saved.", LYRN_SUCCESS)
 
     def create_editor_tab(self, tab, config_key: str, filename: str):
-        """Creates a generic editor tab, with special handling for the heartbeat tab."""
+        """Creates a generic editor tab with brackets, content, and save button."""
         tab.grid_columnconfigure(0, weight=1)
         tab.grid_rowconfigure(1, weight=1)
+
+        # Store widgets for this tab to access them later
+        if not hasattr(self, 'editor_tabs'):
+            self.editor_tabs = {}
+        self.editor_tabs[config_key] = {}
+        widgets = self.editor_tabs[config_key]
 
         # --- Special UI for the new Heartbeat Tab ---
         if config_key == 'heartbeat':
             self.heartbeat_widgets = {}
             heartbeat_config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
 
-            # Main frame for the new layout
             main_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
             main_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=5)
             main_frame.grid_columnconfigure(0, weight=1)
 
-            # Enabled Switch
             self.heartbeat_widgets['enabled_var'] = ctk.BooleanVar()
             enabled_switch = ctk.CTkSwitch(main_frame, text="Enable Heartbeat in System Prompt", variable=self.heartbeat_widgets['enabled_var'])
             enabled_switch.pack(anchor="w", pady=(5, 15))
 
-            # Begin Bracket
             ctk.CTkLabel(main_frame, text="Begin Bracket Text").pack(anchor="w")
             self.heartbeat_widgets['begin_bracket_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['begin_bracket_text'].pack(fill="x", pady=(0, 10))
 
-            # Body
             ctk.CTkLabel(main_frame, text="Heartbeat Instruction Body").pack(anchor="w")
             self.heartbeat_widgets['body_text'] = ctk.CTkTextbox(main_frame, height=150)
             self.heartbeat_widgets['body_text'].pack(fill="both", expand=True, pady=(0, 10))
 
-            # End Bracket
             ctk.CTkLabel(main_frame, text="End Bracket Text").pack(anchor="w")
             self.heartbeat_widgets['end_bracket_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['end_bracket_text'].pack(fill="x", pady=(0, 10))
 
-            # Trigger
             ctk.CTkLabel(main_frame, text="Trigger Phrase (for user reference)").pack(anchor="w")
             self.heartbeat_widgets['trigger_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['trigger_text'].pack(fill="x", pady=(0, 10))
 
-            # Save Button
             save_button = ctk.CTkButton(main_frame, text="Save Heartbeat Settings", command=self.save_heartbeat_config)
             save_button.pack(pady=10)
 
-            # Load data into the new widgets
             self.load_heartbeat_config()
             return
 
-        # --- Generic UI for all other tabs ---
-        top_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
+        # --- New Generic UI for components with config.json ---
+        main_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        main_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1)
 
-        toggle_var = ctk.BooleanVar(value=self.config.get(config_key, True))
+        # Toggle Switch
+        widgets['toggle_var'] = ctk.BooleanVar(value=self.config.get(config_key, True))
         toggle = ctk.CTkSwitch(
-            top_frame,
+            main_frame,
             text=f"Enable {config_key.replace('_', ' ').title()}",
+            variable=widgets['toggle_var'],
+            command=lambda: self.toggle_component(config_key, widgets['toggle_var'].get())
+        )
+        toggle.pack(anchor="w", pady=(5, 15))
+
+        # Begin Bracket
+        ctk.CTkLabel(main_frame, text="Begin Bracket").pack(anchor="w")
+        widgets['begin_bracket_entry'] = ctk.CTkEntry(main_frame)
+        widgets['begin_bracket_entry'].pack(fill="x", pady=(0, 10))
+
+        # Content
+        ctk.CTkLabel(main_frame, text="Instructions").pack(anchor="w")
+        widgets['content_textbox'] = ctk.CTkTextbox(main_frame, height=200, wrap="word")
+        widgets['content_textbox'].pack(fill="both", expand=True, pady=(0, 10))
+
+        # End Bracket
+        ctk.CTkLabel(main_frame, text="End Bracket").pack(anchor="w")
+        widgets['end_bracket_entry'] = ctk.CTkEntry(main_frame)
+        widgets['end_bracket_entry'].pack(fill="x", pady=(0, 10))
+
+        # Save Button
+        save_button = ctk.CTkButton(main_frame, text="Save Settings", command=lambda: self.save_component_config(config_key))
+        save_button.pack(pady=10)
+
+        # Load data into the new widgets
+        self.load_component_config(config_key)
+
+    def load_component_config(self, config_key: str):
+        """Loads data from a component's config.json and content file."""
+        widgets = self.editor_tabs[config_key]
+        component_dir = self.build_prompt_dir / config_key
+        config_path = component_dir / "config.json"
+
+        config = self._load_json(config_path)
+        if not config:
+            # Fallback for components that might not have a config file yet
+            widgets['begin_bracket_entry'].insert("0", f"###{config_key.upper()}_START###")
+            widgets['end_bracket_entry'].insert("0", f"###{config_key.upper()}_END###")
+            return
+
+        widgets['begin_bracket_entry'].insert("0", config.get("begin_bracket", ""))
+        widgets['end_bracket_entry'].insert("0", config.get("end_bracket", ""))
+
+        content_filename = config.get("content_file")
+        if content_filename:
+            content_path = component_dir / content_filename
+            content = self._load_text(content_path)
+            widgets['content_textbox'].insert("1.0", content)
+
+    def save_component_config(self, config_key: str):
+        """Saves the component's brackets and content."""
+        widgets = self.editor_tabs[config_key]
+        component_dir = self.build_prompt_dir / config_key
+        config_path = component_dir / "config.json"
+
+        config = self._load_json(config_path) or {}
+
+        config["begin_bracket"] = widgets['begin_bracket_entry'].get()
+        config["end_bracket"] = widgets['end_bracket_entry'].get()
+
+        self._save_json(config_path, config)
+
+        content_filename = config.get("content_file")
+        if content_filename:
+            content_path = component_dir / content_filename
+            content = widgets['content_textbox'].get("1.0", "end-1c")
+            self._save_text(content_path, content)
+
+        self.parent_app.update_status(f"{config_key.title()} settings saved.", LYRN_SUCCESS)
+
+    def create_personality_tab(self):
+        """Creates the UI for the Personality tab with trait text boxes."""
+        self.personality_widgets = {}
+        tab = self.tab_personality
+        config_key = "personality"
+
+        main_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Enable/Disable Toggle
+        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
+        current_order = self._load_json(prompt_order_path) or []
+        is_enabled = config_key in current_order
+        toggle_var = ctk.BooleanVar(value=is_enabled)
+        toggle_switch = ctk.CTkSwitch(
+            main_frame,
+            text="Enable Personality Component",
             variable=toggle_var,
             command=lambda: self.toggle_component(config_key, toggle_var.get())
         )
-        toggle.pack(side="left")
+        toggle_switch.pack(anchor="w", pady=(5, 15))
+        self.personality_widgets['toggle_var'] = toggle_var
 
-        textbox = ctk.CTkTextbox(tab, wrap="word")
-        textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        # Brackets
+        ctk.CTkLabel(main_frame, text="Begin Bracket").pack(anchor="w")
+        self.personality_widgets['begin_bracket_entry'] = ctk.CTkEntry(main_frame)
+        self.personality_widgets['begin_bracket_entry'].pack(fill="x", pady=(0, 10))
 
-        filepath = self.build_prompt_dir / config_key / filename
-        textbox.insert("1.0", self._load_text(filepath))
-        textbox.bind("<KeyRelease>", lambda event, p=filepath, t=textbox: self._save_text(p, t.get("1.0", "end-1c")))
+        ctk.CTkLabel(main_frame, text="End Bracket").pack(anchor="w")
+        self.personality_widgets['end_bracket_entry'] = ctk.CTkEntry(main_frame)
+        self.personality_widgets['end_bracket_entry'].pack(fill="x", pady=(0, 10))
+
+        # Traits Frame
+        traits_frame = ctk.CTkFrame(main_frame)
+        traits_frame.pack(fill="x", expand=True, pady=10)
+        self.personality_widgets['traits_frame'] = traits_frame
+        self.personality_widgets['trait_entries'] = []
+
+        # Save Button
+        save_button = ctk.CTkButton(main_frame, text="Save Personality", command=self.save_personality_config)
+        save_button.pack(pady=20)
+
+        self.load_personality_config()
+
+    def load_personality_config(self):
+        """Loads the personality configuration and populates the UI."""
+        config_path = self.build_prompt_dir / "personality" / "config.json"
+        config = self._load_json(config_path)
+        if not config:
+            return
+
+        self.personality_widgets['begin_bracket_entry'].insert("0", config.get("begin_bracket", ""))
+        self.personality_widgets['end_bracket_entry'].insert("0", config.get("end_bracket", ""))
+
+        traits = config.get("traits", [])
+        for trait_data in traits:
+            self.add_trait_widget(trait_data)
+
+    def add_trait_widget(self, trait_data):
+        """Adds a widget set for a single trait to the UI."""
+        traits_frame = self.personality_widgets['traits_frame']
+
+        trait_frame = ctk.CTkFrame(traits_frame)
+        trait_frame.pack(fill="x", pady=5, padx=5)
+
+        # Trait Name and Value
+        name_value_frame = ctk.CTkFrame(trait_frame, fg_color="transparent")
+        name_value_frame.pack(fill="x", pady=(0, 5))
+
+        ctk.CTkLabel(name_value_frame, text=trait_data.get("name", "Unknown Trait")).pack(side="left", padx=5)
+
+        value_entry = ctk.CTkEntry(name_value_frame, width=80)
+        value_entry.insert("0", str(trait_data.get("value", "500")))
+        value_entry.pack(side="left", padx=5)
+
+        ctk.CTkLabel(name_value_frame, text="(0-1000)").pack(side="left", padx=5)
+
+        # Instructions Textbox
+        instructions_box = ctk.CTkTextbox(trait_frame, height=80)
+        instructions_box.insert("1.0", trait_data.get("instructions", ""))
+        instructions_box.pack(fill="x", expand=True, padx=5)
+
+        self.personality_widgets['trait_entries'].append({
+            "name": trait_data.get("name"),
+            "value_entry": value_entry,
+            "instructions_box": instructions_box
+        })
+
+    def save_personality_config(self):
+        """Saves the personality configuration to JSON and the formatted text file."""
+        config_path = self.build_prompt_dir / "personality" / "config.json"
+        config = self._load_json(config_path) or {}
+
+        # Save brackets
+        config["begin_bracket"] = self.personality_widgets['begin_bracket_entry'].get()
+        config["end_bracket"] = self.personality_widgets['end_bracket_entry'].get()
+
+        # Save traits and build output text
+        output_parts = [config["begin_bracket"]]
+        updated_traits = []
+        for trait_widget_set in self.personality_widgets['trait_entries']:
+            name = trait_widget_set["name"]
+            value = trait_widget_set["value_entry"].get()
+            instructions = trait_widget_set["instructions_box"].get("1.0", "end-1c")
+
+            # Validate value
+            try:
+                val_int = int(value)
+                if not 0 <= val_int <= 1000:
+                    raise ValueError()
+                value_str = f"{val_int:04d}"
+            except ValueError:
+                self.parent_app.update_status(f"Invalid value for {name}. Must be 0-1000.", LYRN_ERROR)
+                return
+
+            updated_traits.append({
+                "name": name,
+                "value": val_int,
+                "instructions": instructions
+            })
+
+            output_parts.append(f'"{name} = {value_str}"')
+            output_parts.append(f'"{instructions}"')
+
+        config["traits"] = updated_traits
+        output_parts.append(config["end_bracket"])
+
+        # Save the structured data
+        self._save_json(config_path, config)
+
+        # Save the formatted output file
+        output_filename = config.get("output_file", "personality.txt")
+        output_path = self.build_prompt_dir / "personality" / output_filename
+        self._save_text(output_path, "\n\n".join(output_parts))
+
+        self.parent_app.update_status("Personality settings saved.", LYRN_SUCCESS)
 
     def load_heartbeat_config(self):
         """Loads data from heartbeat_config.json into the UI widgets."""
@@ -2230,16 +2447,29 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self._save_json(heartbeat_config_path, config_data)
         self.parent_app.update_status("Heartbeat settings saved.", LYRN_SUCCESS)
 
-    def toggle_component(self, key: str, value: bool):
-        """Updates the builder config file when a toggle is switched."""
-        self.config[key] = value
-        self._save_json(self.config_path, self.config)
-        self.parent_app.update_status(f"{key.title()} {'enabled' if value else 'disabled'}", LYRN_INFO)
+
+    def toggle_component(self, key: str, is_enabled: bool):
+        """Adds or removes a component from the prompt_order.json file."""
+        current_order = self._load_json(self.prompt_order_path) or []
+
+        if is_enabled:
+            if key not in current_order:
+                # Add the key back in a sensible position if possible
+                # For now, just append it. The user can reorder it.
+                current_order.append(key)
+        else:
+            if key in current_order:
+                current_order.remove(key)
+
+        self._save_json(self.prompt_order_path, current_order)
+        self.update_prompt_order_list() # Refresh the draggable list
+        self.parent_app.update_status(f"{key.title()} {'enabled' if is_enabled else 'disabled'}", LYRN_INFO)
 
     def toggle_on_top(self):
         """Toggles the always-on-top status of the window."""
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
+
 
 
 class ThemeBuilderPopup(ThemedPopup):
@@ -4421,7 +4651,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.0.6")
+        self.title("LYRN-AI Dashboard v4.0.7")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
