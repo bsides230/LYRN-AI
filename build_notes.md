@@ -1,3 +1,27 @@
+# LYRN-AI v4.0.7 Build Notes
+
+## v4.0.7 - System Prompt Builder Overhaul (2025-08-23)
+
+This is a major overhaul of the "System Prompt Builder" to provide granular control over every component of the prompt. The old system of simple text files has been replaced with a more robust JSON-based configuration for each component, and the UI has been completely redesigned to expose these new settings.
+
+- **New Component-Based Architecture:**
+    - Each prompt component (Personality, System Rules, etc.) is now defined by a `config.json` file in its respective directory.
+    - This config file specifies the start/end brackets for the block and the name of the file containing the content, allowing for much greater flexibility.
+
+- **Redesigned Prompt Builder UI:**
+    - **New "System Instructions" Tab:** A completely new, fully-configurable prompt component has been added.
+    - **Prompt Build Order First:** The "Prompt Build Order" tab has been moved to the first position for easier access and a "Save Order" button has been added.
+    - **Bracket and Content Editors:** The "System Instructions", "User Preferences", "AI Preferences", and "System Rules" tabs now all feature dedicated text boxes for their start bracket, end bracket, and instruction content, with a save button for each.
+    - **New Personality Editor:** The "Personality" tab has been completely redesigned to match the new format. It now has fields for start/end brackets and a dynamic list of traits. For each trait, there is a text box for its numerical value (0-1000) and a multi-line text box for its instructions.
+
+- **New Toggle and Prompt Generation Logic:**
+    - **Component Toggling:** A new "Components" tab replaces the old "System Rules & Toggles" tab. It contains a master list of all prompt components with on/off switches. Toggling a component off now removes it directly from the `prompt_order.json`, completely disabling it from the prompt build.
+    - **Refactored Prompt Loader:** The `SnapshotLoader` has been rewritten to read the new `config.json` for each enabled component, dynamically assembling the `master_prompt.txt` with the correct custom brackets and content for each block.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.7.pyw`.
+    - The previous version `lyrn_sad_v4.0.6.pyw` has been archived.
+
 # LYRN-AI v4.0.6 Build Notes
 
 ## v4.0.6 - Startup Robustness and Error Handling (2025-08-22)
