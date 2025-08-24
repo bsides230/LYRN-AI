@@ -2052,7 +2052,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.config_path = self.build_prompt_dir / "builder_config.json"
 
         self.title("System Prompt Builder")
-        self.geometry("800x700")
+        self.geometry("1200x700")
         self.minsize(600, 500)
 
         self.on_top_var = ctk.BooleanVar(value=False)
@@ -2097,8 +2097,26 @@ class SystemPromptBuilderPopup(ThemedPopup):
         except IOError as e:
             print(f"Error saving {path}: {e}")
 
+    def save_all_changes(self):
+        """Saves all changes from all tabs."""
+        self.save_prompt_order()
+        for config_key in self.editor_tabs.keys():
+            self.save_component_config(config_key)
+        self.save_personality_config()
+        self.save_heartbeat_config()
+        self.parent_app.update_status("All changes saved.", LYRN_SUCCESS)
+
     def create_widgets(self):
         """Create the tabbed interface."""
+        top_frame = ctk.CTkFrame(self, fg_color="transparent")
+        top_frame.pack(fill="x", padx=10, pady=(10, 0))
+
+        save_all_button = ctk.CTkButton(top_frame, text="Save All Changes", command=self.save_all_changes)
+        save_all_button.pack(side="left", padx=5, pady=5)
+
+        on_top_checkbox = ctk.CTkCheckBox(top_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
+        on_top_checkbox.pack(side="right", padx=5, pady=5)
+
         self.tabview = ctk.CTkTabview(self, width=750, height=650)
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -2123,9 +2141,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         """Creates the UI for the Prompt Build Order tab."""
         self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.save_prompt_order)
         self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
-
-        save_button = ctk.CTkButton(self.tab_prompt_order, text="Save Order", command=lambda: self.save_prompt_order())
-        save_button.pack(pady=10)
 
         self.update_prompt_order_list()
 
@@ -2189,9 +2204,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.heartbeat_widgets['trigger_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['trigger_text'].pack(fill="x", pady=(0, 10))
 
-            save_button = ctk.CTkButton(main_frame, text="Save Heartbeat Settings", command=self.save_heartbeat_config)
-            save_button.pack(pady=10)
-
             self.load_heartbeat_config()
             return
 
@@ -2224,10 +2236,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         ctk.CTkLabel(main_frame, text="End Bracket").pack(anchor="w")
         widgets['end_bracket_entry'] = ctk.CTkEntry(main_frame)
         widgets['end_bracket_entry'].pack(fill="x", pady=(0, 10))
-
-        # Save Button
-        save_button = ctk.CTkButton(main_frame, text="Save Settings", command=lambda: self.save_component_config(config_key))
-        save_button.pack(pady=10)
 
         # Load data into the new widgets
         self.load_component_config(config_key)
@@ -2312,10 +2320,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         traits_frame.pack(fill="x", expand=True, pady=10)
         self.personality_widgets['traits_frame'] = traits_frame
         self.personality_widgets['trait_entries'] = []
-
-        # Save Button
-        save_button = ctk.CTkButton(main_frame, text="Save Personality", command=self.save_personality_config)
-        save_button.pack(pady=20)
 
         self.load_personality_config()
 
