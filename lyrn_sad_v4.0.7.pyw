@@ -2529,6 +2529,14 @@ class SystemPromptBuilderPopup(ThemedPopup):
             widgets.extend(self.find_widgets_recursively(child, widget_type))
         return widgets
 
+    def find_widgets_recursively(self, widget, widget_type):
+        widgets = []
+        if isinstance(widget, widget_type):
+            widgets.append(widget)
+        for child in widget.winfo_children():
+            widgets.extend(self.find_widgets_recursively(child, widget_type))
+        return widgets
+
 
 class ThemeBuilderPopup(ThemedPopup):
     """A popup window for creating and editing themes."""
