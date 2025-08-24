@@ -367,6 +367,15 @@ class SettingsManager:
         }
         self.load_or_detect_first_boot()
 
+    def get_setting(self, key: str, default: any = None) -> any:
+        """Gets a setting from the UI settings."""
+        return self.ui_settings.get(key, default)
+
+    def set_setting(self, key: str, value: any):
+        """Sets a setting in the UI settings and saves it."""
+        self.ui_settings[key] = value
+        self.save_settings()
+
     def load_or_detect_first_boot(self):
         """Load settings or create a default one on first boot."""
         if os.path.exists(SETTINGS_PATH):
@@ -5527,6 +5536,14 @@ Enhanced LYRN-AI system with advanced features active.
         else:
             self.prompt_builder_popup.lift()
             self.prompt_builder_popup.focus()
+
+    def refresh_prompt_from_mode(self):
+        """Rebuilds the master prompt from components and reloads it."""
+        if self.snapshot_loader:
+            self.snapshot_loader.build_master_prompt_from_components()
+            self.update_status("Master prompt rebuilt from current components.", LYRN_SUCCESS)
+        else:
+            self.update_status("Snapshot loader not initialized.", LYRN_ERROR)
 
     def open_job_watcher_popup(self):
         """Opens the job watcher popup window."""
