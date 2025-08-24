@@ -1,5 +1,23 @@
 # LYRN-AI v4.0.8 Build Notes
 
+## v4.0.8 - Main UI Cleanup and Model Preset Fix (2025-08-24)
+
+This update focuses on streamlining the main user interface by reorganizing and removing components, and addresses a bug in the model preset system.
+
+- **Combined Load/Offload Button:** The "Load Model" and "Offload Model" buttons have been consolidated into a single toggle button. The button's text and color now dynamically update to reflect the current model state ("Load Model" when offloaded, "Offload Model" in an accent color when loaded), providing clearer state feedback and saving UI space.
+
+- **New "Memory" Button:** The "Episodic Memory" and "Topic Index" buttons have been removed from the left sidebar. They are now accessible via a new "Memory" button on the right sidebar, which opens a new popup with a tabbed interface for each memory function. This groups related memory features together and declutters the main controls.
+
+- **Removed Redundant Mode Controls:** The "Mode" selection dropdown and its associated "Refresh" button have been removed from the main UI. This functionality was previously moved to the "System Prompt Builder" popup, making these controls redundant.
+
+- **Model Preset Loading Fixed:** Addressed an issue where selecting a model preset might not reliably update the model selection dropdown in the UI. An explicit UI update call has been added to ensure the dropdown's state is immediately synchronized after loading a preset.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.0.8.pyw`.
+    - The previous version `lyrn_sad_v4.0.7.pyw` has been archived.
+
+# LYRN-AI v4.0.8 Build Notes
+
 ## v4.0.8 - Prompt Builder UI Fixes (2025-08-23)
 
 This update addresses several UI issues in the "System Prompt Builder" that were introduced during the recent overhaul.
