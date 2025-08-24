@@ -1,7 +1,7 @@
 {
   "enabled": true,
-  "begin_bracket": "### HEARTBEAT INSTRUCTIONS START ###",
-  "end_bracket": "### HEARTBEAT INSTRUCTIONS END ###",
+  "begin_bracket": "###HBISTART###",
   "body": "This is the body of the heartbeat instructions. The user can edit this text to define the LLM's behavior when the heartbeat is triggered.",
-  "trigger": "/heartbeat"
+  "end_bracket": "###HBIEND###",
+  "trigger": "##JOB_START: HEARTBEAT##"
 }
