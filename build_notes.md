@@ -1,5 +1,13 @@
 # LYRN-AI v4.0.8 Build Notes
 
+## v4.0.8 - Dependency Updates (2025-08-26)
+
+- Added `pyautogui` and `pygetwindow` to `dependencies/requirements.txt` to support system automation features.
+
+### Logging
+- No changes to logging mechanisms were necessary.
+
+
 ## v4.0.8 - Main UI Cleanup and Model Preset Fix (2025-08-24)
 
 This update focuses on streamlining the main user interface by reorganizing and removing components, and addresses a bug in the model preset system.
