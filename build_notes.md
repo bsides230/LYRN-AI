@@ -1,3 +1,20 @@
+# LYRN-AI Build Notes
+
+## v4.0.9 (2025-08-28)
+
+### Features
+- **Chat Memory:** Implemented a chat history system. The LLM now receives the last `N` chat turns as context, enabling conversational memory.
+- **Chat Settings:** Added a new "Chat" tab in the settings window.
+  - Users can now enable or disable the saving of chat history via a toggle switch.
+  - Users can control the number of conversation pairs (from 0 to 50) sent back to the LLM using a slider.
+- **Memory Management UI:** Refactored the "Memory" popup. It now uses a tabbed interface to house the "Episodic Memory" viewer and the "Topic Index" manager in a single, consolidated window.
+
+### Fixes
+- **Missing Chat Saving:** The application now correctly calls the `EpisodicMemoryManager` to save conversations after they are completed. This was a missing piece of functionality.
+
+### Refactoring
+- Consolidated the `EpisodicMemoryPopup` and `TopicIndexPopup` classes into the `MemoryPopup` class to create the new tabbed interface, removing redundant code.
+
 # LYRN-AI v4.0.8 Build Notes
 
 ## v4.0.8 - Dependency Updates (2025-08-26)

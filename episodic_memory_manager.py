@@ -104,6 +104,16 @@ class EpisodicMemoryManager:
         entries.sort(key=lambda x: x.get('time', ''), reverse=True)
         return entries
 
+    def get_recent_entries(self, num_entries: int) -> list:
+        """
+        Retrieves the specified number of most recent chat entries.
+        """
+        if num_entries <= 0:
+            return []
+
+        all_entries = self.get_all_entries() # Already sorted newest to oldest
+        return all_entries[:num_entries]
+
     def parse_entry_file(self, filepath: Path) -> dict:
         """
         Parses a single entry file and extracts key information for the index view.
