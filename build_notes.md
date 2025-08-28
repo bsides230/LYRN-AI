@@ -1,5 +1,18 @@
 # LYRN-AI Build Notes
 
+## v4.1.0 (2025-08-28)
+
+### Features
+- **Merged Memory/Task Popups:** The "Tasks/Goals" popup has been merged into the "Memory" popup. The functionality is now available under "Tasks" and "Goals" tabs in the unified Memory Manager, streamlining the UI.
+- **Static RWI (Relational Web Index):** The "Prompt Build Order" tab in the System Prompt Builder has been renamed to "Static RWI" to better reflect its function based on the system's design documents.
+  - The RWI section now injects an `rwi_instructions.txt` file at the beginning of the system prompt.
+  - Each component in the RWI list now has an info button ("?") that opens a popup with a description of that component's purpose.
+- **New Personality Popup:** The "Personality" editor has been removed from the Settings window and is now a standalone popup accessible from a new "Personality" button on the main UI, located under the System Prompt controls.
+  - The sliders in the new Personality popup will now update the corresponding text box values in the System Prompt Builder in real-time if it is open.
+
+### Refactoring
+- **Moved Chat Controls:** The "Clear Chat Folder" and "Open Chat Folder" buttons have been moved from the main UI's quick controls into the "Chat" tab of the Settings window, grouping them with other chat-related settings.
+
 ## v4.0.9 (2025-08-28)
 
 ### Features
