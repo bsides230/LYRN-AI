@@ -32,6 +32,7 @@ import calendar
 from cycle_manager import CycleManager
 from episodic_memory_manager import EpisodicMemoryManager
 from system_checker import SystemChecker
+from topic_manager import TopicManager
 
 # CustomTkinter imports
 import customtkinter as ctk
