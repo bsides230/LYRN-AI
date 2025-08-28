@@ -1,5 +1,15 @@
 # LYRN-AI Build Notes
 
+## v4.1.2 (2025-08-28)
+
+### Features
+- **RWI Instruction Editor:** The info button ("?") on each component in the "Static RWI" tab has been replaced with an edit button ("✏️").
+  - Clicking the edit button opens a new popup window (`RWIInstructionEditorPopup`) allowing the user to directly edit the instruction for that specific component.
+  - Changes are saved back to the `rwi_instructions.txt` file, which is now dynamically parsed to populate the editor.
+- **Full RWI Viewer/Editor:** A new "View/Edit Full RWI" button has been added to the "Static RWI" tab.
+  - This opens a new popup (`FullRWIViewerPopup`) that displays the entire `rwi_instructions.txt` file in a large, editable textbox.
+  - The popup includes a "Lock File" toggle switch. When enabled, it prevents the textbox and save button from being used, protecting the file from accidental edits. The lock state is saved in `build_prompt/rwi_lock.json`.
+
 ## v4.1.0 (2025-08-28)
 
 ### Features
