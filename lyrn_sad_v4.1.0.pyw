@@ -104,11 +104,38 @@ class Tooltip:
 
 
 
+class InstructionPopup(ThemedPopup):
+    """A simple popup to display instruction text."""
+    def __init__(self, parent, theme_manager: ThemeManager, title: str, instruction: str):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.title(title)
+        self.geometry("400x200")
+        self.grab_set()
+
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(expand=True, fill="both", padx=20, pady=20)
+
+        instruction_label = ctk.CTkLabel(
+            main_frame,
+            text=instruction,
+            wraplength=360,
+            justify="left"
+        )
+        instruction_label.pack(expand=True)
+
+        ok_button = ctk.CTkButton(main_frame, text="OK", command=self.destroy)
+        ok_button.pack(pady=(10, 0))
+
+        self.apply_theme()
+
+
 class DraggableListbox(ctk.CTkScrollableFrame):
     """A scrollable frame that supports drag-and-drop reordering and pinning of items."""
-    def __init__(self, master, command=None, **kwargs):
+    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, **kwargs):
         super().__init__(master, **kwargs)
         self.command = command
+        self.rwi_instructions = rwi_instructions or {}
+        self.theme_manager = theme_manager
         self.items = []
         self.item_map = {}
         self.dragged_item = None
@@ -116,6 +143,13 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.drop_indicator = ctk.CTkFrame(self, height=2, fg_color=LYRN_ACCENT, corner_radius=0)
         self.drop_indicator_index = -1
         self.drag_offset_y = 0
+
+    def show_rwi_info(self, component_name: str):
+        """Shows a popup with instructions for the RWI component."""
+        instruction = self.rwi_instructions.get(component_name, self.rwi_instructions.get("default", "No instruction available."))
+        title = f"Info: {component_name}"
+        popup = InstructionPopup(self, self.theme_manager, title, instruction)
+        popup.focus()
 
     def get_selected_item(self):
         """Returns the currently selected item's frame."""
@@ -137,6 +171,11 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         pin_button = ctk.CTkButton(item_frame, text=pin_char, width=30,
                                    command=lambda frame=item_frame: self.toggle_pin(frame))
         pin_button.pack(side="left", padx=5, pady=5)
+
+        # Info button for RWI instructions
+        info_button = ctk.CTkButton(item_frame, text="?", width=30,
+                                    command=lambda: self.show_rwi_info(text))
+        info_button.pack(side="left", padx=5, pady=5)
 
         label = ctk.CTkLabel(item_frame, text=text, **kwargs)
         label.pack(side="left", padx=10, pady=5)
@@ -591,6 +630,14 @@ class SnapshotLoader:
         order = self._load_json_file(self.prompt_order_path) or []
 
         prompt_parts = []
+
+        # Prepend Static RWI instructions
+        rwi_instructions_path = os.path.join(self.build_prompt_dir, "rwi_instructions.txt")
+        if os.path.exists(rwi_instructions_path):
+            rwi_instructions = self._load_text_file(rwi_instructions_path)
+            if rwi_instructions:
+                prompt_parts.append(rwi_instructions)
+
         for component_name in order:
             component_dir = os.path.join(self.build_prompt_dir, component_name)
             config_path = os.path.join(component_dir, "config.json")
@@ -1374,14 +1421,14 @@ class TabbedSettingsDialog(ThemedPopup):
         # Create tabs
         self.tab_paths = self.tabview.add(self.language_manager.get("tab_directory_paths"))
         # self.tab_prompt = self.tabview.add(self.language_manager.get("tab_prompt_manager")) # Tab is being removed
-        self.tab_personality = self.tabview.add("Personality")
+        # self.tab_personality = self.tabview.add("Personality")
         self.tab_ui_settings = self.tabview.add("UI Settings")
         self.tab_chat = self.tabview.add("Chat")
         self.tab_advanced = self.tabview.add(self.language_manager.get("tab_advanced"))
 
         self.create_paths_tab()
         # self.create_prompt_manager_tab() # Logic moved to popup
-        self.create_personality_tab()
+        # self.create_personality_tab()
         self.create_ui_settings_tab()
         self.create_chat_tab()
         self.create_advanced_tab()
@@ -1466,6 +1513,22 @@ class TabbedSettingsDialog(ThemedPopup):
         self.chat_history_length_label = ctk.CTkLabel(length_frame, text="10", font=font)
         self.chat_history_length_label.pack(side="left", padx=10, pady=10)
         Tooltip(self.chat_history_length_slider, "How many past user/assistant message pairs to include in the context for the LLM. 0 means none.")
+
+        # --- Folder Management ---
+        folder_frame = ctk.CTkFrame(self.tab_chat)
+        folder_frame.pack(fill="x", padx=20, pady=10)
+
+        ctk.CTkLabel(folder_frame, text="Folder Management", font=font).pack(anchor="w", padx=10, pady=(10, 5))
+
+        clear_chat_folder_button = ctk.CTkButton(folder_frame, text="Clear Chat Folder",
+                                                 font=font, command=self.parent_app.clear_chat_folder)
+        clear_chat_folder_button.pack(side="left", padx=10, pady=10)
+        Tooltip(clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
+
+        open_chat_folder_button = ctk.CTkButton(folder_frame, text="Open Chat Folder",
+                                                font=font, command=self.parent_app.open_chat_folder)
+        open_chat_folder_button.pack(side="left", padx=10, pady=10)
+        Tooltip(open_chat_folder_button, "Open chat folder in file explorer.")
 
     def update_chat_history_label(self, value):
         self.chat_history_length_label.configure(text=str(int(value)))
@@ -1660,157 +1723,6 @@ class TabbedSettingsDialog(ThemedPopup):
         ctk.CTkCheckBox(model_loading_frame, text="Show model selector on startup", font=font, variable=self.show_model_selector_var).pack(anchor="w", padx=10, pady=5)
         ctk.CTkCheckBox(model_loading_frame, text="LLM log default visibility", font=font, variable=self.llm_log_visible_var).pack(anchor="w", padx=10, pady=5)
         ctk.CTkCheckBox(model_loading_frame, text="LLM log always on top", font=font, variable=self.llm_log_on_top_var).pack(anchor="w", padx=10, pady=5)
-
-    def create_personality_tab(self):
-        """Creates the personality tab UI."""
-        self.personality_file = Path(SCRIPT_DIR) / "personality.json"
-        self.personality_data = self._load_personality_data()
-        self.initial_traits = self.personality_data.get("active_traits", {}).copy()
-        self.current_traits = self.initial_traits.copy()
-        self.personality_sliders = {}
-        self.personality_labels = {}
-        self.personality_preset_var = ctk.StringVar(value="")
-
-        # Preset management frame
-        preset_frame = ctk.CTkFrame(self.tab_personality)
-        preset_frame.pack(fill="x", padx=10, pady=10)
-        ctk.CTkLabel(preset_frame, text="Presets:").pack(side="left", padx=5)
-        self.personality_preset_menu = ctk.CTkComboBox(preset_frame, variable=self.personality_preset_var, command=self.load_personality_preset)
-        self.personality_preset_menu.pack(side="left", expand=True, fill="x", padx=5)
-
-        save_preset_button = ctk.CTkButton(preset_frame, text="Save Preset", width=100, command=self.save_personality_preset)
-        save_preset_button.pack(side="left", padx=5)
-
-        self.personality_main_frame = ctk.CTkScrollableFrame(self.tab_personality, label_text="Active Traits")
-        self.personality_main_frame.pack(expand=True, fill="both", padx=10, pady=0)
-
-        # Bottom button frame
-        button_frame = ctk.CTkFrame(self.tab_personality)
-        button_frame.pack(fill="x", padx=10, pady=10)
-
-        apply_button = ctk.CTkButton(button_frame, text="Apply Changes", command=self.apply_personality_changes)
-        apply_button.pack(side="right")
-
-        self.populate_personality_sliders()
-        self.populate_personality_presets()
-
-    def _load_personality_data(self):
-        """Loads personality data from the JSON file."""
-        if self.personality_file.exists():
-            try:
-                with open(self.personality_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading or parsing personality.json: {e}. Using default values.")
-                return {"presets": {}, "active_traits": {"creativity": 500}}
-        else:
-            print("Warning: personality.json not found. Creating with default values.")
-            default_data = {
-                "presets": {
-                    "Default": {
-                        "description": "The standard, balanced LYRN personality.",
-                        "traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
-                    }
-                },
-                "active_traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
-            }
-            try:
-                with open(self.personality_file, 'w', encoding='utf-8') as f:
-                    json.dump(default_data, f, indent=2)
-            except IOError as e:
-                print(f"Error creating default personality.json: {e}")
-            return default_data
-
-    def _save_personality_data(self):
-        """Saves the current personality data to the JSON file."""
-        try:
-            with open(self.personality_file, 'w', encoding='utf-8') as f:
-                json.dump(self.personality_data, f, indent=2)
-        except IOError as e:
-            print(f"Error saving personality file: {e}")
-
-    def populate_personality_sliders(self):
-        """Creates or updates sliders based on the data in active_traits."""
-        for widget in self.personality_main_frame.winfo_children():
-            widget.destroy()
-
-        for trait, value in self.current_traits.items():
-            frame = ctk.CTkFrame(self.personality_main_frame)
-            frame.pack(fill="x", pady=5, padx=5)
-
-            label_text = f"{trait.capitalize()}: {value}"
-            label = ctk.CTkLabel(frame, text=label_text, width=150, anchor="w")
-            label.pack(side="left", padx=10)
-            self.personality_labels[trait] = label
-
-            slider = ctk.CTkSlider(frame, from_=0, to=1000, number_of_steps=1000,
-                                   command=lambda v, t=trait: self._on_personality_slider_change(t, v))
-            slider.set(value)
-            slider.pack(side="left", expand=True, fill="x", padx=10)
-            self.personality_sliders[trait] = slider
-
-    def populate_personality_presets(self):
-        """Populates the preset dropdown menu."""
-        presets = list(self.personality_data.get("presets", {}).keys())
-        self.personality_preset_menu.configure(values=["Custom"] + presets)
-
-        active_preset_name = "Custom"
-        for name, preset_data in self.personality_data.get("presets", {}).items():
-            if preset_data.get("traits") == self.current_traits:
-                active_preset_name = name
-                break
-        self.personality_preset_var.set(active_preset_name)
-
-    def _on_personality_slider_change(self, trait_name: str, new_value: float):
-        """Callback when a slider value changes, updates the label and current_traits."""
-        int_value = int(new_value)
-        self.personality_labels[trait_name].configure(text=f"{trait_name.capitalize()}: {int_value}")
-        self.current_traits[trait_name] = int_value
-        self.populate_personality_presets()
-
-    def apply_personality_changes(self):
-        """Applies the changes made to the sliders."""
-        changes_applied = False
-        for trait, value in self.current_traits.items():
-            if self.initial_traits.get(trait) != value:
-                print(f"Delta: {trait} changed from {self.initial_traits.get(trait)} to {value}")
-                self.parent_app.delta_manager.create_delta(
-                    "P-001", "personality", "traits", "update",
-                    trait, str(value)
-                )
-                changes_applied = True
-
-        if changes_applied:
-            self.personality_data["active_traits"] = self.current_traits
-            self._save_personality_data()
-            self.initial_traits = self.current_traits.copy()
-            self.parent_app.update_status("Personality changes applied.", LYRN_SUCCESS)
-        else:
-            self.parent_app.update_status("No changes to apply.", LYRN_INFO)
-
-    def load_personality_preset(self, preset_name: str):
-        """Loads a selected preset's traits into the active sliders."""
-        if preset_name == "Custom":
-            return
-        preset_traits = self.personality_data.get("presets", {}).get(preset_name, {}).get("traits")
-        if preset_traits:
-            self.current_traits = preset_traits.copy()
-            self.populate_personality_sliders()
-            self.populate_personality_presets()
-
-    def save_personality_preset(self):
-        """Saves the current active traits as a new preset."""
-        dialog = ctk.CTkInputDialog(text="Enter a name for the new preset:", title="Save Preset")
-        preset_name = dialog.get_input()
-
-        if preset_name and preset_name not in ["Custom"]:
-            self.personality_data["presets"][preset_name] = {
-                "description": "User-saved preset.",
-                "traits": self.current_traits.copy()
-            }
-            self._save_personality_data()
-            self.populate_personality_presets()
-            self.personality_preset_var.set(preset_name)
 
     def load_current_settings(self):
         """Load current settings into all tabs"""
@@ -2107,6 +2019,171 @@ class TabbedSettingsDialog(ThemedPopup):
             print(f"Error saving settings: {e}")
 
 
+class PersonalityPopup(ThemedPopup):
+    """A popup window for editing personality traits with sliders."""
+    def __init__(self, parent, theme_manager: ThemeManager):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.parent_app = parent
+        self.title("Personality Editor")
+        self.geometry("500x600")
+
+        self.personality_file = Path(SCRIPT_DIR) / "personality.json"
+        self.personality_data = self._load_personality_data()
+        self.initial_traits = self.personality_data.get("active_traits", {}).copy()
+        self.current_traits = self.initial_traits.copy()
+        self.personality_sliders = {}
+        self.personality_labels = {}
+        self.personality_preset_var = ctk.StringVar(value="")
+
+        self.create_widgets()
+        self.populate_personality_sliders()
+        self.populate_personality_presets()
+        self.apply_theme()
+
+    def create_widgets(self):
+        # Preset management frame
+        preset_frame = ctk.CTkFrame(self)
+        preset_frame.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(preset_frame, text="Presets:").pack(side="left", padx=5)
+        self.personality_preset_menu = ctk.CTkComboBox(preset_frame, variable=self.personality_preset_var, command=self.load_personality_preset)
+        self.personality_preset_menu.pack(side="left", expand=True, fill="x", padx=5)
+
+        save_preset_button = ctk.CTkButton(preset_frame, text="Save Preset", width=100, command=self.save_personality_preset)
+        save_preset_button.pack(side="left", padx=5)
+
+        self.personality_main_frame = ctk.CTkScrollableFrame(self, label_text="Active Traits")
+        self.personality_main_frame.pack(expand=True, fill="both", padx=10, pady=0)
+
+        # Bottom button frame
+        button_frame = ctk.CTkFrame(self)
+        button_frame.pack(fill="x", padx=10, pady=10)
+
+        apply_button = ctk.CTkButton(button_frame, text="Apply Changes", command=self.apply_personality_changes)
+        apply_button.pack(side="right")
+
+    def _load_personality_data(self):
+        """Loads personality data from the JSON file."""
+        if self.personality_file.exists():
+            try:
+                with open(self.personality_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Error loading or parsing personality.json: {e}. Using default values.")
+                return {"presets": {}, "active_traits": {"creativity": 500}}
+        else:
+            print("Warning: personality.json not found. Creating with default values.")
+            default_data = {
+                "presets": {
+                    "Default": {
+                        "description": "The standard, balanced LYRN personality.",
+                        "traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
+                    }
+                },
+                "active_traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
+            }
+            try:
+                with open(self.personality_file, 'w', encoding='utf-8') as f:
+                    json.dump(default_data, f, indent=2)
+            except IOError as e:
+                print(f"Error creating default personality.json: {e}")
+            return default_data
+
+    def _save_personality_data(self):
+        """Saves the current personality data to the JSON file."""
+        try:
+            with open(self.personality_file, 'w', encoding='utf-8') as f:
+                json.dump(self.personality_data, f, indent=2)
+        except IOError as e:
+            print(f"Error saving personality file: {e}")
+
+    def populate_personality_sliders(self):
+        """Creates or updates sliders based on the data in active_traits."""
+        for widget in self.personality_main_frame.winfo_children():
+            widget.destroy()
+
+        for trait, value in self.current_traits.items():
+            frame = ctk.CTkFrame(self.personality_main_frame)
+            frame.pack(fill="x", pady=5, padx=5)
+
+            label_text = f"{trait.capitalize()}: {value}"
+            label = ctk.CTkLabel(frame, text=label_text, width=150, anchor="w")
+            label.pack(side="left", padx=10)
+            self.personality_labels[trait] = label
+
+            slider = ctk.CTkSlider(frame, from_=0, to=1000, number_of_steps=1000,
+                                   command=lambda v, t=trait: self._on_personality_slider_change(t, v))
+            slider.set(value)
+            slider.pack(side="left", expand=True, fill="x", padx=10)
+            self.personality_sliders[trait] = slider
+
+    def populate_personality_presets(self):
+        """Populates the preset dropdown menu."""
+        presets = list(self.personality_data.get("presets", {}).keys())
+        self.personality_preset_menu.configure(values=["Custom"] + presets)
+
+        active_preset_name = "Custom"
+        for name, preset_data in self.personality_data.get("presets", {}).items():
+            if preset_data.get("traits") == self.current_traits:
+                active_preset_name = name
+                break
+        self.personality_preset_var.set(active_preset_name)
+
+    def _on_personality_slider_change(self, trait_name: str, new_value: float):
+        """Callback when a slider value changes, updates the label and current_traits."""
+        int_value = int(new_value)
+        self.personality_labels[trait_name].configure(text=f"{trait_name.capitalize()}: {int_value}")
+        self.current_traits[trait_name] = int_value
+        self.populate_personality_presets()
+
+        # Update the prompt builder if it's open
+        if hasattr(self.parent_app, 'prompt_builder_popup') and self.parent_app.prompt_builder_popup.winfo_exists():
+            self.parent_app.prompt_builder_popup.update_personality_trait_value(trait_name, int_value)
+
+    def apply_personality_changes(self):
+        """Applies the changes made to the sliders."""
+        changes_applied = False
+        for trait, value in self.current_traits.items():
+            if self.initial_traits.get(trait) != value:
+                print(f"Delta: {trait} changed from {self.initial_traits.get(trait)} to {value}")
+                self.parent_app.delta_manager.create_delta(
+                    "P-001", "personality", "traits", "update",
+                    trait, str(value)
+                )
+                changes_applied = True
+
+        if changes_applied:
+            self.personality_data["active_traits"] = self.current_traits
+            self._save_personality_data()
+            self.initial_traits = self.current_traits.copy()
+            self.parent_app.update_status("Personality changes applied.", LYRN_SUCCESS)
+        else:
+            self.parent_app.update_status("No changes to apply.", LYRN_INFO)
+
+    def load_personality_preset(self, preset_name: str):
+        """Loads a selected preset's traits into the active sliders."""
+        if preset_name == "Custom":
+            return
+        preset_traits = self.personality_data.get("presets", {}).get(preset_name, {}).get("traits")
+        if preset_traits:
+            self.current_traits = preset_traits.copy()
+            self.populate_personality_sliders()
+            self.populate_personality_presets()
+
+    def save_personality_preset(self):
+        """Saves the current active traits as a new preset."""
+        dialog = ctk.CTkInputDialog(text="Enter a name for the new preset:", title="Save Preset")
+        preset_name = dialog.get_input()
+
+        if preset_name and preset_name not in ["Custom"]:
+            self.personality_data["presets"][preset_name] = {
+                "description": "User-saved preset.",
+                "traits": self.current_traits.copy()
+            }
+            self._save_personality_data()
+            self.populate_personality_presets()
+            self.personality_preset_var.set(preset_name)
+
+
 class SystemPromptBuilderPopup(ThemedPopup):
     """A popup window for building and managing the system prompt with a tabbed interface."""
     def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
@@ -2320,7 +2397,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.tabview = ctk.CTkTabview(self, width=750, height=650)
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.tab_prompt_order = self.tabview.add("Prompt Build Order")
+        self.tab_prompt_order = self.tabview.add("Static RWI")
         self.tab_system_instructions = self.tabview.add("System Instructions")
         self.tab_personality = self.tabview.add("Personality")
         self.tab_heartbeat = self.tabview.add("Heartbeat")
@@ -2338,10 +2415,22 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.create_editor_tab(self.tab_system_rules, "system_rules", "safety.txt")
 
     def create_prompt_order_tab(self):
-        """Creates the UI for the Prompt Build Order tab."""
+        """Creates the UI for the Static RWI tab."""
         for widget in self.tab_prompt_order.winfo_children():
             widget.destroy()
-        self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.save_prompt_order)
+
+        # Define RWI instructions
+        self.rwi_instructions = {
+            "system_instructions": "Core instructions that define the AI's primary function and operational guidelines.",
+            "personality": "Shapes the AI's tone, style, and conversational persona. Sliders control specific traits.",
+            "heartbeat": "Internal cognitive cycle. Defines what the AI thinks about between interactions.",
+            "user_preferences": "Defines the user's preferences for interaction, such as desired tone or verbosity.",
+            "ai_preferences": "Defines the AI's own preferences or default behaviors.",
+            "system_rules": "Hard constraints and safety protocols that the AI must follow.",
+            "default": "This component does not have a specific instruction in the documentation."
+        }
+
+        self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.save_prompt_order, rwi_instructions=self.rwi_instructions, theme_manager=self.theme_manager)
         self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
         self.update_prompt_order_list()
 
@@ -2678,6 +2767,15 @@ class SystemPromptBuilderPopup(ThemedPopup):
         """Toggles the always-on-top status of the window."""
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
+
+    def update_personality_trait_value(self, trait_name: str, new_value: int):
+        """Finds the entry for a trait and updates its value."""
+        for trait_widget_set in self.personality_widgets.get('trait_entries', []):
+            if trait_widget_set["name"] == trait_name:
+                entry = trait_widget_set["value_entry"]
+                entry.delete(0, "end")
+                entry.insert(0, str(new_value))
+                break
 
 
 
@@ -4257,191 +4355,6 @@ class AffordancePopup(ThemedPopup):
         self.tabview.set("Affordance Viewer")
 
 
-class TasksGoalsPopup(ThemedPopup):
-    """A popup window for managing tasks and goals."""
-    def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager):
-        super().__init__(parent=parent, theme_manager=theme_manager)
-        self.language_manager = language_manager
-        self.tasks_dir = Path(SCRIPT_DIR) / "build_prompt" / "tasks"
-        self.goals_dir = Path(SCRIPT_DIR) / "build_prompt" / "goals"
-        self.selected_item = {"tasks": None, "goals": None}
-
-        self.title("Tasks and Goals Manager")
-        self.geometry("800x600")
-
-        self.tabview = ctk.CTkTabview(self, width=750, height=500)
-        self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
-
-        self.tab_tasks = self.tabview.add("Tasks")
-        self.tab_goals = self.tabview.add("Goals")
-
-        self.create_task_goal_tab(self.tab_tasks, "tasks")
-        self.create_task_goal_tab(self.tab_goals, "goals")
-
-        self.apply_theme()
-
-    def _update_index(self, item_type: str):
-        """Updates the _index.json file for the given item type (tasks or goals)."""
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        index_path = data_dir / "_index.json"
-        try:
-            # The local index just needs the filenames.
-            files = sorted([p.name for p in data_dir.glob("*.txt")])
-            with open(index_path, 'w', encoding='utf-8') as f:
-                json.dump(files, f, indent=2)
-            print(f"GUI updated index file: {index_path}")
-        except Exception as e:
-            print(f"GUI Error updating index file for {item_type}: {e}")
-
-    def create_task_goal_tab(self, tab, item_type: str):
-        """Creates the content for a single tab (either tasks or goals)."""
-        tab.grid_columnconfigure(0, weight=1)
-        tab.grid_columnconfigure(1, weight=2)
-        tab.grid_rowconfigure(0, weight=1)
-
-        left_frame = ctk.CTkFrame(tab)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        left_frame.grid_rowconfigure(0, weight=1)
-        left_frame.grid_columnconfigure(0, weight=1)
-
-        list_frame = ctk.CTkScrollableFrame(left_frame, label_text=f"Available {item_type.capitalize()}")
-        list_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
-        setattr(self, f"{item_type}_list_frame", list_frame)
-
-        new_button = ctk.CTkButton(left_frame, text="New", command=lambda: self.add_item(item_type))
-        new_button.grid(row=1, column=0, padx=5, pady=10, sticky="ew")
-
-        delete_button = ctk.CTkButton(left_frame, text="Delete", command=lambda: self.delete_item(item_type))
-        delete_button.grid(row=1, column=1, padx=5, pady=10, sticky="ew")
-
-        right_frame = ctk.CTkFrame(tab)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-        right_frame.grid_rowconfigure(1, weight=1)
-        right_frame.grid_columnconfigure(0, weight=1)
-
-        selected_label = ctk.CTkLabel(right_frame, text=f"No {item_type[:-1]} selected", anchor="w")
-        selected_label.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
-        setattr(self, f"selected_{item_type}_label", selected_label)
-
-        content_textbox = ctk.CTkTextbox(right_frame, wrap="word")
-        content_textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
-        setattr(self, f"{item_type}_content_textbox", content_textbox)
-
-        save_button = ctk.CTkButton(right_frame, text="Save Changes", command=lambda: self.save_item_content(item_type))
-        save_button.grid(row=2, column=0, padx=10, pady=10, sticky="e")
-
-        self.refresh_list(item_type)
-
-    def refresh_list(self, item_type: str):
-        list_frame = getattr(self, f"{item_type}_list_frame")
-        for widget in list_frame.winfo_children():
-            widget.destroy()
-
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-        # Also ensure the index file exists on refresh
-        self._update_index(item_type)
-
-        files = sorted(p.name for p in data_dir.glob("*.txt"))
-
-        for filename in files:
-            label = ctk.CTkLabel(list_frame, text=filename, anchor="w", cursor="hand2")
-            label.pack(fill="x", padx=5, pady=2)
-            label.bind("<Button-1>", lambda e, name=filename, type=item_type: self.on_item_selected(name, type))
-
-    def on_item_selected(self, item_name: str, item_type: str):
-        self.selected_item[item_type] = item_name
-        selected_label = getattr(self, f"selected_{item_type}_label")
-        selected_label.configure(text=item_name)
-
-        content_textbox = getattr(self, f"{item_type}_content_textbox")
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / item_name
-
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
-            content_textbox.delete("1.0", "end")
-            content_textbox.insert("1.0", content)
-        except Exception as e:
-            print(f"Error reading {item_type} file: {e}")
-            content_textbox.delete("1.0", "end")
-            content_textbox.insert("1.0", f"Error loading file: {e}")
-
-    def add_item(self, item_type: str):
-        dialog = ctk.CTkInputDialog(text=f"Enter name for the new {item_type[:-1]}:", title=f"New {item_type[:-1].capitalize()}")
-        name = dialog.get_input()
-        if not name:
-            return
-
-        filename = f"{name}.txt"
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / filename
-
-        if filepath.exists():
-            self.parent_app.update_status(f"{item_type[:-1].capitalize()} '{name}' already exists.", LYRN_ERROR)
-            return
-
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write("")
-            self.refresh_list(item_type)
-            # self._update_index(item_type) is called by refresh_list
-            self.parent_app.update_status(f"Created new {item_type[:-1]} '{name}'.", LYRN_SUCCESS)
-        except Exception as e:
-            self.parent_app.update_status(f"Error creating file: {e}", LYRN_ERROR)
-
-    def delete_item(self, item_type: str):
-        from confirmation_dialog import ConfirmationDialog
-
-        selected_filename = self.selected_item.get(item_type)
-        if not selected_filename:
-            self.parent_app.update_status(f"No {item_type[:-1]} selected to delete.", LYRN_WARNING)
-            return
-
-        confirmed, _ = ConfirmationDialog.show(
-            self, self.theme_manager,
-            title="Confirm Deletion",
-            message=f"Are you sure you want to permanently delete '{selected_filename}'?"
-        )
-        if not confirmed:
-            return
-
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / selected_filename
-
-        try:
-            os.remove(filepath)
-            self.refresh_list(item_type)
-            # self._update_index(item_type) is called by refresh_list
-            getattr(self, f"{item_type}_content_textbox").delete("1.0", "end")
-            getattr(self, f"selected_{item_type}_label").configure(text=f"No {item_type[:-1]} selected")
-            self.selected_item[item_type] = None
-            self.parent_app.update_status(f"Deleted '{selected_filename}'.", LYRN_SUCCESS)
-        except Exception as e:
-            self.parent_app.update_status(f"Error deleting file: {e}", LYRN_ERROR)
-
-    def save_item_content(self, item_type: str):
-        selected_filename = self.selected_item.get(item_type)
-        if not selected_filename:
-            self.parent_app.update_status(f"No {item_type[:-1]} selected to save.", LYRN_WARNING)
-            return
-
-        content_textbox = getattr(self, f"{item_type}_content_textbox")
-        content = content_textbox.get("1.0", "end-1c")
-
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / selected_filename
-
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(content)
-            self.parent_app.update_status(f"Saved changes to '{selected_filename}'.", LYRN_SUCCESS)
-        except Exception as e:
-            self.parent_app.update_status(f"Error saving file: {e}", LYRN_ERROR)
-
-
 class MemoryPopup(ThemedPopup):
     """A popup window for managing different types of memory with a tabbed interface."""
     def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager):
@@ -4461,6 +4374,11 @@ class MemoryPopup(ThemedPopup):
         self.current_topic_slug = None
         self.detail_textboxes = {}
 
+        # Task/Goal attributes
+        self.tasks_dir = Path(SCRIPT_DIR) / "build_prompt" / "tasks"
+        self.goals_dir = Path(SCRIPT_DIR) / "build_prompt" / "goals"
+        self.selected_item = {"tasks": None, "goals": None}
+
         self.title("Memory Manager")
         self.geometry("950x750")
         self.minsize(700, 500)
@@ -4475,12 +4393,17 @@ class MemoryPopup(ThemedPopup):
 
         self.tab_episodic = tabview.add("Episodic Memory")
         self.tab_topic = tabview.add("Topic Index")
+        self.tab_tasks = tabview.add("Tasks")
+        self.tab_goals = tabview.add("Goals")
 
         self.create_episodic_memory_tab(self.tab_episodic)
         self.load_entries()
 
         self.create_topic_index_tab(self.tab_topic)
         self.populate_topic_list()
+
+        self.create_task_goal_tab(self.tab_tasks, "tasks")
+        self.create_task_goal_tab(self.tab_goals, "goals")
 
     # --- Episodic Memory Methods ---
     def create_episodic_memory_tab(self, tab):
@@ -4678,6 +4601,168 @@ class MemoryPopup(ThemedPopup):
         new_settings = {name: var.get() for name, var in self.setting_vars.items()}
         self.settings_manager.set_setting("topic_defaults", new_settings)
         print(f"Saved topic default settings: {new_settings}")
+
+    # --- Task/Goal Methods ---
+    def _update_index(self, item_type: str):
+        """Updates the _index.json file for the given item type (tasks or goals)."""
+        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
+        index_path = data_dir / "_index.json"
+        try:
+            # The local index just needs the filenames.
+            files = sorted([p.name for p in data_dir.glob("*.txt")])
+            with open(index_path, 'w', encoding='utf-8') as f:
+                json.dump(files, f, indent=2)
+            print(f"GUI updated index file: {index_path}")
+        except Exception as e:
+            print(f"GUI Error updating index file for {item_type}: {e}")
+
+    def create_task_goal_tab(self, tab, item_type: str):
+        """Creates the content for a single tab (either tasks or goals)."""
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_columnconfigure(1, weight=2)
+        tab.grid_rowconfigure(0, weight=1)
+
+        left_frame = ctk.CTkFrame(tab)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        left_frame.grid_rowconfigure(0, weight=1)
+        left_frame.grid_columnconfigure(0, weight=1)
+
+        list_frame = ctk.CTkScrollableFrame(left_frame, label_text=f"Available {item_type.capitalize()}")
+        list_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
+        setattr(self, f"{item_type}_list_frame", list_frame)
+
+        new_button = ctk.CTkButton(left_frame, text="New", command=lambda: self.add_item(item_type))
+        new_button.grid(row=1, column=0, padx=5, pady=10, sticky="ew")
+
+        delete_button = ctk.CTkButton(left_frame, text="Delete", command=lambda: self.delete_item(item_type))
+        delete_button.grid(row=1, column=1, padx=5, pady=10, sticky="ew")
+
+        right_frame = ctk.CTkFrame(tab)
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        right_frame.grid_rowconfigure(1, weight=1)
+        right_frame.grid_columnconfigure(0, weight=1)
+
+        selected_label = ctk.CTkLabel(right_frame, text=f"No {item_type[:-1]} selected", anchor="w")
+        selected_label.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
+        setattr(self, f"selected_{item_type}_label", selected_label)
+
+        content_textbox = ctk.CTkTextbox(right_frame, wrap="word")
+        content_textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        setattr(self, f"{item_type}_content_textbox", content_textbox)
+
+        save_button = ctk.CTkButton(right_frame, text="Save Changes", command=lambda: self.save_item_content(item_type))
+        save_button.grid(row=2, column=0, padx=10, pady=10, sticky="e")
+
+        self.refresh_list(item_type)
+
+    def refresh_list(self, item_type: str):
+        list_frame = getattr(self, f"{item_type}_list_frame")
+        for widget in list_frame.winfo_children():
+            widget.destroy()
+
+        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Also ensure the index file exists on refresh
+        self._update_index(item_type)
+
+        files = sorted(p.name for p in data_dir.glob("*.txt"))
+
+        for filename in files:
+            label = ctk.CTkLabel(list_frame, text=filename, anchor="w", cursor="hand2")
+            label.pack(fill="x", padx=5, pady=2)
+            label.bind("<Button-1>", lambda e, name=filename, type=item_type: self.on_item_selected(name, type))
+
+    def on_item_selected(self, item_name: str, item_type: str):
+        self.selected_item[item_type] = item_name
+        selected_label = getattr(self, f"selected_{item_type}_label")
+        selected_label.configure(text=item_name)
+
+        content_textbox = getattr(self, f"{item_type}_content_textbox")
+        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
+        filepath = data_dir / item_name
+
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            content_textbox.delete("1.0", "end")
+            content_textbox.insert("1.0", content)
+        except Exception as e:
+            print(f"Error reading {item_type} file: {e}")
+            content_textbox.delete("1.0", "end")
+            content_textbox.insert("1.0", f"Error loading file: {e}")
+
+    def add_item(self, item_type: str):
+        dialog = ctk.CTkInputDialog(text=f"Enter name for the new {item_type[:-1]}:", title=f"New {item_type[:-1].capitalize()}")
+        name = dialog.get_input()
+        if not name:
+            return
+
+        filename = f"{name}.txt"
+        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
+        filepath = data_dir / filename
+
+        if filepath.exists():
+            self.parent_app.update_status(f"{item_type[:-1].capitalize()} '{name}' already exists.", LYRN_ERROR)
+            return
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("")
+            self.refresh_list(item_type)
+            # self._update_index(item_type) is called by refresh_list
+            self.parent_app.update_status(f"Created new {item_type[:-1]} '{name}'.", LYRN_SUCCESS)
+        except Exception as e:
+            self.parent_app.update_status(f"Error creating file: {e}", LYRN_ERROR)
+
+    def delete_item(self, item_type: str):
+        from confirmation_dialog import ConfirmationDialog
+
+        selected_filename = self.selected_item.get(item_type)
+        if not selected_filename:
+            self.parent_app.update_status(f"No {item_type[:-1]} selected to delete.", LYRN_WARNING)
+            return
+
+        confirmed, _ = ConfirmationDialog.show(
+            self, self.theme_manager,
+            title="Confirm Deletion",
+            message=f"Are you sure you want to permanently delete '{selected_filename}'?"
+        )
+        if not confirmed:
+            return
+
+        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
+        filepath = data_dir / selected_filename
+
+        try:
+            os.remove(filepath)
+            self.refresh_list(item_type)
+            # self._update_index(item_type) is called by refresh_list
+            getattr(self, f"{item_type}_content_textbox").delete("1.0", "end")
+            getattr(self, f"selected_{item_type}_label").configure(text=f"No {item_type[:-1]} selected")
+            self.selected_item[item_type] = None
+            self.parent_app.update_status(f"Deleted '{selected_filename}'.", LYRN_SUCCESS)
+        except Exception as e:
+            self.parent_app.update_status(f"Error deleting file: {e}", LYRN_ERROR)
+
+    def save_item_content(self, item_type: str):
+        selected_filename = self.selected_item.get(item_type)
+        if not selected_filename:
+            self.parent_app.update_status(f"No {item_type[:-1]} selected to save.", LYRN_WARNING)
+            return
+
+        content_textbox = getattr(self, f"{item_type}_content_textbox")
+        content = content_textbox.get("1.0", "end-1c")
+
+        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
+        filepath = data_dir / selected_filename
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(content)
+            self.parent_app.update_status(f"Saved changes to '{selected_filename}'.", LYRN_SUCCESS)
+        except Exception as e:
+            self.parent_app.update_status(f"Error saving file: {e}", LYRN_ERROR)
 
 
 class LyrnAIInterface(ctk.CTkToplevel):
@@ -5097,19 +5182,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.show_llm_log_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.show_llm_log_button, self.tooltips.get("show_llm_log_button", ""))
 
-        chat_folder_frame = ctk.CTkFrame(self.quick_frame)
-        chat_folder_frame.pack(fill="x", padx=10, pady=3)
-
-        self.clear_chat_folder_button = ctk.CTkButton(chat_folder_frame, text="Clear Chat Folder",
-                                                      font=normal_font, command=self.clear_chat_folder)
-        self.clear_chat_folder_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
-        Tooltip(self.clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
-
-        self.open_chat_folder_button = ctk.CTkButton(chat_folder_frame, text="📂", width=40,
-                                                     font=normal_font, command=self.open_chat_folder)
-        self.open_chat_folder_button.pack(side="left")
-        Tooltip(self.open_chat_folder_button, "Open chat folder in file explorer.")
-
         self.terminal_button = ctk.CTkButton(self.quick_frame, text="📟 Code Terminal", command=self.open_terminal)
         self.terminal_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.terminal_button, "Opens a new terminal in the specified directory.")
@@ -5122,9 +5194,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.settings_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
 
-        self.tasks_goals_button = ctk.CTkButton(self.quick_frame, text="🎯 Tasks/Goals", command=self.open_tasks_goals_popup)
-        self.tasks_goals_button.pack(fill="x", padx=10, pady=3)
-        Tooltip(self.tasks_goals_button, "Open the Tasks and Goals manager.")
+        # self.tasks_goals_button = ctk.CTkButton(self.quick_frame, text="🎯 Tasks/Goals", command=self.open_tasks_goals_popup)
+        # self.tasks_goals_button.pack(fill="x", padx=10, pady=3)
+        # Tooltip(self.tasks_goals_button, "Open the Tasks and Goals manager.")
 
 
         # Add a spacer to push content to the top
@@ -5369,6 +5441,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.prompt_builder_button = ctk.CTkButton(self.status_frame, text="📝 System Prompt", command=self.open_prompt_builder)
         self.prompt_builder_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.prompt_builder_button, "Open the System Prompt Builder window.")
+
+        self.personality_button = ctk.CTkButton(self.status_frame, text="🎭 Personality", command=self.open_personality_popup)
+        self.personality_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.personality_button, "Open the Personality slider editor.")
 
 
         # --- End Relocated Controls ---
@@ -5646,6 +5722,15 @@ Enhanced LYRN-AI system with advanced features active.
             self.prompt_builder_popup.lift()
             self.prompt_builder_popup.focus()
 
+    def open_personality_popup(self):
+        """Opens the personality editor popup window."""
+        if not hasattr(self, 'personality_popup') or not self.personality_popup.winfo_exists():
+            self.personality_popup = PersonalityPopup(self, self.theme_manager)
+            self.personality_popup.focus()
+        else:
+            self.personality_popup.lift()
+            self.personality_popup.focus()
+
     def refresh_prompt_from_mode(self):
         """Rebuilds the master prompt from components and reloads it."""
         if self.snapshot_loader:
@@ -5683,15 +5768,6 @@ Enhanced LYRN-AI system with advanced features active.
         else:
             self.memory_popup.lift()
             self.memory_popup.focus()
-
-    def open_tasks_goals_popup(self):
-        """Opens the tasks and goals manager popup window."""
-        if not hasattr(self, 'tasks_goals_popup') or not self.tasks_goals_popup.winfo_exists():
-            self.tasks_goals_popup = TasksGoalsPopup(self, self.theme_manager, self.language_manager)
-            self.tasks_goals_popup.focus()
-        else:
-            self.tasks_goals_popup.lift()
-            self.tasks_goals_popup.focus()
 
     def toggle_log_viewer(self):
         """Creates, shows, or focuses the LLM log viewer window."""
