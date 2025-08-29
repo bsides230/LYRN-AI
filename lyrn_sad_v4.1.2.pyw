@@ -660,10 +660,9 @@ class SnapshotLoader:
         for component_name in rwi_order:
             if component_name in rwi_instructions:
                 data = rwi_instructions[component_name]
-                # This part is just about the instructions, not the actual data blocks yet
-                # The request implies the RWI is a set of instructions.
-                formatted_instruction = f"{data['start']}\n{data['instruction']}\n{data['end']}"
-                rwi_parts.append(formatted_instruction)
+                # Per user feedback, individual RWI sections do not have brackets.
+                instruction = data.get("instruction", "")
+                rwi_parts.append(instruction)
 
         if rwi_parts:
             # We add a header for the entire RWI block for clarity in the master prompt
@@ -2255,48 +2254,35 @@ class SystemPromptBuilderPopup(ThemedPopup):
             return False
 
     def _load_rwi_instructions(self):
-        """Loads and parses the RWI instructions from the text file, including brackets."""
+        """Loads and parses the RWI instructions from the text file."""
         rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
         self.rwi_instructions = {}
         try:
             content = self._load_text(rwi_path)
-            # Regex to capture name, start bracket, end bracket, and instruction
-            pattern = re.compile(r"-\s*([^:]+):\[([^\]]*)\]\[([^\]]*)\]:\s*(.*)")
-
-            # Find the relevant part of the instructions
-            match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', content, re.DOTALL)
+            # Find the relevant part of the instructions (between the main brackets)
+            match = re.search(r'###RWI_INSTRUCTIONS_START###(.*)###RWI_INSTRUCTIONS_END###', content, re.DOTALL)
             if not match:
-                return
+                 match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', content, re.DOTALL)
+                 if not match:
+                    return
 
             instruction_block = match.group(1).strip()
             lines = instruction_block.split('\n')
             for line in lines:
                 line = line.strip()
                 if line.startswith('-'):
-                    parts = pattern.match(line)
-                    if parts:
-                        component, start_bracket, end_bracket, instruction = parts.groups()
+                    # The format is simply: - component_name: instruction
+                    parts = line[1:].strip().split(':', 1)
+                    if len(parts) == 2:
+                        component, instruction = parts
                         self.rwi_instructions[component.strip()] = {
-                            "start_bracket": start_bracket,
-                            "end_bracket": end_bracket,
                             "instruction": instruction.strip()
                         }
-                    else:
-                        # Fallback for old format
-                        legacy_parts = line[1:].strip().split(':', 1)
-                        if len(legacy_parts) == 2:
-                            component, instruction = legacy_parts
-                            self.rwi_instructions[component.strip()] = {
-                                "start_bracket": f"###{component.strip().upper()}_START###",
-                                "end_bracket": f"###{component.strip().upper()}_END###",
-                                "instruction": instruction.strip()
-                            }
-
         except Exception as e:
             print(f"Error loading or parsing RWI instructions: {e}")
 
-    def save_rwi_instruction(self, component_name: str, new_instruction: str, start_bracket: str, end_bracket: str):
-        """Saves a single RWI instruction and its brackets back to the file."""
+    def save_rwi_instruction(self, component_name: str, new_instruction: str):
+        """Saves a single RWI instruction back to the file in simple format."""
         rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
         try:
             content = self._load_text(rwi_path)
@@ -2304,13 +2290,13 @@ class SystemPromptBuilderPopup(ThemedPopup):
             new_lines = []
             found = False
 
-            # Regex to find the line for the specific component
+            # This regex is now more generic to find the component line, regardless of format
             pattern = re.compile(r"-\s*" + re.escape(component_name) + r":.*")
 
             for line in lines:
                 if pattern.match(line.strip()):
-                    # Reconstruct the line with new data
-                    new_line = f"- {component_name}:[{start_bracket}][{end_bracket}]: {new_instruction}"
+                    # Reconstruct the line in the new, simple format
+                    new_line = f"- {component_name}: {new_instruction}"
                     new_lines.append(new_line)
                     found = True
                 else:
@@ -2412,12 +2398,10 @@ class SystemPromptBuilderPopup(ThemedPopup):
             return
 
         component_name = self.rwi_editor_widgets.get("component_name")
-        start_bracket = self.rwi_editor_widgets.get("start_bracket").get()
-        end_bracket = self.rwi_editor_widgets.get("end_bracket").get()
         instruction = self.rwi_editor_widgets.get("instruction").get("1.0", "end-1c")
 
         if component_name:
-            self.save_rwi_instruction(component_name, instruction, start_bracket, end_bracket)
+            self.save_rwi_instruction(component_name, instruction)
 
     def load_mode(self):
         """Loads a saved mode, overwriting the current component configurations."""
@@ -2670,31 +2654,18 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.rwi_editor_placeholder.pack(expand=True)
             return
 
-        self.rwi_editor_panel.grid_columnconfigure(1, weight=1)
+        self.rwi_editor_panel.grid_columnconfigure(0, weight=1)
+        self.rwi_editor_panel.grid_rowconfigure(1, weight=1)
 
         # Create new widgets
-        ctk.CTkLabel(self.rwi_editor_panel, text="Start Bracket:").grid(row=0, column=0, padx=(0, 5), sticky="w")
-        start_bracket_entry = ctk.CTkEntry(self.rwi_editor_panel)
-        start_bracket_entry.grid(row=0, column=1, sticky="ew")
-        start_bracket_entry.insert(0, component_data.get("start_bracket", ""))
-
-        ctk.CTkLabel(self.rwi_editor_panel, text="End Bracket:").grid(row=1, column=0, padx=(0, 5), pady=(5,0), sticky="w")
-        end_bracket_entry = ctk.CTkEntry(self.rwi_editor_panel)
-        end_bracket_entry.grid(row=1, column=1, sticky="ew", pady=(5,0))
-        end_bracket_entry.insert(0, component_data.get("end_bracket", ""))
-
-        ctk.CTkLabel(self.rwi_editor_panel, text="Instruction:").grid(row=2, column=0, columnspan=2, sticky="w", pady=(10, 5))
+        ctk.CTkLabel(self.rwi_editor_panel, text="Instruction:").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
         instruction_textbox = ctk.CTkTextbox(self.rwi_editor_panel, wrap="word")
-        instruction_textbox.grid(row=3, column=0, columnspan=2, sticky="nsew")
+        instruction_textbox.grid(row=1, column=0, columnspan=2, sticky="nsew")
         instruction_textbox.insert("1.0", component_data.get("instruction", ""))
-
-        self.rwi_editor_panel.grid_rowconfigure(3, weight=1)
 
         # Store references to the widgets for saving
         self.rwi_editor_widgets = {
             "component_name": component_name, # Store which component is being edited
-            "start_bracket": start_bracket_entry,
-            "end_bracket": end_bracket_entry,
             "instruction": instruction_textbox
         }
 
