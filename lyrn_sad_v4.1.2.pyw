@@ -148,18 +148,29 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.drag_offset_y = 0
 
     def open_rwi_editor(self, component_name: str):
-        """Opens a popup to edit the instruction for an RWI component."""
+        """Opens a popup to edit the instruction and brackets for an RWI component."""
         if not self.rwi_save_callback:
             print("Error: RWI save callback is not defined.")
             return
 
-        instruction = self.rwi_instructions.get(component_name, "")
+        # Check the file lock status before opening the editor.
+        # We access the parent popup (SystemPromptBuilderPopup) to call its helper method.
+        is_locked = self.master.master._is_rwi_locked()
+
+        component_data = self.rwi_instructions.get(component_name, {})
+        instruction = component_data.get("instruction", "")
+        start_bracket = component_data.get("start_bracket", "")
+        end_bracket = component_data.get("end_bracket", "")
+
         popup = RWIInstructionEditorPopup(
             parent=self,
             theme_manager=self.theme_manager,
             component_name=component_name,
             instruction=instruction,
-            save_callback=self.rwi_save_callback
+            start_bracket=start_bracket,
+            end_bracket=end_bracket,
+            save_callback=self.rwi_save_callback,
+            is_locked=is_locked
         )
         popup.focus()
 
@@ -639,17 +650,45 @@ class SnapshotLoader:
     def build_master_prompt_from_components(self) -> str:
         """Builds the master prompt by concatenating enabled components based on their new config files."""
         print("Building master prompt from components...")
-        order = self._load_json_file(self.prompt_order_path) or []
 
         prompt_parts = []
 
-        # Prepend Static RWI instructions
+        # --- Build the Static RWI block first ---
+        rwi_order_path = os.path.join(self.build_prompt_dir, "rwi_order.json")
         rwi_instructions_path = os.path.join(self.build_prompt_dir, "rwi_instructions.txt")
-        if os.path.exists(rwi_instructions_path):
-            rwi_instructions = self._load_text_file(rwi_instructions_path)
-            if rwi_instructions:
-                prompt_parts.append(rwi_instructions)
 
+        rwi_order = self._load_json_file(rwi_order_path) or []
+        rwi_instructions_content = self._load_text_file(rwi_instructions_path)
+
+        rwi_instructions = {}
+        # Parse the instructions file to get brackets and instructions for each component
+        pattern = re.compile(r"-\s*([^:]+):\[([^\]]*)\]\[([^\]]*)\]:\s*(.*)")
+        instruction_block_match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', rwi_instructions_content, re.DOTALL)
+        if instruction_block_match:
+            instruction_block = instruction_block_match.group(1).strip()
+            for line in instruction_block.split('\n'):
+                match = pattern.match(line.strip())
+                if match:
+                    component, start, end, instruction = match.groups()
+                    rwi_instructions[component.strip()] = {"start": start, "end": end, "instruction": instruction.strip()}
+
+        # Construct the RWI block based on the specified order
+        rwi_parts = []
+        for component_name in rwi_order:
+            if component_name in rwi_instructions:
+                data = rwi_instructions[component_name]
+                # This part is just about the instructions, not the actual data blocks yet
+                # The request implies the RWI is a set of instructions.
+                formatted_instruction = f"{data['start']}\n{data['instruction']}\n{data['end']}"
+                rwi_parts.append(formatted_instruction)
+
+        if rwi_parts:
+            # We add a header for the entire RWI block for clarity in the master prompt
+            full_rwi_block = "###RWI_INSTRUCTIONS_START###\n" + "\n\n".join(rwi_parts) + "\n###RWI_INSTRUCTIONS_END###"
+            prompt_parts.append(full_rwi_block)
+
+        # --- Build the rest of the prompt components ---
+        order = self._load_json_file(self.prompt_order_path) or []
         for component_name in order:
             component_dir = os.path.join(self.build_prompt_dir, component_name)
             config_path = os.path.join(component_dir, "config.json")
@@ -2204,6 +2243,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.snapshot_loader = snapshot_loader
         self.build_prompt_dir = Path(SCRIPT_DIR) / "build_prompt"
         self.config_path = self.build_prompt_dir / "builder_config.json"
+        self.rwi_order_path = self.build_prompt_dir / "rwi_order.json"
 
         self.title("System Prompt Builder")
         self.geometry("1200x700")
@@ -2216,15 +2256,30 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
 
         self.create_widgets()
+
+    def _is_rwi_locked(self) -> bool:
+        """Checks if the RWI file is locked by the FullRWIViewerPopup."""
+        lock_path = self.build_prompt_dir / "rwi_lock.json"
+        if not lock_path.exists():
+            return False
+        try:
+            with open(lock_path, 'r') as f:
+                data = json.load(f)
+                return data.get("locked", False)
+        except (IOError, json.JSONDecodeError):
+            return False
         self.toggle_on_top() # Set initial state
         self.apply_theme()
 
     def _load_rwi_instructions(self):
-        """Loads and parses the RWI instructions from the text file."""
+        """Loads and parses the RWI instructions from the text file, including brackets."""
         rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
         self.rwi_instructions = {}
         try:
             content = self._load_text(rwi_path)
+            # Regex to capture name, start bracket, end bracket, and instruction
+            pattern = re.compile(r"-\s*([^:]+):\[([^\]]*)\]\[([^\]]*)\]:\s*(.*)")
+
             # Find the relevant part of the instructions
             match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', content, re.DOTALL)
             if not match:
@@ -2235,37 +2290,55 @@ class SystemPromptBuilderPopup(ThemedPopup):
             for line in lines:
                 line = line.strip()
                 if line.startswith('-'):
-                    parts = line[1:].strip().split(':', 1)
-                    if len(parts) == 2:
-                        component = parts[0].strip()
-                        instruction = parts[1].strip()
-                        self.rwi_instructions[component] = instruction
+                    parts = pattern.match(line)
+                    if parts:
+                        component, start_bracket, end_bracket, instruction = parts.groups()
+                        self.rwi_instructions[component.strip()] = {
+                            "start_bracket": start_bracket,
+                            "end_bracket": end_bracket,
+                            "instruction": instruction.strip()
+                        }
+                    else:
+                        # Fallback for old format
+                        legacy_parts = line[1:].strip().split(':', 1)
+                        if len(legacy_parts) == 2:
+                            component, instruction = legacy_parts
+                            self.rwi_instructions[component.strip()] = {
+                                "start_bracket": f"###{component.strip().upper()}_START###",
+                                "end_bracket": f"###{component.strip().upper()}_END###",
+                                "instruction": instruction.strip()
+                            }
+
         except Exception as e:
             print(f"Error loading or parsing RWI instructions: {e}")
 
-    def save_rwi_instruction(self, component_name: str, new_instruction: str):
-        """Saves a single RWI instruction back to the file."""
+    def save_rwi_instruction(self, component_name: str, new_instruction: str, start_bracket: str, end_bracket: str):
+        """Saves a single RWI instruction and its brackets back to the file."""
         rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
         try:
             content = self._load_text(rwi_path)
             lines = content.split('\n')
             new_lines = []
             found = False
+
+            # Regex to find the line for the specific component
+            pattern = re.compile(r"-\s*" + re.escape(component_name) + r":.*")
+
             for line in lines:
-                if line.strip().startswith(f'- {component_name}:'):
-                    new_lines.append(f'- **{component_name}**: {new_instruction}')
+                if pattern.match(line.strip()):
+                    # Reconstruct the line with new data
+                    new_line = f"- {component_name}:[{start_bracket}][{end_bracket}]: {new_instruction}"
+                    new_lines.append(new_line)
                     found = True
                 else:
                     new_lines.append(line)
 
             if not found:
-                # This case shouldn't happen with the current UI, but as a fallback
                 print(f"Warning: Component {component_name} not found in rwi_instructions.txt. Not saving.")
                 return
 
             self._save_text(rwi_path, "\n".join(new_lines))
-            # Reload instructions into memory
-            self._load_rwi_instructions()
+            self._load_rwi_instructions() # Reload instructions into memory
             self.parent_app.update_status(f"Instruction for '{component_name}' saved.", LYRN_SUCCESS)
 
         except Exception as e:
@@ -2517,24 +2590,24 @@ class SystemPromptBuilderPopup(ThemedPopup):
         popup.focus()
 
     def update_prompt_order_list(self):
-        """Populates the draggable list with the current prompt order."""
+        """Populates the draggable list with the current RWI component order."""
         self.prompt_order_list.clear()
-        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
-        order = self._load_json(prompt_order_path)
+        # This now correctly loads the RWI order, not the main prompt order.
+        order = self._load_json(self.rwi_order_path)
         if isinstance(order, list):
             for item_name in order:
-                # The "path" key is what DraggableListbox expects
+                # The "path" key is what DraggableListbox expects for the display text.
                 self.prompt_order_list.add_item({"path": item_name, "pinned": False})
 
     def save_prompt_order(self, new_item_objects: Optional[List[dict]] = None):
-        """Saves the new prompt order. Can be called from button (no args) or listbox command (with args)."""
+        """Saves the new RWI component order. Can be called from button (no args) or listbox command (with args)."""
         if new_item_objects is None:
             new_item_objects = self.prompt_order_list.get_item_objects()
 
         new_order = [item["path"] for item in new_item_objects]
-        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
-        self._save_json(prompt_order_path, new_order)
-        self.parent_app.update_status("Prompt order saved.", LYRN_SUCCESS)
+        # This now correctly saves the RWI order, not the main prompt order.
+        self._save_json(self.rwi_order_path, new_order)
+        self.parent_app.update_status("RWI component order saved.", LYRN_SUCCESS)
 
     def create_editor_tab(self, tab, config_key: str, filename: str):
         """Creates a generic editor tab with brackets, content, and save button."""

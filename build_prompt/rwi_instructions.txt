@@ -3,12 +3,12 @@
 This document guides the LLM on how to process the structured memory snapshot (the RWI).
 Each field in the RWI should be treated according to these instructions.
 
-- **identity**: Core identity parameters. Do not modify. Reference for self-awareness.
-- **user_summary**: A summary of the user's personality, preferences, and history. Update this field via reflection.
-- **active_goals**: A list of current objectives. This is a high-priority field for guiding actions.
-- **episodic_memory**: Short-term memory of recent interactions. Use for immediate context.
-- **topic_memory**: Long-term relational memory. Use for deep context and understanding relationships between concepts.
-- **system_rules**: Hard constraints on behavior. These are not suggestions.
-- **personality**: A set of traits that define the AI's persona. These values shape the tone and style of the response.
-- **heartbeat**: Internal cognitive cycle instructions.
+- identity:[###IDENTITY_START###][###IDENTITY_END###]: Core identity parameters. Do not modify. Reference for self-awareness.
+- user_summary:[###USER_SUMMARY_START###][###USER_SUMMARY_END###]: A summary of the user's personality, preferences, and history. Update this field via reflection.
+- active_goals:[###ACTIVE_GOALS_START###][###ACTIVE_GOALS_END###]: A list of current objectives. This is a high-priority field for guiding actions.
+- episodic_memory:[###EPISODIC_MEMORY_START###][###EPISODIC_MEMORY_END###]: Short-term memory of recent interactions. Use for immediate context.
+- topic_memory:[###TOPIC_MEMORY_START###][###TOPIC_MEMORY_END###]: Long-term relational memory. Use for deep context and understanding relationships between concepts.
+- system_rules:[###SYSTEM_RULES_START###][###SYSTEM_RULES_END###]: Hard constraints on behavior. These are not suggestions.
+- personality:[###PERSONALITY_START###][###PERSONALITY_END###]: A set of traits that define the AI's persona. These values shape the tone and style of the response.
+- heartbeat:[###HEARTBEAT_START###][###HEARTBEAT_END###]: Internal cognitive cycle instructions.
 ###RWI_INSTRUCTIONS_END###
