@@ -33,7 +33,6 @@ from cycle_manager import CycleManager
 from episodic_memory_manager import EpisodicMemoryManager
 from system_checker import SystemChecker
 from topic_manager import TopicManager
-from rwi_editor_popup import RWIInstructionEditorPopup
 from full_rwi_viewer_popup import FullRWIViewerPopup
 
 # CustomTkinter imports
@@ -147,33 +146,6 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.drop_indicator_index = -1
         self.drag_offset_y = 0
 
-    def open_rwi_editor(self, component_name: str):
-        """Opens a popup to edit the instruction and brackets for an RWI component."""
-        if not self.rwi_save_callback:
-            print("Error: RWI save callback is not defined.")
-            return
-
-        # Check the file lock status before opening the editor.
-        # We access the parent popup (SystemPromptBuilderPopup) to call its helper method.
-        is_locked = self.master.master._is_rwi_locked()
-
-        component_data = self.rwi_instructions.get(component_name, {})
-        instruction = component_data.get("instruction", "")
-        start_bracket = component_data.get("start_bracket", "")
-        end_bracket = component_data.get("end_bracket", "")
-
-        popup = RWIInstructionEditorPopup(
-            parent=self,
-            theme_manager=self.theme_manager,
-            component_name=component_name,
-            instruction=instruction,
-            start_bracket=start_bracket,
-            end_bracket=end_bracket,
-            save_callback=self.rwi_save_callback,
-            is_locked=is_locked
-        )
-        popup.focus()
-
     def get_selected_item(self):
         """Returns the currently selected item's frame."""
         return self.selected_item
@@ -194,11 +166,6 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         pin_button = ctk.CTkButton(item_frame, text=pin_char, width=30,
                                    command=lambda frame=item_frame: self.toggle_pin(frame))
         pin_button.pack(side="left", padx=5, pady=5)
-
-        # Edit button for RWI instructions
-        edit_button = ctk.CTkButton(item_frame, text="✏️", width=30,
-                                    command=lambda: self.open_rwi_editor(text))
-        edit_button.pack(side="left", padx=5, pady=5)
 
         label = ctk.CTkLabel(item_frame, text=text, **kwargs)
         label.pack(side="left", padx=10, pady=5)
@@ -273,6 +240,11 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
         self.dragged_item.lift()
         self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
+
+        # Call parent to populate the editor panel
+        component_name = self.item_map[self.selected_item]["path"]
+        if hasattr(self.master.master, 'populate_rwi_editor'):
+            self.master.master.populate_rwi_editor(component_name)
 
     def _on_drag(self, event):
         """Callback for when an item is being dragged."""
@@ -2268,6 +2240,26 @@ class SystemPromptBuilderPopup(ThemedPopup):
                 return data.get("locked", False)
         except (IOError, json.JSONDecodeError):
             return False
+
+    def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.language_manager = language_manager
+        self.snapshot_loader = snapshot_loader
+        self.build_prompt_dir = Path(SCRIPT_DIR) / "build_prompt"
+        self.config_path = self.build_prompt_dir / "builder_config.json"
+        self.rwi_order_path = self.build_prompt_dir / "rwi_order.json"
+
+        self.title("System Prompt Builder")
+        self.geometry("1200x700")
+        self.minsize(600, 500)
+
+        self.on_top_var = ctk.BooleanVar(value=False)
+        self.config = self._load_json(self.config_path)
+        self.rwi_instructions = {}
+        self._load_rwi_instructions()
+
+
+        self.create_widgets()
         self.toggle_on_top() # Set initial state
         self.apply_theme()
 
@@ -2383,12 +2375,33 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
     def save_all_changes(self):
         """Saves all changes from all tabs."""
-        self.save_prompt_order()
+        self.save_prompt_order() # Saves rwi_order.json
+        self.save_rwi_editor_changes() # Saves the currently open RWI component
         for config_key in self.editor_tabs.keys():
             self.save_component_config(config_key)
         self.save_personality_config()
         self.save_heartbeat_config()
         self.parent_app.update_status("All changes saved.", LYRN_SUCCESS)
+
+    def save_rwi_editor_changes(self):
+        """Saves the content of the RWI editor panel if a component is being edited."""
+        if not self.rwi_editor_widgets:
+            return # Nothing to save
+
+        if self._is_rwi_locked():
+            tkinter.messagebox.showwarning(
+                "File Locked",
+                "The RWI file is currently locked by the Full RWI Viewer/Editor. Changes to the selected RWI component were not saved."
+            )
+            return
+
+        component_name = self.rwi_editor_widgets.get("component_name")
+        start_bracket = self.rwi_editor_widgets.get("start_bracket").get()
+        end_bracket = self.rwi_editor_widgets.get("end_bracket").get()
+        instruction = self.rwi_editor_widgets.get("instruction").get("1.0", "end-1c")
+
+        if component_name:
+            self.save_rwi_instruction(component_name, instruction, start_bracket, end_bracket)
 
     def load_mode(self):
         """Loads a saved mode, overwriting the current component configurations."""
@@ -2557,25 +2570,84 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.create_editor_tab(self.tab_system_rules, "system_rules", "safety.txt")
 
     def create_prompt_order_tab(self):
-        """Creates the UI for the Static RWI tab."""
+        """Creates the UI for the Static RWI tab with a two-panel layout."""
         for widget in self.tab_prompt_order.winfo_children():
             widget.destroy()
 
-        controls_frame = ctk.CTkFrame(self.tab_prompt_order, fg_color="transparent")
-        controls_frame.pack(fill="x", padx=10, pady=5)
+        self.tab_prompt_order.grid_columnconfigure(0, weight=1)
+        self.tab_prompt_order.grid_columnconfigure(1, weight=2)
+        self.tab_prompt_order.grid_rowconfigure(0, weight=1)
 
+        # --- Left Panel: List of Components ---
+        left_panel = ctk.CTkFrame(self.tab_prompt_order)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        left_panel.grid_rowconfigure(1, weight=1)
+        left_panel.grid_columnconfigure(0, weight=1)
+
+        controls_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        controls_frame.pack(fill="x", padx=10, pady=5)
         full_rwi_button = ctk.CTkButton(controls_frame, text="View/Edit Full RWI", command=self.open_full_rwi_viewer)
         full_rwi_button.pack(side="right")
 
         self.prompt_order_list = DraggableListbox(
-            self.tab_prompt_order,
+            left_panel,
             command=self.save_prompt_order,
             rwi_instructions=self.rwi_instructions,
-            theme_manager=self.theme_manager,
-            rwi_save_callback=self.save_rwi_instruction
+            theme_manager=self.theme_manager
         )
         self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
         self.update_prompt_order_list()
+
+        # --- Right Panel: Editor for Selected Component ---
+        self.rwi_editor_panel = ctk.CTkFrame(self.tab_prompt_order)
+        self.rwi_editor_panel.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+        # Placeholder Label
+        self.rwi_editor_placeholder = ctk.CTkLabel(self.rwi_editor_panel, text="Select an item to edit its details.")
+        self.rwi_editor_placeholder.pack(expand=True)
+
+        # Dictionary to hold the editor widgets
+        self.rwi_editor_widgets = {}
+
+    def populate_rwi_editor(self, component_name: str):
+        """Populates the right-hand panel with editor widgets for the selected RWI component."""
+        # Clear existing widgets from the panel
+        for widget in self.rwi_editor_panel.winfo_children():
+            widget.destroy()
+
+        component_data = self.rwi_instructions.get(component_name)
+        if not component_data:
+            self.rwi_editor_placeholder = ctk.CTkLabel(self.rwi_editor_panel, text=f"Could not find details for {component_name}.")
+            self.rwi_editor_placeholder.pack(expand=True)
+            return
+
+        self.rwi_editor_panel.grid_columnconfigure(1, weight=1)
+
+        # Create new widgets
+        ctk.CTkLabel(self.rwi_editor_panel, text="Start Bracket:").grid(row=0, column=0, padx=(0, 5), sticky="w")
+        start_bracket_entry = ctk.CTkEntry(self.rwi_editor_panel)
+        start_bracket_entry.grid(row=0, column=1, sticky="ew")
+        start_bracket_entry.insert(0, component_data.get("start_bracket", ""))
+
+        ctk.CTkLabel(self.rwi_editor_panel, text="End Bracket:").grid(row=1, column=0, padx=(0, 5), pady=(5,0), sticky="w")
+        end_bracket_entry = ctk.CTkEntry(self.rwi_editor_panel)
+        end_bracket_entry.grid(row=1, column=1, sticky="ew", pady=(5,0))
+        end_bracket_entry.insert(0, component_data.get("end_bracket", ""))
+
+        ctk.CTkLabel(self.rwi_editor_panel, text="Instruction:").grid(row=2, column=0, columnspan=2, sticky="w", pady=(10, 5))
+        instruction_textbox = ctk.CTkTextbox(self.rwi_editor_panel, wrap="word")
+        instruction_textbox.grid(row=3, column=0, columnspan=2, sticky="nsew")
+        instruction_textbox.insert("1.0", component_data.get("instruction", ""))
+
+        self.rwi_editor_panel.grid_rowconfigure(3, weight=1)
+
+        # Store references to the widgets for saving
+        self.rwi_editor_widgets = {
+            "component_name": component_name, # Store which component is being edited
+            "start_bracket": start_bracket_entry,
+            "end_bracket": end_bracket_entry,
+            "instruction": instruction_textbox
+        }
 
     def open_full_rwi_viewer(self):
         """Opens the popup to view/edit the entire rwi_instructions.txt file."""
