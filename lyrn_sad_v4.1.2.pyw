@@ -132,9 +132,10 @@ class InstructionPopup(ThemedPopup):
 
 class DraggableListbox(ctk.CTkScrollableFrame):
     """A scrollable frame that supports drag-and-drop reordering and pinning of items."""
-    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, **kwargs):
+    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, parent_popup=None, **kwargs):
         super().__init__(master, **kwargs)
         self.command = command
+        self.parent_popup = parent_popup
         self.rwi_instructions = rwi_instructions or {}
         self.theme_manager = theme_manager
         self.rwi_save_callback = rwi_save_callback
@@ -145,6 +146,7 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.drop_indicator = ctk.CTkFrame(self, height=2, fg_color=LYRN_ACCENT, corner_radius=0)
         self.drop_indicator_index = -1
         self.drag_offset_y = 0
+        self.is_drag_active = False
 
     def get_selected_item(self):
         """Returns the currently selected item's frame."""
@@ -217,8 +219,8 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         return [self.item_map[item] for item in self.items]
 
     def _on_press(self, event, widget):
-        """Callback for when a mouse button is pressed on an item."""
-        # Find the actual frame to drag from the widget that was clicked
+        """Callback for when a mouse button is pressed on an item. Handles SELECTION only."""
+        # Find the actual frame to select from the widget that was clicked
         if isinstance(widget, (ctk.CTkLabel, ctk.CTkButton)):
             frame_to_select = widget.master
         else:
@@ -226,30 +228,38 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
         # Update selection
         self.selected_item = frame_to_select
-        self.dragged_item = frame_to_select
+        self.is_drag_active = False # Reset drag flag on every new press
 
-        # Visual feedback for selection and drag
+        # Visual feedback for selection
         for item in self.items:
             is_pinned = self.item_map[item].get("pinned", False)
             if item == self.selected_item:
-                item.configure(fg_color=LYRN_PURPLE) # Drag color
+                item.configure(fg_color=LYRN_PURPLE) # Highlight color for selection
             elif is_pinned:
                 item.configure(fg_color=("#E8D5F9", "#402354")) # Pinned color
             else:
                 item.configure(fg_color="transparent") # Default color
 
-        self.dragged_item.lift()
-        self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
-
         # Call parent to populate the editor panel
         component_name = self.item_map[self.selected_item]["path"]
-        if hasattr(self.master.master, 'populate_rwi_editor'):
-            self.master.master.populate_rwi_editor(component_name)
+        if self.parent_popup and hasattr(self.parent_popup, 'populate_rwi_editor'):
+            self.parent_popup.populate_rwi_editor(component_name)
 
     def _on_drag(self, event):
         """Callback for when an item is being dragged."""
-        if not self.dragged_item:
+        if not self.selected_item:
             return
+
+        # --- Initiate drag on first motion ---
+        if not self.is_drag_active:
+            self.is_drag_active = True
+            self.dragged_item = self.selected_item
+            self.dragged_item.lift()
+            self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
+        # ------------------------------------
+
+        if not self.dragged_item:
+             return
 
         # Move the item using root coordinates for smoothness
         new_y_root = event.y_root - self.drag_offset_y
@@ -299,14 +309,14 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
     def _on_release(self, event):
         """Callback for when the mouse button is released."""
+        if not self.is_drag_active:
+            return
+
         if not self.dragged_item:
             return
 
         # Hide indicator
         self.drop_indicator.place_forget()
-
-        # The visual state of the selected item is now managed in _on_press to make it persistent.
-        # We only handle the reordering logic here.
 
         # Use the calculated target_index from the indicator
         target_index = self.drop_indicator_index
@@ -332,6 +342,7 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
         self.dragged_item = None
         self.drop_indicator_index = -1
+        self.is_drag_active = False
 
         # Execute the callback command if provided
         if self.command:
@@ -2228,6 +2239,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
 
         self.create_widgets()
+        self.toggle_on_top() # Set initial state
+        self.apply_theme()
 
     def _is_rwi_locked(self) -> bool:
         """Checks if the RWI file is locked by the FullRWIViewerPopup."""
@@ -2240,28 +2253,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
                 return data.get("locked", False)
         except (IOError, json.JSONDecodeError):
             return False
-
-    def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
-        super().__init__(parent=parent, theme_manager=theme_manager)
-        self.language_manager = language_manager
-        self.snapshot_loader = snapshot_loader
-        self.build_prompt_dir = Path(SCRIPT_DIR) / "build_prompt"
-        self.config_path = self.build_prompt_dir / "builder_config.json"
-        self.rwi_order_path = self.build_prompt_dir / "rwi_order.json"
-
-        self.title("System Prompt Builder")
-        self.geometry("1200x700")
-        self.minsize(600, 500)
-
-        self.on_top_var = ctk.BooleanVar(value=False)
-        self.config = self._load_json(self.config_path)
-        self.rwi_instructions = {}
-        self._load_rwi_instructions()
-
-
-        self.create_widgets()
-        self.toggle_on_top() # Set initial state
-        self.apply_theme()
 
     def _load_rwi_instructions(self):
         """Loads and parses the RWI instructions from the text file, including brackets."""
@@ -2377,11 +2368,36 @@ class SystemPromptBuilderPopup(ThemedPopup):
         """Saves all changes from all tabs."""
         self.save_prompt_order() # Saves rwi_order.json
         self.save_rwi_editor_changes() # Saves the currently open RWI component
+        self._save_rwi_main_brackets()
         for config_key in self.editor_tabs.keys():
             self.save_component_config(config_key)
         self.save_personality_config()
         self.save_heartbeat_config()
         self.parent_app.update_status("All changes saved.", LYRN_SUCCESS)
+
+    def _save_rwi_main_brackets(self):
+        """Saves the main RWI start and end brackets to the instructions file."""
+        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
+        try:
+            lines = self._load_text(rwi_path).split('\n')
+
+            start_bracket = self.rwi_start_bracket_entry.get()
+            end_bracket = self.rwi_end_bracket_entry.get()
+
+            if lines:
+                lines[0] = start_bracket
+                if lines[-1].strip().startswith("###") and lines[-1].strip().endswith("###"):
+                    lines[-1] = end_bracket
+                else:
+                    lines.append(end_bracket)
+            else:
+                lines = [start_bracket, "# Relational Web Index (RWI) Instructions", end_bracket]
+
+            self._save_text(rwi_path, "\n".join(lines))
+
+        except Exception as e:
+            print(f"Error saving RWI main brackets: {e}")
+            self.parent_app.update_status("Error saving RWI main brackets.", LYRN_ERROR)
 
     def save_rwi_editor_changes(self):
         """Saves the content of the RWI editor panel if a component is being edited."""
@@ -2389,7 +2405,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
             return # Nothing to save
 
         if self._is_rwi_locked():
-            tkinter.messagebox.showwarning(
+            tk.messagebox.showwarning(
                 "File Locked",
                 "The RWI file is currently locked by the Full RWI Viewer/Editor. Changes to the selected RWI component were not saved."
             )
@@ -2581,11 +2597,42 @@ class SystemPromptBuilderPopup(ThemedPopup):
         # --- Left Panel: List of Components ---
         left_panel = ctk.CTkFrame(self.tab_prompt_order)
         left_panel.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        left_panel.grid_rowconfigure(1, weight=1)
+        left_panel.grid_rowconfigure(2, weight=1) # Configure row 2 to expand
         left_panel.grid_columnconfigure(0, weight=1)
 
+        # --- Main Brackets Frame ---
+        main_brackets_frame = ctk.CTkFrame(left_panel)
+        main_brackets_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        main_brackets_frame.grid_columnconfigure(1, weight=1)
+
+        # Load brackets from file
+        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
+        content = self._load_text(rwi_path)
+        lines = content.split('\n')
+        start_bracket = "###RWI_INSTRUCTIONS_START###" # Default
+        end_bracket = "###RWI_INSTRUCTIONS_END###" # Default
+        if lines and lines[0].strip():
+            start_bracket = lines[0].strip()
+        if lines:
+            # Search for the end bracket from the bottom up.
+            for i in range(len(lines) - 1, -1, -1):
+                line = lines[i].strip()
+                if line.startswith("###") and line.endswith("###") and "END" in line:
+                    end_bracket = line
+                    break
+
+        ctk.CTkLabel(main_brackets_frame, text="RWI Start Bracket:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.rwi_start_bracket_entry = ctk.CTkEntry(main_brackets_frame)
+        self.rwi_start_bracket_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.rwi_start_bracket_entry.insert(0, start_bracket)
+
+        ctk.CTkLabel(main_brackets_frame, text="RWI End Bracket:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.rwi_end_bracket_entry = ctk.CTkEntry(main_brackets_frame)
+        self.rwi_end_bracket_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        self.rwi_end_bracket_entry.insert(0, end_bracket)
+
         controls_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
-        controls_frame.pack(fill="x", padx=10, pady=5)
+        controls_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
         full_rwi_button = ctk.CTkButton(controls_frame, text="View/Edit Full RWI", command=self.open_full_rwi_viewer)
         full_rwi_button.pack(side="right")
 
@@ -2593,9 +2640,11 @@ class SystemPromptBuilderPopup(ThemedPopup):
             left_panel,
             command=self.save_prompt_order,
             rwi_instructions=self.rwi_instructions,
-            theme_manager=self.theme_manager
+            theme_manager=self.theme_manager,
+            parent_popup=self
         )
-        self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
+        # Use grid instead of pack for better layout management
+        self.prompt_order_list.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
         self.update_prompt_order_list()
 
         # --- Right Panel: Editor for Selected Component ---
