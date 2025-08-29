@@ -33,6 +33,8 @@ from cycle_manager import CycleManager
 from episodic_memory_manager import EpisodicMemoryManager
 from system_checker import SystemChecker
 from topic_manager import TopicManager
+from rwi_editor_popup import RWIInstructionEditorPopup
+from full_rwi_viewer_popup import FullRWIViewerPopup
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -131,11 +133,12 @@ class InstructionPopup(ThemedPopup):
 
 class DraggableListbox(ctk.CTkScrollableFrame):
     """A scrollable frame that supports drag-and-drop reordering and pinning of items."""
-    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, **kwargs):
+    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, **kwargs):
         super().__init__(master, **kwargs)
         self.command = command
         self.rwi_instructions = rwi_instructions or {}
         self.theme_manager = theme_manager
+        self.rwi_save_callback = rwi_save_callback
         self.items = []
         self.item_map = {}
         self.dragged_item = None
@@ -144,11 +147,20 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.drop_indicator_index = -1
         self.drag_offset_y = 0
 
-    def show_rwi_info(self, component_name: str):
-        """Shows a popup with instructions for the RWI component."""
-        instruction = self.rwi_instructions.get(component_name, self.rwi_instructions.get("default", "No instruction available."))
-        title = f"Info: {component_name}"
-        popup = InstructionPopup(self, self.theme_manager, title, instruction)
+    def open_rwi_editor(self, component_name: str):
+        """Opens a popup to edit the instruction for an RWI component."""
+        if not self.rwi_save_callback:
+            print("Error: RWI save callback is not defined.")
+            return
+
+        instruction = self.rwi_instructions.get(component_name, "")
+        popup = RWIInstructionEditorPopup(
+            parent=self,
+            theme_manager=self.theme_manager,
+            component_name=component_name,
+            instruction=instruction,
+            save_callback=self.rwi_save_callback
+        )
         popup.focus()
 
     def get_selected_item(self):
@@ -172,10 +184,10 @@ class DraggableListbox(ctk.CTkScrollableFrame):
                                    command=lambda frame=item_frame: self.toggle_pin(frame))
         pin_button.pack(side="left", padx=5, pady=5)
 
-        # Info button for RWI instructions
-        info_button = ctk.CTkButton(item_frame, text="?", width=30,
-                                    command=lambda: self.show_rwi_info(text))
-        info_button.pack(side="left", padx=5, pady=5)
+        # Edit button for RWI instructions
+        edit_button = ctk.CTkButton(item_frame, text="✏️", width=30,
+                                    command=lambda: self.open_rwi_editor(text))
+        edit_button.pack(side="left", padx=5, pady=5)
 
         label = ctk.CTkLabel(item_frame, text=text, **kwargs)
         label.pack(side="left", padx=10, pady=5)
@@ -2199,10 +2211,67 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
         self.on_top_var = ctk.BooleanVar(value=False)
         self.config = self._load_json(self.config_path)
+        self.rwi_instructions = {}
+        self._load_rwi_instructions()
+
 
         self.create_widgets()
         self.toggle_on_top() # Set initial state
         self.apply_theme()
+
+    def _load_rwi_instructions(self):
+        """Loads and parses the RWI instructions from the text file."""
+        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
+        self.rwi_instructions = {}
+        try:
+            content = self._load_text(rwi_path)
+            # Find the relevant part of the instructions
+            match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', content, re.DOTALL)
+            if not match:
+                return
+
+            instruction_block = match.group(1).strip()
+            lines = instruction_block.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('-'):
+                    parts = line[1:].strip().split(':', 1)
+                    if len(parts) == 2:
+                        component = parts[0].strip()
+                        instruction = parts[1].strip()
+                        self.rwi_instructions[component] = instruction
+        except Exception as e:
+            print(f"Error loading or parsing RWI instructions: {e}")
+
+    def save_rwi_instruction(self, component_name: str, new_instruction: str):
+        """Saves a single RWI instruction back to the file."""
+        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
+        try:
+            content = self._load_text(rwi_path)
+            lines = content.split('\n')
+            new_lines = []
+            found = False
+            for line in lines:
+                if line.strip().startswith(f'- {component_name}:'):
+                    new_lines.append(f'- **{component_name}**: {new_instruction}')
+                    found = True
+                else:
+                    new_lines.append(line)
+
+            if not found:
+                # This case shouldn't happen with the current UI, but as a fallback
+                print(f"Warning: Component {component_name} not found in rwi_instructions.txt. Not saving.")
+                return
+
+            self._save_text(rwi_path, "\n".join(new_lines))
+            # Reload instructions into memory
+            self._load_rwi_instructions()
+            self.parent_app.update_status(f"Instruction for '{component_name}' saved.", LYRN_SUCCESS)
+
+        except Exception as e:
+            print(f"Error saving RWI instruction: {e}")
+            self.parent_app.update_status(f"Error saving instruction for '{component_name}'.", LYRN_ERROR)
+
 
     def _load_json(self, path: Path) -> dict:
         """Loads a JSON file."""
@@ -2419,20 +2488,33 @@ class SystemPromptBuilderPopup(ThemedPopup):
         for widget in self.tab_prompt_order.winfo_children():
             widget.destroy()
 
-        # Define RWI instructions
-        self.rwi_instructions = {
-            "system_instructions": "Core instructions that define the AI's primary function and operational guidelines.",
-            "personality": "Shapes the AI's tone, style, and conversational persona. Sliders control specific traits.",
-            "heartbeat": "Internal cognitive cycle. Defines what the AI thinks about between interactions.",
-            "user_preferences": "Defines the user's preferences for interaction, such as desired tone or verbosity.",
-            "ai_preferences": "Defines the AI's own preferences or default behaviors.",
-            "system_rules": "Hard constraints and safety protocols that the AI must follow.",
-            "default": "This component does not have a specific instruction in the documentation."
-        }
+        controls_frame = ctk.CTkFrame(self.tab_prompt_order, fg_color="transparent")
+        controls_frame.pack(fill="x", padx=10, pady=5)
 
-        self.prompt_order_list = DraggableListbox(self.tab_prompt_order, command=self.save_prompt_order, rwi_instructions=self.rwi_instructions, theme_manager=self.theme_manager)
+        full_rwi_button = ctk.CTkButton(controls_frame, text="View/Edit Full RWI", command=self.open_full_rwi_viewer)
+        full_rwi_button.pack(side="right")
+
+        self.prompt_order_list = DraggableListbox(
+            self.tab_prompt_order,
+            command=self.save_prompt_order,
+            rwi_instructions=self.rwi_instructions,
+            theme_manager=self.theme_manager,
+            rwi_save_callback=self.save_rwi_instruction
+        )
         self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
         self.update_prompt_order_list()
+
+    def open_full_rwi_viewer(self):
+        """Opens the popup to view/edit the entire rwi_instructions.txt file."""
+        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
+        lock_path = self.build_prompt_dir / "rwi_lock.json"
+        popup = FullRWIViewerPopup(
+            parent=self,
+            theme_manager=self.theme_manager,
+            rwi_path=str(rwi_path),
+            lock_path=str(lock_path)
+        )
+        popup.focus()
 
     def update_prompt_order_list(self):
         """Populates the draggable list with the current prompt order."""
@@ -5034,7 +5116,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.0.8")
+        self.title("LYRN-AI Dashboard v4.1.2")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
