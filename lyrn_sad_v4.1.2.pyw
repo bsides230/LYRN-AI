@@ -132,10 +132,11 @@ class InstructionPopup(ThemedPopup):
 
 class DraggableListbox(ctk.CTkScrollableFrame):
     """A scrollable frame that supports drag-and-drop reordering and pinning of items."""
-    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, parent_popup=None, **kwargs):
+    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, parent_popup=None, toggle_command=None, **kwargs):
         super().__init__(master, **kwargs)
         self.command = command
         self.parent_popup = parent_popup
+        self.toggle_command = toggle_command
         self.rwi_instructions = rwi_instructions or {}
         self.theme_manager = theme_manager
         self.rwi_save_callback = rwi_save_callback
@@ -156,6 +157,7 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         """Adds a new draggable item to the list."""
         text = item_data["path"]
         is_pinned = item_data.get("pinned", False)
+        is_active = item_data.get("active", True)
 
         item_frame = ctk.CTkFrame(self, corner_radius=3)
         if is_pinned:
@@ -168,6 +170,13 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         pin_button = ctk.CTkButton(item_frame, text=pin_char, width=30,
                                    command=lambda frame=item_frame: self.toggle_pin(frame))
         pin_button.pack(side="left", padx=5, pady=5)
+
+        # Toggle switch
+        toggle_var = ctk.BooleanVar(value=is_active)
+        toggle_switch = ctk.CTkSwitch(item_frame, text="", variable=toggle_var,
+                                      command=lambda: self.toggle_command(item_data["path"], toggle_var.get()))
+        toggle_switch.pack(side="left", padx=5, pady=5)
+
 
         label = ctk.CTkLabel(item_frame, text=text, **kwargs)
         label.pack(side="left", padx=10, pady=5)
@@ -636,42 +645,37 @@ class SnapshotLoader:
 
         prompt_parts = []
 
+        components_path = os.path.join(self.build_prompt_dir, "components.json")
+        components = self._load_json_file(components_path) or []
+
+        # Filter for active components and sort by order
+        active_components = sorted([c for c in components if c.get('active', True)], key=lambda x: x.get('order', 0))
+
         # --- Build the Static RWI block first ---
-        rwi_order_path = os.path.join(self.build_prompt_dir, "rwi_order.json")
-        rwi_instructions_path = os.path.join(self.build_prompt_dir, "rwi_instructions.txt")
-
-        rwi_order = self._load_json_file(rwi_order_path) or []
-        rwi_instructions_content = self._load_text_file(rwi_instructions_path)
-
-        rwi_instructions = {}
-        # Parse the instructions file to get brackets and instructions for each component
-        pattern = re.compile(r"-\s*([^:]+):\[([^\]]*)\]\[([^\]]*)\]:\s*(.*)")
-        instruction_block_match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', rwi_instructions_content, re.DOTALL)
-        if instruction_block_match:
-            instruction_block = instruction_block_match.group(1).strip()
-            for line in instruction_block.split('\n'):
-                match = pattern.match(line.strip())
-                if match:
-                    component, start, end, instruction = match.groups()
-                    rwi_instructions[component.strip()] = {"start": start, "end": end, "instruction": instruction.strip()}
-
-        # Construct the RWI block based on the specified order
         rwi_parts = []
-        for component_name in rwi_order:
-            if component_name in rwi_instructions:
-                data = rwi_instructions[component_name]
-                # Per user feedback, individual RWI sections do not have brackets.
-                instruction = data.get("instruction", "")
-                rwi_parts.append(instruction)
+        for component in active_components:
+            component_name = component['name']
+            config_path = os.path.join(self.build_prompt_dir, component_name, "config.json")
+            if component_name == "heartbeat":
+                config_path = os.path.join(self.build_prompt_dir, "heartbeat", "heartbeat_config.json")
+
+            config = self._load_json_file(config_path)
+            if config and "rwi_text" in config:
+                rwi_parts.append(config["rwi_text"])
 
         if rwi_parts:
-            # We add a header for the entire RWI block for clarity in the master prompt
+            # The start and end brackets are now defined in the SystemPromptBuilderPopup and are not part of this process.
+            # The user wants the final RWI text to be wrapped in the brackets from the UI.
+            # This method just builds the content. The wrapping should happen elsewhere.
+            # For now, I will just join the parts.
+            # A better approach would be to have the start/end brackets also in a config file.
+            # Let's assume for now that the brackets are static.
             full_rwi_block = "###RWI_INSTRUCTIONS_START###\n" + "\n\n".join(rwi_parts) + "\n###RWI_INSTRUCTIONS_END###"
             prompt_parts.append(full_rwi_block)
 
         # --- Build the rest of the prompt components ---
-        order = self._load_json_file(self.prompt_order_path) or []
-        for component_name in order:
+        for component in active_components:
+            component_name = component['name']
             component_dir = os.path.join(self.build_prompt_dir, component_name)
             config_path = os.path.join(component_dir, "config.json")
 
@@ -2225,7 +2229,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.snapshot_loader = snapshot_loader
         self.build_prompt_dir = Path(SCRIPT_DIR) / "build_prompt"
         self.config_path = self.build_prompt_dir / "builder_config.json"
-        self.rwi_order_path = self.build_prompt_dir / "rwi_order.json"
+        self.components_path = self.build_prompt_dir / "components.json"
 
         self.title("System Prompt Builder")
         self.geometry("1200x700")
@@ -2257,6 +2261,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
         """Loads and parses the RWI instructions from the text file."""
         rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
         self.rwi_instructions = {}
+        if not rwi_path.exists():
+            return
         try:
             content = self._load_text(rwi_path)
             # Find the relevant part of the instructions (between the main brackets)
@@ -2283,36 +2289,24 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
     def save_rwi_instruction(self, component_name: str, new_instruction: str):
         """Saves a single RWI instruction back to the file in simple format."""
-        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
-        try:
-            content = self._load_text(rwi_path)
-            lines = content.split('\n')
-            new_lines = []
-            found = False
-
-            # This regex is now more generic to find the component line, regardless of format
-            pattern = re.compile(r"-\s*" + re.escape(component_name) + r":.*")
-
-            for line in lines:
-                if pattern.match(line.strip()):
-                    # Reconstruct the line in the new, simple format
-                    new_line = f"- {component_name}: {new_instruction}"
-                    new_lines.append(new_line)
-                    found = True
-                else:
-                    new_lines.append(line)
-
-            if not found:
-                print(f"Warning: Component {component_name} not found in rwi_instructions.txt. Not saving.")
+        component_dir = self.build_prompt_dir / component_name
+        config_path = component_dir / "config.json"
+        if not config_path.exists():
+            # Handle heartbeat case
+            if component_name == "heartbeat":
+                config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
+            else:
+                self.parent_app.update_status(f"Config for '{component_name}' not found.", LYRN_ERROR)
                 return
 
-            self._save_text(rwi_path, "\n".join(new_lines))
-            self._load_rwi_instructions() # Reload instructions into memory
-            self.parent_app.update_status(f"Instruction for '{component_name}' saved.", LYRN_SUCCESS)
-
+        try:
+            config = self._load_json(config_path)
+            config["rwi_text"] = new_instruction
+            self._save_json(config_path, config)
+            self.parent_app.update_status(f"RWI text for '{component_name}' saved.", LYRN_SUCCESS)
         except Exception as e:
-            print(f"Error saving RWI instruction: {e}")
-            self.parent_app.update_status(f"Error saving instruction for '{component_name}'.", LYRN_ERROR)
+            print(f"Error saving RWI instruction for {component_name}: {e}")
+            self.parent_app.update_status(f"Error saving RWI for '{component_name}'.", LYRN_ERROR)
 
 
     def _load_json(self, path: Path) -> dict:
@@ -2352,7 +2346,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
     def save_all_changes(self):
         """Saves all changes from all tabs."""
-        self.save_prompt_order() # Saves rwi_order.json
+        self.save_prompt_order()
         self.save_rwi_editor_changes() # Saves the currently open RWI component
         self._save_rwi_main_brackets()
         for config_key in self.editor_tabs.keys():
@@ -2363,39 +2357,13 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
     def _save_rwi_main_brackets(self):
         """Saves the main RWI start and end brackets to the instructions file."""
-        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
-        try:
-            lines = self._load_text(rwi_path).split('\n')
-
-            start_bracket = self.rwi_start_bracket_entry.get()
-            end_bracket = self.rwi_end_bracket_entry.get()
-
-            if lines:
-                lines[0] = start_bracket
-                if lines[-1].strip().startswith("###") and lines[-1].strip().endswith("###"):
-                    lines[-1] = end_bracket
-                else:
-                    lines.append(end_bracket)
-            else:
-                lines = [start_bracket, "# Relational Web Index (RWI) Instructions", end_bracket]
-
-            self._save_text(rwi_path, "\n".join(lines))
-
-        except Exception as e:
-            print(f"Error saving RWI main brackets: {e}")
-            self.parent_app.update_status("Error saving RWI main brackets.", LYRN_ERROR)
+        # This functionality is now deprecated as brackets are part of the loader
+        pass
 
     def save_rwi_editor_changes(self):
         """Saves the content of the RWI editor panel if a component is being edited."""
         if not self.rwi_editor_widgets:
             return # Nothing to save
-
-        if self._is_rwi_locked():
-            tk.messagebox.showwarning(
-                "File Locked",
-                "The RWI file is currently locked by the Full RWI Viewer/Editor. Changes to the selected RWI component were not saved."
-            )
-            return
 
         component_name = self.rwi_editor_widgets.get("component_name")
         instruction = self.rwi_editor_widgets.get("instruction").get("1.0", "end-1c")
@@ -2581,7 +2549,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         # --- Left Panel: List of Components ---
         left_panel = ctk.CTkFrame(self.tab_prompt_order)
         left_panel.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        left_panel.grid_rowconfigure(2, weight=1) # Configure row 2 to expand
+        left_panel.grid_rowconfigure(1, weight=1)
         left_panel.grid_columnconfigure(0, weight=1)
 
         # --- Main Brackets Frame ---
@@ -2589,46 +2557,24 @@ class SystemPromptBuilderPopup(ThemedPopup):
         main_brackets_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         main_brackets_frame.grid_columnconfigure(1, weight=1)
 
-        # Load brackets from file
-        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
-        content = self._load_text(rwi_path)
-        lines = content.split('\n')
-        start_bracket = "###RWI_INSTRUCTIONS_START###" # Default
-        end_bracket = "###RWI_INSTRUCTIONS_END###" # Default
-        if lines and lines[0].strip():
-            start_bracket = lines[0].strip()
-        if lines:
-            # Search for the end bracket from the bottom up.
-            for i in range(len(lines) - 1, -1, -1):
-                line = lines[i].strip()
-                if line.startswith("###") and line.endswith("###") and "END" in line:
-                    end_bracket = line
-                    break
-
         ctk.CTkLabel(main_brackets_frame, text="RWI Start Bracket:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.rwi_start_bracket_entry = ctk.CTkEntry(main_brackets_frame)
         self.rwi_start_bracket_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        self.rwi_start_bracket_entry.insert(0, start_bracket)
+        self.rwi_start_bracket_entry.insert(0, "###RWI_INSTRUCTIONS_START###")
 
         ctk.CTkLabel(main_brackets_frame, text="RWI End Bracket:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
         self.rwi_end_bracket_entry = ctk.CTkEntry(main_brackets_frame)
         self.rwi_end_bracket_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-        self.rwi_end_bracket_entry.insert(0, end_bracket)
-
-        controls_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
-        controls_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
-        full_rwi_button = ctk.CTkButton(controls_frame, text="View/Edit Full RWI", command=self.open_full_rwi_viewer)
-        full_rwi_button.pack(side="right")
+        self.rwi_end_bracket_entry.insert(0, "###RWI_INSTRUCTIONS_END###")
 
         self.prompt_order_list = DraggableListbox(
             left_panel,
             command=self.save_prompt_order,
-            rwi_instructions=self.rwi_instructions,
             theme_manager=self.theme_manager,
-            parent_popup=self
+            parent_popup=self,
+            toggle_command=self.toggle_component
         )
-        # Use grid instead of pack for better layout management
-        self.prompt_order_list.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+        self.prompt_order_list.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.update_prompt_order_list()
 
         # --- Right Panel: Editor for Selected Component ---
@@ -2636,7 +2582,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.rwi_editor_panel.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
         # Placeholder Label
-        self.rwi_editor_placeholder = ctk.CTkLabel(self.rwi_editor_panel, text="Select an item to edit its details.")
+        self.rwi_editor_placeholder = ctk.CTkLabel(self.rwi_editor_panel, text="Select an item to edit its RWI text.")
         self.rwi_editor_placeholder.pack(expand=True)
 
         # Dictionary to hold the editor widgets
@@ -2751,16 +2697,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         main_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=5)
         main_frame.grid_columnconfigure(0, weight=1)
 
-        # Toggle Switch
-        widgets['toggle_var'] = ctk.BooleanVar(value=self.config.get(config_key, True))
-        toggle = ctk.CTkSwitch(
-            main_frame,
-            text=f"Enable {config_key.replace('_', ' ').title()}",
-            variable=widgets['toggle_var'],
-            command=lambda: self.toggle_component(config_key, widgets['toggle_var'].get())
-        )
-        toggle.pack(anchor="w", pady=(5, 15))
-
         # Begin Bracket
         ctk.CTkLabel(main_frame, text="Begin Bracket").pack(anchor="w")
         widgets['begin_bracket_entry'] = ctk.CTkEntry(main_frame)
@@ -2832,20 +2768,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
         main_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
         main_frame.pack(fill="both", expand=True, padx=10, pady=5)
-
-        # Enable/Disable Toggle
-        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
-        current_order = self._load_json(prompt_order_path) or []
-        is_enabled = config_key in current_order
-        toggle_var = ctk.BooleanVar(value=is_enabled)
-        toggle_switch = ctk.CTkSwitch(
-            main_frame,
-            text="Enable Personality Component",
-            variable=toggle_var,
-            command=lambda: self.toggle_component(config_key, toggle_var.get())
-        )
-        toggle_switch.pack(anchor="w", pady=(5, 15))
-        self.personality_widgets['toggle_var'] = toggle_var
 
         # Brackets
         ctk.CTkLabel(main_frame, text="Begin Bracket").pack(anchor="w")

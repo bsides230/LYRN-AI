@@ -48,5 +48,6 @@
       "value": 500,
       "instructions": ""
     }
-  ]
+  ],
+  "rwi_text": "- personality: [###PERSONALITY_START###][###PERSONALITY_END###]: A set of traits that define the AI's persona."
 }

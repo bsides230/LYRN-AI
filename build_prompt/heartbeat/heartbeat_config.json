@@ -3,5 +3,6 @@
   "begin_bracket": "###HBISTART###",
   "body": "This is the body of the heartbeat instructions. The user can edit this text to define the LLM's behavior when the heartbeat is triggered.",
   "end_bracket": "###HBIEND###",
-  "trigger": "##JOB_START: HEARTBEAT##"
+  "trigger": "##JOB_START: HEARTBEAT##",
+  "rwi_text": "- heartbeat: [###HBISTART###][###HBIEND###]: Internal cognitive cycle instructions."
 }
