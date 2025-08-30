@@ -2628,24 +2628,58 @@ class SystemPromptBuilderPopup(ThemedPopup):
         popup.focus()
 
     def update_prompt_order_list(self):
-        """Populates the draggable list with the current RWI component order."""
+        """Populates the draggable list from components.json."""
         self.prompt_order_list.clear()
-        # This now correctly loads the RWI order, not the main prompt order.
-        order = self._load_json(self.rwi_order_path)
-        if isinstance(order, list):
-            for item_name in order:
-                # The "path" key is what DraggableListbox expects for the display text.
-                self.prompt_order_list.add_item({"path": item_name, "pinned": False})
+        components = self._load_json(self.components_path)
+        if isinstance(components, list):
+            # Sort by order key to maintain visual consistency
+            sorted_components = sorted(components, key=lambda x: x.get('order', 0))
+            for comp in sorted_components:
+                self.prompt_order_list.add_item({
+                    "path": comp["name"],
+                    "active": comp.get("active", True),
+                    "pinned": False
+                })
 
     def save_prompt_order(self, new_item_objects: Optional[List[dict]] = None):
-        """Saves the new RWI component order. Can be called from button (no args) or listbox command (with args)."""
+        """Saves the new component order to components.json."""
         if new_item_objects is None:
             new_item_objects = self.prompt_order_list.get_item_objects()
 
-        new_order = [item["path"] for item in new_item_objects]
-        # This now correctly saves the RWI order, not the main prompt order.
-        self._save_json(self.rwi_order_path, new_order)
-        self.parent_app.update_status("RWI component order saved.", LYRN_SUCCESS)
+        components = self._load_json(self.components_path)
+        if not isinstance(components, list):
+            components = []
+
+        # Create a map for easy lookup
+        comp_map = {c['name']: c for c in components}
+
+        updated_components = []
+        for i, item in enumerate(new_item_objects):
+            comp_name = item["path"]
+            if comp_name in comp_map:
+                existing_comp = comp_map[comp_name]
+                existing_comp['order'] = i
+                updated_components.append(existing_comp)
+            else:
+                # Add new component if it's somehow not in the file
+                updated_components.append({"name": comp_name, "order": i, "active": True})
+
+        self._save_json(self.components_path, updated_components)
+        self.parent_app.update_status("Component order saved.", LYRN_SUCCESS)
+
+    def toggle_component(self, key: str, is_enabled: bool):
+        """Updates a component's 'active' state in components.json."""
+        components = self._load_json(self.components_path)
+        if not isinstance(components, list):
+            return # Should not happen
+
+        for comp in components:
+            if comp['name'] == key:
+                comp['active'] = is_enabled
+                break
+
+        self._save_json(self.components_path, components)
+        self.parent_app.update_status(f"{key.title()} {'enabled' if is_enabled else 'disabled'}", LYRN_INFO)
 
     def create_editor_tab(self, tab, config_key: str, filename: str):
         """Creates a generic editor tab with brackets, content, and save button."""
