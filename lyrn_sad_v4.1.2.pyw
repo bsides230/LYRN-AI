@@ -33,7 +33,6 @@ from cycle_manager import CycleManager
 from episodic_memory_manager import EpisodicMemoryManager
 from system_checker import SystemChecker
 from topic_manager import TopicManager
-from rwi_editor_popup import RWIInstructionEditorPopup
 from full_rwi_viewer_popup import FullRWIViewerPopup
 
 # CustomTkinter imports
@@ -133,9 +132,11 @@ class InstructionPopup(ThemedPopup):
 
 class DraggableListbox(ctk.CTkScrollableFrame):
     """A scrollable frame that supports drag-and-drop reordering and pinning of items."""
-    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, **kwargs):
+    def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, parent_popup=None, toggle_command=None, **kwargs):
         super().__init__(master, **kwargs)
         self.command = command
+        self.parent_popup = parent_popup
+        self.toggle_command = toggle_command
         self.rwi_instructions = rwi_instructions or {}
         self.theme_manager = theme_manager
         self.rwi_save_callback = rwi_save_callback
@@ -146,22 +147,7 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.drop_indicator = ctk.CTkFrame(self, height=2, fg_color=LYRN_ACCENT, corner_radius=0)
         self.drop_indicator_index = -1
         self.drag_offset_y = 0
-
-    def open_rwi_editor(self, component_name: str):
-        """Opens a popup to edit the instruction for an RWI component."""
-        if not self.rwi_save_callback:
-            print("Error: RWI save callback is not defined.")
-            return
-
-        instruction = self.rwi_instructions.get(component_name, "")
-        popup = RWIInstructionEditorPopup(
-            parent=self,
-            theme_manager=self.theme_manager,
-            component_name=component_name,
-            instruction=instruction,
-            save_callback=self.rwi_save_callback
-        )
-        popup.focus()
+        self.is_drag_active = False
 
     def get_selected_item(self):
         """Returns the currently selected item's frame."""
@@ -171,6 +157,7 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         """Adds a new draggable item to the list."""
         text = item_data["path"]
         is_pinned = item_data.get("pinned", False)
+        is_active = item_data.get("active", True)
 
         item_frame = ctk.CTkFrame(self, corner_radius=3)
         if is_pinned:
@@ -184,10 +171,12 @@ class DraggableListbox(ctk.CTkScrollableFrame):
                                    command=lambda frame=item_frame: self.toggle_pin(frame))
         pin_button.pack(side="left", padx=5, pady=5)
 
-        # Edit button for RWI instructions
-        edit_button = ctk.CTkButton(item_frame, text="✏️", width=30,
-                                    command=lambda: self.open_rwi_editor(text))
-        edit_button.pack(side="left", padx=5, pady=5)
+        # Toggle switch
+        toggle_var = ctk.BooleanVar(value=is_active)
+        toggle_switch = ctk.CTkSwitch(item_frame, text="", variable=toggle_var,
+                                      command=lambda: self.toggle_command(item_data["path"], toggle_var.get()))
+        toggle_switch.pack(side="left", padx=5, pady=5)
+
 
         label = ctk.CTkLabel(item_frame, text=text, **kwargs)
         label.pack(side="left", padx=10, pady=5)
@@ -239,8 +228,8 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         return [self.item_map[item] for item in self.items]
 
     def _on_press(self, event, widget):
-        """Callback for when a mouse button is pressed on an item."""
-        # Find the actual frame to drag from the widget that was clicked
+        """Callback for when a mouse button is pressed on an item. Handles SELECTION only."""
+        # Find the actual frame to select from the widget that was clicked
         if isinstance(widget, (ctk.CTkLabel, ctk.CTkButton)):
             frame_to_select = widget.master
         else:
@@ -248,25 +237,38 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
         # Update selection
         self.selected_item = frame_to_select
-        self.dragged_item = frame_to_select
+        self.is_drag_active = False # Reset drag flag on every new press
 
-        # Visual feedback for selection and drag
+        # Visual feedback for selection
         for item in self.items:
             is_pinned = self.item_map[item].get("pinned", False)
             if item == self.selected_item:
-                item.configure(fg_color=LYRN_PURPLE) # Drag color
+                item.configure(fg_color=LYRN_PURPLE) # Highlight color for selection
             elif is_pinned:
                 item.configure(fg_color=("#E8D5F9", "#402354")) # Pinned color
             else:
                 item.configure(fg_color="transparent") # Default color
 
-        self.dragged_item.lift()
-        self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
+        # Call parent to populate the editor panel
+        component_name = self.item_map[self.selected_item]["path"]
+        if self.parent_popup and hasattr(self.parent_popup, 'populate_rwi_editor'):
+            self.parent_popup.populate_rwi_editor(component_name)
 
     def _on_drag(self, event):
         """Callback for when an item is being dragged."""
-        if not self.dragged_item:
+        if not self.selected_item:
             return
+
+        # --- Initiate drag on first motion ---
+        if not self.is_drag_active:
+            self.is_drag_active = True
+            self.dragged_item = self.selected_item
+            self.dragged_item.lift()
+            self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
+        # ------------------------------------
+
+        if not self.dragged_item:
+             return
 
         # Move the item using root coordinates for smoothness
         new_y_root = event.y_root - self.drag_offset_y
@@ -316,14 +318,14 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
     def _on_release(self, event):
         """Callback for when the mouse button is released."""
+        if not self.is_drag_active:
+            return
+
         if not self.dragged_item:
             return
 
         # Hide indicator
         self.drop_indicator.place_forget()
-
-        # The visual state of the selected item is now managed in _on_press to make it persistent.
-        # We only handle the reordering logic here.
 
         # Use the calculated target_index from the indicator
         target_index = self.drop_indicator_index
@@ -349,6 +351,7 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
         self.dragged_item = None
         self.drop_indicator_index = -1
+        self.is_drag_active = False
 
         # Execute the callback command if provided
         if self.command:
@@ -638,19 +641,46 @@ class SnapshotLoader:
 
     def build_master_prompt_from_components(self) -> str:
         """Builds the master prompt by concatenating enabled components based on their new config files."""
+        config = self._load_json_file(self.config_path)
+        if config and config.get("master_prompt_locked", False):
+            print("Master prompt is locked. Loading directly from file.")
+            return self._load_text_file(self.master_prompt_path)
+
         print("Building master prompt from components...")
-        order = self._load_json_file(self.prompt_order_path) or []
 
         prompt_parts = []
 
-        # Prepend Static RWI instructions
-        rwi_instructions_path = os.path.join(self.build_prompt_dir, "rwi_instructions.txt")
-        if os.path.exists(rwi_instructions_path):
-            rwi_instructions = self._load_text_file(rwi_instructions_path)
-            if rwi_instructions:
-                prompt_parts.append(rwi_instructions)
+        components_path = os.path.join(self.build_prompt_dir, "components.json")
+        components = self._load_json_file(components_path) or []
 
-        for component_name in order:
+        # Filter for active components and sort by order
+        active_components = sorted([c for c in components if c.get('active', True)], key=lambda x: x.get('order', 0))
+
+        # --- Build the Static RWI block first ---
+        rwi_parts = []
+        for component in active_components:
+            component_name = component['name']
+            config_path = os.path.join(self.build_prompt_dir, component_name, "config.json")
+            if component_name == "heartbeat":
+                config_path = os.path.join(self.build_prompt_dir, "heartbeat", "heartbeat_config.json")
+
+            config = self._load_json_file(config_path)
+            if config and "rwi_text" in config:
+                rwi_parts.append(config["rwi_text"])
+
+        if rwi_parts:
+            # The start and end brackets are now defined in the SystemPromptBuilderPopup and are not part of this process.
+            # The user wants the final RWI text to be wrapped in the brackets from the UI.
+            # This method just builds the content. The wrapping should happen elsewhere.
+            # For now, I will just join the parts.
+            # A better approach would be to have the start/end brackets also in a config file.
+            # Let's assume for now that the brackets are static.
+            full_rwi_block = "###RWI_INSTRUCTIONS_START###\n" + "\n\n".join(rwi_parts) + "\n###RWI_INSTRUCTIONS_END###"
+            prompt_parts.append(full_rwi_block)
+
+        # --- Build the rest of the prompt components ---
+        for component in active_components:
+            component_name = component['name']
             component_dir = os.path.join(self.build_prompt_dir, component_name)
             config_path = os.path.join(component_dir, "config.json")
 
@@ -2204,6 +2234,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.snapshot_loader = snapshot_loader
         self.build_prompt_dir = Path(SCRIPT_DIR) / "build_prompt"
         self.config_path = self.build_prompt_dir / "builder_config.json"
+        self.components_path = self.build_prompt_dir / "components.json"
 
         self.title("System Prompt Builder")
         self.geometry("1200x700")
@@ -2219,58 +2250,68 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.toggle_on_top() # Set initial state
         self.apply_theme()
 
+    def _is_rwi_locked(self) -> bool:
+        """Checks if the RWI file is locked by the FullRWIViewerPopup."""
+        lock_path = self.build_prompt_dir / "rwi_lock.json"
+        if not lock_path.exists():
+            return False
+        try:
+            with open(lock_path, 'r') as f:
+                data = json.load(f)
+                return data.get("locked", False)
+        except (IOError, json.JSONDecodeError):
+            return False
+
     def _load_rwi_instructions(self):
         """Loads and parses the RWI instructions from the text file."""
         rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
         self.rwi_instructions = {}
+        if not rwi_path.exists():
+            return
         try:
             content = self._load_text(rwi_path)
-            # Find the relevant part of the instructions
-            match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', content, re.DOTALL)
+            # Find the relevant part of the instructions (between the main brackets)
+            match = re.search(r'###RWI_INSTRUCTIONS_START###(.*)###RWI_INSTRUCTIONS_END###', content, re.DOTALL)
             if not match:
-                return
+                 match = re.search(r'# Relational Web Index \(RWI\) Instructions(.*?)\#\#\#RWI_INSTRUCTIONS_END\#\#\#', content, re.DOTALL)
+                 if not match:
+                    return
 
             instruction_block = match.group(1).strip()
             lines = instruction_block.split('\n')
             for line in lines:
                 line = line.strip()
                 if line.startswith('-'):
+                    # The format is simply: - component_name: instruction
                     parts = line[1:].strip().split(':', 1)
                     if len(parts) == 2:
-                        component = parts[0].strip()
-                        instruction = parts[1].strip()
-                        self.rwi_instructions[component] = instruction
+                        component, instruction = parts
+                        self.rwi_instructions[component.strip()] = {
+                            "instruction": instruction.strip()
+                        }
         except Exception as e:
             print(f"Error loading or parsing RWI instructions: {e}")
 
     def save_rwi_instruction(self, component_name: str, new_instruction: str):
-        """Saves a single RWI instruction back to the file."""
-        rwi_path = self.build_prompt_dir / "rwi_instructions.txt"
-        try:
-            content = self._load_text(rwi_path)
-            lines = content.split('\n')
-            new_lines = []
-            found = False
-            for line in lines:
-                if line.strip().startswith(f'- {component_name}:'):
-                    new_lines.append(f'- **{component_name}**: {new_instruction}')
-                    found = True
-                else:
-                    new_lines.append(line)
-
-            if not found:
-                # This case shouldn't happen with the current UI, but as a fallback
-                print(f"Warning: Component {component_name} not found in rwi_instructions.txt. Not saving.")
+        """Saves a single RWI instruction back to the file in simple format."""
+        component_dir = self.build_prompt_dir / component_name
+        config_path = component_dir / "config.json"
+        if not config_path.exists():
+            # Handle heartbeat case
+            if component_name == "heartbeat":
+                config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
+            else:
+                self.parent_app.update_status(f"Config for '{component_name}' not found.", LYRN_ERROR)
                 return
 
-            self._save_text(rwi_path, "\n".join(new_lines))
-            # Reload instructions into memory
-            self._load_rwi_instructions()
-            self.parent_app.update_status(f"Instruction for '{component_name}' saved.", LYRN_SUCCESS)
-
+        try:
+            config = self._load_json(config_path)
+            config["rwi_text"] = new_instruction
+            self._save_json(config_path, config)
+            self.parent_app.update_status(f"RWI text for '{component_name}' saved.", LYRN_SUCCESS)
         except Exception as e:
-            print(f"Error saving RWI instruction: {e}")
-            self.parent_app.update_status(f"Error saving instruction for '{component_name}'.", LYRN_ERROR)
+            print(f"Error saving RWI instruction for {component_name}: {e}")
+            self.parent_app.update_status(f"Error saving RWI for '{component_name}'.", LYRN_ERROR)
 
 
     def _load_json(self, path: Path) -> dict:
@@ -2308,14 +2349,21 @@ class SystemPromptBuilderPopup(ThemedPopup):
         except IOError as e:
             print(f"Error saving {path}: {e}")
 
-    def save_all_changes(self):
-        """Saves all changes from all tabs."""
-        self.save_prompt_order()
-        for config_key in self.editor_tabs.keys():
-            self.save_component_config(config_key)
-        self.save_personality_config()
-        self.save_heartbeat_config()
-        self.parent_app.update_status("All changes saved.", LYRN_SUCCESS)
+    def _save_rwi_main_brackets(self):
+        """Saves the main RWI start and end brackets to the instructions file."""
+        # This functionality is now deprecated as brackets are part of the loader
+        pass
+
+    def save_rwi_editor_changes(self):
+        """Saves the content of the RWI editor panel if a component is being edited."""
+        if not self.rwi_editor_widgets:
+            return # Nothing to save
+
+        component_name = self.rwi_editor_widgets.get("component_name")
+        instruction = self.rwi_editor_widgets.get("instruction").get("1.0", "end-1c")
+
+        if component_name:
+            self.save_rwi_instruction(component_name, instruction)
 
     def load_mode(self):
         """Loads a saved mode, overwriting the current component configurations."""
@@ -2438,9 +2486,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         top_frame = ctk.CTkFrame(self, fg_color="transparent")
         top_frame.pack(fill="x", padx=10, pady=(10, 0))
 
-        save_all_button = ctk.CTkButton(top_frame, text="Save All Changes", command=self.save_all_changes)
-        save_all_button.pack(side="left", padx=5, pady=5)
-
         rebuild_prompt_button = ctk.CTkButton(top_frame, text="Rebuild Master Prompt", command=self.parent_app.refresh_prompt_from_mode)
         rebuild_prompt_button.pack(side="left", padx=5, pady=5)
 
@@ -2460,6 +2505,10 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
         on_top_checkbox = ctk.CTkCheckBox(top_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
         on_top_checkbox.pack(side="right", padx=5, pady=5)
+
+        self.master_prompt_lock_var = ctk.BooleanVar(value=self.config.get("master_prompt_locked", False))
+        lock_checkbox = ctk.CTkCheckBox(top_frame, text="Lock Master Prompt", variable=self.master_prompt_lock_var, command=self.toggle_master_prompt_lock)
+        lock_checkbox.pack(side="left", padx=20, pady=5)
 
         self.populate_modes_dropdown()
 
@@ -2484,25 +2533,82 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.create_editor_tab(self.tab_system_rules, "system_rules", "safety.txt")
 
     def create_prompt_order_tab(self):
-        """Creates the UI for the Static RWI tab."""
+        """Creates the UI for the Static RWI tab with a two-panel layout."""
         for widget in self.tab_prompt_order.winfo_children():
             widget.destroy()
 
-        controls_frame = ctk.CTkFrame(self.tab_prompt_order, fg_color="transparent")
-        controls_frame.pack(fill="x", padx=10, pady=5)
+        self.tab_prompt_order.grid_columnconfigure(0, weight=1)
+        self.tab_prompt_order.grid_columnconfigure(1, weight=2)
+        self.tab_prompt_order.grid_rowconfigure(0, weight=1)
 
-        full_rwi_button = ctk.CTkButton(controls_frame, text="View/Edit Full RWI", command=self.open_full_rwi_viewer)
-        full_rwi_button.pack(side="right")
+        # --- Left Panel: List of Components ---
+        left_panel = ctk.CTkFrame(self.tab_prompt_order)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        left_panel.grid_rowconfigure(1, weight=1)
+        left_panel.grid_columnconfigure(0, weight=1)
+
+        # --- Main Brackets Frame ---
+        main_brackets_frame = ctk.CTkFrame(left_panel)
+        main_brackets_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        main_brackets_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(main_brackets_frame, text="RWI Start Bracket:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.rwi_start_bracket_entry = ctk.CTkEntry(main_brackets_frame)
+        self.rwi_start_bracket_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.rwi_start_bracket_entry.insert(0, "###RWI_INSTRUCTIONS_START###")
+
+        ctk.CTkLabel(main_brackets_frame, text="RWI End Bracket:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.rwi_end_bracket_entry = ctk.CTkEntry(main_brackets_frame)
+        self.rwi_end_bracket_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        self.rwi_end_bracket_entry.insert(0, "###RWI_INSTRUCTIONS_END###")
 
         self.prompt_order_list = DraggableListbox(
-            self.tab_prompt_order,
+            left_panel,
             command=self.save_prompt_order,
-            rwi_instructions=self.rwi_instructions,
             theme_manager=self.theme_manager,
-            rwi_save_callback=self.save_rwi_instruction
+            parent_popup=self,
+            toggle_command=self.toggle_component
         )
-        self.prompt_order_list.pack(expand=True, fill="both", padx=10, pady=10)
+        self.prompt_order_list.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.update_prompt_order_list()
+
+        # --- Right Panel: Editor for Selected Component ---
+        self.rwi_editor_panel = ctk.CTkFrame(self.tab_prompt_order)
+        self.rwi_editor_panel.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+
+        # Placeholder Label
+        self.rwi_editor_placeholder = ctk.CTkLabel(self.rwi_editor_panel, text="Select an item to edit its RWI text.")
+        self.rwi_editor_placeholder.pack(expand=True)
+
+        # Dictionary to hold the editor widgets
+        self.rwi_editor_widgets = {}
+
+    def populate_rwi_editor(self, component_name: str):
+        """Populates the right-hand panel with editor widgets for the selected RWI component."""
+        # Clear existing widgets from the panel
+        for widget in self.rwi_editor_panel.winfo_children():
+            widget.destroy()
+
+        component_data = self.rwi_instructions.get(component_name)
+        if not component_data:
+            self.rwi_editor_placeholder = ctk.CTkLabel(self.rwi_editor_panel, text=f"Could not find details for {component_name}.")
+            self.rwi_editor_placeholder.pack(expand=True)
+            return
+
+        self.rwi_editor_panel.grid_columnconfigure(0, weight=1)
+        self.rwi_editor_panel.grid_rowconfigure(1, weight=1)
+
+        # Create new widgets
+        ctk.CTkLabel(self.rwi_editor_panel, text="Instruction:").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+        instruction_textbox = ctk.CTkTextbox(self.rwi_editor_panel, wrap="word")
+        instruction_textbox.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        instruction_textbox.insert("1.0", component_data.get("instruction", ""))
+
+        # Store references to the widgets for saving
+        self.rwi_editor_widgets = {
+            "component_name": component_name, # Store which component is being edited
+            "instruction": instruction_textbox
+        }
 
     def open_full_rwi_viewer(self):
         """Opens the popup to view/edit the entire rwi_instructions.txt file."""
@@ -2517,24 +2623,58 @@ class SystemPromptBuilderPopup(ThemedPopup):
         popup.focus()
 
     def update_prompt_order_list(self):
-        """Populates the draggable list with the current prompt order."""
+        """Populates the draggable list from components.json."""
         self.prompt_order_list.clear()
-        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
-        order = self._load_json(prompt_order_path)
-        if isinstance(order, list):
-            for item_name in order:
-                # The "path" key is what DraggableListbox expects
-                self.prompt_order_list.add_item({"path": item_name, "pinned": False})
+        components = self._load_json(self.components_path)
+        if isinstance(components, list):
+            # Sort by order key to maintain visual consistency
+            sorted_components = sorted(components, key=lambda x: x.get('order', 0))
+            for comp in sorted_components:
+                self.prompt_order_list.add_item({
+                    "path": comp["name"],
+                    "active": comp.get("active", True),
+                    "pinned": False
+                })
 
     def save_prompt_order(self, new_item_objects: Optional[List[dict]] = None):
-        """Saves the new prompt order. Can be called from button (no args) or listbox command (with args)."""
+        """Saves the new component order to components.json."""
         if new_item_objects is None:
             new_item_objects = self.prompt_order_list.get_item_objects()
 
-        new_order = [item["path"] for item in new_item_objects]
-        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
-        self._save_json(prompt_order_path, new_order)
-        self.parent_app.update_status("Prompt order saved.", LYRN_SUCCESS)
+        components = self._load_json(self.components_path)
+        if not isinstance(components, list):
+            components = []
+
+        # Create a map for easy lookup
+        comp_map = {c['name']: c for c in components}
+
+        updated_components = []
+        for i, item in enumerate(new_item_objects):
+            comp_name = item["path"]
+            if comp_name in comp_map:
+                existing_comp = comp_map[comp_name]
+                existing_comp['order'] = i
+                updated_components.append(existing_comp)
+            else:
+                # Add new component if it's somehow not in the file
+                updated_components.append({"name": comp_name, "order": i, "active": True})
+
+        self._save_json(self.components_path, updated_components)
+        self.parent_app.update_status("Component order saved.", LYRN_SUCCESS)
+
+    def toggle_component(self, key: str, is_enabled: bool):
+        """Updates a component's 'active' state in components.json."""
+        components = self._load_json(self.components_path)
+        if not isinstance(components, list):
+            return # Should not happen
+
+        for comp in components:
+            if comp['name'] == key:
+                comp['active'] = is_enabled
+                break
+
+        self._save_json(self.components_path, components)
+        self.parent_app.update_status(f"{key.title()} {'enabled' if is_enabled else 'disabled'}", LYRN_INFO)
 
     def create_editor_tab(self, tab, config_key: str, filename: str):
         """Creates a generic editor tab with brackets, content, and save button."""
@@ -2578,6 +2718,9 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.heartbeat_widgets['trigger_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['trigger_text'].pack(fill="x", pady=(0, 10))
 
+            save_button = ctk.CTkButton(main_frame, text="Save Heartbeat", command=self.save_heartbeat_config)
+            save_button.pack(pady=10, anchor="e")
+
             self.load_heartbeat_config()
             return
 
@@ -2585,16 +2728,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         main_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
         main_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=10, pady=5)
         main_frame.grid_columnconfigure(0, weight=1)
-
-        # Toggle Switch
-        widgets['toggle_var'] = ctk.BooleanVar(value=self.config.get(config_key, True))
-        toggle = ctk.CTkSwitch(
-            main_frame,
-            text=f"Enable {config_key.replace('_', ' ').title()}",
-            variable=widgets['toggle_var'],
-            command=lambda: self.toggle_component(config_key, widgets['toggle_var'].get())
-        )
-        toggle.pack(anchor="w", pady=(5, 15))
 
         # Begin Bracket
         ctk.CTkLabel(main_frame, text="Begin Bracket").pack(anchor="w")
@@ -2610,6 +2743,10 @@ class SystemPromptBuilderPopup(ThemedPopup):
         ctk.CTkLabel(main_frame, text="End Bracket").pack(anchor="w")
         widgets['end_bracket_entry'] = ctk.CTkEntry(main_frame)
         widgets['end_bracket_entry'].pack(fill="x", pady=(0, 10))
+
+        # Save Button for this specific tab
+        save_button = ctk.CTkButton(main_frame, text=f"Save {config_key.replace('_', ' ').title()}", command=lambda k=config_key: self.save_component_config(k))
+        save_button.pack(pady=10, anchor="e")
 
         # Load data into the new widgets
         self.load_component_config(config_key)
@@ -2668,20 +2805,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         main_frame = ctk.CTkScrollableFrame(tab, fg_color="transparent")
         main_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Enable/Disable Toggle
-        prompt_order_path = self.build_prompt_dir / "prompt_order.json"
-        current_order = self._load_json(prompt_order_path) or []
-        is_enabled = config_key in current_order
-        toggle_var = ctk.BooleanVar(value=is_enabled)
-        toggle_switch = ctk.CTkSwitch(
-            main_frame,
-            text="Enable Personality Component",
-            variable=toggle_var,
-            command=lambda: self.toggle_component(config_key, toggle_var.get())
-        )
-        toggle_switch.pack(anchor="w", pady=(5, 15))
-        self.personality_widgets['toggle_var'] = toggle_var
-
         # Brackets
         ctk.CTkLabel(main_frame, text="Begin Bracket").pack(anchor="w")
         self.personality_widgets['begin_bracket_entry'] = ctk.CTkEntry(main_frame)
@@ -2696,6 +2819,9 @@ class SystemPromptBuilderPopup(ThemedPopup):
         traits_frame.pack(fill="x", expand=True, pady=10)
         self.personality_widgets['traits_frame'] = traits_frame
         self.personality_widgets['trait_entries'] = []
+
+        save_button = ctk.CTkButton(main_frame, text="Save Personality", command=self.save_personality_config)
+        save_button.pack(pady=10, anchor="e")
 
         self.load_personality_config()
 
@@ -2849,6 +2975,15 @@ class SystemPromptBuilderPopup(ThemedPopup):
         """Toggles the always-on-top status of the window."""
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
+
+    def toggle_master_prompt_lock(self):
+        """Updates the lock status in the builder_config.json file."""
+        is_locked = self.master_prompt_lock_var.get()
+        self.config["master_prompt_locked"] = is_locked
+        self._save_json(self.config_path, self.config)
+        status_msg = "Master Prompt is now LOCKED." if is_locked else "Master Prompt is now UNLOCKED."
+        color = LYRN_WARNING if is_locked else LYRN_SUCCESS
+        self.parent_app.update_status(status_msg, color)
 
     def update_personality_trait_value(self, trait_name: str, new_value: int):
         """Finds the entry for a trait and updates its value."""
@@ -4884,6 +5019,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.scheduler_manager = None
         self.cycle_manager = None
         self.resource_monitor = None
+        self.master_prompt_content = ""
 
         # Set taskbar icon
         try:
@@ -4979,6 +5115,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Refresh UI elements that depend on the loaded managers
         self.refresh_active_cycle_selector()
         self.update_job_dropdown()
+
+        # Load the master prompt into the cache for the first time
+        self.reload_master_prompt()
 
         # Now, handle the logic that was in start_application_logic
         if self.settings_manager.ui_settings.get("autoload_model", False) and self.settings_manager.settings.get("active", {}).get("model_path"):
@@ -5813,11 +5952,25 @@ Enhanced LYRN-AI system with advanced features active.
             self.personality_popup.lift()
             self.personality_popup.focus()
 
+    def reload_master_prompt(self):
+        """
+        Loads the master prompt using the snapshot loader and caches it.
+        This respects the lock file status.
+        """
+        if self.snapshot_loader:
+            self.master_prompt_content = self.snapshot_loader.load_base_prompt()
+            print("Master prompt reloaded and cached.")
+            self.update_status("Master prompt loaded into memory.", LYRN_INFO)
+        else:
+            self.update_status("Snapshot loader not ready, cannot load prompt.", LYRN_ERROR)
+
     def refresh_prompt_from_mode(self):
         """Rebuilds the master prompt from components and reloads it."""
         if self.snapshot_loader:
             self.snapshot_loader.build_master_prompt_from_components()
             self.update_status("Master prompt rebuilt from current components.", LYRN_SUCCESS)
+            # Immediately reload the newly built prompt into the cache
+            self.reload_master_prompt()
         else:
             self.update_status("Snapshot loader not initialized.", LYRN_ERROR)
 
@@ -6214,8 +6367,8 @@ Enhanced LYRN-AI system with advanced features active.
     def get_response_for_job(self, user_text: str) -> str:
         """Generate AI response for a job and return it as a string."""
         try:
-            # Build prompt
-            full_prompt = self.snapshot_loader.load_base_prompt()
+            # Use the cached prompt
+            full_prompt = self.master_prompt_content
 
             # --- Start of Chat History Injection ---
             history_messages = []
@@ -6284,8 +6437,8 @@ Enhanced LYRN-AI system with advanced features active.
     def generate_response(self, user_text: str):
         """Generate AI response with enhanced handling and metrics capture."""
         try:
-            # Build prompt
-            full_prompt = self.snapshot_loader.load_base_prompt()
+            # Use the cached prompt
+            full_prompt = self.master_prompt_content
 
             messages = [
                 {"role": "system", "content": full_prompt},

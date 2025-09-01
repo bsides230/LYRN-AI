@@ -1,0 +1,32 @@
+[
+  {
+    "name": "system_instructions",
+    "order": 0,
+    "active": true
+  },
+  {
+    "name": "personality",
+    "order": 1,
+    "active": true
+  },
+  {
+    "name": "user_preferences",
+    "order": 2,
+    "active": true
+  },
+  {
+    "name": "ai_preferences",
+    "order": 3,
+    "active": true
+  },
+  {
+    "name": "heartbeat",
+    "order": 4,
+    "active": true
+  },
+  {
+    "name": "system_rules",
+    "order": 5,
+    "active": true
+  }
+]
