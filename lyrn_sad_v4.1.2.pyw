@@ -2718,8 +2718,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.heartbeat_widgets['trigger_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['trigger_text'].pack(fill="x", pady=(0, 10))
 
-        save_button = ctk.CTkButton(main_frame, text="Save Heartbeat", command=self.save_heartbeat_config)
-        save_button.pack(pady=10, anchor="e")
+            save_button = ctk.CTkButton(main_frame, text="Save Heartbeat", command=self.save_heartbeat_config)
+            save_button.pack(pady=10, anchor="e")
 
             self.load_heartbeat_config()
             return
