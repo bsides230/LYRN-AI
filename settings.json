@@ -5,6 +5,7 @@
       "n_ctx": 84000,
       "n_threads": 22,
       "n_gpu_layers": 36,
+      "n_batch": 256,
       "max_tokens": 1024,
       "temperature": 0.7,
       "top_p": 0.95,
@@ -38,6 +39,7 @@
         "n_ctx": 32000,
         "n_threads": 22,
         "n_gpu_layers": 36,
+        "n_batch": 256,
         "max_tokens": 2048,
         "chat_format": "qwen"
       },
@@ -46,6 +48,7 @@
         "n_ctx": 16000,
         "n_threads": 22,
         "n_gpu_layers": 36,
+        "n_batch": 256,
         "max_tokens": 1024,
         "chat_format": null
       },
@@ -54,6 +57,7 @@
         "n_ctx": 48000,
         "n_threads": 22,
         "n_gpu_layers": 36,
+        "n_batch": 256,
         "max_tokens": 1024,
         "chat_format": null
       },
@@ -62,6 +66,7 @@
         "n_ctx": 84000,
         "n_threads": 22,
         "n_gpu_layers": 36,
+        "n_batch": 256,
         "max_tokens": 1024,
         "chat_format": null
       }

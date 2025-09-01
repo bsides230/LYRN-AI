@@ -1155,8 +1155,8 @@ class ModelSelectorPopup(ThemedPopup):
 
         params = [
             ("Context Size:", "n_ctx", 0, 0), ("Threads:", "n_threads", 0, 2),
-            ("GPU Layers:", "n_gpu_layers", 1, 0), ("Max Tokens:", "max_tokens", 1, 2),
-            ("Chat Format:", "chat_format", 2, 0)
+            ("GPU Layers:", "n_gpu_layers", 1, 0), ("Batch Size:", "n_batch", 1, 2),
+            ("Max Tokens:", "max_tokens", 2, 0), ("Chat Format:", "chat_format", 2, 2)
         ]
 
         self.model_entries = {}
@@ -1338,7 +1338,7 @@ class ModelSelectorPopup(ThemedPopup):
 
         for key, entry in self.model_entries.items():
             value = entry.get()
-            if key in ["n_ctx", "n_threads", "n_gpu_layers", "max_tokens"]:
+            if key in ["n_ctx", "n_threads", "n_gpu_layers", "max_tokens", "n_batch"]:
                 try:
                     new_active_settings[key] = int(value)
                 except (ValueError, TypeError):
@@ -5297,6 +5297,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
                 n_ctx=active["n_ctx"],
                 n_threads=active["n_threads"],
                 n_gpu_layers=active["n_gpu_layers"],
+                n_batch=active.get("n_batch", 512),
                 use_mlock=True,
                 use_mmap=False,
                 chat_format=active.get("chat_format"),
@@ -6477,6 +6478,8 @@ Enhanced LYRN-AI system with advanced features active.
             # After stream, parse the captured logs
             log_output = log_capture_buffer.getvalue()
             if log_output:
+                # Print the raw log to stderr so it appears in the log viewer
+                print(log_output, file=sys.stderr)
                 self.metrics.parse_llama_logs(log_output)
                 self.stream_queue.put(('metrics_update', ''))
 
