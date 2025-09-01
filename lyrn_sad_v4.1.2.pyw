@@ -641,6 +641,11 @@ class SnapshotLoader:
 
     def build_master_prompt_from_components(self) -> str:
         """Builds the master prompt by concatenating enabled components based on their new config files."""
+        config = self._load_json_file(self.config_path)
+        if config and config.get("master_prompt_locked", False):
+            print("Master prompt is locked. Loading directly from file.")
+            return self._load_text_file(self.master_prompt_path)
+
         print("Building master prompt from components...")
 
         prompt_parts = []
@@ -2344,17 +2349,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         except IOError as e:
             print(f"Error saving {path}: {e}")
 
-    def save_all_changes(self):
-        """Saves all changes from all tabs."""
-        self.save_prompt_order()
-        self.save_rwi_editor_changes() # Saves the currently open RWI component
-        self._save_rwi_main_brackets()
-        for config_key in self.editor_tabs.keys():
-            self.save_component_config(config_key)
-        self.save_personality_config()
-        self.save_heartbeat_config()
-        self.parent_app.update_status("All changes saved.", LYRN_SUCCESS)
-
     def _save_rwi_main_brackets(self):
         """Saves the main RWI start and end brackets to the instructions file."""
         # This functionality is now deprecated as brackets are part of the loader
@@ -2492,9 +2486,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         top_frame = ctk.CTkFrame(self, fg_color="transparent")
         top_frame.pack(fill="x", padx=10, pady=(10, 0))
 
-        save_all_button = ctk.CTkButton(top_frame, text="Save All Changes", command=self.save_all_changes)
-        save_all_button.pack(side="left", padx=5, pady=5)
-
         rebuild_prompt_button = ctk.CTkButton(top_frame, text="Rebuild Master Prompt", command=self.parent_app.refresh_prompt_from_mode)
         rebuild_prompt_button.pack(side="left", padx=5, pady=5)
 
@@ -2514,6 +2505,10 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
         on_top_checkbox = ctk.CTkCheckBox(top_frame, text="Keep on Top", variable=self.on_top_var, command=self.toggle_on_top)
         on_top_checkbox.pack(side="right", padx=5, pady=5)
+
+        self.master_prompt_lock_var = ctk.BooleanVar(value=self.config.get("master_prompt_locked", False))
+        lock_checkbox = ctk.CTkCheckBox(top_frame, text="Lock Master Prompt", variable=self.master_prompt_lock_var, command=self.toggle_master_prompt_lock)
+        lock_checkbox.pack(side="left", padx=20, pady=5)
 
         self.populate_modes_dropdown()
 
@@ -2723,6 +2718,9 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.heartbeat_widgets['trigger_text'] = ctk.CTkTextbox(main_frame, height=30)
             self.heartbeat_widgets['trigger_text'].pack(fill="x", pady=(0, 10))
 
+        save_button = ctk.CTkButton(main_frame, text="Save Heartbeat", command=self.save_heartbeat_config)
+        save_button.pack(pady=10, anchor="e")
+
             self.load_heartbeat_config()
             return
 
@@ -2745,6 +2743,10 @@ class SystemPromptBuilderPopup(ThemedPopup):
         ctk.CTkLabel(main_frame, text="End Bracket").pack(anchor="w")
         widgets['end_bracket_entry'] = ctk.CTkEntry(main_frame)
         widgets['end_bracket_entry'].pack(fill="x", pady=(0, 10))
+
+        # Save Button for this specific tab
+        save_button = ctk.CTkButton(main_frame, text=f"Save {config_key.replace('_', ' ').title()}", command=lambda k=config_key: self.save_component_config(k))
+        save_button.pack(pady=10, anchor="e")
 
         # Load data into the new widgets
         self.load_component_config(config_key)
@@ -2817,6 +2819,9 @@ class SystemPromptBuilderPopup(ThemedPopup):
         traits_frame.pack(fill="x", expand=True, pady=10)
         self.personality_widgets['traits_frame'] = traits_frame
         self.personality_widgets['trait_entries'] = []
+
+        save_button = ctk.CTkButton(main_frame, text="Save Personality", command=self.save_personality_config)
+        save_button.pack(pady=10, anchor="e")
 
         self.load_personality_config()
 
@@ -2970,6 +2975,15 @@ class SystemPromptBuilderPopup(ThemedPopup):
         """Toggles the always-on-top status of the window."""
         is_on_top = self.on_top_var.get()
         self.attributes("-topmost", is_on_top)
+
+    def toggle_master_prompt_lock(self):
+        """Updates the lock status in the builder_config.json file."""
+        is_locked = self.master_prompt_lock_var.get()
+        self.config["master_prompt_locked"] = is_locked
+        self._save_json(self.config_path, self.config)
+        status_msg = "Master Prompt is now LOCKED." if is_locked else "Master Prompt is now UNLOCKED."
+        color = LYRN_WARNING if is_locked else LYRN_SUCCESS
+        self.parent_app.update_status(status_msg, color)
 
     def update_personality_trait_value(self, trait_name: str, new_value: int):
         """Finds the entry for a trait and updates its value."""
@@ -5005,6 +5019,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.scheduler_manager = None
         self.cycle_manager = None
         self.resource_monitor = None
+        self.master_prompt_content = ""
 
         # Set taskbar icon
         try:
@@ -5100,6 +5115,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Refresh UI elements that depend on the loaded managers
         self.refresh_active_cycle_selector()
         self.update_job_dropdown()
+
+        # Load the master prompt into the cache for the first time
+        self.reload_master_prompt()
 
         # Now, handle the logic that was in start_application_logic
         if self.settings_manager.ui_settings.get("autoload_model", False) and self.settings_manager.settings.get("active", {}).get("model_path"):
@@ -5934,11 +5952,25 @@ Enhanced LYRN-AI system with advanced features active.
             self.personality_popup.lift()
             self.personality_popup.focus()
 
+    def reload_master_prompt(self):
+        """
+        Loads the master prompt using the snapshot loader and caches it.
+        This respects the lock file status.
+        """
+        if self.snapshot_loader:
+            self.master_prompt_content = self.snapshot_loader.load_base_prompt()
+            print("Master prompt reloaded and cached.")
+            self.update_status("Master prompt loaded into memory.", LYRN_INFO)
+        else:
+            self.update_status("Snapshot loader not ready, cannot load prompt.", LYRN_ERROR)
+
     def refresh_prompt_from_mode(self):
         """Rebuilds the master prompt from components and reloads it."""
         if self.snapshot_loader:
             self.snapshot_loader.build_master_prompt_from_components()
             self.update_status("Master prompt rebuilt from current components.", LYRN_SUCCESS)
+            # Immediately reload the newly built prompt into the cache
+            self.reload_master_prompt()
         else:
             self.update_status("Snapshot loader not initialized.", LYRN_ERROR)
 
@@ -6335,8 +6367,8 @@ Enhanced LYRN-AI system with advanced features active.
     def get_response_for_job(self, user_text: str) -> str:
         """Generate AI response for a job and return it as a string."""
         try:
-            # Build prompt
-            full_prompt = self.snapshot_loader.load_base_prompt()
+            # Use the cached prompt
+            full_prompt = self.master_prompt_content
 
             # --- Start of Chat History Injection ---
             history_messages = []
@@ -6405,8 +6437,8 @@ Enhanced LYRN-AI system with advanced features active.
     def generate_response(self, user_text: str):
         """Generate AI response with enhanced handling and metrics capture."""
         try:
-            # Build prompt
-            full_prompt = self.snapshot_loader.load_base_prompt()
+            # Use the cached prompt
+            full_prompt = self.master_prompt_content
 
             messages = [
                 {"role": "system", "content": full_prompt},
