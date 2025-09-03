@@ -1,5 +1,15 @@
 # LYRN-AI Build Notes
 
+## v4.1.3 (2025-09-02)
+
+This is a major refactoring of the System Prompt Builder UI to improve workflow and align with the system's modular design.
+
+- **Complete UI Overhaul:** The System Prompt Builder has been completely redesigned, replacing the old tab-based interface with a more efficient two-panel layout.
+- **Dynamic Component Editor:** The new UI features a draggable list of prompt components on the left. Selecting a component dynamically loads a dedicated editor for it on the right, providing a more intuitive and streamlined workflow.
+- **New RWI (Relational Web Index) Editor:** A new "RWI" component has been added to the list. When selected, it provides a dedicated view for managing RWI-specific information, including the introductory text and a summary of all active components.
+- **Unified Component Activation:** The activation of all prompt components, including Heartbeat, is now controlled by a single toggle switch in the main component list, removing redundant toggles from individual editor panels.
+- **Decoupled RWI Instructions:** The old, centralized `rwi_instructions.txt` file has been deprecated. RWI information is now stored directly in the `config.json` file for each respective component, improving modularity.
+
 ## v4.1.2 (2025-08-28)
 
 ### Features
