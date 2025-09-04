@@ -681,6 +681,11 @@ class SnapshotLoader:
         active_components = sorted([c for c in components if c.get('active', True)], key=lambda x: x.get('order', 0))
 
         # --- Build the Static RWI block first ---
+        rwi_config_path = os.path.join(self.build_prompt_dir, "rwi_config.json")
+        rwi_config = self._load_json_file(rwi_config_path) or {}
+        rwi_start_bracket = rwi_config.get("begin_bracket", "###RWI_INSTRUCTIONS_START###")
+        rwi_end_bracket = rwi_config.get("end_bracket", "###RWI_INSTRUCTIONS_END###")
+
         rwi_parts = []
         rwi_intro = self._load_text_file(os.path.join(self.build_prompt_dir, "rwi_intro.txt"))
 
@@ -698,7 +703,7 @@ class SnapshotLoader:
 
         if rwi_intro or rwi_parts:
             full_rwi_content = "\n\n".join([rwi_intro] + rwi_parts if rwi_intro else rwi_parts)
-            full_rwi_block = f"###RWI_INSTRUCTIONS_START###\n{full_rwi_content}\n###RWI_INSTRUCTIONS_END###"
+            full_rwi_block = f"{rwi_start_bracket}\n{full_rwi_content}\n{rwi_end_bracket}"
             prompt_parts.append(full_rwi_block)
 
         # --- Build the rest of the prompt components ---
@@ -2373,13 +2378,16 @@ class SystemPromptBuilderPopup(ThemedPopup):
         else:
             self._create_generic_editor(component_name)
 
+        # Apply theme to the newly created widgets in the editor panel
+        self.apply_theme()
+
     def _create_generic_editor(self, component_name: str):
         """Creates the standard editor UI for a generic component."""
-        self.editor_panel.grid_columnconfigure(1, weight=1)
-        self.editor_panel.grid_rowconfigure(2, weight=1) # RWI info
-        self.editor_panel.grid_rowconfigure(4, weight=3) # Main content
+        # --- Layout Configuration ---
+        self.editor_panel.grid_columnconfigure(0, weight=1)
+        self.editor_panel.grid_rowconfigure(2, weight=1) # Let the main frame expand
 
-        # Load data
+        # --- Data Loading ---
         component_dir = self.build_prompt_dir / component_name
         config_path = component_dir / "config.json"
         config = self._load_json(config_path) or {}
@@ -2389,13 +2397,13 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
         # --- Top Bar with Title and Buttons ---
         top_bar = ctk.CTkFrame(self.editor_panel, fg_color="transparent")
-        top_bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
+        top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         top_bar.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(top_bar, text=f"Editor: {component_name}", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(top_bar, text=f"Editor: {component_name}", font=ctk.CTkFont(weight="bold")).pack(side="left")
 
         button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
-        button_frame.grid(row=0, column=1, sticky="e")
+        button_frame.pack(side="right")
 
         view_button = ctk.CTkButton(button_frame, text="View File", command=lambda p=content_path, name=component_name, cfg=config: self._view_file_with_brackets(f"View: {name}", p, cfg))
         view_button.pack(side="left", padx=5)
@@ -2403,28 +2411,33 @@ class SystemPromptBuilderPopup(ThemedPopup):
         save_button = ctk.CTkButton(button_frame, text="Save", command=lambda: self._save_generic_config(component_name))
         save_button.pack(side="left", padx=5)
 
-        # --- Editor Fields ---
-        ctk.CTkLabel(self.editor_panel, text="Start Bracket:").grid(row=1, column=0, sticky="w", padx=10, pady=(5, 0))
-        start_bracket_entry = ctk.CTkEntry(self.editor_panel)
-        start_bracket_entry.grid(row=1, column=1, sticky="ew", padx=10, pady=(5, 0))
+        # --- Main Scrollable Frame for Content ---
+        main_frame = ctk.CTkScrollableFrame(self.editor_panel, fg_color="transparent")
+        main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1) # Allow content to expand horizontally
+
+        # --- Editor Fields (Stacked Layout) ---
+        ctk.CTkLabel(main_frame, text="Start Bracket:").pack(anchor="w", padx=10, pady=(5, 0))
+        start_bracket_entry = ctk.CTkEntry(main_frame)
+        start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
         start_bracket_entry.insert(0, config.get("begin_bracket", ""))
 
-        ctk.CTkLabel(self.editor_panel, text="End Bracket:").grid(row=2, column=0, sticky="w", padx=10, pady=(5, 0))
-        end_bracket_entry = ctk.CTkEntry(self.editor_panel)
-        end_bracket_entry.grid(row=2, column=1, sticky="ew", padx=10, pady=(5, 0))
+        ctk.CTkLabel(main_frame, text="End Bracket:").pack(anchor="w", padx=10, pady=(5, 0))
+        end_bracket_entry = ctk.CTkEntry(main_frame)
+        end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
 
-        ctk.CTkLabel(self.editor_panel, text="RWI Info:").grid(row=3, column=0, sticky="nw", padx=10, pady=(10, 0))
-        rwi_info_box = ctk.CTkTextbox(self.editor_panel, height=80)
-        rwi_info_box.grid(row=3, column=1, sticky="nsew", padx=10, pady=5)
+        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5, 0))
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box.pack(fill="x", padx=10, pady=(0, 10), expand=True)
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
 
-        ctk.CTkLabel(self.editor_panel, text="Content/Prompt:").grid(row=4, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 0))
-        content_textbox = ctk.CTkTextbox(self.editor_panel, wrap="word")
-        content_textbox.grid(row=5, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+        ctk.CTkLabel(main_frame, text="Content/Prompt:").pack(anchor="w", padx=10, pady=(5, 0))
+        content_textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        content_textbox.pack(fill="both", padx=10, pady=(0, 10), expand=True)
         content_textbox.insert("1.0", content)
 
-        # Store widgets for saving
+        # --- Store widgets for saving ---
         self.editor_widgets = {
             "component_name": component_name,
             "start_bracket_entry": start_bracket_entry,
@@ -2456,40 +2469,103 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.parent_app.update_status(f"Saved '{component_name}' successfully.", LYRN_SUCCESS)
 
     def _create_rwi_viewer(self):
-        """Creates the editor for the RWI intro text."""
+        """Creates the editor for the RWI intro text and brackets."""
         self.editor_panel.grid_columnconfigure(0, weight=1)
         self.editor_panel.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(self.editor_panel, text="RWI Introduction for LLM:").grid(row=0, column=0, sticky="w", padx=10, pady=(10,0))
-
-        intro_textbox = ctk.CTkTextbox(self.editor_panel, wrap="word")
-        intro_textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
-
+        # --- Data Loading ---
+        config_path = self.build_prompt_dir / "rwi_config.json"
+        config = self._load_json(config_path) or {}
         intro_path = self.build_prompt_dir / "rwi_intro.txt"
-        if intro_path.exists():
-            intro_textbox.insert("1.0", self._load_text(intro_path))
+        intro_content = self._load_text(intro_path)
 
-        button_frame = ctk.CTkFrame(self.editor_panel, fg_color="transparent")
-        button_frame.grid(row=2, column=0, sticky="e", padx=10, pady=10)
+        # --- Top Bar ---
+        top_bar = ctk.CTkFrame(self.editor_panel, fg_color="transparent")
+        top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+        top_bar.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(top_bar, text="Editor: RWI", font=ctk.CTkFont(weight="bold")).pack(side="left")
 
-        save_button = ctk.CTkButton(button_frame, text="Save Intro", command=self._save_rwi_intro)
-        save_button.pack()
+        button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
+        button_frame.pack(side="right")
+        view_button = ctk.CTkButton(button_frame, text="View Full RWI", command=self._view_rwi_content)
+        view_button.pack(side="left", padx=5)
+        save_button = ctk.CTkButton(button_frame, text="Save", command=self._save_rwi_config)
+        save_button.pack(side="left", padx=5)
+
+        # --- Main Scrollable Frame ---
+        main_frame = ctk.CTkScrollableFrame(self.editor_panel, fg_color="transparent")
+        main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # --- Editor Fields (Stacked) ---
+        ctk.CTkLabel(main_frame, text="Start Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        start_bracket_entry = ctk.CTkEntry(main_frame)
+        start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        start_bracket_entry.insert(0, config.get("begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        end_bracket_entry = ctk.CTkEntry(main_frame)
+        end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        end_bracket_entry.insert(0, config.get("end_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="RWI Introduction for LLM:").pack(anchor="w", padx=10, pady=(5,0))
+        intro_textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        intro_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        intro_textbox.insert("1.0", intro_content)
 
         self.editor_widgets = {
             "component_name": "RWI",
+            "start_bracket_entry": start_bracket_entry,
+            "end_bracket_entry": end_bracket_entry,
             "intro_textbox": intro_textbox,
+            "config_path": config_path,
             "intro_path": intro_path
         }
 
-    def _save_rwi_intro(self):
-        """Saves the content of the RWI intro textbox."""
+    def _save_rwi_config(self):
+        """Saves the RWI configuration."""
         if self.editor_widgets.get("component_name") != "RWI":
             return
 
-        content = self.editor_widgets["intro_textbox"].get("1.0", "end-1c")
-        intro_path = self.editor_widgets["intro_path"]
-        self._save_text(intro_path, content)
-        self.parent_app.update_status("RWI intro saved.", LYRN_SUCCESS)
+        w = self.editor_widgets
+
+        # Save brackets to config file
+        config_data = {
+            "begin_bracket": w["start_bracket_entry"].get(),
+            "end_bracket": w["end_bracket_entry"].get()
+        }
+        self._save_json(w["config_path"], config_data)
+
+        # Save intro text to its own file
+        intro_content = w["intro_textbox"].get("1.0", "end-1c")
+        self._save_text(w["intro_path"], intro_content)
+
+        self.parent_app.update_status("RWI settings saved.", LYRN_SUCCESS)
+
+    def _view_rwi_content(self):
+        """Constructs and displays the full RWI block content."""
+        components = self._load_json(self.components_path) or []
+        active_components = [c for c in components if c.get('active', True)]
+
+        rwi_parts = []
+        intro_path = self.build_prompt_dir / "rwi_intro.txt"
+        rwi_intro = self._load_text(intro_path)
+
+        for component in active_components:
+            component_name = component['name']
+            if component_name in ["RWI", "heartbeat"]: continue
+
+            config_path = self.build_prompt_dir / component_name / "config.json"
+            config = self._load_json(config_path)
+            if config and config.get("rwi_text"):
+                rwi_parts.append(f"---\n{component_name.upper()}:\n{config['rwi_text']}")
+
+        full_rwi_content = "\n\n".join([rwi_intro] + rwi_parts if rwi_intro else rwi_parts)
+
+        config_path = self.build_prompt_dir / "rwi_config.json"
+        config = self._load_json(config_path) or {}
+
+        self._view_file_with_brackets("Full RWI Content Preview", full_rwi_content, config, is_content_str=True)
 
     def _create_personality_editor(self):
         """Creates the editor UI for the personality component."""
@@ -2506,10 +2582,10 @@ class SystemPromptBuilderPopup(ThemedPopup):
         top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         top_bar.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(top_bar, text="Editor: Personality", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(top_bar, text="Editor: Personality", font=ctk.CTkFont(weight="bold")).pack(side="left")
 
         button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
-        button_frame.grid(row=0, column=1, sticky="e")
+        button_frame.pack(side="right")
 
         output_filename = config.get("output_file", "personality.txt")
         output_path = self.build_prompt_dir / "personality" / output_filename
@@ -2522,47 +2598,59 @@ class SystemPromptBuilderPopup(ThemedPopup):
         # --- Main Scrollable Frame for Content ---
         main_frame = ctk.CTkScrollableFrame(self.editor_panel, fg_color="transparent")
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1)
 
-        # --- Editor Fields ---
-        ctk.CTkLabel(main_frame, text="Begin Bracket:").pack(anchor="w", padx=10)
+        # --- Editor Fields (Stacked Layout) ---
+        ctk.CTkLabel(main_frame, text="Begin Bracket:").pack(anchor="w", padx=10, pady=(5,0))
         begin_bracket_entry = ctk.CTkEntry(main_frame)
         begin_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
         begin_bracket_entry.insert(0, config.get("begin_bracket", ""))
 
-        ctk.CTkLabel(main_frame, text="End Bracket:").pack(anchor="w", padx=10)
+        ctk.CTkLabel(main_frame, text="End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
         end_bracket_entry = ctk.CTkEntry(main_frame)
         end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
 
-        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10)
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=80)
-        rwi_info_box.pack(fill="x", padx=10, pady=(0, 10))
+        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5,0))
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box.pack(fill="x", expand=True, padx=10, pady=(0, 10))
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
 
         # Traits Frame
         traits_frame = ctk.CTkFrame(main_frame)
         traits_frame.pack(fill="x", expand=True, pady=10, padx=10)
-        ctk.CTkLabel(traits_frame, text="Traits").pack()
+        traits_frame.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(traits_frame, text="Traits", font=ctk.CTkFont(weight="bold")).pack(pady=(0,5))
 
         trait_widgets = []
         traits = config.get("traits", [])
         for trait_data in traits:
-            trait_frame = ctk.CTkFrame(traits_frame)
-            trait_frame.pack(fill="x", pady=5, padx=5)
+            # Container for each trait
+            trait_container = ctk.CTkFrame(traits_frame)
+            trait_container.pack(fill="x", pady=5, padx=5)
+            trait_container.grid_columnconfigure(0, weight=1)
 
-            name_value_frame = ctk.CTkFrame(trait_frame, fg_color="transparent")
+            # Stacked layout for each trait's elements
+            name = trait_data.get("name", "Unknown")
+            value = trait_data.get("value", "500")
+            instructions = trait_data.get("instructions", "")
+
+            # Trait Name and Value on one line
+            name_value_frame = ctk.CTkFrame(trait_container, fg_color="transparent")
             name_value_frame.pack(fill="x", pady=(0, 5))
-            ctk.CTkLabel(name_value_frame, text=trait_data.get("name", "Unknown")).pack(side="left", padx=5)
+            ctk.CTkLabel(name_value_frame, text=f"{name}:").pack(side="left", padx=(0,5))
             value_entry = ctk.CTkEntry(name_value_frame, width=80)
-            value_entry.insert("0", str(trait_data.get("value", "500")))
-            value_entry.pack(side="left", padx=5)
+            value_entry.insert("0", str(value))
+            value_entry.pack(side="left")
 
-            instructions_box = ctk.CTkTextbox(trait_frame, height=60, wrap="word")
-            instructions_box.insert("1.0", trait_data.get("instructions", ""))
-            instructions_box.pack(fill="x", expand=True, padx=5)
+            # Instructions textbox below
+            ctk.CTkLabel(trait_container, text="Instructions:").pack(anchor="w")
+            instructions_box = ctk.CTkTextbox(trait_container, height=60, wrap="word")
+            instructions_box.insert("1.0", instructions)
+            instructions_box.pack(fill="x", expand=True)
 
             trait_widgets.append({
-                "name": trait_data.get("name"),
+                "name": name,
                 "value_entry": value_entry,
                 "instructions_box": instructions_box
             })
@@ -2573,7 +2661,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
             "end_bracket_entry": end_bracket_entry,
             "rwi_info_box": rwi_info_box,
             "trait_widgets": trait_widgets,
-            "config": config # Also need to store config for view button
+            "config": config
         }
 
     def _save_personality_config(self):
@@ -2614,8 +2702,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
     def _create_heartbeat_editor(self):
         """Creates the editor UI for the heartbeat component."""
         # --- Layout Configuration ---
-        self.editor_panel.grid_columnconfigure(1, weight=1)
-        self.editor_panel.grid_rowconfigure(4, weight=1)
+        self.editor_panel.grid_columnconfigure(0, weight=1)
+        self.editor_panel.grid_rowconfigure(1, weight=1)
 
         # --- Data Loading ---
         config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
@@ -2623,13 +2711,13 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
         # --- Top Bar with Title and Buttons ---
         top_bar = ctk.CTkFrame(self.editor_panel, fg_color="transparent")
-        top_bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
+        top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         top_bar.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(top_bar, text="Editor: Heartbeat", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(top_bar, text="Editor: Heartbeat", font=ctk.CTkFont(weight="bold")).pack(side="left")
 
         button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
-        button_frame.grid(row=0, column=1, sticky="e")
+        button_frame.pack(side="right")
 
         view_button = ctk.CTkButton(button_frame, text="View Prompt", command=self._view_heartbeat_prompt)
         view_button.pack(side="left", padx=5)
@@ -2637,25 +2725,30 @@ class SystemPromptBuilderPopup(ThemedPopup):
         save_button = ctk.CTkButton(button_frame, text="Save", command=self._save_heartbeat_config)
         save_button.pack(side="left", padx=5)
 
-        # --- Editor Fields ---
-        ctk.CTkLabel(self.editor_panel, text="Begin Bracket:").grid(row=1, column=0, sticky="w", padx=10, pady=(5,0))
-        begin_bracket_entry = ctk.CTkEntry(self.editor_panel)
-        begin_bracket_entry.grid(row=1, column=1, sticky="ew", padx=10, pady=(5,0))
+        # --- Main Scrollable Frame for Content ---
+        main_frame = ctk.CTkScrollableFrame(self.editor_panel, fg_color="transparent")
+        main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # --- Editor Fields (Stacked Layout) ---
+        ctk.CTkLabel(main_frame, text="Begin Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        begin_bracket_entry = ctk.CTkEntry(main_frame)
+        begin_bracket_entry.pack(fill="x", padx=10, pady=(0,10))
         begin_bracket_entry.insert(0, config.get("begin_bracket", ""))
 
-        ctk.CTkLabel(self.editor_panel, text="End Bracket:").grid(row=2, column=0, sticky="w", padx=10, pady=(5,0))
-        end_bracket_entry = ctk.CTkEntry(self.editor_panel)
-        end_bracket_entry.grid(row=2, column=1, sticky="ew", padx=10, pady=(5,0))
+        ctk.CTkLabel(main_frame, text="End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        end_bracket_entry = ctk.CTkEntry(main_frame)
+        end_bracket_entry.pack(fill="x", padx=10, pady=(0,10))
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
 
-        ctk.CTkLabel(self.editor_panel, text="RWI Info:").grid(row=3, column=0, sticky="nw", padx=10, pady=(10,0))
-        rwi_info_box = ctk.CTkTextbox(self.editor_panel, height=80)
-        rwi_info_box.grid(row=3, column=1, sticky="nsew", padx=10, pady=5)
+        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5,0))
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box.pack(fill="x", expand=True, padx=10, pady=(0,10))
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
 
-        ctk.CTkLabel(self.editor_panel, text="Instruction Body:").grid(row=4, column=0, columnspan=2, sticky="w", padx=10, pady=(10,0))
-        body_text = ctk.CTkTextbox(self.editor_panel, wrap="word")
-        body_text.grid(row=5, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+        ctk.CTkLabel(main_frame, text="Instruction Body:").pack(anchor="w", padx=10, pady=(5,0))
+        body_text = ctk.CTkTextbox(main_frame, wrap="word")
+        body_text.pack(fill="both", expand=True, padx=10, pady=(0,10))
         body_text.insert("1.0", config.get("body", ""))
 
         # --- Store widgets for saving ---
@@ -2703,10 +2796,17 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.parent_app.update_status(f"Error viewing heartbeat: {e}", LYRN_ERROR)
             print(f"Error viewing heartbeat prompt: {e}")
 
-    def _view_file_with_brackets(self, title: str, filepath: Path, config: dict):
-        """Loads a file's content and displays it wrapped in its configured brackets."""
+    def _view_file_with_brackets(self, title: str, content_source: Path or str, config: dict, is_content_str: bool = False):
+        """
+        Loads content and displays it wrapped in its configured brackets.
+        Can accept either a filepath or a raw string as the content source.
+        """
         try:
-            content = self._load_text(filepath)
+            if is_content_str:
+                content = content_source
+            else:
+                content = self._load_text(content_source)
+
             begin_bracket = config.get("begin_bracket", "")
             end_bracket = config.get("end_bracket", "")
 
@@ -2721,7 +2821,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
             popup.focus()
         except Exception as e:
             self.parent_app.update_status(f"Error viewing file: {e}", LYRN_ERROR)
-            print(f"Error viewing file {filepath}: {e}")
+            source_info = "string content" if is_content_str else f"file {content_source}"
+            print(f"Error viewing {source_info}: {e}")
 
     def _view_final_prompt(self):
         """Builds the current master prompt and displays it in a viewer."""
