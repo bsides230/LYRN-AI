@@ -155,7 +155,7 @@ class FileViewerPopup(ThemedPopup):
 
 
 class DraggableListbox(ctk.CTkScrollableFrame):
-    """A scrollable frame that supports drag-and-drop reordering and pinning of items."""
+    """A scrollable frame that supports reordering of items via buttons."""
     def __init__(self, master, command=None, rwi_instructions=None, theme_manager=None, rwi_save_callback=None, parent_popup=None, toggle_command=None, **kwargs):
         super().__init__(master, **kwargs)
         self.command = command
@@ -166,19 +166,14 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         self.rwi_save_callback = rwi_save_callback
         self.items = []
         self.item_map = {}
-        self.dragged_item = None
         self.selected_item = None
-        self.drop_indicator = ctk.CTkFrame(self, height=2, fg_color=LYRN_ACCENT, corner_radius=0)
-        self.drop_indicator_index = -1
-        self.drag_offset_y = 0
-        self.is_drag_active = False
 
     def get_selected_item(self):
         """Returns the currently selected item's frame."""
         return self.selected_item
 
     def add_item(self, item_data: dict, **kwargs):
-        """Adds a new draggable item to the list."""
+        """Adds a new item to the list."""
         text = item_data["path"]
         is_pinned = item_data.get("pinned", False)
         is_active = item_data.get("active", True)
@@ -207,8 +202,6 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
         for widget in [item_frame, label]:
             widget.bind("<ButtonPress-1>", lambda e, frame=item_frame: self._on_press(e, frame))
-            widget.bind("<B1-Motion>", self._on_drag)
-            widget.bind("<ButtonRelease-1>", self._on_release)
 
         self.items.append(item_frame)
         self.item_map[item_frame] = item_data
@@ -261,7 +254,6 @@ class DraggableListbox(ctk.CTkScrollableFrame):
 
         # Update selection
         self.selected_item = frame_to_select
-        self.is_drag_active = False # Reset drag flag on every new press
 
         # Visual feedback for selection
         for item in self.items:
@@ -278,106 +270,59 @@ class DraggableListbox(ctk.CTkScrollableFrame):
         if self.parent_popup and hasattr(self.parent_popup, 'populate_editor_panel'):
             self.parent_popup.populate_editor_panel(component_name)
 
-    def _on_drag(self, event):
-        """Callback for when an item is being dragged."""
+    def move_item_up(self):
+        """Moves the selected item up in the list."""
         if not self.selected_item:
             return
 
-        # --- Initiate drag on first motion ---
-        if not self.is_drag_active:
-            self.is_drag_active = True
-            self.dragged_item = self.selected_item
-            self.dragged_item.lift()
-            self.drag_offset_y = event.y_root - self.dragged_item.winfo_rooty()
-        # ------------------------------------
-
-        if not self.dragged_item:
-             return
-
-        # Move the item using root coordinates for smoothness
-        new_y_root = event.y_root - self.drag_offset_y
-        new_y_parent = new_y_root - self.winfo_rooty()
-        self.dragged_item.place(y=new_y_parent)
-
-        # Update the drop indicator's position
-        self._update_drop_indicator()
-
-    def _update_drop_indicator(self):
-        """Calculates and places the drop indicator line."""
-        if not self.dragged_item:
+        index = self.items.index(self.selected_item)
+        if index == 0:
             return
 
-        # Use the center of the dragged item to determine its logical position
-        drag_center_y = self.dragged_item.winfo_y() + (self.dragged_item.winfo_height() / 2)
+        # Prevent unpinned item from moving into the pinned section
+        num_pinned = sum(1 for item in self.items if self.item_map[item].get("pinned", False))
+        is_selected_pinned = self.item_map[self.selected_item].get("pinned", False)
+        if not is_selected_pinned and index == num_pinned:
+            return # At the boundary, cannot move up
 
-        # Find the index where the dragged item should be inserted
-        target_index = 0
-        for item in self.items:
-            if item == self.dragged_item:
-                continue
-            if drag_center_y > item.winfo_y() + (item.winfo_height() / 2):
-                target_index += 1
+        # Swap items
+        self.items.insert(index - 1, self.items.pop(index))
 
-        self.drop_indicator_index = target_index
-
-        # Determine the visual y-position for the indicator line
-        # Place it at the top of the item that will be pushed down
-        if target_index < len(self.items):
-            # If the target is the dragged item itself, find the next one
-            if self.items[target_index] == self.dragged_item:
-                if target_index + 1 < len(self.items):
-                    indicator_y = self.items[target_index + 1].winfo_y()
-                else: # Dragged to the very end
-                    last_item = self.items[target_index - 1]
-                    indicator_y = last_item.winfo_y() + last_item.winfo_height()
-            else:
-                 indicator_y = self.items[target_index].winfo_y()
-        else: # Dragged past the last item
-            last_item = self.items[-1] if self.items[-1] != self.dragged_item else self.items[-2]
-            indicator_y = last_item.winfo_y() + last_item.winfo_height()
-
-        self.drop_indicator.place(x=0, y=indicator_y - 1, relwidth=1)
-        self.drop_indicator.lift()
-
-
-    def _on_release(self, event):
-        """Callback for when the mouse button is released."""
-        if not self.is_drag_active:
-            return
-
-        if not self.dragged_item:
-            return
-
-        # Hide indicator
-        self.drop_indicator.place_forget()
-
-        # Use the calculated target_index from the indicator
-        target_index = self.drop_indicator_index
-
-        # Constrain the drop to respect pinning boundaries
-        is_pinned = self.item_map[self.dragged_item].get("pinned", False)
-        num_pinned = sum(1 for item in self.items if self.item_map[item].get("pinned", False) and item != self.dragged_item)
-        if is_pinned:
-            target_index = min(target_index, num_pinned)
-        else:
-            target_index = max(target_index, num_pinned)
-
-        # Move the item in the list and repack everything
-        original_item = self.dragged_item
-        self.items.remove(original_item)
-        self.items.insert(target_index, original_item)
-
-        original_item.place_forget()
+        # Repack all items
         for item in self.items:
             item.pack_forget()
         for item in self.items:
             item.pack(fill="x", padx=5, pady=3)
 
-        self.dragged_item = None
-        self.drop_indicator_index = -1
-        self.is_drag_active = False
+        # Save the new order
+        if self.command:
+            self.command(self.get_item_objects())
 
-        # Execute the callback command if provided
+    def move_item_down(self):
+        """Moves the selected item down in the list."""
+        if not self.selected_item:
+            return
+
+        index = self.items.index(self.selected_item)
+        if index >= len(self.items) - 1:
+            return
+
+        # Prevent pinned item from moving into the unpinned section
+        num_pinned = sum(1 for item in self.items if self.item_map[item].get("pinned", False))
+        is_selected_pinned = self.item_map[self.selected_item].get("pinned", False)
+        if is_selected_pinned and index == num_pinned - 1:
+            return # At the boundary, cannot move down
+
+        # Swap items
+        self.items.insert(index + 1, self.items.pop(index))
+
+        # Repack all items
+        for item in self.items:
+            item.pack_forget()
+        for item in self.items:
+            item.pack(fill="x", padx=5, pady=3)
+
+        # Save the new order
         if self.command:
             self.command(self.get_item_objects())
 
@@ -2344,6 +2289,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         left_panel.grid_rowconfigure(0, weight=1)
         left_panel.grid_columnconfigure(0, weight=1)
+        left_panel.grid_columnconfigure(1, weight=0) # For arrow buttons
 
         self.prompt_order_list = DraggableListbox(
             left_panel,
@@ -2354,6 +2300,16 @@ class SystemPromptBuilderPopup(ThemedPopup):
         )
         self.prompt_order_list.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         self.update_prompt_order_list()
+
+        # --- Arrow buttons for reordering ---
+        arrow_button_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
+        arrow_button_frame.grid(row=0, column=1, sticky="ns", pady=5)
+
+        up_button = ctk.CTkButton(arrow_button_frame, text="▲", width=30, command=self.prompt_order_list.move_item_up)
+        up_button.pack(padx=5, pady=5)
+
+        down_button = ctk.CTkButton(arrow_button_frame, text="▼", width=30, command=self.prompt_order_list.move_item_down)
+        down_button.pack(padx=5, pady=5)
 
         # --- Right Panel: Editor Area ---
         self.editor_panel = ctk.CTkFrame(main_content_frame)
@@ -2385,7 +2341,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         """Creates the standard editor UI for a generic component."""
         # --- Layout Configuration ---
         self.editor_panel.grid_columnconfigure(0, weight=1)
-        self.editor_panel.grid_rowconfigure(2, weight=1) # Let the main frame expand
+        self.editor_panel.grid_rowconfigure(1, weight=1) # Let the main frame expand
 
         # --- Data Loading ---
         component_dir = self.build_prompt_dir / component_name
