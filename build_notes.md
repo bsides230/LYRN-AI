@@ -1,5 +1,15 @@
 # LYRN-AI Build Notes
 
+## v4.1.4 (2025-09-05)
+
+This update focuses on UI tweaks and performance improvements for the System Prompt Builder.
+
+- **System Prompt Builder Arrow Relocation:** The up/down arrows used for reordering components in the System Prompt Builder have been moved from the right side of the component list to the far left of the popup. This provides a more intuitive layout and better visual grouping of controls.
+- **System Prompt Builder Performance Enhancement:** The editor panel in the System Prompt Builder has been refactored to be significantly faster and more responsive. Instead of destroying and recreating the editor UI every time a new component is selected, all editor panels are now pre-loaded and cached when the popup is first opened. Switching between components now only toggles the visibility of these cached panels, eliminating the lag associated with UI reconstruction.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.3 (2025-09-02)
 
 This is a major refactoring of the System Prompt Builder UI to improve workflow and align with the system's modular design.
