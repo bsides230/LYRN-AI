@@ -1,5 +1,28 @@
 # LYRN-AI Build Notes
 
+## v4.1.5 (2025-09-05)
+
+This update fixes two significant UI bugs related to the Theming and System Prompt Builder systems.
+
+- **Prompt Builder Panel Fixed:** Resolved a critical bug where the right-side editor panel in the System Prompt Builder would not appear when a component was selected. This was caused by an incorrect layout manager configuration (`pack` and `grid` used in the same parent frame), which has been corrected to use `grid` consistently.
+- **Theming System Refactored and Fixed:**
+    - The Theme Builder is now fully functional. The "Open Theme Builder" button in the settings now correctly launches the builder instead of a "Coming Soon" popup.
+    - The live preview in the Theme Builder has been fixed. It now correctly applies the preview theme to all open windows, not just the main application window, for a consistent and accurate preview.
+    - Redundant theming code was removed from the `TabbedSettingsDialog` to centralize the theming logic in the `ThemedPopup` base class, improving maintainability.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
+## v4.1.4 (2025-09-05)
+
+This update focuses on UI tweaks and performance improvements for the System Prompt Builder.
+
+- **System Prompt Builder Arrow Relocation:** The up/down arrows used for reordering components in the System Prompt Builder have been moved from the right side of the component list to the far left of the popup. This provides a more intuitive layout and better visual grouping of controls.
+- **System Prompt Builder Performance Enhancement:** The editor panel in the System Prompt Builder has been refactored to be significantly faster and more responsive. Instead of destroying and recreating the editor UI every time a new component is selected, all editor panels are now pre-loaded and cached when the popup is first opened. Switching between components now only toggles the visibility of these cached panels, eliminating the lag associated with UI reconstruction.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.3 (2025-09-02)
 
 This is a major refactoring of the System Prompt Builder UI to improve workflow and align with the system's modular design.
