@@ -1,5 +1,18 @@
 # LYRN-AI Build Notes
 
+## v4.1.5 (2025-09-05)
+
+This update fixes two significant UI bugs related to the Theming and System Prompt Builder systems.
+
+- **Prompt Builder Panel Fixed:** Resolved a critical bug where the right-side editor panel in the System Prompt Builder would not appear when a component was selected. This was caused by an incorrect layout manager configuration (`pack` and `grid` used in the same parent frame), which has been corrected to use `grid` consistently.
+- **Theming System Refactored and Fixed:**
+    - The Theme Builder is now fully functional. The "Open Theme Builder" button in the settings now correctly launches the builder instead of a "Coming Soon" popup.
+    - The live preview in the Theme Builder has been fixed. It now correctly applies the preview theme to all open windows, not just the main application window, for a consistent and accurate preview.
+    - Redundant theming code was removed from the `TabbedSettingsDialog` to centralize the theming logic in the `ThemedPopup` base class, improving maintainability.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.4 (2025-09-05)
 
 This update focuses on UI tweaks and performance improvements for the System Prompt Builder.
