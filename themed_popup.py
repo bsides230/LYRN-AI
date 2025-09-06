@@ -116,7 +116,7 @@ class ThemedPopup(ctk.CTkToplevel):
             (ctk.CTkEntry, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
             (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
             (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
-            (ctk.CTkCheckBox, {"fg_color": primary_color}),
+            (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color}),
             (ctk.CTkSwitch, {"progress_color": accent_color}),
             (ctk.CTkProgressBar, {"progress_color": primary_color}),
             (ctk.CTkSlider, {"button_color": primary_color, "progress_color": accent_color}),
