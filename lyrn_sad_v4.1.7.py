@@ -33,6 +33,7 @@ from cycle_manager import CycleManager
 from episodic_memory_manager import EpisodicMemoryManager
 from system_checker import SystemChecker
 from full_rwi_viewer_popup import FullRWIViewerPopup
+from chat_manager import ChatManager
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -1579,6 +1580,22 @@ class TabbedSettingsDialog(ThemedPopup):
         self.chat_history_length_label.pack(side="left", padx=10, pady=10)
         Tooltip(self.chat_history_length_slider, "How many past user/assistant message pairs to include in the context for the LLM. 0 means none.")
 
+        # --- Injection Toggles ---
+        injection_frame = ctk.CTkFrame(self.tab_chat)
+        injection_frame.pack(fill="x", padx=20, pady=10)
+
+        self.enable_deltas_var = ctk.BooleanVar()
+        self.enable_deltas_switch = ctk.CTkSwitch(injection_frame, text="Enable Delta Injection",
+                                                     variable=self.enable_deltas_var, font=font)
+        self.enable_deltas_switch.pack(side="left", padx=10, pady=10)
+        Tooltip(self.enable_deltas_switch, "If enabled, deltas will be injected into the prompt.")
+
+        self.enable_chat_history_var = ctk.BooleanVar()
+        self.enable_chat_history_switch = ctk.CTkSwitch(injection_frame, text="Enable Chat History Injection",
+                                                          variable=self.enable_chat_history_var, font=font)
+        self.enable_chat_history_switch.pack(side="left", padx=10, pady=10)
+        Tooltip(self.enable_chat_history_switch, "If enabled, chat history will be injected into the prompt.")
+
         # --- Folder Management ---
         folder_frame = ctk.CTkFrame(self.tab_chat)
         folder_frame.pack(fill="x", padx=20, pady=10)
@@ -1817,6 +1834,8 @@ class TabbedSettingsDialog(ThemedPopup):
         chat_len = self.settings_manager.ui_settings.get("chat_history_length", 10)
         self.chat_history_length_slider.set(chat_len)
         self.update_chat_history_label(chat_len)
+        self.enable_deltas_var.set(self.settings_manager.ui_settings.get("enable_deltas", True))
+        self.enable_chat_history_var.set(self.settings_manager.ui_settings.get("enable_chat_history", True))
 
     def clear_chat_directory(self):
         """Clear chat directory after confirmation."""
@@ -2022,6 +2041,8 @@ class TabbedSettingsDialog(ThemedPopup):
             # Save Chat settings
             self.settings_manager.ui_settings["save_chat_history"] = self.save_chat_history_var.get()
             self.settings_manager.ui_settings["chat_history_length"] = int(self.chat_history_length_slider.get())
+            self.settings_manager.ui_settings["enable_deltas"] = self.enable_deltas_var.get()
+            self.settings_manager.ui_settings["enable_chat_history"] = self.enable_chat_history_var.get()
 
             # Save all settings
             self.settings_manager.save_settings(settings)
@@ -4535,6 +4556,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.scheduler_manager = None
         self.cycle_manager = None
         self.resource_monitor = None
+        self.chat_manager = None
         self.master_prompt_content = ""
 
         # Set taskbar icon
@@ -4598,6 +4620,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.affordance_manager = AffordanceManager()
         self.scheduler_manager = SchedulerManager()
         self.cycle_manager = CycleManager()
+        self.chat_manager = ChatManager(self.settings_manager.settings["paths"].get("chat", "chat"), self.settings_manager)
         self.resource_monitor = SystemResourceMonitor(self.stream_queue)
         self.resource_monitor.start()
 
@@ -4771,7 +4794,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.1.6")
+        self.title("LYRN-AI Dashboard v4.1.7")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -5051,12 +5074,14 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.eval_label.pack(pady=2)
 
         # Time Metrics
-        self.generation_time_label = ctk.CTkLabel(self.metrics_frame, text="Generation Time: 0s", font=normal_font)
-        self.generation_time_label.pack(pady=2)
-        self.tokenization_time_label = ctk.CTkLabel(self.metrics_frame, text="Tokenization Time: 0s", font=normal_font)
-        self.tokenization_time_label.pack(pady=2)
-        self.kv_caching_time_label = ctk.CTkLabel(self.metrics_frame, text="KV Caching Time: 0s", font=normal_font)
-        self.kv_caching_time_label.pack(pady=2)
+        time_metrics_frame = ctk.CTkFrame(self.metrics_frame, fg_color="transparent")
+        time_metrics_frame.pack(fill="x", padx=10, pady=2)
+        time_metrics_frame.grid_columnconfigure((0, 1), weight=1)
+
+        self.generation_time_label = ctk.CTkLabel(time_metrics_frame, text="Gen Time: 0s", font=normal_font)
+        self.generation_time_label.grid(row=0, column=0, sticky="w")
+        self.tokenization_time_label = ctk.CTkLabel(time_metrics_frame, text="Token Time: 0s", font=normal_font)
+        self.tokenization_time_label.grid(row=0, column=1, sticky="w")
 
         # Total tokens
         total_frame = ctk.CTkFrame(self.metrics_frame)
@@ -5885,7 +5910,8 @@ Enhanced LYRN-AI system with advanced features active.
         self._write_llm_status("busy")
 
         # The old save_chat_message is now deprecated.
-        # self.save_chat_message("user", user_text)
+        if self.chat_manager:
+            self.chat_manager.manage_chat_history_files()
 
         # Display thinking message and start response generation
         self.display_colored_message("Assistant: Thinking...\n\n", "thinking_text")
@@ -5901,23 +5927,14 @@ Enhanced LYRN-AI system with advanced features active.
             full_prompt = self.master_prompt_content
 
             # --- Start of Chat History Injection ---
-            history_messages = []
-            history_length = self.settings_manager.get_setting("chat_history_length", 10)
-
-            if history_length > 0:
-                recent_entries = self.episodic_memory_manager.get_recent_entries(history_length)
-                # Entries are newest to oldest, so we reverse to build the conversation chronologically
-                for entry in reversed(recent_entries):
-                    if entry.get('input'):
-                        history_messages.append({"role": "user", "content": entry['input']})
-                    if entry.get('output'):
-                        history_messages.append({"role": "assistant", "content": entry['output']})
+            history_content = self.chat_manager.get_live_chat_history_content() if self.chat_manager else ""
             # --- End of Chat History Injection ---
 
             messages = [
                 {"role": "system", "content": full_prompt},
             ]
-            messages.extend(history_messages)
+            if history_content:
+                messages.append({"role": "user", "content": history_content})
             messages.append({"role": "user", "content": user_text})
 
             active = self.settings_manager.settings["active"]
@@ -5970,10 +5987,20 @@ Enhanced LYRN-AI system with advanced features active.
             # Use the cached prompt
             full_prompt = self.master_prompt_content
 
-            messages = [
-                {"role": "system", "content": full_prompt},
-                {"role": "user", "content": user_text}
-            ]
+            # Get delta content
+            delta_content = self.delta_manager.get_delta_content() if self.settings_manager.get_setting("enable_deltas", True) else ""
+
+            # Get chat history content
+            history_content = self.chat_manager.get_live_chat_history_content() if self.chat_manager else ""
+
+            # Construct messages
+            messages = [{"role": "system", "content": full_prompt}]
+            if delta_content:
+                messages.append({"role": "system", "content": delta_content})
+            if history_content:
+                # Inject as a user message to simulate conversation flow
+                messages.append({"role": "user", "content": history_content})
+            messages.append({"role": "user", "content": user_text})
 
             active = self.settings_manager.settings["active"]
             handler = StreamHandler(self.stream_queue, self.metrics)
