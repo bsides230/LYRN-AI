@@ -32,7 +32,6 @@ import calendar
 from cycle_manager import CycleManager
 from episodic_memory_manager import EpisodicMemoryManager
 from system_checker import SystemChecker
-from topic_manager import TopicManager
 from full_rwi_viewer_popup import FullRWIViewerPopup
 
 # CustomTkinter imports
@@ -4387,13 +4386,6 @@ class MemoryPopup(ThemedPopup):
         self.selected_entries = []
         self.entry_widgets = []
 
-        # Topic Index attributes
-        self.tm = TopicManager()
-        self.settings_manager = parent.settings_manager
-        self.topic_checkboxes = {}
-        self.current_topic_slug = None
-        self.detail_textboxes = {}
-
         # Task/Goal attributes
         self.tasks_dir = Path(SCRIPT_DIR) / "build_prompt" / "tasks"
         self.goals_dir = Path(SCRIPT_DIR) / "build_prompt" / "goals"
@@ -4412,15 +4404,11 @@ class MemoryPopup(ThemedPopup):
         tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
         self.tab_episodic = tabview.add("Episodic Memory")
-        self.tab_topic = tabview.add("Topic Index")
         self.tab_tasks = tabview.add("Tasks")
         self.tab_goals = tabview.add("Goals")
 
         self.create_episodic_memory_tab(self.tab_episodic)
         self.load_entries()
-
-        self.create_topic_index_tab(self.tab_topic)
-        self.populate_topic_list()
 
         self.create_task_goal_tab(self.tab_tasks, "tasks")
         self.create_task_goal_tab(self.tab_goals, "goals")
@@ -4500,127 +4488,6 @@ class MemoryPopup(ThemedPopup):
                 widget.pack(fill="x", padx=5, pady=(2, 3))
             else:
                 widget.pack_forget()
-
-    # --- Topic Index Methods ---
-    def create_topic_index_tab(self, tab):
-        tab.grid_columnconfigure(1, weight=1)
-        tab.grid_rowconfigure(0, weight=1)
-        left_frame = ctk.CTkFrame(tab)
-        left_frame.grid(row=0, column=0, padx=(0, 10), pady=0, sticky="ns")
-        left_frame.grid_rowconfigure(1, weight=1)
-        ctk.CTkLabel(left_frame, text="Available Topics", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=(10, 5))
-        self.topic_scrollable_frame = ctk.CTkScrollableFrame(left_frame, label_text="")
-        self.topic_scrollable_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ns")
-        left_controls_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
-        left_controls_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
-        ctk.CTkButton(left_controls_frame, text="Add to Active", command=self.add_selected_to_active).pack(pady=(0, 5), fill="x")
-        ctk.CTkButton(left_controls_frame, text="Refresh List", command=self.populate_topic_list).pack(fill="x")
-        self.topic_right_frame = ctk.CTkFrame(tab)
-        self.topic_right_frame.grid(row=0, column=1, pady=0, sticky="nsew")
-        self.topic_right_frame.grid_rowconfigure(1, weight=1)
-        self.topic_right_frame.grid_columnconfigure(0, weight=1)
-        bottom_frame = ctk.CTkFrame(tab)
-        bottom_frame.grid(row=1, column=0, columnspan=2, padx=0, pady=(10, 0), sticky="ew")
-        self.create_settings_controls(bottom_frame)
-        self.create_detail_view_placeholder()
-
-    def populate_topic_list(self):
-        for widget in self.topic_scrollable_frame.winfo_children():
-            widget.destroy()
-        self.topic_checkboxes.clear()
-        all_topics = self.tm.get_all_topic_names()
-        search_data = self.tm.get_topic_search_data()
-        for slug in sorted(all_topics):
-            display_name = search_data.get(slug, {}).get('display_name', slug)
-            item_frame = ctk.CTkFrame(self.topic_scrollable_frame, fg_color="transparent")
-            item_frame.pack(fill="x", expand=True)
-            var = ctk.StringVar()
-            ctk.CTkCheckBox(item_frame, text="", variable=var, width=20).pack(side="left", padx=(0, 5))
-            self.topic_checkboxes[slug] = var
-            ctk.CTkButton(item_frame, text=display_name, fg_color="transparent", anchor="w", command=lambda s=slug: self.show_topic_details(s)).pack(side="left", fill="x", expand=True)
-
-    def add_selected_to_active(self):
-        selected_slugs = [slug for slug, var in self.topic_checkboxes.items() if var.get() == '1']
-        if not selected_slugs: return
-        self.tm.clear_active_topics()
-        self.tm.add_topics_to_active(selected_slugs)
-        print(f"Added {len(selected_slugs)} topics to active: {selected_slugs}")
-
-    def create_detail_view_placeholder(self):
-        for widget in self.topic_right_frame.winfo_children():
-            widget.destroy()
-        ctk.CTkLabel(self.topic_right_frame, text="Select a topic to view or edit its details.", font=ctk.CTkFont(size=14)).pack(expand=True, padx=20, pady=20)
-
-    def show_topic_details(self, topic_slug):
-        self.current_topic_slug = topic_slug
-        content = self.tm.get_topic_content(topic_slug)
-        if content is None:
-            self.create_detail_view_placeholder()
-            return
-        for widget in self.topic_right_frame.winfo_children():
-            widget.destroy()
-        header_frame = ctk.CTkFrame(self.topic_right_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
-        display_name = self.tm.get_topic_search_data().get(topic_slug, {}).get('display_name', topic_slug)
-        ctk.CTkLabel(header_frame, text=display_name, font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
-        ctk.CTkButton(header_frame, text="Save Changes", command=self.save_topic_details).pack(side="right")
-        tab_view = ctk.CTkTabview(self.topic_right_frame)
-        tab_view.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
-        self.detail_textboxes = {}
-        sections = ["Summary", "Personal Insights", "Linked Topics", "Chat Entries", "Notes", "Metadata"]
-        parsed_content = self._parse_topic_content(content)
-        for sec in sections:
-            tab = tab_view.add(sec)
-            textbox = ctk.CTkTextbox(tab, wrap="word", height=400, width=550)
-            textbox.pack(expand=True, fill="both", padx=5, pady=5)
-            textbox.insert("1.0", parsed_content.get(sec, ""))
-            self.detail_textboxes[sec] = textbox
-
-    def _parse_topic_content(self, content):
-        parsed = {}
-        lines, current_section, current_content = content.split('\n'), None, []
-        section_map = { "Summary:": "Summary", "Personal Insights:": "Personal Insights", "Linked Topics:": "Linked Topics", "Chat Entries:": "Chat Entries", "Notes:": "Notes", "Optional: Tags:": "Metadata" }
-        for line in lines:
-            found_section = False
-            for header, key in section_map.items():
-                if line.startswith(header):
-                    if current_section: parsed[current_section] = "\n".join(current_content).strip()
-                    current_section, current_content = key, [line.split(":",1)[1].strip()] if ":" in line else []
-                    found_section = True
-                    break
-            if not found_section and current_section:
-                current_content.append(line)
-        if current_section: parsed[current_section] = "\n".join(current_content).strip()
-        return parsed
-
-    def save_topic_details(self):
-        if not self.current_topic_slug: return
-        original_content = self.tm.get_topic_content(self.current_topic_slug)
-        header_lines = [line for line in original_content.split('\n') if line.startswith("Topic:") or line.startswith("Alt Names:")]
-        new_content = "\n".join(header_lines) + "\n\n"
-        new_content += "Summary:\n" + self.detail_textboxes["Summary"].get("1.0", "end-1c") + "\n\n"
-        new_content += "Personal Insights:\n" + self.detail_textboxes["Personal Insights"].get("1.0", "end-1c") + "\n\n"
-        new_content += "Linked Topics:\n" + self.detail_textboxes["Linked Topics"].get("1.0", "end-1c") + "\n\n"
-        new_content += self.detail_textboxes["Metadata"].get("1.0", "end-1c") + "\n\n"
-        new_content += "Chat Entries:\n" + self.detail_textboxes["Chat Entries"].get("1.0", "end-1c") + "\n\n"
-        new_content += "Notes:\n" + self.detail_textboxes["Notes"].get("1.0", "end-1c")
-        self.tm.save_topic_content(self.current_topic_slug, new_content.strip())
-        print(f"Saved changes to {self.current_topic_slug}")
-
-    def create_settings_controls(self, parent_frame):
-        ctk.CTkLabel(parent_frame, text="Default Context Injection:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=10, pady=5)
-        self.setting_vars = {}
-        defaults = self.settings_manager.get_setting("topic_defaults", {"summary": True, "insights": True, "timeline": True})
-        for setting_name in ["summary", "insights", "timeline"]:
-            var = ctk.BooleanVar(value=defaults.get(setting_name, False))
-            cb = ctk.CTkCheckBox(parent_frame, text=setting_name.title(), variable=var, command=self.save_topic_settings)
-            cb.pack(side="left", padx=5, pady=5)
-            self.setting_vars[setting_name] = var
-
-    def save_topic_settings(self):
-        new_settings = {name: var.get() for name, var in self.setting_vars.items()}
-        self.settings_manager.set_setting("topic_defaults", new_settings)
-        print(f"Saved topic default settings: {new_settings}")
 
     # --- Task/Goal Methods ---
     def _update_index(self, item_type: str):
@@ -4889,7 +4756,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.resource_monitor.start()
 
         # Start watcher scripts
-        watcher_scripts = ["task_goal_watcher.py", "scheduler_watcher.py", "cycle_watcher.py", "topic_watcher.py"]
+        watcher_scripts = ["task_goal_watcher.py", "scheduler_watcher.py", "cycle_watcher.py"]
         for script_name in watcher_scripts:
             try:
                 watcher_path = os.path.join(SCRIPT_DIR, "automation", script_name)
