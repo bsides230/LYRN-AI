@@ -4386,10 +4386,6 @@ class MemoryPopup(ThemedPopup):
         self.selected_entries = []
         self.entry_widgets = []
 
-        # Task/Goal attributes
-        self.tasks_dir = Path(SCRIPT_DIR) / "build_prompt" / "tasks"
-        self.goals_dir = Path(SCRIPT_DIR) / "build_prompt" / "goals"
-        self.selected_item = {"tasks": None, "goals": None}
 
         self.title("Memory Manager")
         self.geometry("950x750")
@@ -4404,14 +4400,9 @@ class MemoryPopup(ThemedPopup):
         tabview.pack(fill="both", expand=True, padx=10, pady=10)
 
         self.tab_episodic = tabview.add("Episodic Memory")
-        self.tab_tasks = tabview.add("Tasks")
-        self.tab_goals = tabview.add("Goals")
 
         self.create_episodic_memory_tab(self.tab_episodic)
         self.load_entries()
-
-        self.create_task_goal_tab(self.tab_tasks, "tasks")
-        self.create_task_goal_tab(self.tab_goals, "goals")
 
     # --- Episodic Memory Methods ---
     def create_episodic_memory_tab(self, tab):
@@ -4488,169 +4479,6 @@ class MemoryPopup(ThemedPopup):
                 widget.pack(fill="x", padx=5, pady=(2, 3))
             else:
                 widget.pack_forget()
-
-    # --- Task/Goal Methods ---
-    def _update_index(self, item_type: str):
-        """Updates the _index.json file for the given item type (tasks or goals)."""
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        index_path = data_dir / "_index.json"
-        try:
-            # The local index just needs the filenames.
-            files = sorted([p.name for p in data_dir.glob("*.txt")])
-            with open(index_path, 'w', encoding='utf-8') as f:
-                json.dump(files, f, indent=2)
-            print(f"GUI updated index file: {index_path}")
-        except Exception as e:
-            print(f"GUI Error updating index file for {item_type}: {e}")
-
-    def create_task_goal_tab(self, tab, item_type: str):
-        """Creates the content for a single tab (either tasks or goals)."""
-        tab.grid_columnconfigure(0, weight=1)
-        tab.grid_columnconfigure(1, weight=2)
-        tab.grid_rowconfigure(0, weight=1)
-
-        left_frame = ctk.CTkFrame(tab)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        left_frame.grid_rowconfigure(0, weight=1)
-        left_frame.grid_columnconfigure(0, weight=1)
-
-        list_frame = ctk.CTkScrollableFrame(left_frame, label_text=f"Available {item_type.capitalize()}")
-        list_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
-        setattr(self, f"{item_type}_list_frame", list_frame)
-
-        new_button = ctk.CTkButton(left_frame, text="New", command=lambda: self.add_item(item_type))
-        new_button.grid(row=1, column=0, padx=5, pady=10, sticky="ew")
-
-        delete_button = ctk.CTkButton(left_frame, text="Delete", command=lambda: self.delete_item(item_type))
-        delete_button.grid(row=1, column=1, padx=5, pady=10, sticky="ew")
-
-        right_frame = ctk.CTkFrame(tab)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-        right_frame.grid_rowconfigure(1, weight=1)
-        right_frame.grid_columnconfigure(0, weight=1)
-
-        selected_label = ctk.CTkLabel(right_frame, text=f"No {item_type[:-1]} selected", anchor="w")
-        selected_label.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
-        setattr(self, f"selected_{item_type}_label", selected_label)
-
-        content_textbox = ctk.CTkTextbox(right_frame, wrap="word")
-        content_textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
-        setattr(self, f"{item_type}_content_textbox", content_textbox)
-
-        save_button = ctk.CTkButton(right_frame, text="Save Changes", command=lambda: self.save_item_content(item_type))
-        save_button.grid(row=2, column=0, padx=10, pady=10, sticky="e")
-
-        self.refresh_list(item_type)
-
-    def refresh_list(self, item_type: str):
-        list_frame = getattr(self, f"{item_type}_list_frame")
-        for widget in list_frame.winfo_children():
-            widget.destroy()
-
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-        # Also ensure the index file exists on refresh
-        self._update_index(item_type)
-
-        files = sorted(p.name for p in data_dir.glob("*.txt"))
-
-        for filename in files:
-            label = ctk.CTkLabel(list_frame, text=filename, anchor="w", cursor="hand2")
-            label.pack(fill="x", padx=5, pady=2)
-            label.bind("<Button-1>", lambda e, name=filename, type=item_type: self.on_item_selected(name, type))
-
-    def on_item_selected(self, item_name: str, item_type: str):
-        self.selected_item[item_type] = item_name
-        selected_label = getattr(self, f"selected_{item_type}_label")
-        selected_label.configure(text=item_name)
-
-        content_textbox = getattr(self, f"{item_type}_content_textbox")
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / item_name
-
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
-            content_textbox.delete("1.0", "end")
-            content_textbox.insert("1.0", content)
-        except Exception as e:
-            print(f"Error reading {item_type} file: {e}")
-            content_textbox.delete("1.0", "end")
-            content_textbox.insert("1.0", f"Error loading file: {e}")
-
-    def add_item(self, item_type: str):
-        dialog = ctk.CTkInputDialog(text=f"Enter name for the new {item_type[:-1]}:", title=f"New {item_type[:-1].capitalize()}")
-        name = dialog.get_input()
-        if not name:
-            return
-
-        filename = f"{name}.txt"
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / filename
-
-        if filepath.exists():
-            self.parent_app.update_status(f"{item_type[:-1].capitalize()} '{name}' already exists.", LYRN_ERROR)
-            return
-
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write("")
-            self.refresh_list(item_type)
-            # self._update_index(item_type) is called by refresh_list
-            self.parent_app.update_status(f"Created new {item_type[:-1]} '{name}'.", LYRN_SUCCESS)
-        except Exception as e:
-            self.parent_app.update_status(f"Error creating file: {e}", LYRN_ERROR)
-
-    def delete_item(self, item_type: str):
-        from confirmation_dialog import ConfirmationDialog
-
-        selected_filename = self.selected_item.get(item_type)
-        if not selected_filename:
-            self.parent_app.update_status(f"No {item_type[:-1]} selected to delete.", LYRN_WARNING)
-            return
-
-        confirmed, _ = ConfirmationDialog.show(
-            self, self.theme_manager,
-            title="Confirm Deletion",
-            message=f"Are you sure you want to permanently delete '{selected_filename}'?"
-        )
-        if not confirmed:
-            return
-
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / selected_filename
-
-        try:
-            os.remove(filepath)
-            self.refresh_list(item_type)
-            # self._update_index(item_type) is called by refresh_list
-            getattr(self, f"{item_type}_content_textbox").delete("1.0", "end")
-            getattr(self, f"selected_{item_type}_label").configure(text=f"No {item_type[:-1]} selected")
-            self.selected_item[item_type] = None
-            self.parent_app.update_status(f"Deleted '{selected_filename}'.", LYRN_SUCCESS)
-        except Exception as e:
-            self.parent_app.update_status(f"Error deleting file: {e}", LYRN_ERROR)
-
-    def save_item_content(self, item_type: str):
-        selected_filename = self.selected_item.get(item_type)
-        if not selected_filename:
-            self.parent_app.update_status(f"No {item_type[:-1]} selected to save.", LYRN_WARNING)
-            return
-
-        content_textbox = getattr(self, f"{item_type}_content_textbox")
-        content = content_textbox.get("1.0", "end-1c")
-
-        data_dir = self.tasks_dir if item_type == "tasks" else self.goals_dir
-        filepath = data_dir / selected_filename
-
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(content)
-            self.parent_app.update_status(f"Saved changes to '{selected_filename}'.", LYRN_SUCCESS)
-        except Exception as e:
-            self.parent_app.update_status(f"Error saving file: {e}", LYRN_ERROR)
-
 
 class LyrnAIInterface(ctk.CTkToplevel):
     """Main LYRN-AI interface with enhanced features"""
@@ -4756,7 +4584,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.resource_monitor.start()
 
         # Start watcher scripts
-        watcher_scripts = ["task_goal_watcher.py", "scheduler_watcher.py", "cycle_watcher.py"]
+        watcher_scripts = ["scheduler_watcher.py", "cycle_watcher.py"]
         for script_name in watcher_scripts:
             try:
                 watcher_path = os.path.join(SCRIPT_DIR, "automation", script_name)
