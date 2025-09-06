@@ -131,27 +131,70 @@ class InstructionPopup(ThemedPopup):
 
 
 class FileViewerPopup(ThemedPopup):
-    """A simple popup to display file content."""
-    def __init__(self, parent, theme_manager: ThemeManager, title: str, content: str):
+    """A popup to display file content, with an optional refresh button."""
+    def __init__(self, parent, theme_manager: ThemeManager, title: str, content_source: Path or str, config: dict, is_content_str: bool = False):
         super().__init__(parent=parent, theme_manager=theme_manager)
         self.title(title)
         self.geometry("600x500")
-        self.grab_set()
+        # self.grab_set() # Removed to allow interaction with the parent window
+
+        self.content_source = content_source
+        self.config = config
+        self.is_content_str = is_content_str
+        self.parent_app = parent.parent_app # To call parent methods like update_status
 
         main_frame = ctk.CTkFrame(self, fg_color="transparent")
         main_frame.pack(expand=True, fill="both", padx=10, pady=10)
         main_frame.grid_rowconfigure(0, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
-        textbox = ctk.CTkTextbox(main_frame, wrap="word")
-        textbox.grid(row=0, column=0, sticky="nsew")
-        textbox.insert("1.0", content)
-        textbox.configure(state="disabled")
+        self.textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        self.textbox.grid(row=0, column=0, sticky="nsew")
 
-        ok_button = ctk.CTkButton(main_frame, text="OK", command=self.destroy)
-        ok_button.grid(row=1, column=0, pady=(10, 0))
+        self.refresh_content() # Load initial content
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.grid(row=1, column=0, pady=(10, 0))
+
+        if not self.is_content_str:
+            refresh_button = ctk.CTkButton(button_frame, text="Refresh", command=self.refresh_content)
+            refresh_button.pack(side="left", padx=(0, 10))
+
+        ok_button = ctk.CTkButton(button_frame, text="Close", command=self.destroy)
+        ok_button.pack(side="left")
 
         self.apply_theme()
+
+    def refresh_content(self):
+        """Loads or reloads the content into the textbox."""
+        try:
+            if self.is_content_str:
+                content = self.content_source
+            else:
+                path = Path(self.content_source)
+                if path.exists():
+                    content = path.read_text(encoding='utf-8')
+                else:
+                    content = "[File not found or not specified]"
+
+            begin_bracket = self.config.get("begin_bracket", "")
+            end_bracket = self.config.get("end_bracket", "")
+            full_content = f"{begin_bracket}\n{content}\n{end_bracket}"
+
+            self.textbox.configure(state="normal")
+            self.textbox.delete("1.0", "end")
+            self.textbox.insert("1.0", full_content)
+            self.textbox.configure(state="disabled")
+            if not self.is_content_str:
+                 self.parent_app.update_status(f"Refreshed: {os.path.basename(self.content_source)}", LYRN_INFO)
+
+
+        except Exception as e:
+            error_message = f"Error refreshing content: {e}"
+            self.textbox.configure(state="normal")
+            self.textbox.delete("1.0", "end")
+            self.textbox.insert("1.0", error_message)
+            self.textbox.configure(state="disabled")
 
 
 class DraggableListbox(ctk.CTkScrollableFrame):
@@ -2633,21 +2676,13 @@ class SystemPromptBuilderPopup(ThemedPopup):
         Can accept either a filepath or a raw string as the content source.
         """
         try:
-            if is_content_str:
-                content = content_source
-            else:
-                content = self._load_text(content_source)
-
-            begin_bracket = config.get("begin_bracket", "")
-            end_bracket = config.get("end_bracket", "")
-
-            full_content = f"{begin_bracket}\n{content}\n{end_bracket}"
-
             popup = FileViewerPopup(
                 parent=self,
                 theme_manager=self.theme_manager,
                 title=title,
-                content=full_content
+                content_source=content_source,
+                config=config,
+                is_content_str=is_content_str
             )
             popup.focus()
         except Exception as e:
@@ -5607,7 +5642,8 @@ Enhanced LYRN-AI system with advanced features active.
                 (ctk.CTkFrame, {"fg_color": frame_bg, "border_color": border_color}),
                 (ctk.CTkLabel, {"text_color": label_text}),
                 (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
-                (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color})
+                (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
+                (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color})
             ]:
                 for widget in self.find_widgets_recursively(self, widget_type):
                     try:
