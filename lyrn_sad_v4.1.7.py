@@ -945,48 +945,100 @@ class SystemResourceMonitor:
                 print(f"Warning: NVML shutdown failed: {e}")
 
 class StreamHandler:
-    """Enhanced stream handler with better metrics capture"""
+    """Enhanced stream handler with better metrics capture and special channel parsing."""
 
-    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics):
+    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics, is_oss_model: bool = False):
         self.gui_queue = gui_queue
         self.metrics = metrics
+        self.is_oss_model = is_oss_model
         self.current_response = ""
         self.thinking_content = ""
         self.is_finished = False
         self.log_buffer = ""
+        # New attributes for special channel parsing
+        self.in_analysis_channel = False
+        self.analysis_content = ""
+        self.final_content_started = False
+        self.buffer = ""
 
     def handle_token(self, token_data):
-        """Handle streaming tokens with thinking detection"""
+        """Handle streaming tokens, with special logic for OSS model channels."""
         if 'choices' in token_data and len(token_data['choices']) > 0:
             delta = token_data['choices'][0].get('delta', {})
             content = delta.get('content', '')
 
             if content:
-                self.current_response += content
-
-                # Detect thinking tags
-                if '<thinking>' in content or self.thinking_content:
-                    if '<thinking>' in content:
-                        self.thinking_content = content.split('<thinking>')[-1]
-                        content = content.split('<thinking>')[0]
-                    elif '</thinking>' in content:
-                        thinking_end = content.split('</thinking>')[0]
-                        self.thinking_content += thinking_end
-                        content = content.split('</thinking>', 1)[-1]
-                        # Send thinking content separately
-                        self.gui_queue.put(('thinking', self.thinking_content))
-                        self.thinking_content = ""
-                    else:
-                        self.thinking_content += content
-                        content = ""
-
-                if content:
-                    self.gui_queue.put(('token', content, 'assistant'))
+                if self.is_oss_model:
+                    self.buffer += content
+                    self._process_oss_buffer()
+                else:
+                    # Original logic for non-OSS models
+                    self._process_standard_content(content)
 
             finish_reason = token_data['choices'][0].get('finish_reason')
             if finish_reason is not None:
+                if self.is_oss_model and self.analysis_content:
+                    # Flush any remaining analysis content at the end
+                    self.gui_queue.put(('analysis_token', self.analysis_content))
                 self.is_finished = True
                 self.gui_queue.put(('finished', self.current_response))
+
+    def _process_standard_content(self, content: str):
+        """Processes content for standard models (non-OSS)."""
+        self.current_response += content
+        # Thinking tag detection can be refactored into its own method if needed
+        if '<thinking>' in content or self.thinking_content:
+            if '<thinking>' in content:
+                self.thinking_content = content.split('<thinking>')[-1]
+                content = content.split('<thinking>')[0]
+            elif '</thinking>' in content:
+                thinking_end = content.split('</thinking>')[0]
+                self.thinking_content += thinking_end
+                content = content.split('</thinking>', 1)[-1]
+                self.gui_queue.put(('thinking', self.thinking_content))
+                self.thinking_content = ""
+            else:
+                self.thinking_content += content
+                content = ""
+        if content:
+            self.gui_queue.put(('token', content, 'assistant'))
+
+    def _process_oss_buffer(self):
+        """Processes the buffer for special OSS channel markers."""
+        analysis_start_tag = "<|channel|>analysis<|message|>"
+        final_start_tag = "<|start|>assistant<|channel|>final<|message|>"
+
+        # Switch to final content channel
+        if not self.final_content_started and final_start_tag in self.buffer:
+            # Flush any content in the analysis channel before switching
+            if self.in_analysis_channel:
+                pre_final_content = self.buffer.split(final_start_tag)[0]
+                self.analysis_content += pre_final_content
+                if self.analysis_content:
+                    self.gui_queue.put(('analysis_token', self.analysis_content))
+                self.analysis_content = "" # Reset analysis content
+
+            self.in_analysis_channel = False
+            self.final_content_started = True
+            self.buffer = self.buffer.split(final_start_tag, 1)[1]
+            self.gui_queue.put(('clear_analysis_display', '')) # Clear analysis display
+
+        # Switch to analysis channel
+        if not self.in_analysis_channel and not self.final_content_started and analysis_start_tag in self.buffer:
+            self.in_analysis_channel = True
+            # Discard the tag and anything before it
+            self.buffer = self.buffer.split(analysis_start_tag, 1)[1]
+
+        # Process content based on the current channel
+        if self.in_analysis_channel:
+            self.analysis_content += self.buffer
+            self.gui_queue.put(('analysis_token', self.buffer)) # Stream analysis tokens
+            self.buffer = ""
+        elif self.final_content_started:
+            if self.buffer:
+                self.current_response += self.buffer
+                self.gui_queue.put(('token', self.buffer, 'assistant'))
+                self.buffer = ""
 
     def capture_logs(self, log_content: str):
         """Enhanced log capture"""
@@ -1186,6 +1238,11 @@ class ModelSelectorPopup(ThemedPopup):
             entry.grid(row=row, column=col+1, padx=10, pady=5, sticky="w")
             self.model_entries[key] = entry
 
+        # Add is_oss_model checkbox
+        self.is_oss_model_var = ctk.BooleanVar()
+        self.is_oss_model_checkbox = ctk.CTkCheckBox(grid_frame, text="OSS Model (Analysis Channel)", variable=self.is_oss_model_var, font=font)
+        self.is_oss_model_checkbox.grid(row=3, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+
         # Warning Label
         warning_label = ctk.CTkLabel(
             main_frame,
@@ -1342,6 +1399,9 @@ class ModelSelectorPopup(ThemedPopup):
             if model_filename in self.model_dropdown.cget("values"):
                 self.model_dropdown.set(model_filename)
 
+        # Load is_oss_model setting
+        self.is_oss_model_var.set(active_settings.get("is_oss_model", False))
+
     def load_model(self):
         """Save settings, trigger model load in parent, and close popup."""
         # 1. Get settings from UI
@@ -1369,6 +1429,8 @@ class ModelSelectorPopup(ThemedPopup):
                 new_active_settings[key] = None if not value else value
             else:
                 new_active_settings[key] = value
+
+        new_active_settings["is_oss_model"] = self.is_oss_model_var.get()
 
         # 2. Save settings
         self.settings_manager.settings["active"] = new_active_settings
@@ -2684,11 +2746,14 @@ class SystemPromptBuilderPopup(ThemedPopup):
             if not heartbeat_content:
                 heartbeat_content = "[Heartbeat is currently disabled or has no content]"
 
+            # Correctly instantiate FileViewerPopup
             popup = FileViewerPopup(
                 parent=self,
                 theme_manager=self.theme_manager,
                 title="Heartbeat Prompt Preview",
-                content=heartbeat_content.strip()
+                content_source=heartbeat_content.strip(),
+                config={}, # The heartbeat string is already fully formatted
+                is_content_str=True
             )
             popup.focus()
         except Exception as e:
@@ -2721,11 +2786,14 @@ class SystemPromptBuilderPopup(ThemedPopup):
         prompt_content = self.snapshot_loader.build_master_prompt_from_components()
 
         if prompt_content:
+            # Correctly instantiate FileViewerPopup
             popup = FileViewerPopup(
                 parent=self,
                 theme_manager=self.theme_manager,
                 title="Final Prompt Preview",
-                content=prompt_content
+                content_source=prompt_content,
+                config={},  # No specific brackets for the whole prompt
+                is_content_str=True
             )
             popup.focus()
             self.parent_app.update_status("Final prompt preview ready.", LYRN_SUCCESS)
@@ -5236,8 +5304,14 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.chat_display = ctk.CTkTextbox(chat_frame, font=chat_font, wrap="word", border_width=2, text_color=self.theme_manager.get_color("display_text_color"))
         self.chat_display.grid(row=0, column=0, sticky="nsew", padx=20, pady=(20, 10))
 
+        # --- Analysis Display (for OSS models) ---
+        self.analysis_display = ctk.CTkTextbox(chat_frame, font=chat_font, wrap="word", border_width=2, height=150)
+        # self.analysis_display.grid(row=1, column=0, sticky="nsew", padx=20, pady=(10, 10)) # Initially hidden
+        self.analysis_display.grid_remove() # Use grid_remove to hide it initially
+
         # Configure tags for colored text
         self.chat_display.tag_config("system_text", foreground=self.theme_manager.get_color("system_text"))
+        self.analysis_display.tag_config("analysis_text", foreground=self.theme_manager.get_color("info")) # Use info color for analysis
         self.chat_display.tag_config("user_text", foreground=self.theme_manager.get_color("user_text"))
         self.chat_display.tag_config("assistant_text", foreground=self.theme_manager.get_color("assistant_text"))
         self.chat_display.tag_config("thinking_text", foreground=self.theme_manager.get_color("thinking_text"))
@@ -5916,6 +5990,12 @@ Enhanced LYRN-AI system with advanced features active.
         # Display thinking message and start response generation
         self.display_colored_message("Assistant: Thinking...\n\n", "thinking_text")
         self.is_thinking = True
+
+        # Show analysis display if it's an OSS model
+        if self.settings_manager.settings.get("active", {}).get("is_oss_model", False):
+            self.analysis_display.grid(row=1, column=0, sticky="nsew", padx=20, pady=(10, 10))
+        else:
+            self.analysis_display.grid_remove()
         self.set_model_status("Thinking") # Blue for generating
         threading.Thread(target=self.generate_response, args=(user_text,), daemon=True).start()
         self.update_status("Generating response...", LYRN_INFO)
@@ -6003,7 +6083,8 @@ Enhanced LYRN-AI system with advanced features active.
             messages.append({"role": "user", "content": user_text})
 
             active = self.settings_manager.settings["active"]
-            handler = StreamHandler(self.stream_queue, self.metrics)
+            is_oss_model = active.get("is_oss_model", False)
+            handler = StreamHandler(self.stream_queue, self.metrics, is_oss_model=is_oss_model)
 
             # Setup stderr capture
             log_capture_buffer = io.StringIO()
@@ -6114,6 +6195,18 @@ Enhanced LYRN-AI system with advanced features active.
                         _, thinking_content = message
                         self.chat_logger.append_log("THINKING", thinking_content)
                         self.display_colored_message(f"🤔 Thinking Log: {thinking_content[:150]}...\n\n", "thinking_text")
+
+                    elif message[0] == 'analysis_token':
+                        _, content = message
+                        self.analysis_display.configure(state="normal")
+                        self.analysis_display.insert("end", content)
+                        self.analysis_display.see("end")
+                        self.analysis_display.configure(state="disabled")
+
+                    elif message[0] == 'clear_analysis_display':
+                        self.analysis_display.configure(state="normal")
+                        self.analysis_display.delete("1.0", "end")
+                        self.analysis_display.configure(state="disabled")
 
                     elif message[0] == 'finished':
                         if self.is_thinking: # Handles empty responses
@@ -6227,10 +6320,10 @@ Enhanced LYRN-AI system with advanced features active.
             self.kv_label.configure(text=f"KV Cache: {self.metrics.kv_cache_reused:,} tokens")
             self.prompt_label.configure(text=f"Prompt: {self.metrics.prompt_tokens:,} tokens")
             self.eval_label.configure(text=f"Generation: {self.metrics.eval_speed:.1f} tok/s")
-            self.total_label.configure(text=f"Total: {self.metrics.total_tokens:,} tokens")
+        n_ctx = self.settings_manager.settings.get("active", {}).get("n_ctx", 1)
+        self.total_label.configure(text=f"Total: {self.metrics.total_tokens:,} / {n_ctx:,} tokens")
 
             # Update progress bar for KV cache and Total Tokens
-            n_ctx = self.settings_manager.settings.get("active", {}).get("n_ctx", 1)
             if n_ctx > 0:
                 kv_ratio = min(self.metrics.kv_cache_reused / n_ctx, 1.0)
                 self.kv_progress.set(kv_ratio)
