@@ -28,14 +28,11 @@ class SystemChecker:
     def __init__(self, settings_manager):
         self.settings_manager = settings_manager
         self.essential_files = [
-            "automation/task_goal_watcher.py",
             "automation/scheduler_watcher.py",
             "automation/cycle_watcher.py",
-            "automation/topic_watcher.py",
             "automation/scheduler_manager.py",
             "automation_controller.py",
             "cycle_manager.py",
-            "topic_manager.py",
             "episodic_memory_manager.py",
             "delta_manager.py",
             "affordance_manager.py",
