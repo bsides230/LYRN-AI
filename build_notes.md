@@ -1,5 +1,15 @@
 # LYRN-AI Build Notes
 
+## v4.1.8 (2025-09-05)
+
+This is a hotfix release to address a `SyntaxError` that was preventing the application from running.
+
+- **SyntaxError Fix:** Corrected a `SyntaxError: expected 'except' or 'finally' block` in the `update_enhanced_metrics` function. The code was improperly structured, with several lines of code placed between the `try` and `except` blocks. These lines have been moved inside the `try` block, resolving the error.
+- **Versioning:** The application version has been updated to `v4.1.8`.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.7 (2025-09-05)
 
 This update focuses on refining the prompt injection system, giving users more granular control over context, and improving UI compactness.

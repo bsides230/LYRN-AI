@@ -4862,7 +4862,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.1.7")
+        self.title("LYRN-AI Dashboard v4.1.8")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -6320,8 +6320,8 @@ Enhanced LYRN-AI system with advanced features active.
             self.kv_label.configure(text=f"KV Cache: {self.metrics.kv_cache_reused:,} tokens")
             self.prompt_label.configure(text=f"Prompt: {self.metrics.prompt_tokens:,} tokens")
             self.eval_label.configure(text=f"Generation: {self.metrics.eval_speed:.1f} tok/s")
-        n_ctx = self.settings_manager.settings.get("active", {}).get("n_ctx", 1)
-        self.total_label.configure(text=f"Total: {self.metrics.total_tokens:,} / {n_ctx:,} tokens")
+            n_ctx = self.settings_manager.settings.get("active", {}).get("n_ctx", 1)
+            self.total_label.configure(text=f"Total: {self.metrics.total_tokens:,} / {n_ctx:,} tokens")
 
             # Update progress bar for KV cache and Total Tokens
             if n_ctx > 0:
