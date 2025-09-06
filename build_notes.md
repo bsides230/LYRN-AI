@@ -1,5 +1,17 @@
 # LYRN-AI Build Notes
 
+## v4.1.6 (2025-09-05)
+
+This update introduces several UI improvements and adds more detailed performance metrics.
+
+- **"Episodic Memory" Tab Renamed:** The "Episodic Memory" tab in the Memory popup has been renamed to "Chat History" to be more intuitive for users.
+- **Performance Metrics Enhanced:** The Performance Metrics section now includes timers for "Generation Time" and "Tokenization Time", displayed in minutes and seconds, giving users more insight into model performance.
+- **Affordances Button Relocated:** The "Affordances" button has been moved from the right sidebar to the left sidebar, directly underneath the "Personality" button, for better grouping of related controls.
+- **Ctrl+Enter Fix:** The Ctrl+Enter shortcut to send a message from the input textbox now works reliably and prevents the default action of inserting a newline.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.5 (2025-09-05)
 
 This update fixes two significant UI bugs related to the Theming and System Prompt Builder systems.
