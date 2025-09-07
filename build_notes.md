@@ -1,5 +1,23 @@
 # LYRN-AI Build Notes
 
+## v4.2.0 - UI and Logging Fixes (2025-09-07)
+
+This update addresses user feedback regarding UI spacing and fixes a critical bug in the chat logging system to ensure logs are clean and correctly formatted for reinjection.
+
+- **UI Spacing Refined:**
+    - Reduced the vertical spacing in the chat display for a more compact and readable conversation flow.
+    - Adjusted the newlines printed after the user's message and between the "Thinking" and "Assistant" sections of the response.
+
+- **Chat Log Formatting Corrected:**
+    - Fixed a major bug where chat logs were being written incorrectly, including raw model output with "thinking" steps and using the wrong headers.
+    - Removed a redundant logging call that was saving the raw, unfiltered model output.
+    - The `JournalLogger` now correctly saves only the final, clean assistant response.
+    - Log files now begin with a `#Timestamp#` as requested.
+    - Log file headers have been corrected from `#RESPONSE_START#` to `#ASSISTANT_START#`.
+
+### Logging
+- The chat logging system has been corrected to only log the final, user-facing messages, ensuring the logs are clean and suitable for being reinjected as chat history.
+
 ## v4.1.9 Fixes (2025-09-07)
 
 This is a bugfix release to address two outstanding errors that were affecting model conversation history and UI stability.
