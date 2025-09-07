@@ -6138,16 +6138,21 @@ Enhanced LYRN-AI system with advanced features active.
             # Use the cached prompt
             full_prompt = self.master_prompt_content
 
-            # --- Start of Chat History Injection ---
-            history_content = self.chat_manager.get_live_chat_history_content() if self.chat_manager else ""
-            # --- End of Chat History Injection ---
+            # Get chat history as a structured list of messages
+            history_messages = self.chat_manager.get_chat_history_messages() if self.chat_manager else []
 
             messages = [
                 {"role": "system", "content": full_prompt},
             ]
-            if history_content:
-                messages.append({"role": "user", "content": history_content})
-            messages.append({"role": "user", "content": user_text})
+            messages.extend(history_messages)
+
+            # Ensure roles alternate by merging if the last message is also from the user
+            if messages and messages[-1].get("role") == "user":
+                print("Warning: Merging consecutive user messages in get_response_for_job.")
+                messages[-1]["content"] += "\n\n" + user_text
+            else:
+                messages.append({"role": "user", "content": user_text})
+
 
             active = self.settings_manager.settings["active"]
 
@@ -6212,7 +6217,12 @@ Enhanced LYRN-AI system with advanced features active.
 
             # Add the structured history and the current user input
             messages.extend(history_messages)
-            messages.append({"role": "user", "content": user_text})
+            # Ensure roles alternate by merging if the last message is also from the user
+            if messages and messages[-1].get("role") == "user":
+                print("Warning: Merging consecutive user messages to maintain alternating roles.")
+                messages[-1]["content"] += "\n\n" + user_text
+            else:
+                messages.append({"role": "user", "content": user_text})
 
             active = self.settings_manager.settings["active"]
             is_oss_model = active.get("is_oss_model", False)
