@@ -6072,6 +6072,9 @@ Enhanced LYRN-AI system with advanced features active.
             self.update_status("No model loaded", LYRN_ERROR)
             return
 
+        # Get chat history BEFORE logging the new message
+        history_messages = self.chat_manager.get_chat_history_messages() if self.chat_manager else []
+
         # Start a new structured log for this interaction
         self.chat_logger.start_log()
         self.chat_logger.append_log("USER", user_text)
@@ -6095,7 +6098,7 @@ Enhanced LYRN-AI system with advanced features active.
         self.is_thinking = True
 
         self.set_model_status("Thinking") # Blue for generating
-        threading.Thread(target=self.generate_response, args=(user_text,), daemon=True).start()
+        threading.Thread(target=self.generate_response, args=(user_text, history_messages), daemon=True).start()
         self.update_status("Generating response...", LYRN_INFO)
 
     def get_response_for_job(self, user_text: str) -> str:
@@ -6164,7 +6167,7 @@ Enhanced LYRN-AI system with advanced features active.
             self.chat_display.delete(pos, "end")
         self.chat_display.configure(state="disabled")
 
-    def generate_response(self, user_text: str):
+    def generate_response(self, user_text: str, history_messages: List[Dict[str, str]]):
         """Generate AI response with enhanced handling and metrics capture."""
         try:
             # Use the cached prompt
@@ -6172,9 +6175,6 @@ Enhanced LYRN-AI system with advanced features active.
 
             # Get delta content
             delta_content = self.delta_manager.get_delta_content() if self.settings_manager.get_setting("enable_deltas", True) else ""
-
-            # Get chat history as a structured list of messages
-            history_messages = self.chat_manager.get_chat_history_messages() if self.chat_manager else []
 
             # Construct messages
             messages = [{"role": "system", "content": full_prompt}]
