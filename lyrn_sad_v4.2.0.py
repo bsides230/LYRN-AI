@@ -4975,7 +4975,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.1.9")
+        self.title("LYRN-AI Dashboard v4.2.0")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -6474,7 +6474,6 @@ Enhanced LYRN-AI system with advanced features active.
             self.eval_label.configure(text="Generation: 0 tok/s")
             self.total_label.configure(text="Total: 0 tokens")
             self.kv_progress.set(0)
-            self.speed_indicator.configure(text_color="#666666")
         except Exception as e:
             print(f"Error resetting metrics: {e}")
 

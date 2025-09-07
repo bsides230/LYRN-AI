@@ -64,15 +64,12 @@ class ChatManager:
                 for role, text in role_blocks:
                     role_lower = role.lower()
 
-                    # Map the raw role to an internal category
-                    internal_role = self.role_mappings.get(role_lower)
-
-                    # For history, we only care about user and final_output
-                    if internal_role == "final_output":
-                        # Map to 'assistant' for the LLM API
-                        messages.append({"role": "assistant", "content": text.strip()})
-                    elif role_lower == "user":
+                    # For the purpose of history, any role that isn't 'user' is treated as 'assistant'
+                    if role_lower == "user":
                         messages.append({"role": "user", "content": text.strip()})
+                    else:
+                        # Treat all other roles (assistant, model, thinking, etc.) as the assistant's turn
+                        messages.append({"role": "assistant", "content": text.strip()})
 
             # Ensure the conversation ends with a user message if possible,
             # but llama-cpp can handle assistant as the last message.

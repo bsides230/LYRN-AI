@@ -1,5 +1,15 @@
 # LYRN-AI Build Notes
 
+## v4.2.0 (2025-09-07)
+
+This is a bugfix release to address two outstanding errors that were affecting model conversation history and UI stability.
+
+- **Conversation Role Fix:** Resolved a critical bug that caused the `Conversation roles must alternate` error. The `ChatManager` now correctly treats all non-user roles (e.g., `assistant`, `model`, `thinking`) as the 'assistant' for the purpose of constructing chat history. This prevents consecutive 'user' messages from being sent to the model, which was the root cause of the error.
+- **Metrics Display Fix:** Fixed an `AttributeError` in the `reset_metrics_display` function that occurred when reloading the model. The code was attempting to reference a non-existent UI widget (`speed_indicator`). The erroneous line has been removed, resolving the crash.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.9 (2025-09-07)
 
 This is a major feature update focused on improving model compatibility, user customization, and providing a clearer view of the AI's operations. The core changes revolve around a more flexible handling of model roles (e.g., `assistant`, `model`, `thinking`, `analysis`) to prevent conversation errors and give users more control over the GUI's appearance and behavior.
