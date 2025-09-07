@@ -1,17 +1,18 @@
 {
   "settings": {
     "active": {
-      "model_path": "D:\\LYRN-SAD\\models\\llm_reasoner_gemma3.gguf",
-      "n_ctx": 84000,
+      "model_path": "D:\\LYRN-SAD\\models\\Huihui-gpt-oss-20b-BF16-abliterated.gguf",
+      "n_ctx": 16000,
       "n_threads": 22,
       "n_gpu_layers": 36,
       "n_batch": 256,
-      "max_tokens": 1024,
+      "max_tokens": 5000,
       "temperature": 0.7,
       "top_p": 0.95,
       "top_k": 40,
       "stream": true,
-      "chat_format": null
+      "chat_format": null,
+      "is_oss_model": false
     },
     "paths": {
       "static_snapshots": "D:\\LYRN-SAD\\build_prompt/static_snapshots",
@@ -35,13 +36,16 @@
     },
     "model_presets": {
       "1": {
-        "model_path": "D:\\LYRN-SAD\\models\\Qwen.Qwen3-4B-Thinking-2507.Q4_K_M.gguf",
-        "n_ctx": 32000,
+        "model_path": "D:\\LYRN-SAD\\models\\openai_gpt-oss-20b-Q4_K_M.gguf",
+        "n_ctx": 16000,
         "n_threads": 22,
         "n_gpu_layers": 36,
+        "temperature": 0.7,
+        "max_tokens": 1024,
+        "top_p": 0.95,
+        "top_k": 40,
         "n_batch": 256,
-        "max_tokens": 2048,
-        "chat_format": "qwen"
+        "chat_format": null
       },
       "2": {
         "model_path": "D:\\LYRN-SAD\\models\\openai_gpt-oss-20b-Q4_K_M.gguf",
@@ -75,11 +79,23 @@
   "ui_settings": {
     "font_size": 12,
     "window_size": "1400x900",
+    "confirmation_preferences": {},
+    "save_chat_history": false,
+    "chat_history_length": 10,
+    "show_thinking_text": true,
+    "chat_colors": {
+      "user_text": "#00C0A0",
+      "assistant_text": "#FFFFFF",
+      "thinking_text": "#FFD700",
+      "system_text": "#B0B0B0"
+    },
     "show_model_selector": false,
     "autoload_model": false,
     "llm_log_visible": false,
     "llm_log_on_top": false,
     "language": "en",
-    "terminal_start_path": ""
+    "terminal_start_path": "",
+    "enable_deltas": true,
+    "enable_chat_history": true
   }
 }
