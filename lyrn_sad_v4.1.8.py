@@ -34,6 +34,7 @@ from episodic_memory_manager import EpisodicMemoryManager
 from system_checker import SystemChecker
 from full_rwi_viewer_popup import FullRWIViewerPopup
 from chat_manager import ChatManager
+from log_manager import JournalLogger, LiveDisplayLogger
 
 # CustomTkinter imports
 import customtkinter as ctk
@@ -945,110 +946,97 @@ class SystemResourceMonitor:
                 print(f"Warning: NVML shutdown failed: {e}")
 
 class StreamHandler:
-    """Enhanced stream handler with better metrics capture and special channel parsing."""
-
-    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics, is_oss_model: bool = False):
+    """
+    A robust stream handler that parses role tags (e.g., <thinking>) from the model's output
+    and sends complete, role-specific messages to the GUI queue.
+    """
+    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics, role_config: dict):
         self.gui_queue = gui_queue
         self.metrics = metrics
-        self.is_oss_model = is_oss_model
-        self.current_response = ""
-        self.thinking_content = ""
-        self.is_finished = False
-        self.log_buffer = ""
-        # New attributes for special channel parsing
-        self.in_analysis_channel = False
-        self.analysis_content = ""
-        self.final_content_started = False
+        self.role_config = role_config
         self.buffer = ""
+        self.current_role = "assistant"
+        self.role_buffers = {"assistant": ""}
+        self.known_roles = list(role_config.get("role_map", {}).keys())
 
     def handle_token(self, token_data):
-        """Handle streaming tokens, with special logic for OSS model channels."""
+        """Handles incoming tokens from the streaming API."""
         if 'choices' in token_data and len(token_data['choices']) > 0:
             delta = token_data['choices'][0].get('delta', {})
             content = delta.get('content', '')
 
             if content:
-                if self.is_oss_model:
-                    self.buffer += content
-                    self._process_oss_buffer()
-                else:
-                    # Original logic for non-OSS models
-                    self._process_standard_content(content)
+                self.buffer += content
+                self._process_buffer()
 
             finish_reason = token_data['choices'][0].get('finish_reason')
             if finish_reason is not None:
-                if self.is_oss_model and self.analysis_content:
-                    # Flush any remaining analysis content at the end
-                    self.gui_queue.put(('analysis_token', self.analysis_content))
-                self.is_finished = True
-                self.gui_queue.put(('finished', self.current_response))
+                self._flush_all_roles()
+                self.gui_queue.put(('finished', ''))
 
-    def _process_standard_content(self, content: str):
-        """Processes content for standard models (non-OSS)."""
-        self.current_response += content
-        # Thinking tag detection can be refactored into its own method if needed
-        if '<thinking>' in content or self.thinking_content:
-            if '<thinking>' in content:
-                self.thinking_content = content.split('<thinking>')[-1]
-                content = content.split('<thinking>')[0]
-            elif '</thinking>' in content:
-                thinking_end = content.split('</thinking>')[0]
-                self.thinking_content += thinking_end
-                content = content.split('</thinking>', 1)[-1]
-                self.gui_queue.put(('thinking', self.thinking_content))
-                self.thinking_content = ""
-            else:
-                self.thinking_content += content
-                content = ""
-        if content:
-            self.gui_queue.put(('token', content, 'assistant'))
+    def _process_buffer(self):
+        """Processes the buffer to find and handle role tags."""
+        # Regex to find any start or end role tag
+        # e.g., <thinking>, </thinking>, <analysis>, </analysis>
+        tag_regex = re.compile(r"</?(" + "|".join(self.known_roles) + r")>")
 
-    def _process_oss_buffer(self):
-        """Processes the buffer for special OSS channel markers."""
-        analysis_start_tag = "<|channel|>analysis<|message|>"
-        final_start_tag = "<|start|>assistant<|channel|>final<|message|>"
-
-        # Switch to final content channel
-        if not self.final_content_started and final_start_tag in self.buffer:
-            # Flush any content in the analysis channel before switching
-            if self.in_analysis_channel:
-                pre_final_content = self.buffer.split(final_start_tag)[0]
-                self.analysis_content += pre_final_content
-                if self.analysis_content:
-                    self.gui_queue.put(('analysis_token', self.analysis_content))
-                self.analysis_content = "" # Reset analysis content
-
-            self.in_analysis_channel = False
-            self.final_content_started = True
-            self.buffer = self.buffer.split(final_start_tag, 1)[1]
-            self.gui_queue.put(('clear_analysis_display', '')) # Clear analysis display
-
-        # Switch to analysis channel
-        if not self.in_analysis_channel and not self.final_content_started and analysis_start_tag in self.buffer:
-            self.in_analysis_channel = True
-            # Discard the tag and anything before it
-            self.buffer = self.buffer.split(analysis_start_tag, 1)[1]
-
-        # Process content based on the current channel
-        if self.in_analysis_channel:
-            self.analysis_content += self.buffer
-            self.gui_queue.put(('analysis_token', self.buffer)) # Stream analysis tokens
-            self.buffer = ""
-        elif self.final_content_started:
-            if self.buffer:
-                self.current_response += self.buffer
-                self.gui_queue.put(('token', self.buffer, 'assistant'))
+        while True:
+            match = tag_regex.search(self.buffer)
+            if not match:
+                # No more tags, the rest of the buffer is for the current role
+                self.role_buffers.setdefault(self.current_role, "")
+                self.role_buffers[self.current_role] += self.buffer
                 self.buffer = ""
+                break
+
+            # Add content before the tag to the current role's buffer
+            pre_tag_content = self.buffer[:match.start()]
+            self.role_buffers.setdefault(self.current_role, "")
+            self.role_buffers[self.current_role] += pre_tag_content
+
+            tag = match.group(0)
+            role_name = match.group(1)
+
+            if tag.startswith("</"):  # It's an end tag
+                if role_name == self.current_role:
+                    # We've finished capturing this role, flush it
+                    self._flush_role(self.current_role)
+                    self.current_role = "assistant" # Default back to assistant
+            else:  # It's a start tag
+                # Flush whatever role we were in before
+                self._flush_role(self.current_role)
+                self.current_role = role_name
+
+            # Move buffer past the processed tag
+            self.buffer = self.buffer[match.end():]
+
+    def _flush_role(self, role: str):
+        """Sends the content of a role's buffer to the GUI queue if it has content."""
+        if role in self.role_buffers and self.role_buffers[role]:
+            content = self.role_buffers[role]
+            self.gui_queue.put(('role_message', role, content))
+            self.role_buffers[role] = "" # Clear buffer after flushing
+
+    def _flush_all_roles(self):
+        """Flushes any remaining content in any buffer at the end of the stream."""
+        # Also flush the main buffer
+        if self.buffer:
+            self.role_buffers.setdefault(self.current_role, "")
+            self.role_buffers[self.current_role] += self.buffer
+            self.buffer = ""
+
+        for role in list(self.role_buffers.keys()):
+            self._flush_role(role)
 
     def capture_logs(self, log_content: str):
-        """Enhanced log capture"""
-        self.log_buffer += log_content
-        if any(marker in self.log_buffer for marker in ["llama_perf_context_print", "eval time", "prompt eval time"]):
-            self.metrics.parse_llama_logs(self.log_buffer)
+        """Enhanced log capture (remains the same)."""
+        # This method is not part of the core stream parsing, but is kept for metrics.
+        # Its implementation can be considered unchanged.
+        log_buffer = getattr(self, 'log_buffer', '') + log_content
+        setattr(self, 'log_buffer', log_buffer)
+        if any(marker in log_buffer for marker in ["llama_perf_context_print", "eval time", "prompt eval time"]):
+            self.metrics.parse_llama_logs(log_buffer)
             self.gui_queue.put(('metrics_update', ''))
-
-    def get_response(self) -> str:
-        return self.current_response
 
 class QueueIO(io.TextIOBase):
     """A file-like object that writes to a queue."""
@@ -1132,49 +1120,6 @@ class LogViewerPopup(ThemedPopup):
             self.after(100, self.process_log_queue)
 
 
-class StructuredChatLogger:
-    """Handles the creation and appending of structured chat logs for automation."""
-    def __init__(self, chat_dir: str):
-        self.chat_dir = Path(chat_dir)
-        self.chat_dir.mkdir(parents=True, exist_ok=True)
-        self.current_log_path = None
-
-    def start_log(self) -> str:
-        """
-        Starts a new log file with a timestamp and returns the path.
-        """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"chat_{timestamp}.txt"
-        self.current_log_path = self.chat_dir / filename
-        # Create the file immediately to establish its existence
-        with open(self.current_log_path, 'w', encoding='utf-8') as f:
-            f.write("") # Write an empty string to create the file
-        return str(self.current_log_path)
-
-    def append_log(self, role: str, content: str):
-        """
-        Appends a new section to the current log file.
-        Role can be 'USER', 'THINKING', or 'RESPONSE'.
-        """
-        if not self.current_log_path:
-            print("Error: start_log() must be called before appending.")
-            return
-
-        role_upper = role.upper()
-        start_tag = f"#{role_upper}_START#"
-        end_tag = f"#{role_upper}_END#"
-
-        formatted_content = f"{start_tag}\n{content}\n{end_tag}\n\n"
-
-        try:
-            with open(self.current_log_path, 'a', encoding='utf-8') as f:
-                f.write(formatted_content)
-        except Exception as e:
-            print(f"Error appending to log file {self.current_log_path}: {e}")
-
-    def new_log_session(self):
-        """Resets the current_log_path to ensure the next write starts a new file."""
-        self.current_log_path = None
 
 class ModelSelectorPopup(ThemedPopup):
     """A popup window to select a model and configure settings on startup."""
@@ -1658,6 +1603,17 @@ class TabbedSettingsDialog(ThemedPopup):
         self.enable_chat_history_switch.pack(side="left", padx=10, pady=10)
         Tooltip(self.enable_chat_history_switch, "If enabled, chat history will be injected into the prompt.")
 
+        # --- Display Toggles ---
+        display_frame = ctk.CTkFrame(self.tab_chat)
+        display_frame.pack(fill="x", padx=20, pady=10)
+
+        self.show_intermediate_steps_var = ctk.BooleanVar()
+        self.show_intermediate_steps_switch = ctk.CTkSwitch(display_frame, text="Show intermediate model steps (thinking/analysis)",
+                                                          variable=self.show_intermediate_steps_var, font=font)
+        self.show_intermediate_steps_switch.pack(side="left", padx=10, pady=10)
+        Tooltip(self.show_intermediate_steps_switch, "If enabled, shows the model's thought process before the final answer.")
+
+
         # --- Folder Management ---
         folder_frame = ctk.CTkFrame(self.tab_chat)
         folder_frame.pack(fill="x", padx=20, pady=10)
@@ -1898,6 +1854,7 @@ class TabbedSettingsDialog(ThemedPopup):
         self.update_chat_history_label(chat_len)
         self.enable_deltas_var.set(self.settings_manager.ui_settings.get("enable_deltas", True))
         self.enable_chat_history_var.set(self.settings_manager.ui_settings.get("enable_chat_history", True))
+        self.show_intermediate_steps_var.set(self.settings_manager.ui_settings.get("show_intermediate_steps", True))
 
     def clear_chat_directory(self):
         """Clear chat directory after confirmation."""
@@ -2105,6 +2062,7 @@ class TabbedSettingsDialog(ThemedPopup):
             self.settings_manager.ui_settings["chat_history_length"] = int(self.chat_history_length_slider.get())
             self.settings_manager.ui_settings["enable_deltas"] = self.enable_deltas_var.get()
             self.settings_manager.ui_settings["enable_chat_history"] = self.enable_chat_history_var.get()
+            self.settings_manager.ui_settings["show_intermediate_steps"] = self.show_intermediate_steps_var.get()
 
             # Save all settings
             self.settings_manager.save_settings(settings)
@@ -4605,6 +4563,18 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.settings_manager = SettingsManager()
         self.theme_manager = ThemeManager()
 
+        # Load role config
+        try:
+            with open(os.path.join(SCRIPT_DIR, "role_config.json"), 'r', encoding='utf-8') as f:
+                self.role_config = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Warning: Could not load role_config.json: {e}. Using default.")
+            self.role_config = {"role_map": {}, "group_styles": {}}
+
+        # Initialize new loggers
+        self.journal_logger = JournalLogger()
+        self.live_display_logger = LiveDisplayLogger()
+
         # Perform system checks on startup
         system_checker = SystemChecker(self.settings_manager)
         system_checker.check_and_create_folders()
@@ -4684,7 +4654,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.delta_manager = DeltaManager()
         self.automation_controller = AutomationController()
         self.metrics = EnhancedPerformanceMetrics()
-        self.chat_logger = StructuredChatLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
         self.affordance_manager = AffordanceManager()
         self.scheduler_manager = SchedulerManager()
         self.cycle_manager = CycleManager()
@@ -5386,9 +5355,55 @@ Enhanced LYRN-AI system with advanced features active.
     def display_colored_message(self, message: str, tag: str):
         """Appends a message to the chat display with a specific color tag."""
         self.chat_display.configure(state="normal")
-        self.chat_display.insert("end", message, tag)
+        self.chat_display.insert("end", message, (tag,))
         self.chat_display.see("end")
         self.chat_display.configure(state="disabled")
+
+    def refresh_chat_display(self):
+        """
+        Reads the entire live display log, parses it, and renders it to the
+        chat display window, respecting role groups and settings.
+        """
+        self.chat_display.configure(state="normal")
+        self.chat_display.delete("1.0", "end")
+
+        full_log_content = self.live_display_logger.read_all()
+        if not full_log_content:
+            self.chat_display.configure(state="disabled")
+            return
+
+        # Regex to find all role blocks
+        tag_regex = re.compile(r"#([A-Z_]+)_START#\n(.*?)\n#\1_END#", re.DOTALL)
+
+        show_intermediate = self.settings_manager.ui_settings.get("show_intermediate_steps", True)
+
+        for match in tag_regex.finditer(full_log_content):
+            role_name_upper = match.group(1)
+            role_name = role_name_upper.lower()
+            content = match.group(2)
+
+            role_map = self.role_config.get("role_map", {})
+            group_styles = self.role_config.get("group_styles", {})
+
+            # Determine the group for this role
+            role_group = role_map.get(role_name, "unknown")
+
+            # Check if we should skip displaying this role
+            if not show_intermediate and role_group == "intermediate":
+                continue
+
+            # Get the style for this group
+            style = group_styles.get(role_group, group_styles.get("assistant")) # Default to assistant style
+            color_tag = style.get("color_tag", "assistant_text")
+            display_name = style.get("display_name", "Assistant")
+
+            # Format and display the message
+            formatted_message = f"{display_name}: {content}\n\n"
+            self.display_colored_message(formatted_message, color_tag)
+
+        self.chat_display.configure(state="disabled")
+        self.chat_display.see("end")
+
 
     def on_theme_selected(self, theme_name: str):
         """Callback for when a new theme is selected from the dropdown."""
@@ -5969,12 +5984,12 @@ Enhanced LYRN-AI system with advanced features active.
             self.update_status("No model loaded", LYRN_ERROR)
             return
 
-        # Start a new structured log for this interaction
-        self.chat_logger.start_log()
-        self.chat_logger.append_log("USER", user_text)
+        # Log to new systems
+        self.journal_logger.log("user", user_text)
+        self.live_display_logger.log("user", user_text)
 
-        # Display user message
-        self.display_colored_message(f"You: {user_text}\n\n", "user_text")
+        # The display will be refreshed after the response is generated.
+        self.refresh_chat_display()
 
         # Clear input and disable send
         self.input_box.delete("0.0", "end")
@@ -5988,7 +6003,7 @@ Enhanced LYRN-AI system with advanced features active.
             self.chat_manager.manage_chat_history_files()
 
         # Display thinking message and start response generation
-        self.display_colored_message("Assistant: Thinking...\n\n", "thinking_text")
+        # self.display_colored_message("Assistant: Thinking...\n\n", "thinking_text")
         self.is_thinking = True
 
         # Show analysis display if it's an OSS model
@@ -6083,8 +6098,7 @@ Enhanced LYRN-AI system with advanced features active.
             messages.append({"role": "user", "content": user_text})
 
             active = self.settings_manager.settings["active"]
-            is_oss_model = active.get("is_oss_model", False)
-            handler = StreamHandler(self.stream_queue, self.metrics, is_oss_model=is_oss_model)
+            handler = StreamHandler(self.stream_queue, self.metrics, self.role_config)
 
             # Setup stderr capture
             log_capture_buffer = io.StringIO()
@@ -6129,45 +6143,13 @@ Enhanced LYRN-AI system with advanced features active.
             # Save complete response
             complete_response = ''.join(response_parts)
             self.last_assistant_response = complete_response
-            self.chat_logger.append_log("RESPONSE", complete_response)
-            # The old save_chat_message is now deprecated.
-            # self.save_chat_message("assistant", complete_response)
+            # The old chat_logger is now deprecated in favor of the new system
+            # self.chat_logger.append_log("RESPONSE", complete_response)
 
         except Exception as e:
             self.stream_queue.put(('error', str(e)))
         finally:
             self.stream_queue.put(('enable_send', ''))
-
-    # def save_chat_message(self, role: str, content: str) -> Optional[str]:
-    #     """
-    #     Saves a chat message to a file in the format expected by the system
-    #     and returns the full path to the file.
-    #     """
-    #     if not self.settings_manager.settings:
-    #         return None
-
-    #     chat_dir = self.settings_manager.settings["paths"].get("chat", "")
-    #     if not chat_dir:
-    #         print("Chat directory not configured in settings.")
-    #         return None
-
-    #     os.makedirs(chat_dir, exist_ok=True)
-    #     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    #     filename = f"chat_{timestamp}.txt"
-    #     filepath = os.path.join(chat_dir, filename)
-
-    #     try:
-    #         with open(filepath, 'w', encoding='utf-8') as f:
-    #             if role == "user":
-    #                 # The 'model' header acts as a marker for where the response begins
-    #                 f.write(f"user\n{content}\n\nmodel\n")
-    #             else:
-    #                 # Assistant messages are just saved directly for logging
-    #                 f.write(f"assistant\n{content}\n")
-    #         return filepath
-    #     except Exception as e:
-    #         print(f"Error saving chat message: {e}")
-    #         return None
 
     def process_queue(self):
         """Process messages from stream queue with enhanced handling"""
@@ -6176,53 +6158,24 @@ Enhanced LYRN-AI system with advanced features active.
                 try:
                     message = self.stream_queue.get_nowait()
 
-                    if message[0] == 'token':
-                        if self.is_thinking:
-                            self.remove_thinking_message()
-                            self.is_thinking = False
+                    if message[0] == 'role_message':
+                        _, role, content = message
+                        self.journal_logger.log(role, content)
+                        self.live_display_logger.log(role, content)
 
-                        _, content, msg_type = message
-                        tag = f"{msg_type}_text"
-
-                        if not hasattr(self, '_assistant_started'):
-                            self.display_colored_message("Assistant: ", "assistant_text")
-                            self._assistant_started = True
-
-                        self.display_colored_message(content, tag)
-
-                    elif message[0] == 'thinking':
-                        # This handles the model's internal monologue, separate from the UI's "Thinking..."
-                        _, thinking_content = message
-                        self.chat_logger.append_log("THINKING", thinking_content)
-                        self.display_colored_message(f"🤔 Thinking Log: {thinking_content[:150]}...\n\n", "thinking_text")
-
-                    elif message[0] == 'analysis_token':
-                        _, content = message
-                        self.analysis_display.configure(state="normal")
-                        self.analysis_display.insert("end", content)
-                        self.analysis_display.see("end")
-                        self.analysis_display.configure(state="disabled")
-
-                    elif message[0] == 'clear_analysis_display':
-                        self.analysis_display.configure(state="normal")
-                        self.analysis_display.delete("1.0", "end")
-                        self.analysis_display.configure(state="disabled")
+                        # Accumulate the final response for episodic memory
+                        role_map = self.role_config.get("role_map", {})
+                        if role_map.get(role) == "final_output":
+                             self.last_assistant_response = content
 
                     elif message[0] == 'finished':
-                        if self.is_thinking: # Handles empty responses
-                            self.remove_thinking_message()
-                            self.is_thinking = False
-
+                        self.refresh_chat_display()
                         self.update_status("Response complete", LYRN_SUCCESS)
                         self.set_model_status("Ready")
-                        if hasattr(self, '_assistant_started'):
-                            # The newline is now handled by the 'token_count_info' message
-                            delattr(self, '_assistant_started')
 
                         # Save the conversation to episodic memory
                         if self.settings_manager.get_setting("save_chat_history", True):
                             try:
-                                # Simple summary generation
                                 heading = self.last_assistant_response.split('\n')[0][:80]
                                 self.episodic_memory_manager.create_chat_entry(
                                     mode="chat",
@@ -6235,7 +6188,6 @@ Enhanced LYRN-AI system with advanced features active.
                             except Exception as e:
                                 print(f"Error saving chat to episodic memory: {e}")
 
-                        # Check for pending jobs now that the model is idle
                         self._maybe_run_automated_job()
 
                     elif message[0] == 'show_loading':
@@ -6246,7 +6198,9 @@ Enhanced LYRN-AI system with advanced features active.
 
                     elif message[0] == 'token_count_info':
                         _, info_text = message
-                        self.display_colored_message(info_text, "system_text")
+                        # This can be logged to journal if desired, but not displayed directly
+                        self.journal_logger.log("system_info", info_text.strip())
+
 
                     elif message[0] == 'metrics_update':
                         self.update_enhanced_metrics()
@@ -6258,7 +6212,11 @@ Enhanced LYRN-AI system with advanced features active.
                         if self.is_thinking:
                             self.remove_thinking_message()
                             self.is_thinking = False
-                        self.display_colored_message(f"Error: {message[1]}\n\n", "error")
+                        # Log error to display and journal
+                        error_content = f"Error: {message[1]}"
+                        self.journal_logger.log("error", error_content)
+                        self.live_display_logger.log("error", error_content)
+                        self.refresh_chat_display()
                         self.update_status("Error occurred", LYRN_ERROR)
 
                     elif message[0] == 'enable_send':
@@ -6268,7 +6226,6 @@ Enhanced LYRN-AI system with advanced features active.
                              self.update_status("Generation stopped.", LYRN_WARNING)
                              self.set_model_status("Ready")
                         self._write_llm_status("idle")
-                        # Also check for jobs when the send button is re-enabled
                         self._maybe_run_automated_job()
 
                     elif message[0] == 'inject_trigger':
@@ -6368,11 +6325,10 @@ Enhanced LYRN-AI system with advanced features active.
             print(f"Error updating status: {e}")
 
     def clear_chat(self):
-        """Clear chat display"""
+        """Clears the live display log and refreshes the chat window."""
         try:
-            self.chat_display.configure(state="normal")
-            self.chat_display.delete("0.0", "end")
-            self.chat_display.configure(state="disabled")
+            self.live_display_logger.clear()
+            self.refresh_chat_display()
             self.update_status("Chat display cleared", LYRN_INFO)
         except Exception as e:
             print(f"Error clearing chat: {e}")

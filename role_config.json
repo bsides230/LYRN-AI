@@ -1,0 +1,30 @@
+{
+  "role_map": {
+    "user": "user",
+    "assistant": "final_output",
+    "model": "final_output",
+    "thinking": "intermediate",
+    "analysis": "intermediate",
+    "qwen_thinking": "intermediate",
+    "smol_thinking": "intermediate",
+    "openai_oss_analysis": "intermediate"
+  },
+  "group_styles": {
+    "user": {
+      "color_tag": "user_text",
+      "display_name": "You"
+    },
+    "final_output": {
+      "color_tag": "assistant_text",
+      "display_name": "Assistant"
+    },
+    "intermediate": {
+      "color_tag": "thinking_text",
+      "display_name": "Thinking"
+    },
+    "error": {
+      "color_tag": "error",
+      "display_name": "Error"
+    }
+  }
+}
