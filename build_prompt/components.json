@@ -1,32 +1,37 @@
 [
   {
-    "name": "system_instructions",
+    "name": "RWI",
     "order": 0,
     "active": true
   },
   {
-    "name": "personality",
+    "name": "system_instructions",
     "order": 1,
     "active": true
   },
   {
-    "name": "user_preferences",
+    "name": "personality",
     "order": 2,
     "active": true
   },
   {
-    "name": "ai_preferences",
+    "name": "system_rules",
     "order": 3,
     "active": true
   },
   {
-    "name": "heartbeat",
+    "name": "ai_preferences",
     "order": 4,
     "active": true
   },
   {
-    "name": "system_rules",
+    "name": "user_preferences",
     "order": 5,
-    "active": true
+    "active": false
+  },
+  {
+    "name": "heartbeat",
+    "order": 6,
+    "active": false
   }
 ]

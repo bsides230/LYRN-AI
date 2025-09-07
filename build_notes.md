@@ -1,5 +1,58 @@
 # LYRN-AI Build Notes
 
+## v4.1.9 Fixes #2 - UI and Logging Fixes (2025-09-07)
+
+This update addresses user feedback regarding UI spacing and fixes a critical bug in the chat logging system to ensure logs are clean and correctly formatted for reinjection.
+
+- **UI Spacing Refined:**
+    - Reduced the vertical spacing in the chat display for a more compact and readable conversation flow.
+    - Adjusted the newlines printed after the user's message and between the "Thinking" and "Assistant" sections of the response.
+
+- **Chat Log Formatting Corrected:**
+    - Fixed a major bug where chat logs were being written incorrectly, including raw model output with "thinking" steps and using the wrong headers.
+    - Removed a redundant logging call that was saving the raw, unfiltered model output.
+    - The `JournalLogger` now correctly saves only the final, clean assistant response.
+    - Log files now begin with a `#Timestamp#` as requested.
+    - Log file headers have been corrected from `#RESPONSE_START#` to `#ASSISTANT_START#`.
+
+### Logging
+- The chat logging system has been corrected to only log the final, user-facing messages, ensuring the logs are clean and suitable for being reinjected as chat history.
+
+## v4.1.9 Fixes (2025-09-07)
+
+This is a bugfix release to address two outstanding errors that were affecting model conversation history and UI stability.
+
+- **Conversation Role Fix:** Resolved a critical bug that caused the `Conversation roles must alternate` error. The `ChatManager` now correctly treats all non-user roles (e.g., `assistant`, `model`, `thinking`) as the 'assistant' for the purpose of constructing chat history. This prevents consecutive 'user' messages from being sent to the model, which was the root cause of the error.
+- **Metrics Display Fix:** Fixed an `AttributeError` in the `reset_metrics_display` function that occurred when reloading the model. The code was attempting to reference a non-existent UI widget (`speed_indicator`). The erroneous line has been removed, resolving the crash.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
+## v4.1.9 (2025-09-07)
+
+This is a major feature update focused on improving model compatibility, user customization, and providing a clearer view of the AI's operations. The core changes revolve around a more flexible handling of model roles (e.g., `assistant`, `model`, `thinking`, `analysis`) to prevent conversation errors and give users more control over the GUI's appearance and behavior.
+
+- **Dynamic Role Handling & History Fix:**
+    - Refactored the core chat processing logic to dynamically handle various model output roles (e.g., `assistant`, `model`, `thinking`, `analysis`). This resolves the `Conversation roles must alternate` error that occurred with models not strictly using the `assistant` role.
+    - The `ChatManager` now intelligently parses journal files to construct a valid, alternating `user`/`assistant` history for the LLM, while ignoring intermediate "thinking" steps for context, ensuring compatibility.
+
+- **Separated Thinking/Analysis Display:**
+    - All non-final model outputs (e.g., `thinking`, `analysis`, `smol_thought`) are now categorized as `thinking_process` and routed to a separate "Analysis" display box below the main chat window.
+    - This visually separates the model's final response from its intermediate steps, reducing confusion.
+
+- **New Chat Appearance Settings:**
+    - Added a new "Chat Appearance" section to the "Chat" tab in Settings.
+    - **Customizable Role Colors:** Users can now set custom colors for "User Text", "Assistant Text", "Thinking/Analysis Text", and "System Text".
+    - **Toggle Thinking Display:** A new switch allows users to show or hide the "Analysis" display box, giving them control over GUI verbosity.
+
+- **New Model Parameters:**
+    - Added UI controls for `Temperature`, `Top P`, and `Top K` to the "Model Settings" popup, allowing users to fine-tune generation parameters.
+    - Ensured these settings are correctly saved to and loaded from `settings.json` and model presets.
+
+### Logging
+- The `StructuredChatLogger` has been renamed to `JournalLogger` to better reflect its purpose.
+- The Journal now logs all raw roles from the model stream (`USER`, `THINKING`, `RESPONSE`), creating a complete and auditable record of every interaction.
+
 ## v4.1.8 (2025-09-05)
 
 This is a hotfix release to address a `SyntaxError` that was preventing the application from running.
