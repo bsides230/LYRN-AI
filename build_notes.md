@@ -1,5 +1,29 @@
 # LYRN-AI Build Notes
 
+## v4.1.8 (2025-09-05)
+
+This is a hotfix release to address a `SyntaxError` that was preventing the application from running.
+
+- **SyntaxError Fix:** Corrected a `SyntaxError: expected 'except' or 'finally' block` in the `update_enhanced_metrics` function. The code was improperly structured, with several lines of code placed between the `try` and `except` blocks. These lines have been moved inside the `try` block, resolving the error.
+- **Versioning:** The application version has been updated to `v4.1.8`.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
+## v4.1.7 (2025-09-05)
+
+This update focuses on refining the prompt injection system, giving users more granular control over context, and improving UI compactness.
+
+- **Performance Metrics Cleanup:** The Performance Metrics section in the UI has been made more compact. The "KV Caching Time" metric, which was non-functional, has been removed to save space and reduce clutter.
+
+- **Delta and Chat History Injection Overhaul:**
+    - **New Toggles:** The Chat Settings tab now includes dedicated on/off toggles for "Delta Injection" and "Chat History Injection", allowing users to control exactly what context is sent to the model.
+    - **Corrected Injection Order:** The prompt building logic has been fixed to ensure that deltas and chat history are injected in the correct order: `master_prompt` -> `deltas` -> `chat_history` -> `user_input`.
+    - **Decoupled Chat History:** The chat history mechanism is now fully decoupled from the long-term Episodic Memory. It now manages a rolling window of chat logs in the `chat/` directory, respecting the number of pairs set in the Chat Settings. A new `ChatManager` class handles this logic, ensuring only the desired amount of recent conversation is used for context.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.6 (2025-09-05)
 
 This update introduces several UI improvements and adds more detailed performance metrics.

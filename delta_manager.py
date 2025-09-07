@@ -104,3 +104,33 @@ class DeltaManager:
             if temp_filepath.exists():
                 os.remove(temp_filepath)
             return None
+
+    def get_delta_content(self) -> str:
+        """
+        Reads the manifest, then reads each delta file and concatenates
+        their content into a single string for prompt injection.
+        """
+        self._load_manifest() # Ensure we have the latest manifest
+
+        all_delta_contents = []
+
+        # The manifest stores paths relative to the 'deltas' directory
+        for relative_path_str in self.manifest.get("deltas", []):
+            delta_file_path = self.base_dir / relative_path_str
+            if delta_file_path.exists():
+                try:
+                    content = delta_file_path.read_text(encoding='utf-8')
+                    all_delta_contents.append(content)
+                except Exception as e:
+                    print(f"Error reading delta file {delta_file_path}: {e}")
+            else:
+                print(f"Warning: Delta file listed in manifest not found: {delta_file_path}")
+
+        if not all_delta_contents:
+            return ""
+
+        # Join all individual delta file contents into one block
+        full_delta_block = "\n".join(all_delta_contents)
+
+        # Wrap the entire block in clear markers for the LLM
+        return f"###DELTAS_START###\n{full_delta_block}\n###DELTAS_END###"
