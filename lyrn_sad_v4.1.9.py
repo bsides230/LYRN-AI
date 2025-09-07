@@ -961,87 +961,50 @@ class StreamHandler:
         self.role_color_tags = role_color_tags
         self.is_oss_model = is_oss_model
         self.current_response = ""
-        self.thinking_content = ""
         self.is_finished = False
         self.log_buffer = ""
-        # New attributes for special channel parsing
-        self.in_analysis_channel = False
-        self.analysis_content = ""
-        self.final_content_started = False
         self.buffer = ""
-
-    def handle_token(self, token_data):
-        """Handle streaming tokens, with special logic for OSS model channels."""
-        if 'choices' in token_data and len(token_data['choices']) > 0:
-            delta = token_data['choices'][0].get('delta', {})
-            content = delta.get('content', '')
-
-            if content:
-                if self.is_oss_model:
-                    self.buffer += content
-                    self._process_oss_buffer()
-                else:
-                    # Original logic for non-OSS models
-                    self._process_standard_content(content)
-
-            finish_reason = token_data['choices'][0].get('finish_reason')
-            if finish_reason is not None:
-                if self.is_oss_model and self.analysis_content:
-                    # Flush any remaining analysis content at the end
-                    self.gui_queue.put(('analysis_token', self.analysis_content))
-                self.is_finished = True
-                self.gui_queue.put(('finished', self.current_response))
-
-    def _process_buffer(self):
-        """
-        Processes the internal buffer for role tags and sends tokens to the GUI.
-        This is the core of the dynamic role handling.
-        """
-        # Define role tags and their corresponding internal role category
-        role_tags = {
-            "<thinking>": "thinking_process",
-            "</thinking>": "final_output",
+        self.current_role = "final_output"  # Start with a default role
+        self.role_tags = {
             "<|channel|>analysis<|message|>": "thinking_process",
             "<|start|>assistant<|channel|>final<|message|>": "final_output",
         }
 
-        # Default to final_output if no tags are present
-        if not hasattr(self, 'current_role'):
-            self.current_role = "final_output"
 
-        processed_up_to = 0
-        for i in range(len(self.buffer)):
-            # Check for any of the role tags starting at the current position
+    def _process_buffer(self):
+        """
+        Processes the internal buffer for role tags, sends tokens to the GUI,
+        and manages role changes.
+        """
+        while True:
             found_tag = None
-            for tag, role in role_tags.items():
-                if self.buffer.startswith(tag, i):
+            found_pos = -1
+            found_role = ""
+
+            # Find the earliest occurrence of any of the defined role tags in the buffer
+            for tag, role in self.role_tags.items():
+                pos = self.buffer.find(tag)
+                if pos != -1 and (found_pos == -1 or pos < found_pos):
+                    found_pos = pos
                     found_tag = tag
-                    new_role = role
-                    break
+                    found_role = role
 
             if found_tag:
-                # We found a tag. Send the content accumulated so far for the *old* role.
-                content_before_tag = self.buffer[processed_up_to:i]
+                # A tag was found. The content before this tag belongs to the current role.
+                content_before_tag = self.buffer[:found_pos]
                 if content_before_tag:
                     self.gui_queue.put(('token', content_before_tag, self.current_role))
                     if self.current_role == 'final_output':
                         self.current_response += content_before_tag
 
-                # Switch to the new role
-                self.current_role = new_role
+                # We have a new role.
+                self.current_role = found_role
 
-                # Advance the processed pointer past the tag
-                processed_up_to = i + len(found_tag)
-
-        # Send any remaining content in the buffer under the current role
-        remaining_content = self.buffer[processed_up_to:]
-        if remaining_content:
-            self.gui_queue.put(('token', remaining_content, self.current_role))
-            if self.current_role == 'final_output':
-                self.current_response += remaining_content
-
-        # Clear the buffer now that it has been processed
-        self.buffer = ""
+                # Remove the processed content and the tag itself from the buffer, then continue the loop.
+                self.buffer = self.buffer[found_pos + len(found_tag):]
+            else:
+                # No more tags were found in the buffer. Exit the loop.
+                break
 
     def handle_token(self, token_data):
         """Handle streaming tokens by adding to a buffer and processing it."""
@@ -1051,10 +1014,17 @@ class StreamHandler:
 
             if content:
                 self.buffer += content
-                self._process_buffer() # Process the buffer every time new content arrives
+                self._process_buffer()
 
             finish_reason = token_data['choices'][0].get('finish_reason')
             if finish_reason is not None:
+                # The stream is finished. Flush any remaining content in the buffer.
+                if self.buffer:
+                    self.gui_queue.put(('token', self.buffer, self.current_role))
+                    if self.current_role == 'final_output':
+                        self.current_response += self.buffer
+                    self.buffer = ""
+
                 self.is_finished = True
                 self.gui_queue.put(('finished', self.current_response))
 
@@ -5417,19 +5387,12 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.chat_display = ctk.CTkTextbox(chat_frame, font=chat_font, wrap="word", border_width=2, text_color=self.theme_manager.get_color("display_text_color"))
         self.chat_display.grid(row=0, column=0, sticky="nsew", padx=20, pady=(20, 10))
 
-        # --- Analysis Display (for OSS models) ---
-        self.analysis_display = ctk.CTkTextbox(chat_frame, font=chat_font, wrap="word", border_width=2, height=150)
-        # self.analysis_display.grid(row=1, column=0, sticky="nsew", padx=20, pady=(10, 10)) # Initially hidden
-        self.analysis_display.grid_remove() # Use grid_remove to hide it initially
-
         # Configure tags for colored text using chat_colors from settings
         chat_colors = self.settings_manager.get_setting("chat_colors", {})
         self.chat_display.tag_config("system_text", foreground=chat_colors.get("system_text", "#B0B0B0"))
         self.chat_display.tag_config("user_text", foreground=chat_colors.get("user_text", "#00C0A0"))
         self.chat_display.tag_config("assistant_text", foreground=chat_colors.get("assistant_text", "#FFFFFF"))
         self.chat_display.tag_config("thinking_text", foreground=chat_colors.get("thinking_text", "#FFD700"))
-        # The analysis display will also use the thinking_text color
-        self.analysis_display.tag_config("thinking_text", foreground=chat_colors.get("thinking_text", "#FFD700"))
         self.chat_display.tag_config("error", foreground=self.theme_manager.get_color("error"))
         self.chat_display.tag_config("success", foreground=self.theme_manager.get_color("success"))
 
@@ -5623,7 +5586,6 @@ Enhanced LYRN-AI system with advanced features active.
                 self.chat_display.tag_config("user_text", foreground=chat_colors.get("user_text", "#00C0A0"))
                 self.chat_display.tag_config("assistant_text", foreground=chat_colors.get("assistant_text", "#FFFFFF"))
                 self.chat_display.tag_config("thinking_text", foreground=chat_colors.get("thinking_text", "#FFD700"))
-                self.analysis_display.tag_config("thinking_text", foreground=chat_colors.get("thinking_text", "#FFD700"))
 
 
         except Exception as e:
@@ -6098,13 +6060,6 @@ Enhanced LYRN-AI system with advanced features active.
         self.chat_logger.start_log()
         self.chat_logger.append_log("USER", user_text)
 
-        # Clear the analysis display for the new message
-        if hasattr(self, 'analysis_display'):
-            self.analysis_display.configure(state="normal")
-            self.analysis_display.delete("1.0", "end")
-            self.analysis_display.configure(state="disabled")
-            self.analysis_display.grid_remove() # Hide it until thinking text arrives
-
         # Display user message
         self.display_colored_message(f"You: {user_text}\n\n", "user_text")
 
@@ -6123,11 +6078,6 @@ Enhanced LYRN-AI system with advanced features active.
         self.display_colored_message("Assistant: Thinking...\n\n", "thinking_text")
         self.is_thinking = True
 
-        # Show analysis display if it's an OSS model
-        if self.settings_manager.settings.get("active", {}).get("is_oss_model", False):
-            self.analysis_display.grid(row=1, column=0, sticky="nsew", padx=20, pady=(10, 10))
-        else:
-            self.analysis_display.grid_remove()
         self.set_model_status("Thinking") # Blue for generating
         threading.Thread(target=self.generate_response, args=(user_text,), daemon=True).start()
         self.update_status("Generating response...", LYRN_INFO)
@@ -6335,12 +6285,10 @@ Enhanced LYRN-AI system with advanced features active.
                         elif internal_role == "thinking_process":
                             if self.settings_manager.get_setting("show_thinking_text", True):
                                 tag = self.role_color_tags.get("thinking_process", "thinking_text")
-                                if not self.analysis_display.winfo_viewable():
-                                    self.analysis_display.grid()
-                                self.analysis_display.configure(state="normal")
-                                self.analysis_display.insert("end", content, tag)
-                                self.analysis_display.see("end")
-                                self.analysis_display.configure(state="disabled")
+                                if not hasattr(self, '_thinking_started'):
+                                    self.display_colored_message("\n\nThinking: ", tag)
+                                    self._thinking_started = True
+                                self.display_colored_message(content, tag)
 
                     elif message[0] == 'finished':
                         if self.is_thinking: # Handles empty responses
@@ -6350,8 +6298,9 @@ Enhanced LYRN-AI system with advanced features active.
                         self.update_status("Response complete", LYRN_SUCCESS)
                         self.set_model_status("Ready")
                         if hasattr(self, '_assistant_started'):
-                            # The newline is now handled by the 'token_count_info' message
                             delattr(self, '_assistant_started')
+                        if hasattr(self, '_thinking_started'):
+                            delattr(self, '_thinking_started')
 
                         # Save the complete response to the structured journal log
                         self.chat_logger.append_log("RESPONSE", message[1])
