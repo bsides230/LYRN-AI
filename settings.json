@@ -80,6 +80,7 @@
     "llm_log_visible": false,
     "llm_log_on_top": false,
     "language": "en",
-    "terminal_start_path": ""
+    "terminal_start_path": "",
+    "show_reasoning": true
   }
 }

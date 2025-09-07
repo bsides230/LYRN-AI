@@ -17,6 +17,7 @@
     "user_text": "#60A5FA",
     "assistant_text": "#34D399",
     "thinking_text": "#F472B6",
+    "analysis_text": "#3B82F6",
     "display_text_color": "#FFFFFF",
     "border_color": "#7552bf"
   }

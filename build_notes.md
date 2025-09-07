@@ -1,5 +1,27 @@
 # LYRN-AI Build Notes
 
+## v4.1.9 (2025-09-06)
+
+This update improves model configurability and enhances how the GUI handles
+reasoning output from various models.
+
+- **Model Loader Sampling Controls:** `model_loader.py` now accepts command line
+  arguments for `temperature`, `top_p`, and `top_k`, allowing preset or runtime
+  control over sampling behaviour. The loader logs these values and injects them
+  into the active settings used for each generation.
+- **Generalised Role Handling:** The streaming handler now captures the role
+  returned by the model and supports additional reasoning tags such as
+  `<think>` and `<analysis>`. Final output roles like `assistant` and `model` are
+  treated uniformly so the GUI can separate reasoning from answers reliably.
+- **Reasoning Display Toggle:** A new **"Show thinking/analysis text"** option
+  in UI Settings lets users hide the model's reasoning stream. When enabled,
+  reasoning text and analysis channels appear in distinct colours that can be
+  customised in the Theme Editor via the new `analysis_text` colour entry.
+
+### Logging
+- The model loader logs the sampling parameters (`temperature`, `top_p`, and
+  `top_k`) on startup for easier debugging.
+
 ## v4.1.8 (2025-09-05)
 
 This is a hotfix release to address a `SyntaxError` that was preventing the application from running.

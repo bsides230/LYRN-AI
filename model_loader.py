@@ -206,6 +206,9 @@ def main():
     parser.add_argument("--n_ctx", type=int, default=8192, help="Context size.")
     parser.add_argument("--n_threads", type=int, default=8, help="Number of threads.")
     parser.add_argument("--n_gpu_layers", type=int, default=0, help="Number of GPU layers.")
+    parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature.")
+    parser.add_argument("--top_p", type=float, default=0.95, help="Top-p sampling value.")
+    parser.add_argument("--top_k", type=int, default=40, help="Top-k sampling value.")
     args = parser.parse_args()
 
     log("--- LYRN-AI Model Loader (File-based) ---")
@@ -213,9 +216,16 @@ def main():
     log(f"Context Size: {args.n_ctx}")
     log(f"Threads: {args.n_threads}")
     log(f"GPU Layers: {args.n_gpu_layers}")
+    log(f"Temperature: {args.temperature}")
+    log(f"Top-p: {args.top_p}")
+    log(f"Top-k: {args.top_k}")
     log("-----------------------------------------")
 
     settings = load_settings()
+    active = settings.setdefault("active", {})
+    active["temperature"] = args.temperature
+    active["top_p"] = args.top_p
+    active["top_k"] = args.top_k
 
     # --- Load the actual Llama model ---
     try:
