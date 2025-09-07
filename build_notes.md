@@ -1,6 +1,6 @@
 # LYRN-AI Build Notes
 
-## v4.2.0 (2025-09-07)
+## v4.1.9 Fixes (2025-09-07)
 
 This is a bugfix release to address two outstanding errors that were affecting model conversation history and UI stability.
 
