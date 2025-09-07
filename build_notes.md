@@ -1,5 +1,17 @@
 # LYRN-AI Build Notes
 
+## v4.1.9 (2025-09-05)
+
+This update enhances streaming role handling and channel parsing.
+
+- **Dynamic Role Detection:** StreamHandler now derives the message role from model metadata or incoming token headers.
+- **Configurable Channel Markers:** Final and analysis channel tokens are selected from a model-specific marker map, supporting Gemma, Qwen, OpenAI OSS and SmolML3.
+- **Role Propagation:** Both standard and OSS stream processors forward the detected role with each token event.
+- **Versioning:** The application version has been updated to `v4.1.9`.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.8 (2025-09-05)
 
 This is a hotfix release to address a `SyntaxError` that was preventing the application from running.
