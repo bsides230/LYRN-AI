@@ -1003,7 +1003,13 @@ class StreamHandler:
                 # Remove the processed content and the tag itself from the buffer, then continue the loop.
                 self.buffer = self.buffer[found_pos + len(found_tag):]
             else:
-                # No more tags were found in the buffer. Exit the loop.
+                # No more tags were found in the buffer. To stream the rest of the
+                # content, we flush the buffer.
+                if self.buffer:
+                    self.gui_queue.put(('token', self.buffer, self.current_role))
+                    if self.current_role == 'final_output':
+                        self.current_response += self.buffer
+                    self.buffer = ""
                 break
 
     def handle_token(self, token_data):
@@ -6278,7 +6284,7 @@ Enhanced LYRN-AI system with advanced features active.
                         if internal_role == "final_output":
                             tag = self.role_color_tags.get("final_output", "assistant_text")
                             if not hasattr(self, '_assistant_started'):
-                                self.display_colored_message("Assistant: ", tag)
+                                self.display_colored_message(" Assistant: ", tag)
                                 self._assistant_started = True
                             self.display_colored_message(content, tag)
 
