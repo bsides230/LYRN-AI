@@ -997,19 +997,26 @@ class StreamHandler:
                     if self.current_role == 'final_output':
                         self.current_response += content_before_tag
 
+                # Check for role transition to add spacing
+                if self.current_role == "thinking_process" and found_role == "final_output":
+                    self.gui_queue.put(('token', '\n\n', 'system_text'))
+
                 # We have a new role.
                 self.current_role = found_role
 
                 # Remove the processed content and the tag itself from the buffer, then continue the loop.
                 self.buffer = self.buffer[found_pos + len(found_tag):]
             else:
-                # No more tags were found in the buffer. To stream the rest of the
-                # content, we flush the buffer.
-                if self.buffer:
-                    self.gui_queue.put(('token', self.buffer, self.current_role))
-                    if self.current_role == 'final_output':
-                        self.current_response += self.buffer
-                    self.buffer = ""
+                # No tag found. To stream, we can send *most* of the buffer,
+                # but keep a tail end to avoid sending a partial tag.
+                # The longest tag is 46 chars. Let's use a safe buffer size like 50.
+                if len(self.buffer) > 50:
+                    content_to_stream = self.buffer[:-50]
+                    if content_to_stream:
+                        self.gui_queue.put(('token', content_to_stream, self.current_role))
+                        if self.current_role == 'final_output':
+                            self.current_response += content_to_stream
+                        self.buffer = self.buffer[-50:]
                 break
 
     def handle_token(self, token_data):
@@ -6284,7 +6291,7 @@ Enhanced LYRN-AI system with advanced features active.
                         if internal_role == "final_output":
                             tag = self.role_color_tags.get("final_output", "assistant_text")
                             if not hasattr(self, '_assistant_started'):
-                                self.display_colored_message(" Assistant: ", tag)
+                                self.display_colored_message("Assistant: ", tag)
                                 self._assistant_started = True
                             self.display_colored_message(content, tag)
 
