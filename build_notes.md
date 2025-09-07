@@ -1,5 +1,15 @@
 # LYRN-AI Build Notes
 
+## v4.1.9 (2025-09-06)
+
+This update addresses a crash caused by missing role configuration data when processing streamed model output.
+
+- **Queue Processing Robustness:** Added fallback handling when loading role configuration so that missing `role_map` or `group_styles` entries no longer cause `NoneType` errors during queue processing and chat rendering.
+- **Versioning:** The application version has been updated to `v4.1.9` and the previous `v4.1.8` file has been archived.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.8 (2025-09-05)
 
 This is a hotfix release to address a `SyntaxError` that was preventing the application from running.
