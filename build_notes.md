@@ -1,6 +1,6 @@
 # LYRN-AI Build Notes
 
-## v4.2.0 - UI and Logging Fixes (2025-09-07)
+## v4.1.9 Fixes #2 - UI and Logging Fixes (2025-09-07)
 
 This update addresses user feedback regarding UI spacing and fixes a critical bug in the chat logging system to ensure logs are clean and correctly formatted for reinjection.
 
