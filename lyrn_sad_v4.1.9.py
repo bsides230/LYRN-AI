@@ -999,7 +999,7 @@ class StreamHandler:
 
                 # Check for role transition to add spacing
                 if self.current_role == "thinking_process" and found_role == "final_output":
-                    self.gui_queue.put(('token', '\n', 'system_text'))
+                    self.gui_queue.put(('token', '\n\n', 'system_text'))
 
                 # We have a new role.
                 self.current_role = found_role
@@ -2569,12 +2569,12 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
 
         ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5, 0))
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
         rwi_info_box.pack(fill="x", padx=10, pady=(0, 10), expand=True)
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
 
         ctk.CTkLabel(main_frame, text="Content/Prompt:").pack(anchor="w", padx=10, pady=(5, 0))
-        content_textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        content_textbox = ctk.CTkTextbox(main_frame, wrap="word", undo=True)
         content_textbox.pack(fill="both", padx=10, pady=(0, 10), expand=True)
         content_textbox.insert("1.0", content)
 
@@ -2643,7 +2643,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
 
         ctk.CTkLabel(main_frame, text="RWI Introduction for LLM:").pack(anchor="w", padx=10, pady=(5,0))
-        intro_textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        intro_textbox = ctk.CTkTextbox(main_frame, wrap="word", undo=True)
         intro_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         intro_textbox.insert("1.0", intro_content)
 
@@ -2713,7 +2713,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
         ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5,0))
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
         rwi_info_box.pack(fill="x", expand=True, padx=10, pady=(0, 10))
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
         traits_frame = ctk.CTkFrame(main_frame)
@@ -2733,7 +2733,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
             value_entry.insert("0", str(value))
             value_entry.pack(side="left")
             ctk.CTkLabel(trait_container, text="Instructions:").pack(anchor="w")
-            instructions_box = ctk.CTkTextbox(trait_container, height=60, wrap="word")
+            instructions_box = ctk.CTkTextbox(trait_container, height=60, wrap="word", undo=True)
             instructions_box.insert("1.0", instructions)
             instructions_box.pack(fill="x", expand=True)
             trait_widgets.append({"name": name, "value_entry": value_entry, "instructions_box": instructions_box})
@@ -2789,11 +2789,11 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.pack(fill="x", padx=10, pady=(0,10))
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
         ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5,0))
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
         rwi_info_box.pack(fill="x", expand=True, padx=10, pady=(0,10))
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
         ctk.CTkLabel(main_frame, text="Instruction Body:").pack(anchor="w", padx=10, pady=(5,0))
-        body_text = ctk.CTkTextbox(main_frame, wrap="word")
+        body_text = ctk.CTkTextbox(main_frame, wrap="word", undo=True)
         body_text.pack(fill="both", expand=True, padx=10, pady=(0,10))
         body_text.insert("1.0", config.get("body", ""))
         return {"begin_bracket_entry": begin_bracket_entry, "end_bracket_entry": end_bracket_entry, "rwi_info_box": rwi_info_box, "body_text": body_text}
@@ -2924,6 +2924,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.parent_app.update_status(f"{key.title()} {'enabled' if is_enabled else 'disabled'}", LYRN_INFO)
         self.parent_app.refresh_prompt_from_mode()
         self.update_prompt_order_list()
+        self.apply_theme()
 
     def toggle_on_top(self):
         """Toggles the always-on-top status of the window."""
@@ -3424,12 +3425,12 @@ class JobBuilderPopup(ThemedPopup):
 
         # Job Instructions
         ctk.CTkLabel(main_frame, text="Job Instructions (for build_prompt)").pack(anchor="w")
-        self.job_instructions_text = ctk.CTkTextbox(main_frame, height=200)
+        self.job_instructions_text = ctk.CTkTextbox(main_frame, height=200, undo=True)
         self.job_instructions_text.pack(fill="both", pady=(0, 10), expand=True)
 
         # Trigger Prompt
         ctk.CTkLabel(main_frame, text="Trigger Prompt (for LLM execution)").pack(anchor="w")
-        self.trigger_prompt_text = ctk.CTkTextbox(main_frame, height=100)
+        self.trigger_prompt_text = ctk.CTkTextbox(main_frame, height=100, undo=True)
         self.trigger_prompt_text.pack(fill="both", pady=(0, 10), expand=True)
 
         # Save Button
@@ -3599,7 +3600,7 @@ class JobWatcherPopup(ThemedPopup):
         self.trigger_name_entry.pack(fill="x", padx=5, pady=(0, 10))
 
         ctk.CTkLabel(editor_frame, text="Trigger Prompt:").pack(anchor="w", padx=5)
-        self.trigger_prompt_text = ctk.CTkTextbox(editor_frame, wrap="word")
+        self.trigger_prompt_text = ctk.CTkTextbox(editor_frame, wrap="word", undo=True)
         self.trigger_prompt_text.pack(expand=True, fill="both", padx=5, pady=(0, 10))
 
         # Buttons for the editor
@@ -3851,12 +3852,12 @@ class JobWatcherPopup(ThemedPopup):
 
         # Reflection Instructions
         ctk.CTkLabel(reflection_frame, text="Reflection Instructions").pack(anchor="w")
-        self.reflection_instructions_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_instructions_text = ctk.CTkTextbox(reflection_frame, height=100, undo=True)
         self.reflection_instructions_text.pack(fill="x", pady=(0, 10), expand=True)
 
         # Gold-Standard Example
         ctk.CTkLabel(reflection_frame, text="Gold-Standard Example").pack(anchor="w")
-        self.reflection_gold_standard_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_gold_standard_text = ctk.CTkTextbox(reflection_frame, height=100, undo=True)
         self.reflection_gold_standard_text.pack(fill="x", pady=(0, 10), expand=True)
 
         # Reflection Iterations
@@ -5413,7 +5414,8 @@ class LyrnAIInterface(ctk.CTkToplevel):
         hint_label = ctk.CTkLabel(input_frame, text="Use Ctrl+Enter to send", font=("Consolas", 10))
         hint_label.grid(row=0, column=0, sticky="nw", padx=5, pady=2)
 
-        self.input_box = ctk.CTkTextbox(input_frame, height=100, font=chat_font, border_width=2)
+        # TODO: A proper spellcheck implementation is a future feature. It would likely require a custom widget inheriting from CTkTextbox.
+        self.input_box = ctk.CTkTextbox(input_frame, height=100, font=chat_font, border_width=2, undo=True)
         self.input_box.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
         input_frame.grid_rowconfigure(1, weight=1)
 
