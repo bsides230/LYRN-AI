@@ -20,7 +20,7 @@ class CycleWatcher:
         self.root_dir = Path(__file__).parent.parent
         self.active_cycle_flag_path = self.root_dir / "global_flags" / "active_cycle.json"
         self.llm_status_flag_path = self.root_dir / "global_flags" / "llm_status.txt"
-        self.cycle_trigger_path = self.root_dir / "ipc" / "cycle_trigger.txt"
+        self.cycle_trigger_path = self.root_dir / "global_flags" / "cycle_trigger.txt"
 
         # Ensure directories exist
         self.active_cycle_flag_path.parent.mkdir(exist_ok=True)
