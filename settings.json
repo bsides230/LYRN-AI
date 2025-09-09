@@ -1,12 +1,12 @@
 {
   "settings": {
     "active": {
-      "model_path": "D:\\LYRN-SAD\\models\\Qwen.Qwen3-4B-Thinking-2507.Q4_K_M.gguf",
-      "n_ctx": 16000,
+      "model_path": "D:\\LYRN-SAD\\models\\gemma-3-4b-it-abliterated-q4_0.gguf",
+      "n_ctx": 80000,
       "n_threads": 22,
       "n_gpu_layers": 36,
       "n_batch": 256,
-      "max_tokens": 5000,
+      "max_tokens": 1024,
       "temperature": 0.7,
       "top_p": 0.95,
       "top_k": 40,
@@ -81,7 +81,7 @@
     "window_size": "1400x900",
     "confirmation_preferences": {},
     "save_chat_history": false,
-    "chat_history_length": 10,
+    "chat_history_length": 50,
     "show_thinking_text": true,
     "chat_colors": {
       "user_text": "#00C0A0",
