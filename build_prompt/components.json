@@ -22,7 +22,7 @@
   {
     "name": "ai_preferences",
     "order": 4,
-    "active": false
+    "active": true
   },
   {
     "name": "user_preferences",
