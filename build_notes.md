@@ -1,5 +1,25 @@
 # LYRN-AI Build Notes
 
+## v4.2.0 - Job Component for System Prompt (2025-09-11)
+
+This update introduces a new "Jobs" component to the System Prompt Builder, designed to improve the performance of the automation system by pre-caching job instructions.
+
+-   **New "Jobs" System Prompt Component:**
+    -   A new "Jobs" component can be enabled in the System Prompt Builder. When active, it will inject the instructions for all available jobs directly into the system prompt.
+    -   The goal is to load these instructions into the model's KV cache on startup, allowing automated jobs to be triggered with a simple, low-token trigger phrase without the need to re-send the full instructions each time.
+
+-   **New Jobs Editor UI:**
+    -   The editor panel for the "Jobs" component features a clickable list of all jobs defined in `automation/jobs/jobs.json`.
+    -   A "Refresh" button allows the user to reload this list if they have added or removed jobs while the prompt builder is open.
+
+-   **Job Viewing and Editing Workflow:**
+    -   Clicking a job in the list opens a new popup (`JobInstructionViewerPopup`) that displays the full text of the job's instructions.
+    -   This viewer popup contains an "Edit Job" button, which seamlessly opens the existing `JobBuilderPopup` for that specific job.
+    -   This reuses the existing, robust job editing functionality and ensures that any changes saved in the editor are reflected in the viewer and the main job list.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.1.9 Fixes #2 - UI and Logging Fixes (2025-09-07)
 
 This update addresses user feedback regarding UI spacing and fixes a critical bug in the chat logging system to ensure logs are clean and correctly formatted for reinjection.

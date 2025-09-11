@@ -627,8 +627,9 @@ class SettingsManager:
 class SnapshotLoader:
     """Loads the static base prompt from the 'build_prompt' directory."""
 
-    def __init__(self, settings_manager: SettingsManager):
+    def __init__(self, settings_manager: SettingsManager, automation_controller: AutomationController):
         self.settings_manager = settings_manager
+        self.automation_controller = automation_controller
         self.build_prompt_dir = os.path.join(SCRIPT_DIR, "build_prompt")
         self.master_prompt_path = os.path.join(self.build_prompt_dir, "master_prompt.txt")
         self.config_path = os.path.join(self.build_prompt_dir, "builder_config.json")
@@ -701,7 +702,23 @@ class SnapshotLoader:
         # --- Build the rest of the prompt components ---
         for component in active_components:
             component_name = component['name']
-            if component_name == "RWI": continue
+            if component_name == "RWI":
+                continue
+
+            # Handle the special "jobs" component
+            if component_name == "jobs":
+                all_jobs = self.automation_controller.job_definitions
+                if all_jobs:
+                    job_instructions_parts = []
+                    for job_name, job_data in all_jobs.items():
+                        instruction = job_data.get("instructions", "")
+                        job_instructions_parts.append(f"###JOB: {job_name}###\n{instruction}")
+
+                    full_jobs_content = "\n\n".join(job_instructions_parts)
+                    # We'll use a standard bracket format for the jobs block
+                    jobs_block = f"###ALL_JOBS_START###\n{full_jobs_content}\n###_END###"
+                    prompt_parts.append(jobs_block)
+                continue
 
             component_dir = os.path.join(self.build_prompt_dir, component_name)
 
@@ -2375,6 +2392,58 @@ class PersonalityPopup(ThemedPopup):
             self.personality_preset_var.set(preset_name)
 
 
+class JobInstructionViewerPopup(ThemedPopup):
+    """A popup to view job instructions and provide an edit button."""
+    def __init__(self, parent, theme_manager: ThemeManager, automation_controller: AutomationController, job_name: str, refresh_callback):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.automation_controller = automation_controller
+        self.job_name = job_name
+        self.refresh_callback = refresh_callback
+        self.parent_app = parent.parent_app # Main application instance
+
+        self.title(f"Instructions: {self.job_name}")
+        self.geometry("500x400")
+
+        job_info = self.automation_controller.job_definitions.get(self.job_name, {})
+        instructions = job_info.get("instructions", "No instructions found for this job.")
+
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(expand=True, fill="both", padx=10, pady=10)
+        main_frame.grid_rowconfigure(0, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        self.textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        self.textbox.grid(row=0, column=0, sticky="nsew")
+        self.textbox.insert("1.0", instructions)
+        self.textbox.configure(state="disabled")
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.grid(row=1, column=0, pady=(10, 0))
+
+        edit_button = ctk.CTkButton(button_frame, text="Edit Job", command=self.edit_job)
+        edit_button.pack(side="left", padx=(0, 10))
+
+        close_button = ctk.CTkButton(button_frame, text="Close", command=self.destroy)
+        close_button.pack(side="left")
+
+        self.apply_theme()
+
+    def edit_job(self):
+        """Opens the JobBuilderPopup for the current job."""
+        # This will be fully implemented in the next step. For now, it just closes this popup.
+        self.destroy()
+        # The logic to open JobBuilderPopup will be added in step 4.
+        popup = JobBuilderPopup(
+            parent=self.parent_app.prompt_builder_popup, # The parent should be the prompt builder
+            automation_controller=self.automation_controller,
+            theme_manager=self.theme_manager,
+            language_manager=self.parent_app.language_manager,
+            refresh_callback=self.refresh_callback,
+            job_name=self.job_name
+        )
+        popup.focus()
+
+
 class SystemPromptBuilderPopup(ThemedPopup):
     """A popup window for building and managing the system prompt with a two-panel interface."""
     def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
@@ -2523,6 +2592,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
                 widgets = self._create_rwi_viewer(editor_frame)
             elif comp_name == "personality":
                 widgets = self._create_personality_editor(editor_frame)
+            elif comp_name == "jobs":
+                widgets = self._create_jobs_editor(editor_frame)
             else:
                 # Ensure the component exists before creating an editor for it
                 if any(c['name'] == comp_name for c in components):
@@ -2779,6 +2850,67 @@ class SystemPromptBuilderPopup(ThemedPopup):
         output_parts = [f'"{t["name"]} = {t["value"]:04d}"\n"{t["instructions"]}"' for t in updated_traits]
         self._save_text(output_path, "\n\n".join(output_parts))
         self.parent_app.update_status("Personality settings saved.", LYRN_SUCCESS)
+
+    def _create_jobs_editor(self, parent_frame):
+        """Creates the UI for the jobs component editor."""
+        parent_frame.grid_columnconfigure(0, weight=1)
+        parent_frame.grid_rowconfigure(1, weight=1)
+
+        # --- Top Bar ---
+        top_bar = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+        ctk.CTkLabel(top_bar, text="Editor: Jobs", font=ctk.CTkFont(weight="bold")).pack(side="left")
+
+        refresh_button = ctk.CTkButton(top_bar, text="Refresh", command=self._refresh_jobs_list)
+        refresh_button.pack(side="right", padx=5)
+
+        # --- Main Content: Job List ---
+        self.jobs_list_frame = ctk.CTkScrollableFrame(parent_frame, label_text="Available Jobs")
+        self.jobs_list_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+
+        self._refresh_jobs_list()
+
+        return {"refresh_button": refresh_button, "jobs_list_frame": self.jobs_list_frame}
+
+    def _refresh_jobs_list(self):
+        """Clears and repopulates the list of jobs."""
+        for widget in self.jobs_list_frame.winfo_children():
+            widget.destroy()
+
+        job_definitions = self.parent_app.automation_controller.job_definitions
+        if not job_definitions:
+            ctk.CTkLabel(self.jobs_list_frame, text="No jobs found.").pack(pady=10)
+            return
+
+        for job_name in sorted(job_definitions.keys()):
+            # Using a frame for each job to potentially add more info later
+            job_frame = ctk.CTkFrame(self.jobs_list_frame, fg_color="transparent")
+            job_frame.pack(fill="x", pady=2, padx=5)
+
+            job_button = ctk.CTkButton(
+                job_frame,
+                text=job_name,
+                anchor="w",
+                command=lambda name=job_name: self._view_job_instructions(name)
+            )
+            job_button.pack(side="left", expand=True, fill="x")
+
+    def _view_job_instructions(self, job_name: str):
+        """Opens a popup to view the job's instructions."""
+        job_info = self.parent_app.automation_controller.job_definitions.get(job_name)
+        if not job_info:
+            self.parent_app.update_status(f"Could not find job: {job_name}", LYRN_ERROR)
+            return
+
+        popup = JobInstructionViewerPopup(
+            parent=self,
+            theme_manager=self.theme_manager,
+            automation_controller=self.parent_app.automation_controller,
+            job_name=job_name,
+            refresh_callback=self._refresh_jobs_list # Pass the refresh callback
+        )
+        popup.focus()
+
 
     def _view_file_with_brackets(self, title: str, content_source: Path or str, config: dict, is_content_str: bool = False):
         """
@@ -4719,9 +4851,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         potentially blocking operations. Runs in a background thread.
         """
         print("Starting background initialization...")
-        self.snapshot_loader = SnapshotLoader(self.settings_manager)
         self.delta_manager = DeltaManager()
         self.automation_controller = AutomationController()
+        self.snapshot_loader = SnapshotLoader(self.settings_manager, self.automation_controller)
         self.metrics = EnhancedPerformanceMetrics()
         self.chat_logger = JournalLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
         self.affordance_manager = AffordanceManager()
@@ -5379,7 +5511,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Welcome message with LYRN branding
         welcome_msg = f"""
 ╔═══════════════════════════════════════════════════════╗
-║                   LYRN-AI v3.9.6                      ║
+║                   LYRN-AI v4.2.0                      ║
 ║              Advanced Language Interface              ║
 ║                                                       ║
 ║ • Enhanced performance monitoring                     ║

@@ -28,5 +28,10 @@
     "name": "user_preferences",
     "order": 5,
     "active": false
+  },
+  {
+    "name": "jobs",
+    "order": 6,
+    "active": false
   }
 ]
