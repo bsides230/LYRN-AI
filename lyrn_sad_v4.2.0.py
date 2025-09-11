@@ -978,12 +978,11 @@ class SystemResourceMonitor:
 class StreamHandler:
     """Enhanced stream handler with better metrics capture and special channel parsing."""
 
-    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics, role_mappings: dict, role_color_tags: dict, is_oss_model: bool = False):
+    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics, role_mappings: dict, role_color_tags: dict):
         self.gui_queue = gui_queue
         self.metrics = metrics
         self.role_mappings = role_mappings
         self.role_color_tags = role_color_tags
-        self.is_oss_model = is_oss_model
         self.current_response = ""
         self.is_finished = False
         self.log_buffer = ""
@@ -1268,10 +1267,6 @@ class ModelSelectorPopup(ThemedPopup):
             entry.grid(row=row, column=col+1, padx=10, pady=5, sticky="w")
             self.model_entries[key] = entry
 
-        # Add is_oss_model checkbox
-        self.is_oss_model_var = ctk.BooleanVar()
-        self.is_oss_model_checkbox = ctk.CTkCheckBox(grid_frame, text="OSS Model (Analysis Channel)", variable=self.is_oss_model_var, font=font)
-        self.is_oss_model_checkbox.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky="w")
 
         # Warning Label
         warning_label = ctk.CTkLabel(
@@ -1435,8 +1430,6 @@ class ModelSelectorPopup(ThemedPopup):
             if model_filename in self.model_dropdown.cget("values"):
                 self.model_dropdown.set(model_filename)
 
-        # Load is_oss_model setting
-        self.is_oss_model_var.set(active_settings.get("is_oss_model", False))
 
     def load_model(self):
         """Save settings, trigger model load in parent, and close popup."""
@@ -1473,7 +1466,6 @@ class ModelSelectorPopup(ThemedPopup):
             else:
                 new_active_settings[key] = value
 
-        new_active_settings["is_oss_model"] = self.is_oss_model_var.get()
 
         # 2. Save settings
         self.settings_manager.settings["active"] = new_active_settings
@@ -6368,8 +6360,7 @@ Enhanced LYRN-AI system with advanced features active.
                 messages.append({"role": "user", "content": user_text})
 
             active = self.settings_manager.settings["active"]
-            is_oss_model = active.get("is_oss_model", False)
-            handler = StreamHandler(self.stream_queue, self.metrics, self.role_mappings, self.role_color_tags, is_oss_model=is_oss_model)
+            handler = StreamHandler(self.stream_queue, self.metrics, self.role_mappings, self.role_color_tags)
 
             # Setup stderr capture
             log_capture_buffer = io.StringIO()
