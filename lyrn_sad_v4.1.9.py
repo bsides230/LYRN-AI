@@ -999,7 +999,7 @@ class StreamHandler:
 
                 # Check for role transition to add spacing
                 if self.current_role == "thinking_process" and found_role == "final_output":
-                    self.gui_queue.put(('token', '\n', 'system_text'))
+                    self.gui_queue.put(('token', '\n\n', 'system_text'))
 
                 # We have a new role.
                 self.current_role = found_role
@@ -1187,8 +1187,8 @@ class ModelSelectorPopup(ThemedPopup):
         self.settings_manager = settings_manager
 
         self.title("Model Settings")
-        self.geometry("600x450")
-        self.minsize(500, 400)
+        self.geometry("600x550")
+        self.minsize(500, 500)
         self.grab_set() # Modal - prevent interaction with main window
 
         self.model_path = ""
@@ -1624,7 +1624,7 @@ class TabbedSettingsDialog(ThemedPopup):
             self.path_entries[key] = entry
 
     def create_chat_tab(self):
-        """Create the Chat settings tab."""
+        """Create the Chat settings tab with a refactored layout."""
         try:
             font = ctk.CTkFont(family="Consolas", size=12)
             title_font = ctk.CTkFont(family="Consolas", size=14, weight="bold")
@@ -1632,114 +1632,104 @@ class TabbedSettingsDialog(ThemedPopup):
             font = ("Consolas", 12)
             title_font = ("Consolas", 14, "bold")
 
+        # Main frame with 2 columns
         self.tab_chat.grid_columnconfigure(0, weight=1)
+        self.tab_chat.grid_columnconfigure(1, weight=1)
+        self.tab_chat.grid_rowconfigure(0, weight=1)
 
-        ctk.CTkLabel(self.tab_chat, text="Chat History Settings",
-                    font=title_font).pack(pady=20)
+        left_frame = ctk.CTkFrame(self.tab_chat)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=(20, 10), pady=20)
+        right_frame = ctk.CTkFrame(self.tab_chat)
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 20), pady=20)
 
-        # --- Chat History Saving Toggle ---
-        history_frame = ctk.CTkFrame(self.tab_chat)
-        history_frame.pack(fill="x", padx=20, pady=10)
+        # --- LEFT FRAME: History and Injection ---
+        ctk.CTkLabel(left_frame, text="Chat History & Context", font=title_font).pack(pady=(10, 20))
 
+        # Chat History Saving Toggle
         self.save_chat_history_var = ctk.BooleanVar()
-        self.save_chat_history_switch = ctk.CTkSwitch(history_frame, text="Save Chat History",
-                                                    variable=self.save_chat_history_var, font=font)
-        self.save_chat_history_switch.pack(side="left", padx=10, pady=10)
+        self.save_chat_history_switch = ctk.CTkSwitch(left_frame, text="Save Chat History", variable=self.save_chat_history_var, font=font)
+        self.save_chat_history_switch.pack(anchor="w", padx=20, pady=10)
         Tooltip(self.save_chat_history_switch, "If enabled, conversations will be saved to the episodic memory.")
 
-        # --- Chat History Length Slider ---
-        length_frame = ctk.CTkFrame(self.tab_chat)
+        # Chat History Length Slider
+        length_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         length_frame.pack(fill="x", padx=20, pady=10)
-
-        ctk.CTkLabel(length_frame, text="Chat History Length:", font=font).pack(side="left", padx=10, pady=10)
-
-        self.chat_history_length_slider = ctk.CTkSlider(length_frame, from_=0, to=50, number_of_steps=50,
-                                                        command=self.update_chat_history_label)
-        self.chat_history_length_slider.pack(side="left", fill="x", expand=True, padx=10, pady=10)
-
-        self.chat_history_length_label = ctk.CTkLabel(length_frame, text="10", font=font)
-        self.chat_history_length_label.pack(side="left", padx=10, pady=10)
+        ctk.CTkLabel(length_frame, text="History Length:", font=font).pack(side="left")
+        self.chat_history_length_label = ctk.CTkLabel(length_frame, text="10", font=font, width=30)
+        self.chat_history_length_label.pack(side="right", padx=(10,0))
+        self.chat_history_length_slider = ctk.CTkSlider(length_frame, from_=0, to=50, number_of_steps=50, command=self.update_chat_history_label)
+        self.chat_history_length_slider.pack(side="right", fill="x", expand=True)
         Tooltip(self.chat_history_length_slider, "How many past user/assistant message pairs to include in the context for the LLM. 0 means none.")
 
-        # --- Injection Toggles ---
-        injection_frame = ctk.CTkFrame(self.tab_chat)
-        injection_frame.pack(fill="x", padx=20, pady=10)
-
+        # Injection Toggles
         self.enable_deltas_var = ctk.BooleanVar()
-        self.enable_deltas_switch = ctk.CTkSwitch(injection_frame, text="Enable Delta Injection",
-                                                     variable=self.enable_deltas_var, font=font)
-        self.enable_deltas_switch.pack(side="left", padx=10, pady=10)
+        self.enable_deltas_switch = ctk.CTkSwitch(left_frame, text="Enable Delta Injection", variable=self.enable_deltas_var, font=font)
+        self.enable_deltas_switch.pack(anchor="w", padx=20, pady=10)
         Tooltip(self.enable_deltas_switch, "If enabled, deltas will be injected into the prompt.")
 
         self.enable_chat_history_var = ctk.BooleanVar()
-        self.enable_chat_history_switch = ctk.CTkSwitch(injection_frame, text="Enable Chat History Injection",
-                                                          variable=self.enable_chat_history_var, font=font)
-        self.enable_chat_history_switch.pack(side="left", padx=10, pady=10)
+        self.enable_chat_history_switch = ctk.CTkSwitch(left_frame, text="Enable Chat History Injection", variable=self.enable_chat_history_var, font=font)
+        self.enable_chat_history_switch.pack(anchor="w", padx=20, pady=10)
         Tooltip(self.enable_chat_history_switch, "If enabled, chat history will be injected into the prompt.")
 
-        # --- Folder Management ---
-        folder_frame = ctk.CTkFrame(self.tab_chat)
-        folder_frame.pack(fill="x", padx=20, pady=10)
-
-        ctk.CTkLabel(folder_frame, text="Folder Management", font=font).pack(anchor="w", padx=10, pady=(10, 5))
-
-        clear_chat_folder_button = ctk.CTkButton(folder_frame, text="Clear Chat Folder",
-                                                 font=font, command=self.parent_app.clear_chat_folder)
-        clear_chat_folder_button.pack(side="left", padx=10, pady=10)
+        # Folder Management
+        folder_frame = ctk.CTkFrame(left_frame)
+        folder_frame.pack(fill="x", padx=15, pady=20)
+        ctk.CTkLabel(folder_frame, text="Folder Management", font=font).pack(anchor="w", pady=(0, 10))
+        clear_chat_folder_button = ctk.CTkButton(folder_frame, text="Clear Chat Folder", font=font, command=self.parent_app.clear_chat_folder)
+        clear_chat_folder_button.pack(side="left", padx=5, pady=5)
         Tooltip(clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
-
-        open_chat_folder_button = ctk.CTkButton(folder_frame, text="Open Chat Folder",
-                                                font=font, command=self.parent_app.open_chat_folder)
-        open_chat_folder_button.pack(side="left", padx=10, pady=10)
+        open_chat_folder_button = ctk.CTkButton(folder_frame, text="Open Chat Folder", font=font, command=self.parent_app.open_chat_folder)
+        open_chat_folder_button.pack(side="left", padx=5, pady=5)
         Tooltip(open_chat_folder_button, "Open chat folder in file explorer.")
 
-        # --- Appearance Settings ---
-        appearance_frame = ctk.CTkFrame(self.tab_chat)
-        appearance_frame.pack(fill="x", padx=20, pady=10, expand=True)
-
-        ctk.CTkLabel(appearance_frame, text="Chat Appearance", font=title_font).pack(pady=10)
+        # --- RIGHT FRAME: Appearance ---
+        ctk.CTkLabel(right_frame, text="Chat Appearance", font=title_font).pack(pady=(10, 20))
 
         # Toggle for thinking/analysis text
         self.show_thinking_var = ctk.BooleanVar()
-        self.show_thinking_switch = ctk.CTkSwitch(appearance_frame, text="Show Thinking/Analysis Text", variable=self.show_thinking_var, font=font)
-        self.show_thinking_switch.pack(side="top", anchor="w", padx=10, pady=10)
+        self.show_thinking_switch = ctk.CTkSwitch(right_frame, text="Show Thinking/Analysis Text", variable=self.show_thinking_var, font=font)
+        self.show_thinking_switch.pack(anchor="w", padx=20, pady=10)
         Tooltip(self.show_thinking_switch, "Toggle the visibility of the model's intermediate thinking and analysis steps.")
 
         # Color settings
-        color_frame = ctk.CTkFrame(appearance_frame)
-        color_frame.pack(fill="x", expand=True, padx=10, pady=10)
+        color_frame = ctk.CTkFrame(right_frame)
+        color_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
         self.color_setting_widgets = {}
         color_roles = {
             "user_text": "User Text",
-            "assistant_text": "Assistant Text", # This will be the final_output color
+            "assistant_text": "Assistant Text",
             "thinking_text": "Thinking/Analysis Text",
             "system_text": "System Text"
         }
 
         for key, label_text in color_roles.items():
             row_frame = ctk.CTkFrame(color_frame, fg_color="transparent")
-            row_frame.pack(fill="x", pady=4, padx=5)
+            row_frame.pack(fill="x", pady=5, padx=5)
+            ctk.CTkLabel(row_frame, text=label_text, font=font, width=150, anchor="w").pack(side="left")
+            hex_entry = ctk.CTkEntry(row_frame, font=font, width=90)
+            hex_entry.pack(side="left", padx=10)
 
-            ctk.CTkLabel(row_frame, text=label_text, font=font, width=180, anchor="w").pack(side="left")
+            preview = ctk.CTkFrame(row_frame, width=28, height=28, border_width=1)
+            preview.pack(side="left", padx=5)
 
-            hex_label = ctk.CTkLabel(row_frame, text="#FFFFFF", font=font, width=80)
-            hex_label.pack(side="left", padx=5)
+            hex_entry.bind("<KeyRelease>", lambda e, k=key: self.update_color_preview(k))
+            self.color_setting_widgets[key] = {'entry': hex_entry, 'preview': preview}
 
-            color_swatch = ctk.CTkButton(row_frame, text="", width=150, height=28, corner_radius=3, border_width=1, command=lambda k=key: self.choose_chat_color(k))
-            color_swatch.pack(side="left", padx=10, fill="x", expand=True)
+    def update_color_preview(self, key: str):
+        """Updates the color preview swatch from the hex entry."""
+        widget_set = self.color_setting_widgets.get(key)
+        if not widget_set:
+            return
 
-            self.color_setting_widgets[key] = {'label': hex_label, 'swatch': color_swatch}
-
-    def choose_chat_color(self, key: str):
-        """Opens a color chooser and updates the swatch for a chat color."""
-        initial_color = self.color_setting_widgets[key]['label'].cget("text")
-        picker = CustomColorPickerPopup(self, initial_color=initial_color)
-        new_color = picker.get_color()
-
-        if new_color:
-            self.color_setting_widgets[key]['label'].configure(text=new_color)
-            self.color_setting_widgets[key]['swatch'].configure(fg_color=new_color)
+        hex_code = widget_set['entry'].get()
+        # Basic validation for a hex color
+        if re.match(r'^#(?:[0-9a-fA-F]{3}){1,2}$', hex_code):
+            widget_set['preview'].configure(fg_color=hex_code)
+        else:
+            # Indicate invalid color, e.g., by setting a default or error color
+            widget_set['preview'].configure(fg_color="gray")
 
 
     def update_chat_history_label(self, value):
@@ -1971,9 +1961,10 @@ class TabbedSettingsDialog(ThemedPopup):
         self.show_thinking_var.set(self.settings_manager.get_setting("show_thinking_text", True))
         chat_colors = self.settings_manager.get_setting("chat_colors", {})
         for key, widgets in self.color_setting_widgets.items():
-            color = chat_colors.get(key, "#FFFFFF") # Default to white if a key is missing
-            widgets['label'].configure(text=color)
-            widgets['swatch'].configure(fg_color=color)
+            color = chat_colors.get(key, "#FFFFFF")
+            widgets['entry'].delete(0, "end")
+            widgets['entry'].insert(0, color)
+            self.update_color_preview(key) # Update preview from loaded color
 
     def clear_chat_directory(self):
         """Clear chat directory after confirmation."""
@@ -2184,7 +2175,7 @@ class TabbedSettingsDialog(ThemedPopup):
 
             # Save Appearance settings
             self.settings_manager.ui_settings["show_thinking_text"] = self.show_thinking_var.get()
-            new_chat_colors = {key: widgets['label'].cget("text") for key, widgets in self.color_setting_widgets.items()}
+            new_chat_colors = {key: widgets['entry'].get() for key, widgets in self.color_setting_widgets.items()}
             self.settings_manager.ui_settings["chat_colors"] = new_chat_colors
 
 
@@ -2578,12 +2569,12 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
 
         ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5, 0))
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
         rwi_info_box.pack(fill="x", padx=10, pady=(0, 10), expand=True)
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
 
         ctk.CTkLabel(main_frame, text="Content/Prompt:").pack(anchor="w", padx=10, pady=(5, 0))
-        content_textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        content_textbox = ctk.CTkTextbox(main_frame, wrap="word", undo=True)
         content_textbox.pack(fill="both", padx=10, pady=(0, 10), expand=True)
         content_textbox.insert("1.0", content)
 
@@ -2652,7 +2643,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
 
         ctk.CTkLabel(main_frame, text="RWI Introduction for LLM:").pack(anchor="w", padx=10, pady=(5,0))
-        intro_textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        intro_textbox = ctk.CTkTextbox(main_frame, wrap="word", undo=True)
         intro_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         intro_textbox.insert("1.0", intro_content)
 
@@ -2722,7 +2713,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
         ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5,0))
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
         rwi_info_box.pack(fill="x", expand=True, padx=10, pady=(0, 10))
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
         traits_frame = ctk.CTkFrame(main_frame)
@@ -2742,7 +2733,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
             value_entry.insert("0", str(value))
             value_entry.pack(side="left")
             ctk.CTkLabel(trait_container, text="Instructions:").pack(anchor="w")
-            instructions_box = ctk.CTkTextbox(trait_container, height=60, wrap="word")
+            instructions_box = ctk.CTkTextbox(trait_container, height=60, wrap="word", undo=True)
             instructions_box.insert("1.0", instructions)
             instructions_box.pack(fill="x", expand=True)
             trait_widgets.append({"name": name, "value_entry": value_entry, "instructions_box": instructions_box})
@@ -2798,11 +2789,11 @@ class SystemPromptBuilderPopup(ThemedPopup):
         end_bracket_entry.pack(fill="x", padx=10, pady=(0,10))
         end_bracket_entry.insert(0, config.get("end_bracket", ""))
         ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5,0))
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=100)
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
         rwi_info_box.pack(fill="x", expand=True, padx=10, pady=(0,10))
         rwi_info_box.insert("1.0", config.get("rwi_text", ""))
         ctk.CTkLabel(main_frame, text="Instruction Body:").pack(anchor="w", padx=10, pady=(5,0))
-        body_text = ctk.CTkTextbox(main_frame, wrap="word")
+        body_text = ctk.CTkTextbox(main_frame, wrap="word", undo=True)
         body_text.pack(fill="both", expand=True, padx=10, pady=(0,10))
         body_text.insert("1.0", config.get("body", ""))
         return {"begin_bracket_entry": begin_bracket_entry, "end_bracket_entry": end_bracket_entry, "rwi_info_box": rwi_info_box, "body_text": body_text}
@@ -2932,6 +2923,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self._save_json(self.components_path, components)
         self.parent_app.update_status(f"{key.title()} {'enabled' if is_enabled else 'disabled'}", LYRN_INFO)
         self.parent_app.refresh_prompt_from_mode()
+        self.update_prompt_order_list()
+        self.apply_theme()
 
     def toggle_on_top(self):
         """Toggles the always-on-top status of the window."""
@@ -3432,12 +3425,12 @@ class JobBuilderPopup(ThemedPopup):
 
         # Job Instructions
         ctk.CTkLabel(main_frame, text="Job Instructions (for build_prompt)").pack(anchor="w")
-        self.job_instructions_text = ctk.CTkTextbox(main_frame, height=200)
+        self.job_instructions_text = ctk.CTkTextbox(main_frame, height=200, undo=True)
         self.job_instructions_text.pack(fill="both", pady=(0, 10), expand=True)
 
         # Trigger Prompt
         ctk.CTkLabel(main_frame, text="Trigger Prompt (for LLM execution)").pack(anchor="w")
-        self.trigger_prompt_text = ctk.CTkTextbox(main_frame, height=100)
+        self.trigger_prompt_text = ctk.CTkTextbox(main_frame, height=100, undo=True)
         self.trigger_prompt_text.pack(fill="both", pady=(0, 10), expand=True)
 
         # Save Button
@@ -3607,7 +3600,7 @@ class JobWatcherPopup(ThemedPopup):
         self.trigger_name_entry.pack(fill="x", padx=5, pady=(0, 10))
 
         ctk.CTkLabel(editor_frame, text="Trigger Prompt:").pack(anchor="w", padx=5)
-        self.trigger_prompt_text = ctk.CTkTextbox(editor_frame, wrap="word")
+        self.trigger_prompt_text = ctk.CTkTextbox(editor_frame, wrap="word", undo=True)
         self.trigger_prompt_text.pack(expand=True, fill="both", padx=5, pady=(0, 10))
 
         # Buttons for the editor
@@ -3859,12 +3852,12 @@ class JobWatcherPopup(ThemedPopup):
 
         # Reflection Instructions
         ctk.CTkLabel(reflection_frame, text="Reflection Instructions").pack(anchor="w")
-        self.reflection_instructions_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_instructions_text = ctk.CTkTextbox(reflection_frame, height=100, undo=True)
         self.reflection_instructions_text.pack(fill="x", pady=(0, 10), expand=True)
 
         # Gold-Standard Example
         ctk.CTkLabel(reflection_frame, text="Gold-Standard Example").pack(anchor="w")
-        self.reflection_gold_standard_text = ctk.CTkTextbox(reflection_frame, height=100)
+        self.reflection_gold_standard_text = ctk.CTkTextbox(reflection_frame, height=100, undo=True)
         self.reflection_gold_standard_text.pack(fill="x", pady=(0, 10), expand=True)
 
         # Reflection Iterations
@@ -4763,7 +4756,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
     def show_loading_indicator(self):
         """Shows the indeterminate loading progress bar."""
         if hasattr(self, 'loading_progressbar'):
-            self.loading_progressbar.pack(fill="x", pady=5, padx=10)
+            self.loading_progressbar.pack(fill="x", pady=5, padx=10, before=self.status_textbox)
             self.loading_progressbar.start()
             self.update_status("Loading model...", LYRN_INFO)
 
@@ -5421,7 +5414,8 @@ class LyrnAIInterface(ctk.CTkToplevel):
         hint_label = ctk.CTkLabel(input_frame, text="Use Ctrl+Enter to send", font=("Consolas", 10))
         hint_label.grid(row=0, column=0, sticky="nw", padx=5, pady=2)
 
-        self.input_box = ctk.CTkTextbox(input_frame, height=100, font=chat_font, border_width=2)
+        # TODO: A proper spellcheck implementation is a future feature. It would likely require a custom widget inheriting from CTkTextbox.
+        self.input_box = ctk.CTkTextbox(input_frame, height=100, font=chat_font, border_width=2, undo=True)
         self.input_box.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
         input_frame.grid_rowconfigure(1, weight=1)
 
@@ -6547,7 +6541,7 @@ Enhanced LYRN-AI system with advanced features active.
 
     def _watch_cycle_trigger_file(self):
         """Watches for the cycle trigger file and injects its content."""
-        trigger_path = Path(SCRIPT_DIR) / "ipc" / "cycle_trigger.txt"
+        trigger_path = Path(SCRIPT_DIR) / "global_flags" / "cycle_trigger.txt"
         while True:
             try:
                 if trigger_path.exists():
