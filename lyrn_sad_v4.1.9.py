@@ -5481,7 +5481,8 @@ Enhanced LYRN-AI system with advanced features active.
                 (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
                 (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color}),
                 (ctk.CTkSlider, {"progress_color": primary_color, "button_color": primary_color, "button_hover_color": button_hover_color}),
-                (ctk.CTkSwitch, {"progress_color": primary_color})
+                (ctk.CTkSwitch, {"progress_color": primary_color, "fg_color": primary_color}),
+                (ctk.CTkTabview, {"segmented_button_selected_color": primary_color, "segmented_button_selected_hover_color": button_hover_color})
             ]:
                 for widget in self.find_widgets_recursively(self, widget_type):
                     try:
