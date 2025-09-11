@@ -23,7 +23,6 @@ import tkinter as tk
 from delta_manager import DeltaManager
 from automation_controller import AutomationController, Job
 from color_picker import CustomColorPickerPopup
-from heartbeat import get_heartbeat_string
 from file_lock import SimpleFileLock
 from affordance_manager import AffordanceManager, Affordance
 from themed_popup import ThemedPopup, ThemeManager
@@ -689,8 +688,6 @@ class SnapshotLoader:
             if component_name == "RWI": continue # Skip the RWI meta-component itself
 
             config_path = os.path.join(self.build_prompt_dir, component_name, "config.json")
-            if component_name == "heartbeat":
-                config_path = os.path.join(self.build_prompt_dir, "heartbeat", "heartbeat_config.json")
 
             config = self._load_json_file(config_path)
             if config and "rwi_text" in config and config["rwi_text"]:
@@ -707,13 +704,6 @@ class SnapshotLoader:
             if component_name == "RWI": continue
 
             component_dir = os.path.join(self.build_prompt_dir, component_name)
-
-            # Special handling for heartbeat
-            if component_name == 'heartbeat':
-                heartbeat_content = get_heartbeat_string()
-                if heartbeat_content:
-                    prompt_parts.append(heartbeat_content)
-                continue
 
             # Generic component handling
             config_path = os.path.join(component_dir, "config.json")
@@ -2502,8 +2492,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
                 widgets = self._create_rwi_viewer(editor_frame)
             elif comp_name == "personality":
                 widgets = self._create_personality_editor(editor_frame)
-            elif comp_name == "heartbeat":
-                widgets = self._create_heartbeat_editor(editor_frame)
             else:
                 # Ensure the component exists before creating an editor for it
                 if any(c['name'] == comp_name for c in components):
@@ -2675,7 +2663,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         rwi_intro = self._load_text(self.build_prompt_dir / "rwi_intro.txt")
         for component in active_components:
             component_name = component['name']
-            if component_name in ["RWI", "heartbeat"]: continue
+            if component_name == "RWI": continue
             config = self._load_json(self.build_prompt_dir / component_name / "config.json")
             if config and config.get("rwi_text"):
                 rwi_parts.append(f"---\n{component_name.upper()}:\n{config['rwi_text']}")
@@ -2760,78 +2748,6 @@ class SystemPromptBuilderPopup(ThemedPopup):
         output_parts = [f'"{t["name"]} = {t["value"]:04d}"\n"{t["instructions"]}"' for t in updated_traits]
         self._save_text(output_path, "\n\n".join(output_parts))
         self.parent_app.update_status("Personality settings saved.", LYRN_SUCCESS)
-
-    def _create_heartbeat_editor(self, parent_frame):
-        """Creates the editor UI for the heartbeat component."""
-        parent_frame.grid_columnconfigure(0, weight=1)
-        parent_frame.grid_rowconfigure(1, weight=1)
-        config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
-        config = self._load_json(config_path) or {}
-        top_bar = ctk.CTkFrame(parent_frame, fg_color="transparent")
-        top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
-        top_bar.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(top_bar, text="Editor: Heartbeat", font=ctk.CTkFont(weight="bold")).pack(side="left")
-        button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
-        button_frame.pack(side="right")
-        view_button = ctk.CTkButton(button_frame, text="View Prompt", command=self._view_heartbeat_prompt)
-        view_button.pack(side="left", padx=5)
-        save_button = ctk.CTkButton(button_frame, text="Save", command=self._save_heartbeat_config)
-        save_button.pack(side="left", padx=5)
-        main_frame = ctk.CTkScrollableFrame(parent_frame, fg_color="transparent")
-        main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        main_frame.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(main_frame, text="Begin Bracket:").pack(anchor="w", padx=10, pady=(5,0))
-        begin_bracket_entry = ctk.CTkEntry(main_frame)
-        begin_bracket_entry.pack(fill="x", padx=10, pady=(0,10))
-        begin_bracket_entry.insert(0, config.get("begin_bracket", ""))
-        ctk.CTkLabel(main_frame, text="End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
-        end_bracket_entry = ctk.CTkEntry(main_frame)
-        end_bracket_entry.pack(fill="x", padx=10, pady=(0,10))
-        end_bracket_entry.insert(0, config.get("end_bracket", ""))
-        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5,0))
-        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
-        rwi_info_box.pack(fill="x", expand=True, padx=10, pady=(0,10))
-        rwi_info_box.insert("1.0", config.get("rwi_text", ""))
-        ctk.CTkLabel(main_frame, text="Instruction Body:").pack(anchor="w", padx=10, pady=(5,0))
-        body_text = ctk.CTkTextbox(main_frame, wrap="word", undo=True)
-        body_text.pack(fill="both", expand=True, padx=10, pady=(0,10))
-        body_text.insert("1.0", config.get("body", ""))
-        return {"begin_bracket_entry": begin_bracket_entry, "end_bracket_entry": end_bracket_entry, "rwi_info_box": rwi_info_box, "body_text": body_text}
-
-    def _save_heartbeat_config(self):
-        """Saves the current state of the heartbeat UI widgets to the JSON file."""
-        if "heartbeat" not in self.editor_widgets: return
-        w = self.editor_widgets["heartbeat"]
-        config_path = self.build_prompt_dir / "heartbeat" / "heartbeat_config.json"
-        config_data = self._load_json(config_path) or {}
-        config_data["begin_bracket"] = w['begin_bracket_entry'].get()
-        config_data["end_bracket"] = w['end_bracket_entry'].get()
-        config_data["rwi_text"] = w['rwi_info_box'].get("1.0", "end-1c")
-        config_data["body"] = w['body_text'].get("1.0", "end-1c")
-        self._save_json(config_path, config_data)
-        self.parent_app.update_status("Heartbeat settings saved.", LYRN_SUCCESS)
-
-    def _view_heartbeat_prompt(self):
-        """Generates and displays the current heartbeat prompt."""
-        try:
-            from heartbeat import get_heartbeat_string
-            heartbeat_content = get_heartbeat_string()
-            if not heartbeat_content:
-                heartbeat_content = "[Heartbeat is currently disabled or has no content]"
-
-            # Correctly instantiate FileViewerPopup
-            popup = FileViewerPopup(
-                parent=self,
-                theme_manager=self.theme_manager,
-                title="Heartbeat Prompt Preview",
-                content_source=heartbeat_content.strip(),
-                config={}, # The heartbeat string is already fully formatted
-                is_content_str=True
-            )
-            popup.focus()
-        except Exception as e:
-            self.parent_app.update_status(f"Error viewing heartbeat: {e}", LYRN_ERROR)
-            print(f"Error viewing heartbeat prompt: {e}")
 
     def _view_file_with_brackets(self, title: str, content_source: Path or str, config: dict, is_content_str: bool = False):
         """
@@ -5182,25 +5098,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         Tooltip(self.memory_button, "Open the Memory management popup.")
 
         return self.right_sidebar
-
-    def open_heartbeat_logs_folder(self):
-        """Opens the heartbeat logs directory in the system's file explorer."""
-        logs_dir = os.path.join(SCRIPT_DIR, "automation", "heartbeat_outputs")
-        if not os.path.isdir(logs_dir):
-            os.makedirs(logs_dir, exist_ok=True)
-            self.update_status("Heartbeat logs directory created.", LYRN_INFO)
-
-        try:
-            if sys.platform == "win32":
-                os.startfile(os.path.realpath(logs_dir))
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", logs_dir])
-            else:
-                subprocess.Popen(["xdg-open", logs_dir])
-            self.update_status("Opened heartbeat logs folder.", LYRN_INFO)
-        except Exception as e:
-            self.update_status(f"Error opening folder: {e}", LYRN_ERROR)
-            print(f"Error opening folder: {e}")
 
     def create_enhanced_metrics(self):
         """Create enhanced performance metrics with gauges"""

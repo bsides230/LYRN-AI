@@ -28,10 +28,5 @@
     "name": "user_preferences",
     "order": 5,
     "active": false
-  },
-  {
-    "name": "heartbeat",
-    "order": 6,
-    "active": false
   }
 ]
