@@ -989,7 +989,7 @@ class StreamHandler:
 
                 # Check for role transition to add spacing
                 if self.current_role == "thinking_process" and found_role == "final_output":
-                    self.gui_queue.put(('token', '\n\n', 'system_text'))
+                    self.gui_queue.put(('token', '\n', 'system_text'))
 
                 # We have a new role.
                 self.current_role = found_role
@@ -6184,7 +6184,7 @@ Enhanced LYRN-AI system with advanced features active.
                         if internal_role == "final_output":
                             tag = self.role_color_tags.get("final_output", "assistant_text")
                             if not hasattr(self, '_assistant_started'):
-                                self.display_colored_message("Assistant: ", tag)
+                                self.display_colored_message("\n\nAssistant: ", tag)
                                 self._assistant_started = True
                             self.display_colored_message(content, tag)
 
