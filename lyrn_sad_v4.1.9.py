@@ -1539,6 +1539,7 @@ class TabbedSettingsDialog(ThemedPopup):
         self.create_widgets()
         self.load_current_settings()
         self.apply_theme()
+        self.refresh_chat_color_previews()
 
     def open_theme_builder(self):
         """Opens the theme builder popup."""
@@ -1641,15 +1642,23 @@ class TabbedSettingsDialog(ThemedPopup):
         self.save_chat_history_switch.pack(anchor="w", padx=20, pady=10)
         Tooltip(self.save_chat_history_switch, "If enabled, conversations will be saved to the episodic memory.")
 
-        # Chat History Length Slider
+        # Chat History Length Stepper
         length_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         length_frame.pack(fill="x", padx=20, pady=10)
         ctk.CTkLabel(length_frame, text="History Length:", font=font).pack(side="left")
-        self.chat_history_length_label = ctk.CTkLabel(length_frame, text="10", font=font, width=30)
-        self.chat_history_length_label.pack(side="right", padx=(10,0))
-        self.chat_history_length_slider = ctk.CTkSlider(length_frame, from_=0, to=50, number_of_steps=50, command=self.update_chat_history_label)
-        self.chat_history_length_slider.pack(side="right", fill="x", expand=True)
-        Tooltip(self.chat_history_length_slider, "How many past user/assistant message pairs to include in the context for the LLM. 0 means none.")
+
+        self.history_length_entry = ctk.CTkEntry(length_frame, width=50, font=font, justify="center")
+        self.history_length_entry.pack(side="left", padx=10)
+
+        stepper_frame = ctk.CTkFrame(length_frame, fg_color="transparent")
+        stepper_frame.pack(side="left")
+
+        up_button = ctk.CTkButton(stepper_frame, text="▲", width=25, height=12, font=font, command=self.increase_history_length)
+        up_button.pack(pady=(0,1))
+        down_button = ctk.CTkButton(stepper_frame, text="▼", width=25, height=12, font=font, command=self.decrease_history_length)
+        down_button.pack(pady=(1,0))
+
+        Tooltip(length_frame, "How many past user/assistant message pairs to include in the context for the LLM. 0 means none. Max 50.")
 
         # Injection Toggles
         self.enable_deltas_var = ctk.BooleanVar()
@@ -1689,8 +1698,8 @@ class TabbedSettingsDialog(ThemedPopup):
         self.color_setting_widgets = {}
         color_roles = {
             "user_text": "User Text",
-            "assistant_text": "Assistant Text",
             "thinking_text": "Thinking/Analysis Text",
+            "assistant_text": "Assistant Text",
             "system_text": "System Text"
         }
 
@@ -1721,9 +1730,31 @@ class TabbedSettingsDialog(ThemedPopup):
             # Indicate invalid color, e.g., by setting a default or error color
             widget_set['preview'].configure(fg_color="gray")
 
+    def refresh_chat_color_previews(self):
+        """Force-update the color swatches after a theme change might have reset them."""
+        if hasattr(self, 'color_setting_widgets'):
+            for key in self.color_setting_widgets:
+                self.update_color_preview(key)
 
-    def update_chat_history_label(self, value):
-        self.chat_history_length_label.configure(text=str(int(value)))
+    def increase_history_length(self):
+        try:
+            current_value = int(self.history_length_entry.get())
+            if current_value < 50:
+                self.history_length_entry.delete(0, "end")
+                self.history_length_entry.insert(0, str(current_value + 1))
+        except ValueError:
+            self.history_length_entry.delete(0, "end")
+            self.history_length_entry.insert(0, "10")
+
+    def decrease_history_length(self):
+        try:
+            current_value = int(self.history_length_entry.get())
+            if current_value > 0:
+                self.history_length_entry.delete(0, "end")
+                self.history_length_entry.insert(0, str(current_value - 1))
+        except ValueError:
+            self.history_length_entry.delete(0, "end")
+            self.history_length_entry.insert(0, "10")
 
     def create_ui_settings_tab(self):
         """Create the UI settings tab."""
@@ -1942,8 +1973,8 @@ class TabbedSettingsDialog(ThemedPopup):
         # Load Chat settings
         self.save_chat_history_var.set(self.settings_manager.ui_settings.get("save_chat_history", True))
         chat_len = self.settings_manager.ui_settings.get("chat_history_length", 10)
-        self.chat_history_length_slider.set(chat_len)
-        self.update_chat_history_label(chat_len)
+        self.history_length_entry.delete(0, "end")
+        self.history_length_entry.insert(0, str(chat_len))
         self.enable_deltas_var.set(self.settings_manager.ui_settings.get("enable_deltas", True))
         self.enable_chat_history_var.set(self.settings_manager.ui_settings.get("enable_chat_history", True))
 
@@ -2159,7 +2190,7 @@ class TabbedSettingsDialog(ThemedPopup):
 
             # Save Chat settings
             self.settings_manager.ui_settings["save_chat_history"] = self.save_chat_history_var.get()
-            self.settings_manager.ui_settings["chat_history_length"] = int(self.chat_history_length_slider.get())
+            self.settings_manager.ui_settings["chat_history_length"] = int(self.history_length_entry.get())
             self.settings_manager.ui_settings["enable_deltas"] = self.enable_deltas_var.get()
             self.settings_manager.ui_settings["enable_chat_history"] = self.enable_chat_history_var.get()
 
@@ -5448,7 +5479,10 @@ Enhanced LYRN-AI system with advanced features active.
                 (ctk.CTkLabel, {"text_color": label_text}),
                 (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
                 (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
-                (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color})
+                (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color}),
+                (ctk.CTkSlider, {"progress_color": primary_color, "button_color": primary_color, "button_hover_color": button_hover_color}),
+                (ctk.CTkSwitch, {"progress_color": primary_color, "fg_color": primary_color}),
+                (ctk.CTkTabview, {"segmented_button_selected_color": primary_color, "segmented_button_selected_hover_color": button_hover_color})
             ]:
                 for widget in self.find_widgets_recursively(self, widget_type):
                     try:
