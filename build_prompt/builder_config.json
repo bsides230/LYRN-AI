@@ -1,6 +1,5 @@
 {
   "personality": true,
-  "heartbeat": true,
   "prompt_build_order": true,
   "user_preferences": true,
   "ai_preferences": true,

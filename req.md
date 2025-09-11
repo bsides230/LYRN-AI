@@ -16,7 +16,6 @@ These are the essential Python scripts that make up the LYRN GUI application.
 -   `delta_manager.py`
 -   `episodic_memory_manager.py`
 -   `file_lock.py`
--   `heartbeat.py`
 -   `model_loader.py`
 -   `system_checker.py`
 -   `system_interaction_service.py`
