@@ -707,16 +707,33 @@ class SnapshotLoader:
 
             # Handle the special "jobs" component
             if component_name == "jobs":
+                jobs_config_path = os.path.join(self.build_prompt_dir, "jobs", "config.json")
+                jobs_config = self._load_json_file(jobs_config_path) or {}
+
                 all_jobs = self.automation_controller.job_definitions
                 if all_jobs:
                     job_instructions_parts = []
+                    job_begin_bracket = jobs_config.get("job_begin_bracket", "")
+                    job_end_bracket = jobs_config.get("job_end_bracket", "")
+
                     for job_name, job_data in all_jobs.items():
                         instruction = job_data.get("instructions", "")
-                        job_instructions_parts.append(f"###JOB: {job_name}###\n{instruction}")
+
+                        start_bracket = job_begin_bracket.replace("*job_name*", job_name)
+                        end_bracket = job_end_bracket.replace("*job_name*", job_name)
+
+                        job_instructions_parts.append(f"{start_bracket}\n{instruction}\n{end_bracket}")
 
                     full_jobs_content = "\n\n".join(job_instructions_parts)
-                    # We'll use a standard bracket format for the jobs block
-                    jobs_block = f"###ALL_JOBS_START###\n{full_jobs_content}\n###_END###"
+
+                    main_instructions = jobs_config.get("instructions", "")
+                    if main_instructions:
+                        full_jobs_content = f"{main_instructions}\n\n{full_jobs_content}"
+
+                    section_begin_bracket = jobs_config.get("begin_bracket", "")
+                    section_end_bracket = jobs_config.get("end_bracket", "")
+
+                    jobs_block = f"{section_begin_bracket}\n{full_jobs_content}\n{section_end_bracket}"
                     prompt_parts.append(jobs_block)
                 continue
 
@@ -2856,21 +2873,124 @@ class SystemPromptBuilderPopup(ThemedPopup):
         parent_frame.grid_columnconfigure(0, weight=1)
         parent_frame.grid_rowconfigure(1, weight=1)
 
+        # --- Config Path ---
+        config_path = self.build_prompt_dir / "jobs" / "config.json"
+        config = self._load_json(config_path) or {}
+
         # --- Top Bar ---
         top_bar = ctk.CTkFrame(parent_frame, fg_color="transparent")
         top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         ctk.CTkLabel(top_bar, text="Editor: Jobs", font=ctk.CTkFont(weight="bold")).pack(side="left")
 
-        refresh_button = ctk.CTkButton(top_bar, text="Refresh", command=self._refresh_jobs_list)
-        refresh_button.pack(side="right", padx=5)
+        button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
+        button_frame.pack(side="right")
 
-        # --- Main Content: Job List ---
-        self.jobs_list_frame = ctk.CTkScrollableFrame(parent_frame, label_text="Available Jobs")
-        self.jobs_list_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        view_button = ctk.CTkButton(button_frame, text="View Merged Jobs", command=self._view_merged_jobs)
+        view_button.pack(side="left", padx=5)
+
+        save_button = ctk.CTkButton(button_frame, text="Save", command=self._save_jobs_config)
+        save_button.pack(side="left", padx=5)
+
+        refresh_button = ctk.CTkButton(button_frame, text="Refresh", command=self._refresh_jobs_list)
+        refresh_button.pack(side="left", padx=5)
+
+
+        # --- Main Content ---
+        main_frame = ctk.CTkScrollableFrame(parent_frame, fg_color="transparent")
+        main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # --- General Settings ---
+        ctk.CTkLabel(main_frame, text="Jobs Section Instructions:").pack(anchor="w", padx=10, pady=(5,0))
+        instructions_textbox = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        instructions_textbox.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        instructions_textbox.insert("1.0", config.get("instructions", ""))
+
+        ctk.CTkLabel(main_frame, text="Jobs Section Start Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_start_bracket_entry = ctk.CTkEntry(main_frame)
+        section_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_start_bracket_entry.insert(0, config.get("begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Jobs Section End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_end_bracket_entry = ctk.CTkEntry(main_frame)
+        section_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_end_bracket_entry.insert(0, config.get("end_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Job Start Bracket (*job_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        job_start_bracket_entry = ctk.CTkEntry(main_frame)
+        job_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        job_start_bracket_entry.insert(0, config.get("job_begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Job End Bracket (*job_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        job_end_bracket_entry = ctk.CTkEntry(main_frame)
+        job_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        job_end_bracket_entry.insert(0, config.get("job_end_bracket", ""))
+
+        # --- Job List ---
+        self.jobs_list_frame = ctk.CTkScrollableFrame(main_frame, label_text="Available Jobs")
+        self.jobs_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         self._refresh_jobs_list()
 
-        return {"refresh_button": refresh_button, "jobs_list_frame": self.jobs_list_frame}
+        return {
+            "instructions_textbox": instructions_textbox,
+            "section_start_bracket_entry": section_start_bracket_entry,
+            "section_end_bracket_entry": section_end_bracket_entry,
+            "job_start_bracket_entry": job_start_bracket_entry,
+            "job_end_bracket_entry": job_end_bracket_entry,
+            "config_path": config_path,
+        }
+
+    def _save_jobs_config(self):
+        """Saves the jobs configuration."""
+        if "jobs" not in self.editor_widgets:
+            return
+
+        w = self.editor_widgets["jobs"]
+        config_data = {
+            "instructions": w["instructions_textbox"].get("1.0", "end-1c"),
+            "begin_bracket": w["section_start_bracket_entry"].get(),
+            "end_bracket": w["section_end_bracket_entry"].get(),
+            "job_begin_bracket": w["job_start_bracket_entry"].get(),
+            "job_end_bracket": w["job_end_bracket_entry"].get(),
+        }
+        self._save_json(w["config_path"], config_data)
+        self.parent_app.update_status("Jobs settings saved.", LYRN_SUCCESS)
+
+    def _view_merged_jobs(self):
+        """Constructs and displays the full jobs block content."""
+        if "jobs" not in self.editor_widgets:
+            return
+
+        w = self.editor_widgets["jobs"]
+        config_path = self.build_prompt_dir / "jobs" / "config.json"
+        config = self._load_json(config_path) or {}
+
+        all_jobs = self.parent_app.automation_controller.job_definitions
+        if not all_jobs:
+            self.parent_app.update_status("No jobs found to merge.", LYRN_WARNING)
+            return
+
+        job_instructions_parts = []
+        job_begin_bracket = config.get("job_begin_bracket", "")
+        job_end_bracket = config.get("job_end_bracket", "")
+
+        for job_name, job_data in all_jobs.items():
+            instruction = job_data.get("instructions", "")
+
+            start_bracket = job_begin_bracket.replace("*job_name*", job_name)
+            end_bracket = job_end_bracket.replace("*job_name*", job_name)
+
+            job_instructions_parts.append(f"{start_bracket}\n{instruction}\n{end_bracket}")
+
+        full_jobs_content = "\n\n".join(job_instructions_parts)
+
+        # Add the main instructions if they exist
+        main_instructions = config.get("instructions", "")
+        if main_instructions:
+            full_jobs_content = f"{main_instructions}\n\n{full_jobs_content}"
+
+        self._view_file_with_brackets("Merged Jobs Preview", full_jobs_content, config, is_content_str=True)
 
     def _refresh_jobs_list(self):
         """Clears and repopulates the list of jobs."""
