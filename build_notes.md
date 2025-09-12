@@ -1,5 +1,17 @@
 # LYRN-AI Build Notes
 
+## v4.2.6 - UI Refinements (2025-09-12)
+
+This is a minor update to refine the UI for the System Prompt Builder and fix a theming bug with dynamically created elements.
+
+- **Centralized Component Buttons:** The "Edit" and "Delete" buttons in the System Prompt Builder have been moved from being on every individual component to a single, centralized set of controls that operate on the selected component. This declutters the UI and provides a more standard user experience.
+- **Dynamic Theming Fix:** Fixed a bug where new elements added in the "Component Builder" popup would not be correctly themed. The `apply_theme()` method is now called after an element is created, ensuring all new UI widgets receive the correct styling.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
+---
+
 ## v4.2.5 - Dynamic Prompt Component Builder (2025-09-12)
 
 This update introduces a major new feature allowing users to dynamically create, edit, and delete components for the system prompt directly within the GUI.
