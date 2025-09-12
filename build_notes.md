@@ -1,5 +1,30 @@
 # LYRN-AI Build Notes
 
+## v4.2.1 - OSS Tooling & UI Overhaul (2025-09-11)
+
+This is a major update that refactors the internal "Affordances" system to align with OpenAI's open-source tool format, overhauls several UI components for better usability, and fixes numerous bugs.
+
+- **Affordance System Rebranded to OSS Tools:**
+    - Researched and adopted the `gpt-oss` "harmony" format for tool definitions.
+    - The `AffordancePopup` has been completely redesigned with a new text-based editor, replacing the old form. Users now define tools using a TypeScript-like syntax.
+    - A new "Affordances" component has been added to the System Prompt Builder, which injects all defined tools into the context for the LLM, similar to how "Jobs" are handled.
+
+- **Core GUI and UX Changes:**
+    - **Backend Job Injection:** Running a job from the "Automation" popup now injects the trigger directly into the backend, rather than pasting it into the user's input box.
+    - **Memory UI Cleanup:** The "Memory" button has been removed from the main UI. The chat history viewer is now accessed via a "View Chat History" button in the Chat Settings tab.
+    - **Job Selection Removed:** The manual job selection dropdown has been removed from the main UI to streamline the interface.
+    - **Brighter Metrics:** The color of the "Generation tok/s" label has been changed to a new, brighter theme color for better visibility.
+    - **Settings Popup Resized:** The main settings window height has been increased to prevent buttons from being squished.
+
+- **Bug Fixes and Minor Adjustments:**
+    - **New Job Saving:** Fixed a bug where the "Save" button in the new job editor would fail to close the popup and refresh the job list due to a hardcoded path.
+    - **Themed Preset Popup:** The input dialog for saving a model preset is now correctly themed.
+    - **Total Tokens Metric:** The "Total Tokens" calculation in the performance metrics now correctly includes tokens from the KV cache.
+    - **Tab Rename:** The "Reflection Cycle" tab in the Automation popup has been renamed to "Prompt Training" to be more descriptive.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.2.1 - Merged Jobs Preview Hotfix (2025-09-11)
 
 This is a minor hotfix to address a UI formatting issue in the System Prompt Builder.

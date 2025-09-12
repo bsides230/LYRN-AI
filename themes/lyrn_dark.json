@@ -18,6 +18,7 @@
     "assistant_text": "#34D399",
     "thinking_text": "#F472B6",
     "display_text_color": "#FFFFFF",
-    "border_color": "#7552bf"
+    "border_color": "#7552bf",
+    "generation_speed_text": "#A7F3D0"
   }
 }
