@@ -12,7 +12,7 @@
     "trigger": "Execute the reflection job."
   },
   "keyword_job": {
-    "instructions": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\"]",
+    "instructions": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\", \"keyword3\"]",
     "trigger": "Execute the keyword job."
   }
 }

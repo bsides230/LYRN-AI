@@ -1,8 +1,8 @@
 {
   "settings": {
     "active": {
-      "model_path": "D:\\LYRN-SAD\\models\\gemma-3-4b-it-abliterated-q4_0.gguf",
-      "n_ctx": 80000,
+      "model_path": "D:\\LYRN-SAD\\models\\openai_gpt-oss-20b-Q4_K_M.gguf",
+      "n_ctx": 16000,
       "n_threads": 22,
       "n_gpu_layers": 36,
       "n_batch": 256,

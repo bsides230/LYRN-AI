@@ -25,12 +25,12 @@
     "active": true
   },
   {
-    "name": "user_preferences",
+    "name": "jobs",
     "order": 5,
-    "active": false
+    "active": true
   },
   {
-    "name": "jobs",
+    "name": "user_preferences",
     "order": 6,
     "active": false
   }
