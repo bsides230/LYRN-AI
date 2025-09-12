@@ -784,7 +784,7 @@ class SnapshotLoader:
             # Handle the new "affordances" component
             if component_name == "affordances":
                 affordances_config_path = os.path.join(self.build_prompt_dir, "affordances", "config.json")
-                affordances_config = self._load_json(affordances_config_path) or {}
+                affordances_config = self._load_json_file(affordances_config_path) or {}
                 all_affordances = self.parent_app.affordance_manager.get_all_affordances()
 
                 if all_affordances:
@@ -2552,14 +2552,11 @@ class SystemPromptBuilderPopup(ThemedPopup):
         self.apply_theme()
 
     def _load_json(self, path: Path) -> dict:
-        """Loads a JSON file."""
-        if path.exists():
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading {path}: {e}")
-        return {}
+        """Loads a JSON file by delegating to the snapshot_loader."""
+        if not path:
+            return {}
+        # Ensure the path is a string, as the underlying method expects it.
+        return self.snapshot_loader._load_json_file(str(path)) or {}
 
     def _save_json(self, path: Path, data: dict):
         """Saves data to a JSON file."""
@@ -4169,7 +4166,7 @@ class JobWatcherPopup(ThemedPopup):
 
         # Trigger a rebuild of the master prompt
         if hasattr(self.parent_app, 'snapshot_loader'):
-            self.parent_app.snapshot_loader.generate_master_index()
+            self.parent_app.snapshot_loader.build_master_prompt_from_components()
 
     def create_reflection_tab(self):
         """Creates the UI for the Reflection Cycle tab."""
