@@ -5493,11 +5493,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
     def create_chat_area(self):
         """Create enhanced chat interface with colored text support"""
         chat_frame = ctk.CTkFrame(self, corner_radius=38)
-        # chat_frame.grid(row=1, column=1, sticky="nsew", padx=(0, 5), pady=(0, 10))
         chat_frame.grid_rowconfigure(0, weight=1)
         chat_frame.grid_columnconfigure(0, weight=1)
 
-        # Chat display with enhanced text handling
         try:
             chat_font = ctk.CTkFont(family="Consolas", size=self.current_font_size)
         except:
@@ -5506,7 +5504,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.chat_display = ctk.CTkTextbox(chat_frame, font=chat_font, wrap="word", border_width=2, text_color=self.theme_manager.get_color("display_text_color"))
         self.chat_display.grid(row=0, column=0, sticky="nsew", padx=20, pady=(20, 10))
 
-        # Configure tags for colored text using chat_colors from settings
         chat_colors = self.settings_manager.get_setting("chat_colors", {})
         self.chat_display.tag_config("system_text", foreground=chat_colors.get("system_text", "#B0B0B0"))
         self.chat_display.tag_config("user_text", foreground=chat_colors.get("user_text", "#00C0A0"))
@@ -5515,39 +5512,32 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.chat_display.tag_config("error", foreground=self.theme_manager.get_color("error"))
         self.chat_display.tag_config("success", foreground=self.theme_manager.get_color("success"))
 
-        # Input area
         input_frame = ctk.CTkFrame(chat_frame)
         input_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 20))
         input_frame.grid_columnconfigure(0, weight=1)
 
-        # Add hint label for sending message
         hint_label = ctk.CTkLabel(input_frame, text="Use Ctrl+Enter to send", font=("Consolas", 10))
         hint_label.grid(row=0, column=0, sticky="nw", padx=5, pady=2)
 
-        # TODO: A proper spellcheck implementation is a future feature. It would likely require a custom widget inheriting from CTkTextbox.
         self.input_box = ctk.CTkTextbox(input_frame, height=100, font=chat_font, border_width=2, undo=True)
         self.input_box.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
         input_frame.grid_rowconfigure(1, weight=1)
 
-        # Button Frame for Send and Copy
         button_vframe = ctk.CTkFrame(input_frame, fg_color="transparent")
         button_vframe.grid(row=1, column=1, padx=(5,0))
 
-        # Send button with LYRN styling
         self.send_btn = ctk.CTkButton(button_vframe, text="Send", width=80,
                                      font=chat_font,
                                      command=self.send_message)
         self.send_btn.pack(pady=(0, 5), fill="x")
         Tooltip(self.send_btn, self.tooltips.get("send_button", ""))
 
-        # Copy last response button
         self.copy_btn = ctk.CTkButton(button_vframe, text="Copy", width=80,
                                      font=chat_font,
                                      command=self.copy_last_response)
         self.copy_btn.pack(pady=(5, 0), fill="x")
         Tooltip(self.copy_btn, "Copies the last assistant response to the clipboard.")
 
-        # Stop button
         self.stop_btn = ctk.CTkButton(button_vframe, text="Stop", width=80,
                                      font=chat_font,
                                      command=self.stop_generation_process,
@@ -5555,8 +5545,8 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.stop_btn.pack(pady=(5, 0), fill="x")
         Tooltip(self.stop_btn, "Stops the current generation.")
 
-        # Bind keyboard shortcut
         self.input_box.bind("<Control-Return>", self.send_message_from_event)
+        return chat_frame
 
     def execute_job_directly(self, job_name: str, job_trigger: str):
         """Executes a job by sending its trigger directly to the backend without user interaction."""
@@ -5564,13 +5554,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.update_status("No model loaded", LYRN_ERROR)
             return
 
-        # Log the job execution as a system message
         self.display_colored_message(f"--- Running Job: {job_name} ---\n", "system_text")
 
-        # Get chat history
         history_messages = self.chat_manager.get_chat_history_messages() if self.chat_manager else []
 
-        # Start a new structured log for this interaction
         self.chat_logger.start_log()
         self.chat_logger.append_log("USER", f"--- JOB TRIGGER: {job_name} ---\n{job_trigger}")
 
@@ -5579,7 +5566,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.stop_generation = False
         self._write_llm_status("busy")
 
-        # Display thinking message and start response generation
         self.display_colored_message("Assistant: Thinking...\n", "thinking_text")
         self.is_thinking = True
 
@@ -5587,28 +5573,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         threading.Thread(target=self.generate_response, args=(job_trigger, history_messages), daemon=True).start()
         self.update_status(f"Executing job '{job_name}'...", LYRN_INFO)
 
-        # Welcome message with LYRN branding
-        welcome_msg = f"""
-╔═══════════════════════════════════════════════════════╗
-║                   LYRN-AI v4.2.1                      ║
-║              Advanced Language Interface              ║
-║                                                       ║
-║ • Enhanced performance monitoring                     ║
-║ • Multi-colored text display                          ║
-║ • Live theme switching                                ║
-║ • Advanced job coordination                           ║
-║ • Memory-optimized model handling                     ║
-║ • LYRN-AI branded experience                          ║
-║                                                       ║
-║ Status: {'🟢 ONLINE' if self.llm else '🔴 MODEL NOT LOADED'}                               ║
-╚═══════════════════════════════════════════════════════╝
-
-Ready for interaction. Use Ctrl+Enter to send messages.
-Enhanced LYRN-AI system with advanced features active.
-"""
-        # Welcome message removed as per request
-        # self.display_colored_message(f"{welcome_msg}\n\n", "system_text")
-        return chat_frame
 
     def display_colored_message(self, message: str, tag: str):
         """Appends a message to the chat display with a specific color tag."""
