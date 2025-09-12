@@ -5848,6 +5848,17 @@ class LyrnAIInterface(ctk.CTkToplevel):
             if hasattr(self, 'status_frame'):
                 self.status_frame.configure(border_color=border_color)
 
+            # --- Apply secondary button color ---
+            secondary_button_color = tm.get_color("secondary_button", fallback="#555555")
+            if hasattr(self, 'show_llm_log_button'):
+                self.show_llm_log_button.configure(fg_color=secondary_button_color)
+            if hasattr(self, 'terminal_button'):
+                self.terminal_button.configure(fg_color=secondary_button_color)
+            if hasattr(self, 'clear_chat_button'):
+                self.clear_chat_button.configure(fg_color=secondary_button_color)
+            if hasattr(self, 'clear_chat_folder_button'):
+                self.clear_chat_folder_button.configure(fg_color=secondary_button_color)
+
             print("Color theme re-applied to main window widgets.")
 
             # --- Re-apply chat-specific colors ---
