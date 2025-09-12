@@ -2975,7 +2975,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
             job_instructions_parts.append(f"{start_bracket}\n{instruction}\n{end_bracket}")
 
-        full_jobs_content = "\n\n".join(job_instructions_parts)
+        full_jobs_content = ("\n\n" + "="*80 + "\n\n").join(job_instructions_parts)
 
         # Add the main instructions if they exist
         main_instructions = config.get("instructions", "")
@@ -5145,7 +5145,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.2.0")
+        self.title("LYRN-AI Dashboard v4.2.1")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -5623,7 +5623,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Welcome message with LYRN branding
         welcome_msg = f"""
 ╔═══════════════════════════════════════════════════════╗
-║                   LYRN-AI v4.2.0                      ║
+║                   LYRN-AI v4.2.1                      ║
 ║              Advanced Language Interface              ║
 ║                                                       ║
 ║ • Enhanced performance monitoring                     ║

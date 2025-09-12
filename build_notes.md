@@ -1,5 +1,14 @@
 # LYRN-AI Build Notes
 
+## v4.2.1 - Merged Jobs Preview Hotfix (2025-09-11)
+
+This is a minor hotfix to address a UI formatting issue in the System Prompt Builder.
+
+- **Merged Jobs Separator:** Fixed a bug in the "View Merged Jobs" popup where all job instructions were concatenated into a single, unreadable block of text. A distinct visual separator (`================================================================================`) is now added between each job, making the preview clear and easy to read.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.2.0 - Job Component for System Prompt (2025-09-11)
 
 This update introduces a new "Jobs" component to the System Prompt Builder, designed to improve the performance of the automation system by pre-caching job instructions.
