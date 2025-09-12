@@ -1,5 +1,35 @@
 # LYRN-AI Build Notes
 
+## v4.2.6 - UI Refinements (2025-09-12)
+
+This is a minor update to refine the UI for the System Prompt Builder and fix a theming bug with dynamically created elements.
+
+- **Centralized Component Buttons:** The "Edit" and "Delete" buttons in the System Prompt Builder have been moved from being on every individual component to a single, centralized set of controls that operate on the selected component. This declutters the UI and provides a more standard user experience.
+- **Dynamic Theming Fix:** Fixed a bug where new elements added in the "Component Builder" popup would not be correctly themed. The `apply_theme()` method is now called after an element is created, ensuring all new UI widgets receive the correct styling.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
+---
+
+## v4.2.5 - Dynamic Prompt Component Builder (2025-09-12)
+
+This update introduces a major new feature allowing users to dynamically create, edit, and delete components for the system prompt directly within the GUI.
+
+### Key Features:
+- **Component Builder Popup:** A new popup accessed via a '+' button in the System Prompt Builder allows for the creation of new prompt components.
+- **Dynamic Elements:** Users can add elements like text boxes to their components, name them, and see them update in real-time.
+- **Edit and Delete:** Existing components can be edited using the same builder interface, or deleted entirely.
+- **Themed Confirmation:** A themed confirmation dialog has been implemented to prevent accidental deletion of components.
+- **Modular by Default:** The default components (RWI, system instructions, etc.) can now be customized or even deleted for ultimate flexibility.
+
+### Logging:
+- All component creation, modification, and deletion events are logged to the console.
+- The `components.json` file is updated to reflect the new component registry.
+- New component directories and files are created under `build_prompt/`.
+
+---
+
 ## v4.2.4 - Theming Overhaul (2025-09-12)
 
 - **Theming Rework:**
