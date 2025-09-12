@@ -101,8 +101,7 @@ class AutomationController:
             "trigger": trigger
         }
 
-        # This is a placeholder path. The actual path should be managed properly.
-        jobs_json_path = Path("automation/jobs/jobs.json")
+    jobs_json_path = self.job_definitions_path / "jobs.json"
         jobs_lock_path = jobs_json_path.with_suffix('.json.lock')
 
         try:

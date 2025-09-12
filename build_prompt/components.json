@@ -30,8 +30,13 @@
     "active": true
   },
   {
-    "name": "user_preferences",
+    "name": "affordances",
     "order": 6,
+    "active": true
+  },
+  {
+    "name": "user_preferences",
+    "order": 7,
     "active": false
   }
 ]
