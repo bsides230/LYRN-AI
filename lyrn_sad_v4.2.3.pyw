@@ -4974,6 +4974,20 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.create_widgets()
         self.apply_color_theme()
 
+        # Load previous chat session
+        try:
+            active_chat_path = os.path.join(SCRIPT_DIR, "active_chat.txt")
+            if os.path.exists(active_chat_path):
+                with open(active_chat_path, "r", encoding="utf-8") as f:
+                    chat_content = f.read()
+                if chat_content:
+                    self.chat_display.configure(state="normal")
+                    self.chat_display.insert("1.0", chat_content)
+                    self.chat_display.configure(state="disabled")
+                    self.chat_display.see("end")
+        except Exception as e:
+            print(f"Error loading previous chat session: {e}")
+
         # Handle window closing and keybinds
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind("<Control-Shift-P>", self.open_command_palette)
@@ -5051,6 +5065,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Refresh UI elements that depend on the loaded managers
         self.refresh_active_cycle_selector()
         self.update_job_dropdown()
+        self.update_oss_tool_dropdown()
 
         # Load the master prompt into the cache for the first time
         self.reload_master_prompt()
@@ -5144,6 +5159,16 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def on_closing(self):
         """Handle cleanup on window close."""
+        # Save chat content
+        try:
+            chat_content = self.chat_display.get("1.0", "end-1c")
+            # To prevent saving just a newline
+            if chat_content.strip():
+                with open(os.path.join(SCRIPT_DIR, "active_chat.txt"), "w", encoding="utf-8") as f:
+                    f.write(chat_content)
+        except Exception as e:
+            print(f"Error saving chat on close: {e}")
+
         if hasattr(self, 'resource_monitor'):
             self.resource_monitor.stop()
         self.master.destroy() # Destroy the root window to exit the app
@@ -5191,7 +5216,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.2.2")
+        self.title("LYRN-AI Dashboard v4.2.3")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -5352,9 +5377,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.clear_chat_folder_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
 
-        self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
-        self.settings_button.pack(fill="x", padx=10, pady=3)
-        Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
 
         # self.tasks_goals_button = ctk.CTkButton(self.quick_frame, text="🎯 Tasks/Goals", command=self.open_tasks_goals_popup)
         # self.tasks_goals_button.pack(fill="x", padx=10, pady=3)
@@ -5380,10 +5402,15 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
         datetime_frame = ctk.CTkFrame(self.right_sidebar, fg_color="transparent")
         datetime_frame.pack(pady=(20, 10), padx=10, anchor="n")
+        datetime_frame.grid_columnconfigure(0, weight=1)
 
         # Combine date and time into a single label for guaranteed one-line display
         self.datetime_label = ctk.CTkLabel(datetime_frame, text="", font=datetime_font)
-        self.datetime_label.pack()
+        self.datetime_label.grid(row=0, column=0, sticky="w", padx=(0, 10))
+
+        self.settings_button = ctk.CTkButton(datetime_frame, text="⚙️", command=self.open_settings, width=40, height=40)
+        self.settings_button.grid(row=0, column=1)
+        Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
 
         # Enhanced Performance Metrics Section
         self.create_enhanced_metrics()
@@ -5411,10 +5438,21 @@ class LyrnAIInterface(ctk.CTkToplevel):
         run_job_button = ctk.CTkButton(job_runner_frame, text="Run", width=60, command=self.run_selected_job_from_dropdown)
         run_job_button.pack(side="left", padx=5)
 
+        # OSS Tool Runner
+        oss_tool_runner_frame = ctk.CTkFrame(self.job_frame)
+        oss_tool_runner_frame.pack(fill="x", padx=10, pady=5)
+        self.oss_tool_dropdown = ctk.CTkComboBox(oss_tool_runner_frame, values=["No tools loaded"])
+        self.oss_tool_dropdown.pack(side="left", expand=True, fill="x")
+        run_oss_tool_button = ctk.CTkButton(oss_tool_runner_frame, text="Run", width=60, command=self.run_selected_oss_tool)
+        run_oss_tool_button.pack(side="left", padx=5)
 
-        self.job_watcher_button = ctk.CTkButton(self.job_frame, text="Automation", command=self.open_job_watcher_popup)
+        self.job_watcher_button = ctk.CTkButton(self.job_frame, text="Job Manager", command=self.open_job_watcher_popup)
         self.job_watcher_button.pack(fill="x", padx=10, pady=5)
         Tooltip(self.job_watcher_button, "Open the Job Automation Watcher popup.")
+
+        self.oss_tool_button = ctk.CTkButton(self.job_frame, text="OSS Tools", command=self.open_oss_tool_popup)
+        self.oss_tool_button.pack(fill="x", padx=10, pady=5)
+        Tooltip(self.oss_tool_button, "Open the OSS Tool Editor to manage tools.")
 
         # self.memory_button = ctk.CTkButton(self.job_frame, text="Memory", command=self.open_memory_popup)
         # self.memory_button.pack(fill="x", padx=10, pady=5)
@@ -5445,12 +5483,17 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.kv_progress.pack(fill="x", padx=5, pady=(0,5))
         self.kv_progress.set(0)
 
-        # Prompt tokens
-        self.prompt_label = ctk.CTkLabel(self.metrics_frame, text="Prompt: 0 tokens", font=normal_font)
-        self.prompt_label.pack(pady=2)
+        # Prompt and Response tokens
+        token_frame = ctk.CTkFrame(self.metrics_frame, fg_color="transparent")
+        token_frame.pack(fill="x", padx=10, pady=2)
+        token_frame.grid_columnconfigure((0, 1), weight=1)
+        self.prompt_label = ctk.CTkLabel(token_frame, text="Prompt: 0 tokens", font=normal_font)
+        self.prompt_label.grid(row=0, column=0, sticky="w")
+        self.response_label = ctk.CTkLabel(token_frame, text="Response: 0 tokens", font=normal_font)
+        self.response_label.grid(row=0, column=1, sticky="w")
 
         # Generation speed
-        self.eval_label = ctk.CTkLabel(self.metrics_frame, text="Generation: 0 tok/s", font=normal_font)
+        self.eval_label = ctk.CTkLabel(self.metrics_frame, text="Generation: 0.0 tok/s", font=normal_font)
         self.eval_label.pack(pady=2)
 
         # Time Metrics
@@ -5458,9 +5501,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         time_metrics_frame.pack(fill="x", padx=10, pady=2)
         time_metrics_frame.grid_columnconfigure((0, 1), weight=1)
 
-        self.generation_time_label = ctk.CTkLabel(time_metrics_frame, text="Gen Time: 0s", font=normal_font)
+        self.generation_time_label = ctk.CTkLabel(time_metrics_frame, text="Gen Time: 0.0s", font=normal_font)
         self.generation_time_label.grid(row=0, column=0, sticky="w")
-        self.tokenization_time_label = ctk.CTkLabel(time_metrics_frame, text="Token Time: 0s", font=normal_font)
+        self.tokenization_time_label = ctk.CTkLabel(time_metrics_frame, text="Token Time: 0.0s", font=normal_font)
         self.tokenization_time_label.grid(row=0, column=1, sticky="w")
 
         # Total tokens
@@ -5593,9 +5636,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.personality_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.personality_button, "Open the Personality slider editor.")
 
-        self.oss_tool_button = ctk.CTkButton(self.status_frame, text="OSS Tools", command=self.open_oss_tool_popup)
-        self.oss_tool_button.pack(fill="x", padx=10, pady=3)
-        Tooltip(self.oss_tool_button, "Open the OSS Tool Editor to manage tools.")
 
 
         # --- End Relocated Controls ---
@@ -6637,6 +6677,32 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.job_dropdown.configure(values=["Loading..."])
             self.job_dropdown.set("Loading...")
 
+    def update_oss_tool_dropdown(self):
+        """Populates the manual oss tool selection dropdown."""
+        if hasattr(self, 'oss_tool_dropdown') and self.oss_tool_manager:
+            tool_names = [tool.name for tool in self.oss_tool_manager.get_all_tools()]
+            self.oss_tool_dropdown.configure(values=tool_names if tool_names else ["No tools loaded"])
+            if not tool_names:
+                self.oss_tool_dropdown.set("No tools loaded")
+            else:
+                self.oss_tool_dropdown.set(tool_names[0])
+        elif hasattr(self, 'oss_tool_dropdown'):
+            self.oss_tool_dropdown.configure(values=["Loading..."])
+            self.oss_tool_dropdown.set("Loading...")
+
+    def run_selected_oss_tool(self):
+        """Runs the oss tool selected in the right-sidebar dropdown."""
+        tool_name = self.oss_tool_dropdown.get()
+        if not tool_name or "No tools" in tool_name:
+            self.update_status("No tool selected to run.", LYRN_WARNING)
+            return
+
+        tool_prompt = f"Please use the '{tool_name}' tool."
+        self.input_box.delete("1.0", "end")
+        self.input_box.insert("1.0", tool_prompt)
+        self.send_message()
+        self.update_status(f"Executing tool: {tool_name}", LYRN_ACCENT)
+
 
 
     def update_enhanced_metrics(self):
@@ -6648,6 +6714,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
             # Update labels
             self.kv_label.configure(text=f"KV Cache: {self.metrics.kv_cache_reused:,} tokens")
             self.prompt_label.configure(text=f"Prompt: {self.metrics.prompt_tokens:,} tokens")
+            self.response_label.configure(text=f"Response: {self.metrics.eval_tokens:,} tokens")
             self.eval_label.configure(text=f"Generation: {self.metrics.eval_speed:.1f} tok/s")
             n_ctx = self.settings_manager.settings.get("active", {}).get("n_ctx", 1)
             self.total_label.configure(text=f"Total: {self.metrics.total_tokens:,} / {n_ctx:,} tokens")
@@ -6661,8 +6728,8 @@ class LyrnAIInterface(ctk.CTkToplevel):
                 self.total_progress.set(total_ratio)
 
             # Update time labels
-            self.generation_time_label.configure(text=f"Generation Time: {self.format_ms_to_min_sec(self.metrics.generation_time_ms)}")
-            self.tokenization_time_label.configure(text=f"Tokenization Time: {self.format_ms_to_min_sec(self.metrics.tokenization_time_ms)}")
+            self.generation_time_label.configure(text=f"Gen Time: {self.format_ms_to_min_sec(self.metrics.generation_time_ms)}")
+            self.tokenization_time_label.configure(text=f"Token Time: {self.format_ms_to_min_sec(self.metrics.tokenization_time_ms)}")
 
         except Exception as e:
             print(f"Error updating metrics: {e}")
@@ -6695,11 +6762,17 @@ class LyrnAIInterface(ctk.CTkToplevel):
             print(f"Error updating status: {e}")
 
     def clear_chat(self):
-        """Clear chat display"""
+        """Clear chat display and the saved chat file."""
         try:
             self.chat_display.configure(state="normal")
             self.chat_display.delete("0.0", "end")
             self.chat_display.configure(state="disabled")
+
+            # Also clear the saved chat file
+            active_chat_path = os.path.join(SCRIPT_DIR, "active_chat.txt")
+            if os.path.exists(active_chat_path):
+                os.remove(active_chat_path)
+
             self.update_status("Chat display cleared", LYRN_INFO)
         except Exception as e:
             print(f"Error clearing chat: {e}")

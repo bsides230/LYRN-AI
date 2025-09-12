@@ -1,5 +1,28 @@
 # LYRN-AI Build Notes
 
+## v4.2.3 - UI Refinements and Persistence (2025-09-11)
+
+This update introduces several user-requested UI improvements and adds chat persistence.
+
+- **Performance Metrics Refactor:**
+    - The performance metrics block has been reorganized for better readability.
+    - A "Response Tokens" metric has been added.
+    - "Generation Time" and "Tokenization Time" labels are now static to prevent framing issues when their values update.
+
+- **UI Layout Changes:**
+    - The "Automation" button has been renamed to "Job Manager".
+    - The "OSS Tools" button has been moved to the right sidebar, below the "Job Manager" button.
+    - A new combobox and "Run" button for OSS tools have been added below the job runner.
+    - The "Settings" button has been moved to the right sidebar, next to the date and time display, and is now a square button with a gear icon.
+
+- **Chat Persistence:**
+    - The chat display content is now saved to `active_chat.txt` when the application is closed.
+    - The chat content is reloaded from this file on startup.
+    - Manually clearing the chat display now also clears the saved chat file.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
 ## v4.2.1 - OSS Tooling & UI Overhaul (2025-09-11)
 
 This is a major update that refactors the internal "Affordances" system to align with OpenAI's open-source tool format, overhauls several UI components for better usability, and fixes numerous bugs.
@@ -166,7 +189,7 @@ This update focuses on UI tweaks and performance improvements for the System Pro
 ### Logging
 - No changes to logging mechanisms were necessary for this update.
 
-## v4.1.3 (2025-09-02)
+## v4.1.3 (2025-08-02)
 
 This is a major refactoring of the System Prompt Builder UI to improve workflow and align with the system's modular design.
 
@@ -788,7 +811,7 @@ This update focuses on fixing the heartbeat system to respect the global automat
     - The editor is accessible from the main UI via a new "Affordances" button in the "Job Automation" section, making it a first-class feature.
     - The popup has a two-tab layout:
         - **Viewer Tab:** Lists all saved affordances, with options to "Edit" or "Delete" them.
-        - **Editor Tab:** A form for creating and editing affordances with fields for name, start/end triggers, output path, and filename.
+        - **Editor Tab:** A form for creating and editing affordances with fields for name, start/end triggers, an output filename, and a directory selector for the output path.
     - All changes made in the GUI are saved to `automation/affordances.json` via the existing `AffordanceManager`.
 
 - **Versioning:**
