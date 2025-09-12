@@ -1,5 +1,17 @@
 # LYRN-AI Build Notes
 
+## v4.2.4 - Theming Overhaul (2025-09-12)
+
+- **Theming Rework:**
+  - Reworked all theme files (`lyrn_light.json`, `lyrn_dark.json`, `lyrn_black.json`) for consistency and to fix color mismatches.
+  - Introduced new color properties (`secondary_button`, `secondary_border_color`, `secondary_accent`) to provide more granular control over UI elements.
+  - Changed the "Settings" button to use the new `secondary_button` color for better visual distinction.
+  - Applied a consistent border color to all text boxes across the application, including the main chat, popups, and viewers, using the new `secondary_border_color`.
+  - Ensured that all UI elements correctly inherit and display colors from the selected theme.
+
+### Logging
+- No new logging was added in this version. The focus was on visual and theme-related improvements.
+
 ## v4.2.3 - UI Refinements and Persistence (2025-09-11)
 
 This update introduces several user-requested UI improvements and adds chat persistence.

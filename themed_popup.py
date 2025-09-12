@@ -110,11 +110,11 @@ class ThemedPopup(ctk.CTkToplevel):
 
         widget_configs = [
             (ctk.CTkButton, {"fg_color": primary_color, "hover_color": button_hover_color}),
-            (ctk.CTkComboBox, {"button_color": primary_color, "button_hover_color": button_hover_color, "border_color": border_color}),
+            (ctk.CTkComboBox, {"button_color": primary_color, "button_hover_color": button_hover_color, "border_color": tm.get_color("secondary_border_color", border_color)}),
             (ctk.CTkFrame, {"fg_color": frame_bg, "border_color": border_color}),
             (ctk.CTkLabel, {"text_color": label_text}),
-            (ctk.CTkEntry, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
-            (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": border_color}),
+            (ctk.CTkEntry, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": tm.get_color("secondary_border_color", border_color)}),
+            (ctk.CTkTextbox, {"fg_color": textbox_bg, "text_color": textbox_fg, "border_color": tm.get_color("secondary_border_color", border_color)}),
             (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
             (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color}),
             (ctk.CTkSwitch, {

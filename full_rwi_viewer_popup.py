@@ -20,7 +20,7 @@ class FullRWIViewerPopup(ThemedPopup):
         main_frame.grid_rowconfigure(0, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
-        self.textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        self.textbox = ctk.CTkTextbox(main_frame, wrap="word", border_width=2, border_color=self.theme_manager.get_color("secondary_border_color"))
         self.textbox.grid(row=0, column=0, sticky="nsew")
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
