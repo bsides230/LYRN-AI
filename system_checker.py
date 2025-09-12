@@ -13,7 +13,7 @@ class MissingFilesPopup(ThemedPopup):
         label = ctk.CTkLabel(self, text="The following essential files are missing:", font=ctk.CTkFont(size=14, weight="bold"))
         label.pack(pady=10, padx=10)
 
-        textbox = ctk.CTkTextbox(self, wrap="word", height=150)
+        textbox = ctk.CTkTextbox(self, wrap="word", height=150, border_width=2, border_color=self.theme_manager.get_color("secondary_border_color"))
         textbox.pack(expand=True, fill="both", padx=10, pady=10)
         textbox.insert("end", "\n".join(missing_files))
         textbox.configure(state="disabled")
