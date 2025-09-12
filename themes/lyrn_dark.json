@@ -5,6 +5,7 @@
     "primary": "#7552bf",
     "accent": "#35215f",
     "button_hover": "#35215f",
+    "secondary_button": "#4B4B4B",
     "success": "#10B981",
     "warning": "#F59E0B",
     "error": "#EF4444",
