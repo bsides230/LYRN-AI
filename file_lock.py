@@ -1,5 +1,7 @@
 import os
 import time
+import tempfile
+import hashlib
 
 class SimpleFileLock:
     """
@@ -11,7 +13,10 @@ class SimpleFileLock:
         # do work on the resource
     """
     def __init__(self, lock_file_path, timeout=5):
-        self.lock_file_path = lock_file_path
+        # To avoid permission errors in the application directory, place locks in the system's temp folder.
+        # A hash of the original path is used to create a unique but deterministic lock file name.
+        lock_file_hash = hashlib.md5(str(lock_file_path).encode()).hexdigest()
+        self.lock_file_path = os.path.join(tempfile.gettempdir(), f"{lock_file_hash}.lock")
         self.timeout = timeout
         self._lock_file_handle = None
 
