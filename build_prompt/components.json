@@ -32,7 +32,7 @@
   {
     "name": "affordances",
     "order": 6,
-    "active": true
+    "active": false
   },
   {
     "name": "user_preferences",
