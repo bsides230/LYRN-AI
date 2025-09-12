@@ -1,5 +1,28 @@
 # LYRN-AI Build Notes
 
+## v4.2.7 - Documentation and In-App Help (2025-09-12)
+
+This is a major documentation and usability update focused on improving the user experience by providing comprehensive documentation and context-sensitive help directly within the application.
+
+- **New In-App Help System:**
+  - Implemented a new, context-sensitive help system.
+  - A small question mark button (`?`) has been added to every major popup window and settings tab.
+  - Clicking the button opens a popup with a detailed explanation of the features and controls in that specific section of the UI.
+  - All help text is loaded from a new, easily editable `docs/en/help_content.json` file.
+
+- **Documentation Overhaul:**
+  - **Remade `README.md`**: The project's main README has been completely rewritten to be more comprehensive, up-to-date with the latest features, and to better explain the project's core philosophy.
+  - **New `QUICK_START.md`**: A new quick start guide has been created to help new users get the application installed and running as quickly as possible.
+
+- **Updated Hover Tooltips:**
+  - All hover tooltips throughout the application have been reviewed and updated to be more descriptive, accurate, and helpful.
+  - Tooltip text is now managed centrally in `hover_tooltip.json`.
+
+### Logging
+- No changes to logging mechanisms were necessary for this update.
+
+---
+
 ## v4.2.6 - UI Refinements (2025-09-12)
 
 This is a minor update to refine the UI for the System Prompt Builder and fix a theming bug with dynamically created elements.
