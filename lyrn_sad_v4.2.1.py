@@ -2898,6 +2898,11 @@ class SystemPromptBuilderPopup(ThemedPopup):
         instructions_textbox.pack(fill="x", padx=10, pady=(0, 10), expand=True)
         instructions_textbox.insert("1.0", config.get("instructions", ""))
 
+        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5, 0))
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        rwi_info_box.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        rwi_info_box.insert("1.0", config.get("rwi_text", ""))
+
         ctk.CTkLabel(main_frame, text="Jobs Section Start Bracket:").pack(anchor="w", padx=10, pady=(5,0))
         section_start_bracket_entry = ctk.CTkEntry(main_frame)
         section_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
@@ -2926,6 +2931,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
         return {
             "instructions_textbox": instructions_textbox,
+            "rwi_info_box": rwi_info_box,
             "section_start_bracket_entry": section_start_bracket_entry,
             "section_end_bracket_entry": section_end_bracket_entry,
             "job_start_bracket_entry": job_start_bracket_entry,
@@ -2941,6 +2947,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
         w = self.editor_widgets["jobs"]
         config_data = {
             "instructions": w["instructions_textbox"].get("1.0", "end-1c"),
+            "rwi_text": w["rwi_info_box"].get("1.0", "end-1c"),
             "begin_bracket": w["section_start_bracket_entry"].get(),
             "end_bracket": w["section_end_bracket_entry"].get(),
             "job_begin_bracket": w["job_start_bracket_entry"].get(),
@@ -2975,7 +2982,7 @@ class SystemPromptBuilderPopup(ThemedPopup):
 
             job_instructions_parts.append(f"{start_bracket}\n{instruction}\n{end_bracket}")
 
-        full_jobs_content = ("\n\n" + "="*80 + "\n\n").join(job_instructions_parts)
+        full_jobs_content = ("\n\n" + "="*20 + " JOB SEPARATOR " + "="*20 + "\n\n").join(job_instructions_parts)
 
         # Add the main instructions if they exist
         main_instructions = config.get("instructions", "")
