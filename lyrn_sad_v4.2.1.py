@@ -627,8 +627,9 @@ class SettingsManager:
 class SnapshotLoader:
     """Loads the static base prompt from the 'build_prompt' directory."""
 
-    def __init__(self, settings_manager: SettingsManager):
+    def __init__(self, settings_manager: SettingsManager, automation_controller: AutomationController):
         self.settings_manager = settings_manager
+        self.automation_controller = automation_controller
         self.build_prompt_dir = os.path.join(SCRIPT_DIR, "build_prompt")
         self.master_prompt_path = os.path.join(self.build_prompt_dir, "master_prompt.txt")
         self.config_path = os.path.join(self.build_prompt_dir, "builder_config.json")
@@ -701,7 +702,40 @@ class SnapshotLoader:
         # --- Build the rest of the prompt components ---
         for component in active_components:
             component_name = component['name']
-            if component_name == "RWI": continue
+            if component_name == "RWI":
+                continue
+
+            # Handle the special "jobs" component
+            if component_name == "jobs":
+                jobs_config_path = os.path.join(self.build_prompt_dir, "jobs", "config.json")
+                jobs_config = self._load_json_file(jobs_config_path) or {}
+
+                all_jobs = self.automation_controller.job_definitions
+                if all_jobs:
+                    job_instructions_parts = []
+                    job_begin_bracket = jobs_config.get("job_begin_bracket", "")
+                    job_end_bracket = jobs_config.get("job_end_bracket", "")
+
+                    for job_name, job_data in all_jobs.items():
+                        instruction = job_data.get("instructions", "")
+
+                        start_bracket = job_begin_bracket.replace("*job_name*", job_name)
+                        end_bracket = job_end_bracket.replace("*job_name*", job_name)
+
+                        job_instructions_parts.append(f"{start_bracket}\n{instruction}\n{end_bracket}")
+
+                    full_jobs_content = "\n\n".join(job_instructions_parts)
+
+                    main_instructions = jobs_config.get("instructions", "")
+                    if main_instructions:
+                        full_jobs_content = f"{main_instructions}\n\n{full_jobs_content}"
+
+                    section_begin_bracket = jobs_config.get("begin_bracket", "")
+                    section_end_bracket = jobs_config.get("end_bracket", "")
+
+                    jobs_block = f"{section_begin_bracket}\n{full_jobs_content}\n{section_end_bracket}"
+                    prompt_parts.append(jobs_block)
+                continue
 
             component_dir = os.path.join(self.build_prompt_dir, component_name)
 
@@ -944,12 +978,11 @@ class SystemResourceMonitor:
 class StreamHandler:
     """Enhanced stream handler with better metrics capture and special channel parsing."""
 
-    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics, role_mappings: dict, role_color_tags: dict, is_oss_model: bool = False):
+    def __init__(self, gui_queue, metrics: EnhancedPerformanceMetrics, role_mappings: dict, role_color_tags: dict):
         self.gui_queue = gui_queue
         self.metrics = metrics
         self.role_mappings = role_mappings
         self.role_color_tags = role_color_tags
-        self.is_oss_model = is_oss_model
         self.current_response = ""
         self.is_finished = False
         self.log_buffer = ""
@@ -1234,10 +1267,6 @@ class ModelSelectorPopup(ThemedPopup):
             entry.grid(row=row, column=col+1, padx=10, pady=5, sticky="w")
             self.model_entries[key] = entry
 
-        # Add is_oss_model checkbox
-        self.is_oss_model_var = ctk.BooleanVar()
-        self.is_oss_model_checkbox = ctk.CTkCheckBox(grid_frame, text="OSS Model (Analysis Channel)", variable=self.is_oss_model_var, font=font)
-        self.is_oss_model_checkbox.grid(row=5, column=0, columnspan=2, padx=10, pady=5, sticky="w")
 
         # Warning Label
         warning_label = ctk.CTkLabel(
@@ -1401,8 +1430,6 @@ class ModelSelectorPopup(ThemedPopup):
             if model_filename in self.model_dropdown.cget("values"):
                 self.model_dropdown.set(model_filename)
 
-        # Load is_oss_model setting
-        self.is_oss_model_var.set(active_settings.get("is_oss_model", False))
 
     def load_model(self):
         """Save settings, trigger model load in parent, and close popup."""
@@ -1439,7 +1466,6 @@ class ModelSelectorPopup(ThemedPopup):
             else:
                 new_active_settings[key] = value
 
-        new_active_settings["is_oss_model"] = self.is_oss_model_var.get()
 
         # 2. Save settings
         self.settings_manager.settings["active"] = new_active_settings
@@ -2375,6 +2401,58 @@ class PersonalityPopup(ThemedPopup):
             self.personality_preset_var.set(preset_name)
 
 
+class JobInstructionViewerPopup(ThemedPopup):
+    """A popup to view job instructions and provide an edit button."""
+    def __init__(self, parent, theme_manager: ThemeManager, automation_controller: AutomationController, job_name: str, refresh_callback):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.automation_controller = automation_controller
+        self.job_name = job_name
+        self.refresh_callback = refresh_callback
+        self.parent_app = parent.parent_app # Main application instance
+
+        self.title(f"Instructions: {self.job_name}")
+        self.geometry("500x400")
+
+        job_info = self.automation_controller.job_definitions.get(self.job_name, {})
+        instructions = job_info.get("instructions", "No instructions found for this job.")
+
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(expand=True, fill="both", padx=10, pady=10)
+        main_frame.grid_rowconfigure(0, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        self.textbox = ctk.CTkTextbox(main_frame, wrap="word")
+        self.textbox.grid(row=0, column=0, sticky="nsew")
+        self.textbox.insert("1.0", instructions)
+        self.textbox.configure(state="disabled")
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.grid(row=1, column=0, pady=(10, 0))
+
+        edit_button = ctk.CTkButton(button_frame, text="Edit Job", command=self.edit_job)
+        edit_button.pack(side="left", padx=(0, 10))
+
+        close_button = ctk.CTkButton(button_frame, text="Close", command=self.destroy)
+        close_button.pack(side="left")
+
+        self.apply_theme()
+
+    def edit_job(self):
+        """Opens the JobBuilderPopup for the current job."""
+        # This will be fully implemented in the next step. For now, it just closes this popup.
+        self.destroy()
+        # The logic to open JobBuilderPopup will be added in step 4.
+        popup = JobBuilderPopup(
+            parent=self.parent_app.prompt_builder_popup, # The parent should be the prompt builder
+            automation_controller=self.automation_controller,
+            theme_manager=self.theme_manager,
+            language_manager=self.parent_app.language_manager,
+            refresh_callback=self.refresh_callback,
+            job_name=self.job_name
+        )
+        popup.focus()
+
+
 class SystemPromptBuilderPopup(ThemedPopup):
     """A popup window for building and managing the system prompt with a two-panel interface."""
     def __init__(self, parent, theme_manager: ThemeManager, language_manager: LanguageManager, snapshot_loader: SnapshotLoader):
@@ -2523,6 +2601,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
                 widgets = self._create_rwi_viewer(editor_frame)
             elif comp_name == "personality":
                 widgets = self._create_personality_editor(editor_frame)
+            elif comp_name == "jobs":
+                widgets = self._create_jobs_editor(editor_frame)
             else:
                 # Ensure the component exists before creating an editor for it
                 if any(c['name'] == comp_name for c in components):
@@ -2779,6 +2859,177 @@ class SystemPromptBuilderPopup(ThemedPopup):
         output_parts = [f'"{t["name"]} = {t["value"]:04d}"\n"{t["instructions"]}"' for t in updated_traits]
         self._save_text(output_path, "\n\n".join(output_parts))
         self.parent_app.update_status("Personality settings saved.", LYRN_SUCCESS)
+
+    def _create_jobs_editor(self, parent_frame):
+        """Creates the UI for the jobs component editor."""
+        parent_frame.grid_columnconfigure(0, weight=1)
+        parent_frame.grid_rowconfigure(1, weight=1)
+
+        # --- Config Path ---
+        config_path = self.build_prompt_dir / "jobs" / "config.json"
+        config = self._load_json(config_path) or {}
+
+        # --- Top Bar ---
+        top_bar = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+        ctk.CTkLabel(top_bar, text="Editor: Jobs", font=ctk.CTkFont(weight="bold")).pack(side="left")
+
+        button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
+        button_frame.pack(side="right")
+
+        view_button = ctk.CTkButton(button_frame, text="View Merged Jobs", command=self._view_merged_jobs)
+        view_button.pack(side="left", padx=5)
+
+        save_button = ctk.CTkButton(button_frame, text="Save", command=self._save_jobs_config)
+        save_button.pack(side="left", padx=5)
+
+        refresh_button = ctk.CTkButton(button_frame, text="Refresh", command=self._refresh_jobs_list)
+        refresh_button.pack(side="left", padx=5)
+
+
+        # --- Main Content ---
+        main_frame = ctk.CTkScrollableFrame(parent_frame, fg_color="transparent")
+        main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # --- General Settings ---
+        ctk.CTkLabel(main_frame, text="Jobs Section Instructions:").pack(anchor="w", padx=10, pady=(5,0))
+        instructions_textbox = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        instructions_textbox.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        instructions_textbox.insert("1.0", config.get("instructions", ""))
+
+        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5, 0))
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        rwi_info_box.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        rwi_info_box.insert("1.0", config.get("rwi_text", ""))
+
+        ctk.CTkLabel(main_frame, text="Jobs Section Start Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_start_bracket_entry = ctk.CTkEntry(main_frame)
+        section_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_start_bracket_entry.insert(0, config.get("begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Jobs Section End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_end_bracket_entry = ctk.CTkEntry(main_frame)
+        section_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_end_bracket_entry.insert(0, config.get("end_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Job Start Bracket (*job_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        job_start_bracket_entry = ctk.CTkEntry(main_frame)
+        job_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        job_start_bracket_entry.insert(0, config.get("job_begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Job End Bracket (*job_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        job_end_bracket_entry = ctk.CTkEntry(main_frame)
+        job_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        job_end_bracket_entry.insert(0, config.get("job_end_bracket", ""))
+
+        # --- Job List ---
+        self.jobs_list_frame = ctk.CTkScrollableFrame(main_frame, label_text="Available Jobs")
+        self.jobs_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self._refresh_jobs_list()
+
+        return {
+            "instructions_textbox": instructions_textbox,
+            "rwi_info_box": rwi_info_box,
+            "section_start_bracket_entry": section_start_bracket_entry,
+            "section_end_bracket_entry": section_end_bracket_entry,
+            "job_start_bracket_entry": job_start_bracket_entry,
+            "job_end_bracket_entry": job_end_bracket_entry,
+            "config_path": config_path,
+        }
+
+    def _save_jobs_config(self):
+        """Saves the jobs configuration."""
+        if "jobs" not in self.editor_widgets:
+            return
+
+        w = self.editor_widgets["jobs"]
+        config_data = {
+            "instructions": w["instructions_textbox"].get("1.0", "end-1c"),
+            "rwi_text": w["rwi_info_box"].get("1.0", "end-1c"),
+            "begin_bracket": w["section_start_bracket_entry"].get(),
+            "end_bracket": w["section_end_bracket_entry"].get(),
+            "job_begin_bracket": w["job_start_bracket_entry"].get(),
+            "job_end_bracket": w["job_end_bracket_entry"].get(),
+        }
+        self._save_json(w["config_path"], config_data)
+        self.parent_app.update_status("Jobs settings saved.", LYRN_SUCCESS)
+
+    def _view_merged_jobs(self):
+        """Constructs and displays the full jobs block content."""
+        if "jobs" not in self.editor_widgets:
+            return
+
+        w = self.editor_widgets["jobs"]
+        config_path = self.build_prompt_dir / "jobs" / "config.json"
+        config = self._load_json(config_path) or {}
+
+        all_jobs = self.parent_app.automation_controller.job_definitions
+        if not all_jobs:
+            self.parent_app.update_status("No jobs found to merge.", LYRN_WARNING)
+            return
+
+        job_instructions_parts = []
+        job_begin_bracket = config.get("job_begin_bracket", "")
+        job_end_bracket = config.get("job_end_bracket", "")
+
+        for job_name, job_data in all_jobs.items():
+            instruction = job_data.get("instructions", "")
+
+            start_bracket = job_begin_bracket.replace("*job_name*", job_name)
+            end_bracket = job_end_bracket.replace("*job_name*", job_name)
+
+            job_instructions_parts.append(f"{start_bracket}\n{instruction}\n{end_bracket}")
+
+        full_jobs_content = ("\n\n" + "="*20 + " JOB SEPARATOR " + "="*20 + "\n\n").join(job_instructions_parts)
+
+        # Add the main instructions if they exist
+        main_instructions = config.get("instructions", "")
+        if main_instructions:
+            full_jobs_content = f"{main_instructions}\n\n{full_jobs_content}"
+
+        self._view_file_with_brackets("Merged Jobs Preview", full_jobs_content, config, is_content_str=True)
+
+    def _refresh_jobs_list(self):
+        """Clears and repopulates the list of jobs."""
+        for widget in self.jobs_list_frame.winfo_children():
+            widget.destroy()
+
+        job_definitions = self.parent_app.automation_controller.job_definitions
+        if not job_definitions:
+            ctk.CTkLabel(self.jobs_list_frame, text="No jobs found.").pack(pady=10)
+            return
+
+        for job_name in sorted(job_definitions.keys()):
+            # Using a frame for each job to potentially add more info later
+            job_frame = ctk.CTkFrame(self.jobs_list_frame, fg_color="transparent")
+            job_frame.pack(fill="x", pady=2, padx=5)
+
+            job_button = ctk.CTkButton(
+                job_frame,
+                text=job_name,
+                anchor="w",
+                command=lambda name=job_name: self._view_job_instructions(name)
+            )
+            job_button.pack(side="left", expand=True, fill="x")
+
+    def _view_job_instructions(self, job_name: str):
+        """Opens a popup to view the job's instructions."""
+        job_info = self.parent_app.automation_controller.job_definitions.get(job_name)
+        if not job_info:
+            self.parent_app.update_status(f"Could not find job: {job_name}", LYRN_ERROR)
+            return
+
+        popup = JobInstructionViewerPopup(
+            parent=self,
+            theme_manager=self.theme_manager,
+            automation_controller=self.parent_app.automation_controller,
+            job_name=job_name,
+            refresh_callback=self._refresh_jobs_list # Pass the refresh callback
+        )
+        popup.focus()
+
 
     def _view_file_with_brackets(self, title: str, content_source: Path or str, config: dict, is_content_str: bool = False):
         """
@@ -4719,9 +4970,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         potentially blocking operations. Runs in a background thread.
         """
         print("Starting background initialization...")
-        self.snapshot_loader = SnapshotLoader(self.settings_manager)
         self.delta_manager = DeltaManager()
         self.automation_controller = AutomationController()
+        self.snapshot_loader = SnapshotLoader(self.settings_manager, self.automation_controller)
         self.metrics = EnhancedPerformanceMetrics()
         self.chat_logger = JournalLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
         self.affordance_manager = AffordanceManager()
@@ -4901,7 +5152,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.2.0")
+        self.title("LYRN-AI Dashboard v4.2.1")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -5379,7 +5630,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         # Welcome message with LYRN branding
         welcome_msg = f"""
 ╔═══════════════════════════════════════════════════════╗
-║                   LYRN-AI v3.9.6                      ║
+║                   LYRN-AI v4.2.1                      ║
 ║              Advanced Language Interface              ║
 ║                                                       ║
 ║ • Enhanced performance monitoring                     ║
@@ -6116,8 +6367,7 @@ Enhanced LYRN-AI system with advanced features active.
                 messages.append({"role": "user", "content": user_text})
 
             active = self.settings_manager.settings["active"]
-            is_oss_model = active.get("is_oss_model", False)
-            handler = StreamHandler(self.stream_queue, self.metrics, self.role_mappings, self.role_color_tags, is_oss_model=is_oss_model)
+            handler = StreamHandler(self.stream_queue, self.metrics, self.role_mappings, self.role_color_tags)
 
             # Setup stderr capture
             log_capture_buffer = io.StringIO()
