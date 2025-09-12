@@ -105,16 +105,30 @@ class DeltaManager:
                 os.remove(temp_filepath)
             return None
 
+    def update_simple_delta(self, trait_name: str, formatted_string: str):
+        """
+        Updates a simple key-value delta in the manifest.
+        This is used for things like personality sliders where only the latest value matters.
+        """
+        self._load_manifest()
+        if "simple_deltas" not in self.manifest:
+            self.manifest["simple_deltas"] = {}
+
+        self.manifest["simple_deltas"][trait_name] = formatted_string
+        self._save_manifest()
+        print(f"Updated simple delta for '{trait_name}'.")
+
     def get_delta_content(self) -> str:
         """
         Reads the manifest, then reads each delta file and concatenates
         their content into a single string for prompt injection.
+        Also includes simple deltas.
         """
         self._load_manifest() # Ensure we have the latest manifest
 
         all_delta_contents = []
 
-        # The manifest stores paths relative to the 'deltas' directory
+        # Process structured deltas from files
         for relative_path_str in self.manifest.get("deltas", []):
             delta_file_path = self.base_dir / relative_path_str
             if delta_file_path.exists():
@@ -125,6 +139,11 @@ class DeltaManager:
                     print(f"Error reading delta file {delta_file_path}: {e}")
             else:
                 print(f"Warning: Delta file listed in manifest not found: {delta_file_path}")
+
+        # Process simple deltas from the manifest itself
+        simple_deltas = self.manifest.get("simple_deltas", {})
+        for trait_name, formatted_string in simple_deltas.items():
+            all_delta_contents.append(formatted_string)
 
         if not all_delta_contents:
             return ""

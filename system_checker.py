@@ -35,7 +35,7 @@ class SystemChecker:
             "cycle_manager.py",
             "episodic_memory_manager.py",
             "delta_manager.py",
-            "affordance_manager.py"
+            "oss_tool_manager.py"
         ]
 
     def check_and_create_folders(self):

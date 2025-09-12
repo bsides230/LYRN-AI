@@ -127,6 +127,32 @@ class AutomationController:
         except (IOError, TimeoutError, json.JSONDecodeError) as e:
             print(f"Error saving job definition for '{job_name}': {e}")
 
+    def delete_job_definition(self, job_name: str):
+        """Deletes a job's definition from the jobs.json file."""
+        jobs_json_path = self.job_definitions_path / "jobs.json"
+        jobs_lock_path = jobs_json_path.with_suffix('.json.lock')
+
+        try:
+            with SimpleFileLock(jobs_lock_path):
+                if jobs_json_path.exists():
+                    with open(jobs_json_path, 'r', encoding='utf-8') as f:
+                        all_jobs = json.load(f)
+                else:
+                    all_jobs = {}
+
+                if job_name in all_jobs:
+                    del all_jobs[job_name]
+
+                with open(jobs_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(all_jobs, f, indent=2)
+
+            if job_name in self.job_definitions:
+                del self.job_definitions[job_name]
+            print(f"Job definition for '{job_name}' deleted successfully.")
+
+        except (IOError, TimeoutError, json.JSONDecodeError) as e:
+            print(f"Error deleting job definition for '{job_name}': {e}")
+
     def add_job(self, name: str, priority: int = 100, when: str = "now", args: Optional[Dict[str, Any]] = None):
         """Adds a new job to the file-based execution queue in a thread-safe manner."""
         if name not in self.job_definitions:

@@ -1,4 +1,20 @@
 {
+  "snapshot": {
+    "creativity": 500,
+    "consistency": 800,
+    "verbosity": 400,
+    "assertiveness": 600,
+    "curiosity": 750,
+    "enthusiasm": 650
+  },
+  "formats": {
+    "creativity": "personality.creativity = *value*",
+    "consistency": "personality.consistency = *value*",
+    "verbosity": "personality.verbosity = *value*",
+    "assertiveness": "personality.assertiveness = *value*",
+    "curiosity": "personality.curiosity = *value*",
+    "enthusiasm": "personality.enthusiasm = *value*"
+  },
   "presets": {
     "default": {
       "description": "A balanced, helpful assistant.",
@@ -6,7 +22,9 @@
         "creativity": 500,
         "consistency": 800,
         "verbosity": 400,
-        "assertiveness": 600
+        "assertiveness": 600,
+        "curiosity": 750,
+        "enthusiasm": 650
       }
     },
     "creative_writer": {
@@ -15,7 +33,9 @@
         "creativity": 900,
         "consistency": 400,
         "verbosity": 800,
-        "assertiveness": 700
+        "assertiveness": 700,
+        "curiosity": 900,
+        "enthusiasm": 800
       }
     }
   },
@@ -23,6 +43,8 @@
     "creativity": 500,
     "consistency": 800,
     "verbosity": 400,
-    "assertiveness": 600
+    "assertiveness": 600,
+    "curiosity": 750,
+    "enthusiasm": 650
   }
 }

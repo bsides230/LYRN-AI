@@ -19,6 +19,9 @@
         "thinking_text": "#B83280",
         "display_text_color": "#000000",
         "border_color": "#1A202C",
-        "generation_speed_text": "#047857"
+    "generation_speed_text": "#047857",
+    "switch_button": "#1A202C",
+    "switch_bg_off": "#D1D5DB",
+    "switch_progress": "#7552bf"
     }
 }

@@ -24,7 +24,7 @@ from delta_manager import DeltaManager
 from automation_controller import AutomationController, Job
 from color_picker import CustomColorPickerPopup
 from file_lock import SimpleFileLock
-from affordance_manager import AffordanceManager, Affordance
+from oss_tool_manager import OSSToolManager, OSSTool
 from themed_popup import ThemedPopup, ThemeManager
 from automation.scheduler_manager import SchedulerManager
 import calendar
@@ -782,26 +782,37 @@ class SnapshotLoader:
                     prompt_parts.append(jobs_block)
                 continue
 
-            # Handle the new "affordances" component
-            if component_name == "affordances":
-                affordances_config_path = os.path.join(self.build_prompt_dir, "affordances", "config.json")
-                affordances_config = self._load_json_file(affordances_config_path) or {}
-                all_affordances = self.parent_app.affordance_manager.get_all_affordances()
+            # Handle the new "oss_tools" component
+            if component_name == "oss_tools":
+                oss_tools_config_path = os.path.join(self.build_prompt_dir, "oss_tools", "config.json")
+                oss_tools_config = self._load_json_file(oss_tools_config_path) or {}
+                all_tools = self.parent_app.oss_tool_manager.get_all_tools()
 
-                if all_affordances:
-                    definitions = [aff.params.get("definition", "") for aff in all_affordances if aff.params.get("definition")]
-                    if definitions:
-                        namespace_content = "\n\n".join(definitions)
-                        full_text = f"namespace functions {{\n\n{namespace_content}\n\n}} // namespace functions"
+                if all_tools:
+                    tool_parts = []
+                    tool_begin_bracket = oss_tools_config.get("tool_begin_bracket", "")
+                    tool_end_bracket = oss_tools_config.get("tool_end_bracket", "")
 
-                        main_instructions = affordances_config.get("instructions", "")
-                        if main_instructions:
-                            full_text = f"{main_instructions}\n\n{full_text}"
+                    for tool in all_tools:
+                        definition = tool.params.get("definition", "")
+                        if not definition:
+                            continue
 
-                        section_begin_bracket = affordances_config.get("begin_bracket", "")
-                        section_end_bracket = affordances_config.get("end_bracket", "")
-                        affordances_block = f"{section_begin_bracket}\n{full_text}\n{section_end_bracket}"
-                        prompt_parts.append(affordances_block)
+                        start_bracket = tool_begin_bracket.replace("*tool_name*", tool.name)
+                        end_bracket = tool_end_bracket.replace("*tool_name*", tool.name)
+                        tool_parts.append(f"{start_bracket}\n{definition}\n{end_bracket}")
+
+                    full_tools_content = "\n\n".join(tool_parts)
+
+                    main_instructions = oss_tools_config.get("instructions", "")
+                    if main_instructions:
+                        full_tools_content = f"{main_instructions}\n\n{full_tools_content}"
+
+                    section_begin_bracket = oss_tools_config.get("begin_bracket", "")
+                    section_end_bracket = oss_tools_config.get("end_bracket", "")
+
+                    oss_tools_block = f"{section_begin_bracket}\n{full_tools_content}\n{section_end_bracket}"
+                    prompt_parts.append(oss_tools_block)
                 continue
 
             component_dir = os.path.join(self.build_prompt_dir, component_name)
@@ -1751,7 +1762,7 @@ class TabbedSettingsDialog(ThemedPopup):
         down_button = ctk.CTkButton(stepper_frame, text="▼", width=25, height=12, font=font, command=self.decrease_history_length)
         down_button.pack(pady=(1,0))
 
-        Tooltip(length_frame, "How many past user/assistant message pairs to include in the context for the LLM. 0 means none. Max 50.")
+        Tooltip(length_frame, "How many past user/assistant message pairs to include in the context for the LLM. 0 means none.")
 
         # Injection Toggles
         self.enable_deltas_var = ctk.BooleanVar()
@@ -1837,9 +1848,8 @@ class TabbedSettingsDialog(ThemedPopup):
     def increase_history_length(self):
         try:
             current_value = int(self.history_length_entry.get())
-            if current_value < 50:
-                self.history_length_entry.delete(0, "end")
-                self.history_length_entry.insert(0, str(current_value + 1))
+            self.history_length_entry.delete(0, "end")
+            self.history_length_entry.insert(0, str(current_value + 1))
         except ValueError:
             self.history_length_entry.delete(0, "end")
             self.history_length_entry.insert(0, "10")
@@ -2308,6 +2318,49 @@ class TabbedSettingsDialog(ThemedPopup):
             print(f"Error saving settings: {e}")
 
 
+class DeltaFormatPopup(ThemedPopup):
+    """A popup to edit the format strings for personality deltas."""
+    def __init__(self, parent, theme_manager: ThemeManager):
+        super().__init__(parent=parent, theme_manager=theme_manager)
+        self.parent_popup = parent
+        self.title("Edit Delta Formats")
+        self.geometry("600x500")
+        self.grab_set()
+
+        self.format_entries = {}
+        self.personality_data = self.parent_popup.personality_data
+
+        main_frame = ctk.CTkScrollableFrame(self)
+        main_frame.pack(expand=True, fill="both", padx=15, pady=15)
+
+        ctk.CTkLabel(main_frame, text="Define the format for each delta. Use *value* as a placeholder for the slider's value.", wraplength=550).pack(pady=(0, 10))
+
+        for trait_name in self.personality_data.get("snapshot", {}).keys():
+            frame = ctk.CTkFrame(main_frame)
+            frame.pack(fill="x", pady=5)
+            ctk.CTkLabel(frame, text=trait_name.capitalize(), width=120).pack(side="left", padx=5)
+            entry = ctk.CTkEntry(frame)
+            entry.pack(side="left", expand=True, fill="x", padx=5)
+            entry.insert(0, self.personality_data.get("formats", {}).get(trait_name, ""))
+            self.format_entries[trait_name] = entry
+
+        save_button = ctk.CTkButton(self, text="Save Formats", command=self.save_formats)
+        save_button.pack(pady=10)
+
+        self.apply_theme()
+
+    def save_formats(self):
+        """Saves the updated format strings back to personality.json."""
+        if "formats" not in self.personality_data:
+            self.personality_data["formats"] = {}
+
+        for trait_name, entry in self.format_entries.items():
+            self.personality_data["formats"][trait_name] = entry.get()
+
+        self.parent_popup._save_personality_data()
+        self.parent_popup.parent_app.update_status("Delta formats saved successfully.", LYRN_SUCCESS)
+        self.destroy()
+
 class PersonalityPopup(ThemedPopup):
     """A popup window for editing personality traits with sliders."""
     def __init__(self, parent, theme_manager: ThemeManager):
@@ -2318,8 +2371,8 @@ class PersonalityPopup(ThemedPopup):
 
         self.personality_file = Path(SCRIPT_DIR) / "personality.json"
         self.personality_data = self._load_personality_data()
-        self.initial_traits = self.personality_data.get("active_traits", {}).copy()
-        self.current_traits = self.initial_traits.copy()
+        self.current_traits = self.personality_data.get("active_traits", {}).copy()
+
         self.personality_sliders = {}
         self.personality_labels = {}
         self.personality_preset_var = ctk.StringVar(value="")
@@ -2329,26 +2382,38 @@ class PersonalityPopup(ThemedPopup):
         self.populate_personality_presets()
         self.apply_theme()
 
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def on_close(self):
+        """Saves the active traits when the window is closed."""
+        self.personality_data["active_traits"] = self.current_traits
+        self._save_personality_data()
+        self.parent_app.update_status("Active personality traits saved.", LYRN_INFO)
+        self.destroy()
+
     def create_widgets(self):
-        # Preset management frame
-        preset_frame = ctk.CTkFrame(self)
-        preset_frame.pack(fill="x", padx=10, pady=10)
+        top_frame = ctk.CTkFrame(self)
+        top_frame.pack(fill="x", padx=10, pady=10)
+
+        preset_frame = ctk.CTkFrame(top_frame)
+        preset_frame.pack(side="left", expand=True, fill="x")
         ctk.CTkLabel(preset_frame, text="Presets:").pack(side="left", padx=5)
         self.personality_preset_menu = ctk.CTkComboBox(preset_frame, variable=self.personality_preset_var, command=self.load_personality_preset)
         self.personality_preset_menu.pack(side="left", expand=True, fill="x", padx=5)
 
-        save_preset_button = ctk.CTkButton(preset_frame, text="Save Preset", width=100, command=self.save_personality_preset)
-        save_preset_button.pack(side="left", padx=5)
+        edit_formats_button = ctk.CTkButton(top_frame, text="Edit Formats", command=self.open_format_editor)
+        edit_formats_button.pack(side="right", padx=5)
 
-        self.personality_main_frame = ctk.CTkScrollableFrame(self, label_text="Active Traits")
+        save_preset_button = ctk.CTkButton(top_frame, text="Save Preset", width=100, command=self.save_personality_preset)
+        save_preset_button.pack(side="right", padx=5)
+
+        self.personality_main_frame = ctk.CTkScrollableFrame(self, label_text="Personality Snapshot")
         self.personality_main_frame.pack(expand=True, fill="both", padx=10, pady=0)
 
-        # Bottom button frame
-        button_frame = ctk.CTkFrame(self)
-        button_frame.pack(fill="x", padx=10, pady=10)
-
-        apply_button = ctk.CTkButton(button_frame, text="Apply Changes", command=self.apply_personality_changes)
-        apply_button.pack(side="right")
+    def open_format_editor(self):
+        """Opens the popup to edit delta formats."""
+        popup = DeltaFormatPopup(self, self.theme_manager)
+        popup.focus()
 
     def _load_personality_data(self):
         """Loads personality data from the JSON file."""
@@ -2358,112 +2423,33 @@ class PersonalityPopup(ThemedPopup):
                     return json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 print(f"Error loading or parsing personality.json: {e}. Using default values.")
-                return {"presets": {}, "active_traits": {"creativity": 500}}
+                # Return a structure that matches the new format
+                return {"snapshot": {}, "formats": {}, "presets": {}, "active_traits": {}}
         else:
+            # Create a default file if it doesn't exist
             print("Warning: personality.json not found. Creating with default values.")
             default_data = {
-                "presets": {
-                    "Default": {
-                        "description": "The standard, balanced LYRN personality.",
-                        "traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
-                    }
+                "snapshot": {"creativity": 500, "consistency": 800, "verbosity": 400},
+                "formats": {
+                    "creativity": "personality.creativity = *value*",
+                    "consistency": "personality.consistency = *value*",
+                    "verbosity": "personality.verbosity = *value*"
                 },
-                "active_traits": { "creativity": 500, "consistency": 750, "verbosity": 400, "assertiveness": 600, "curiosity": 800 }
+                "presets": {"default": {"traits": {"creativity": 500, "consistency": 800, "verbosity": 400}}},
+                "active_traits": {"creativity": 500, "consistency": 800, "verbosity": 400}
             }
-            try:
-                with open(self.personality_file, 'w', encoding='utf-8') as f:
-                    json.dump(default_data, f, indent=2)
-            except IOError as e:
-                print(f"Error creating default personality.json: {e}")
+            self._save_personality_data(default_data)
             return default_data
-
-    def _save_personality_data(self):
-        """Saves the current personality data to the JSON file."""
-        try:
-            with open(self.personality_file, 'w', encoding='utf-8') as f:
-                json.dump(self.personality_data, f, indent=2)
-        except IOError as e:
-            print(f"Error saving personality file: {e}")
-
-    def populate_personality_sliders(self):
-        """Creates or updates sliders based on the data in active_traits."""
-        for widget in self.personality_main_frame.winfo_children():
-            widget.destroy()
-
-        for trait, value in self.current_traits.items():
-            frame = ctk.CTkFrame(self.personality_main_frame)
-            frame.pack(fill="x", pady=5, padx=5)
-
-            label_text = f"{trait.capitalize()}: {value}"
-            label = ctk.CTkLabel(frame, text=label_text, width=150, anchor="w")
-            label.pack(side="left", padx=10)
-            self.personality_labels[trait] = label
-
-            slider = ctk.CTkSlider(frame, from_=0, to=1000, number_of_steps=1000,
-                                   command=lambda v, t=trait: self._on_personality_slider_change(t, v))
-            slider.set(value)
-            slider.pack(side="left", expand=True, fill="x", padx=10)
-            self.personality_sliders[trait] = slider
-
-    def populate_personality_presets(self):
-        """Populates the preset dropdown menu."""
-        presets = list(self.personality_data.get("presets", {}).keys())
-        self.personality_preset_menu.configure(values=["Custom"] + presets)
-
-        active_preset_name = "Custom"
-        for name, preset_data in self.personality_data.get("presets", {}).items():
-            if preset_data.get("traits") == self.current_traits:
-                active_preset_name = name
-                break
-        self.personality_preset_var.set(active_preset_name)
-
-    def _on_personality_slider_change(self, trait_name: str, new_value: float):
-        """Callback when a slider value changes, updates the label and current_traits."""
-        int_value = int(new_value)
-        self.personality_labels[trait_name].configure(text=f"{trait_name.capitalize()}: {int_value}")
-        self.current_traits[trait_name] = int_value
-        self.populate_personality_presets()
-
-        # Update the prompt builder if it's open
-        if hasattr(self.parent_app, 'prompt_builder_popup') and self.parent_app.prompt_builder_popup.winfo_exists():
-            self.parent_app.prompt_builder_popup.update_personality_trait_value(trait_name, int_value)
-
-    def apply_personality_changes(self):
-        """Applies the changes made to the sliders."""
-        changes_applied = False
-        for trait, value in self.current_traits.items():
-            if self.initial_traits.get(trait) != value:
-                print(f"Delta: {trait} changed from {self.initial_traits.get(trait)} to {value}")
-                self.parent_app.delta_manager.create_delta(
-                    "P-001", "personality", "traits", "update",
-                    trait, str(value)
-                )
-                changes_applied = True
-
-        if changes_applied:
-            self.personality_data["active_traits"] = self.current_traits
-            self._save_personality_data()
-            self.initial_traits = self.current_traits.copy()
-            self.parent_app.update_status("Personality changes applied.", LYRN_SUCCESS)
-        else:
-            self.parent_app.update_status("No changes to apply.", LYRN_INFO)
-
-    def load_personality_preset(self, preset_name: str):
-        """Loads a selected preset's traits into the active sliders."""
-        if preset_name == "Custom":
-            return
-        preset_traits = self.personality_data.get("presets", {}).get(preset_name, {}).get("traits")
-        if preset_traits:
-            self.current_traits = preset_traits.copy()
-            self.populate_personality_sliders()
-            self.populate_personality_presets()
 
     def save_personality_preset(self):
         """Saves the current active traits as a new preset."""
-        dialog = ctk.CTkInputDialog(text="Enter a name for the new preset:", title="Save Preset")
+        dialog = ThemedInputDialog(self, self.theme_manager, text="Enter a name for the new preset:", title="Save Preset")
         preset_name = dialog.get_input()
 
         if preset_name and preset_name not in ["Custom"]:
+            if "presets" not in self.personality_data:
+                self.personality_data["presets"] = {}
+
             self.personality_data["presets"][preset_name] = {
                 "description": "User-saved preset.",
                 "traits": self.current_traits.copy()
@@ -2471,6 +2457,75 @@ class PersonalityPopup(ThemedPopup):
             self._save_personality_data()
             self.populate_personality_presets()
             self.personality_preset_var.set(preset_name)
+
+    def _save_personality_data(self, data=None):
+        """Saves the current personality data to the JSON file."""
+        if data is None:
+            data = self.personality_data
+        try:
+            with open(self.personality_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        except IOError as e:
+            print(f"Error saving personality file: {e}")
+
+    def populate_personality_sliders(self):
+        """Creates sliders based on the 'snapshot' keys."""
+        for widget in self.personality_main_frame.winfo_children():
+            widget.destroy()
+
+        snapshot_traits = self.personality_data.get("snapshot", {})
+        for trait, default_value in snapshot_traits.items():
+            # Use the 'active_traits' value if it exists, otherwise the snapshot's default
+            current_value = self.current_traits.get(trait, default_value)
+
+            frame = ctk.CTkFrame(self.personality_main_frame)
+            frame.pack(fill="x", pady=5, padx=5)
+
+            label_text = f"{trait.capitalize()}: {current_value}"
+            label = ctk.CTkLabel(frame, text=label_text, width=150, anchor="w")
+            label.pack(side="left", padx=10)
+            self.personality_labels[trait] = label
+
+            slider = ctk.CTkSlider(frame, from_=0, to=1000, number_of_steps=1000,
+                                   command=lambda v, t=trait: self._on_personality_slider_change(t, v))
+            slider.set(current_value)
+            slider.pack(side="left", expand=True, fill="x", padx=10)
+            self.personality_sliders[trait] = slider
+
+    def populate_personality_presets(self):
+        """Populates the preset dropdown menu."""
+        presets = list(self.personality_data.get("presets", {}).keys())
+        self.personality_preset_menu.configure(values=["Custom"] + presets)
+        self.personality_preset_var.set("Custom") # Default to custom
+
+    def _on_personality_slider_change(self, trait_name: str, new_value: float):
+        """Callback when a slider value changes, updates the label and the delta manifest."""
+        int_value = int(new_value)
+        self.personality_labels[trait_name].configure(text=f"{trait_name.capitalize()}: {int_value}")
+        self.current_traits[trait_name] = int_value
+
+        # Get the format string and create the simple delta
+        format_string = self.personality_data.get("formats", {}).get(trait_name)
+        if format_string:
+            delta_str = format_string.replace("*value*", str(int_value))
+            self.parent_app.delta_manager.update_simple_delta(trait_name, delta_str)
+        else:
+            print(f"Warning: No delta format found for trait '{trait_name}'.")
+
+    def load_personality_preset(self, preset_name: str):
+        """Loads a selected preset's traits into the active sliders."""
+        if preset_name == "Custom":
+            return
+
+        preset_traits = self.personality_data.get("presets", {}).get(preset_name, {}).get("traits")
+        if preset_traits:
+            self.current_traits = preset_traits.copy()
+            # Update all sliders and their corresponding deltas
+            for trait, value in self.current_traits.items():
+                if trait in self.personality_sliders:
+                    self.personality_sliders[trait].set(value)
+                    self._on_personality_slider_change(trait, value)
+            self.parent_app.update_status(f"Loaded preset '{preset_name}'.", LYRN_INFO)
 
 
 class JobInstructionViewerPopup(ThemedPopup):
@@ -2672,8 +2727,8 @@ class SystemPromptBuilderPopup(ThemedPopup):
                 widgets = self._create_personality_editor(editor_frame)
             elif comp_name == "jobs":
                 widgets = self._create_jobs_editor(editor_frame)
-            elif comp_name == "affordances":
-                widgets = self._create_affordances_editor(editor_frame)
+            elif comp_name == "oss_tools":
+                widgets = self._create_oss_tools_editor(editor_frame)
             else:
                 # Ensure the component exists before creating an editor for it
                 if any(c['name'] == comp_name for c in components):
@@ -3085,70 +3140,142 @@ class SystemPromptBuilderPopup(ThemedPopup):
             )
             job_button.pack(side="left", expand=True, fill="x")
 
-    def _create_affordances_editor(self, parent_frame):
-        """Creates the UI for the affordances component editor."""
+    def _save_oss_tools_config(self):
+        """Saves the oss_tools configuration."""
+        if "oss_tools" not in self.editor_widgets:
+            return
+
+        w = self.editor_widgets["oss_tools"]
+        config_data = {
+            "instructions": w["instructions_textbox"].get("1.0", "end-1c"),
+            "rwi_text": w["rwi_info_box"].get("1.0", "end-1c"),
+            "begin_bracket": w["section_start_bracket_entry"].get(),
+            "end_bracket": w["section_end_bracket_entry"].get(),
+            "tool_begin_bracket": w["tool_start_bracket_entry"].get(),
+            "tool_end_bracket": w["tool_end_bracket_entry"].get(),
+        }
+        self._save_json(w["config_path"], config_data)
+        self.parent_app.update_status("OSS Tools settings saved.", LYRN_SUCCESS)
+
+    def _create_oss_tools_editor(self, parent_frame):
+        """Creates the UI for the oss_tools component editor."""
         parent_frame.grid_columnconfigure(0, weight=1)
         parent_frame.grid_rowconfigure(1, weight=1)
 
-        config_path = self.build_prompt_dir / "affordances" / "config.json"
+        config_path = self.build_prompt_dir / "oss_tools" / "config.json"
         config = self._load_json(config_path) or {}
 
         top_bar = ctk.CTkFrame(parent_frame, fg_color="transparent")
         top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
-        ctk.CTkLabel(top_bar, text="Editor: Affordances", font=ctk.CTkFont(weight="bold")).pack(side="left")
+        ctk.CTkLabel(top_bar, text="Editor: OSS Tools", font=ctk.CTkFont(weight="bold")).pack(side="left")
 
         button_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
         button_frame.pack(side="right")
 
-        view_button = ctk.CTkButton(button_frame, text="View Merged Affordances", command=self._view_merged_affordances)
+        view_button = ctk.CTkButton(button_frame, text="View Merged Tools", command=self._view_merged_oss_tools)
         view_button.pack(side="left", padx=5)
 
-        refresh_button = ctk.CTkButton(button_frame, text="Refresh", command=self._refresh_affordances_list)
+        save_button = ctk.CTkButton(button_frame, text="Save", command=self._save_oss_tools_config)
+        save_button.pack(side="left", padx=5)
+
+        refresh_button = ctk.CTkButton(button_frame, text="Refresh", command=self._refresh_oss_tools_list)
         refresh_button.pack(side="left", padx=5)
 
         main_frame = ctk.CTkScrollableFrame(parent_frame, fg_color="transparent")
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         main_frame.grid_columnconfigure(0, weight=1)
 
-        self.affordances_list_frame = ctk.CTkScrollableFrame(main_frame, label_text="Available Affordances (Tools)")
-        self.affordances_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        ctk.CTkLabel(main_frame, text="Tools Section Instructions:").pack(anchor="w", padx=10, pady=(5,0))
+        instructions_textbox = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        instructions_textbox.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        instructions_textbox.insert("1.0", config.get("instructions", ""))
 
-        self._refresh_affordances_list()
+        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5, 0))
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        rwi_info_box.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        rwi_info_box.insert("1.0", config.get("rwi_text", ""))
 
-        return {} # No widgets to save for this read-only view
+        ctk.CTkLabel(main_frame, text="Tools Section Start Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_start_bracket_entry = ctk.CTkEntry(main_frame)
+        section_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_start_bracket_entry.insert(0, config.get("begin_bracket", ""))
 
-    def _refresh_affordances_list(self):
-        """Clears and repopulates the list of affordances."""
-        if not hasattr(self, 'affordances_list_frame'): return
-        for widget in self.affordances_list_frame.winfo_children():
+        ctk.CTkLabel(main_frame, text="Tools Section End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_end_bracket_entry = ctk.CTkEntry(main_frame)
+        section_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_end_bracket_entry.insert(0, config.get("end_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Tool Start Bracket (*tool_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        tool_start_bracket_entry = ctk.CTkEntry(main_frame)
+        tool_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        tool_start_bracket_entry.insert(0, config.get("tool_begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Tool End Bracket (*tool_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        tool_end_bracket_entry = ctk.CTkEntry(main_frame)
+        tool_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        tool_end_bracket_entry.insert(0, config.get("tool_end_bracket", ""))
+
+        self.oss_tools_list_frame = ctk.CTkScrollableFrame(main_frame, label_text="Available OSS Tools")
+        self.oss_tools_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self._refresh_oss_tools_list()
+
+        return {
+            "instructions_textbox": instructions_textbox,
+            "rwi_info_box": rwi_info_box,
+            "section_start_bracket_entry": section_start_bracket_entry,
+            "section_end_bracket_entry": section_end_bracket_entry,
+            "tool_start_bracket_entry": tool_start_bracket_entry,
+            "tool_end_bracket_entry": tool_end_bracket_entry,
+            "config_path": config_path,
+        }
+
+    def _refresh_oss_tools_list(self):
+        """Clears and repopulates the list of tools."""
+        if not hasattr(self, 'oss_tools_list_frame'): return
+        for widget in self.oss_tools_list_frame.winfo_children():
             widget.destroy()
 
-        all_affordances = self.parent_app.affordance_manager.get_all_affordances()
-        if not all_affordances:
-            ctk.CTkLabel(self.affordances_list_frame, text="No affordances found.").pack(pady=10)
+        all_tools = self.parent_app.oss_tool_manager.get_all_tools()
+        if not all_tools:
+            ctk.CTkLabel(self.oss_tools_list_frame, text="No tools found.").pack(pady=10)
             return
 
-        for affordance in sorted(all_affordances, key=lambda a: a.name):
-            aff_frame = ctk.CTkFrame(self.affordances_list_frame, fg_color="transparent")
-            aff_frame.pack(fill="x", pady=2, padx=5)
-            ctk.CTkLabel(aff_frame, text=affordance.name, anchor="w").pack(side="left", expand=True, fill="x")
+        for tool in sorted(all_tools, key=lambda a: a.name):
+            tool_frame = ctk.CTkFrame(self.oss_tools_list_frame, fg_color="transparent")
+            tool_frame.pack(fill="x", pady=2, padx=5)
+            ctk.CTkLabel(tool_frame, text=tool.name, anchor="w").pack(side="left", expand=True, fill="x")
 
-    def _view_merged_affordances(self):
-        """Constructs and displays the full affordances block content."""
-        config_path = self.build_prompt_dir / "affordances" / "config.json"
+    def _view_merged_oss_tools(self):
+        """Constructs and displays the full oss_tools block content."""
+        config_path = self.build_prompt_dir / "oss_tools" / "config.json"
         config = self._load_json(config_path) or {}
 
-        all_affordances = self.parent_app.affordance_manager.get_all_affordances()
-        if not all_affordances:
-            self.parent_app.update_status("No affordances found to merge.", LYRN_WARNING)
+        all_tools = self.parent_app.oss_tool_manager.get_all_tools()
+        if not all_tools:
+            self.parent_app.update_status("No tools found to merge.", LYRN_WARNING)
             return
 
-        # Build the namespace block
-        definitions = [aff.params.get("definition", "") for aff in all_affordances if aff.params.get("definition")]
-        namespace_content = "\n\n".join(definitions)
-        full_text = f"namespace functions {{\n\n{namespace_content}\n\n}} // namespace functions"
+        tool_parts = []
+        tool_begin_bracket = config.get("tool_begin_bracket", "")
+        tool_end_bracket = config.get("tool_end_bracket", "")
 
-        self._view_file_with_brackets("Merged Affordances Preview", full_text, config, is_content_str=True)
+        for tool in all_tools:
+            definition = tool.params.get("definition", "")
+            if not definition:
+                continue
+
+            start_bracket = tool_begin_bracket.replace("*tool_name*", tool.name)
+            end_bracket = tool_end_bracket.replace("*tool_name*", tool.name)
+            tool_parts.append(f"{start_bracket}\n{definition}\n{end_bracket}")
+
+        full_tools_content = "\n\n".join(tool_parts)
+
+        main_instructions = config.get("instructions", "")
+        if main_instructions:
+            full_tools_content = f"{main_instructions}\n\n{full_tools_content}"
+
+        self._view_file_with_brackets("Merged OSS Tools Preview", full_tools_content, config, is_content_str=True)
 
 
     def _view_job_instructions(self, job_name: str):
@@ -3294,19 +3421,16 @@ class ThemeBuilderPopup(ThemedPopup):
         self.language_manager = language_manager
 
         self.title("Theme Builder")
-        self.geometry("800x650")
-        self.minsize(700, 500)
-
-        # self.grab_set() # Removed to make non-modal
+        self.geometry("800x750") # Increased height
+        self.minsize(700, 600)   # Increased min height
 
         self.create_theme_builder_widgets()
         self.load_selected_theme(self.theme_manager.get_current_theme_name())
         self.preview_theme()
         self.apply_theme()
 
-
     def create_theme_builder_widgets(self):
-        """Create the theme builder tab UI with an advanced preview."""
+        """Create the theme builder tab UI with a fixed layout and improved color pickers."""
         try:
             font = ctk.CTkFont(family="Consolas", size=12)
             title_font = ctk.CTkFont(family="Consolas", size=14, weight="bold")
@@ -3316,117 +3440,115 @@ class ThemeBuilderPopup(ThemedPopup):
 
         # Main frame for the builder
         main_frame = ctk.CTkFrame(self)
-        main_frame.pack(expand=True, fill="both", padx=20, pady=10)
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=1)
+        main_frame.pack(expand=True, fill="both", padx=10, pady=10)
+        main_frame.grid_columnconfigure(0, weight=1) # Left panel
+        main_frame.grid_columnconfigure(1, weight=1) # Right panel
+        main_frame.grid_rowconfigure(0, weight=1)
 
-        # Left side for color pickers
-        left_frame = ctk.CTkScrollableFrame(main_frame, label_text="Color Settings")
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        # --- Left Panel ---
+        left_panel = ctk.CTkFrame(main_frame)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        left_panel.grid_rowconfigure(2, weight=1) # Make color picker scroll area expand
+        left_panel.grid_columnconfigure(0, weight=1)
 
-        # Right side for preview
+        # --- Right Panel (Preview) ---
         right_frame = ctk.CTkFrame(main_frame)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
 
-        # --- Theme Management ---
-        manage_frame = ctk.CTkFrame(left_frame)
-        manage_frame.pack(fill="x", padx=10, pady=10)
-
+        # --- Theme Management (in left panel) ---
+        manage_frame = ctk.CTkFrame(left_panel)
+        manage_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10,5))
         self.theme_selector_combo = ctk.CTkComboBox(manage_frame, values=self.theme_manager.get_theme_names(), command=self.load_selected_theme)
         self.theme_selector_combo.pack(side="left", expand=True, fill="x", padx=(0,5))
-        Tooltip(self.theme_selector_combo, "Select a theme to edit or delete.")
-
         delete_button = ctk.CTkButton(manage_frame, text="Delete", width=60, command=self.delete_selected_theme)
         delete_button.pack(side="left")
-        Tooltip(delete_button, "Deletes the currently selected theme.")
 
-        # --- Color Pickers ---
-        ctk.CTkLabel(left_frame, text="Theme Name:", font=font).pack(anchor="w", padx=10, pady=(10, 0))
-        self.theme_name_entry = ctk.CTkEntry(left_frame, font=font)
-        self.theme_name_entry.pack(fill="x", padx=10, pady=(0, 10))
+        # --- Theme Name (in left panel) ---
+        name_frame = ctk.CTkFrame(left_panel)
+        name_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+        ctk.CTkLabel(name_frame, text="Theme Name:", font=font).pack(side="left", padx=(0, 5))
+        self.theme_name_entry = ctk.CTkEntry(name_frame, font=font)
+        self.theme_name_entry.pack(side="left", expand=True, fill="x")
+
+        # --- Color Pickers (Scrollable, in left panel) ---
+        color_picker_frame = ctk.CTkScrollableFrame(left_panel, label_text="Color Settings")
+        color_picker_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
 
         self.color_widgets = {}
         color_labels = {
             "primary": "Primary", "accent": "Accent", "button_hover": "Button Hover",
+            "frame_bg": "Frame Background", "border_color": "Border Color", "label_text": "Label Text",
+            "textbox_fg": "Textbox Foreground", "display_text_color": "Display Text", "system_text": "System Text",
+            "user_text": "User Text", "assistant_text": "Assistant Text", "thinking_text": "Thinking Text",
             "success": "Success", "warning": "Warning", "error": "Error", "info": "Info",
-            "frame_bg": "Frame BG", "textbox_bg": "Textbox BG", "textbox_fg": "Textbox FG",
-            "label_text": "Label Text", "system_text": "System Text", "user_text": "User Text",
-            "assistant_text": "Assistant Text", "thinking_text": "Thinking Text",
-            "display_text_color": "Display Text", "border_color": "Border Color"
+            "textbox_bg": "Textbox Background", "switch_progress": "Switch Progress (On)",
+            "switch_button": "Switch Button", "switch_bg_off": "Switch Background (Off)",
+            "progressbar_progress": "Progressbar Progress", "slider_progress": "Slider Progress",
+            "slider_button": "Slider Button", "tab_selected": "Tab Selected", "tab_unselected": "Tab Unselected",
+            "tab_selected_hover": "Tab Selected Hover", "tab_unselected_hover": "Tab Unselected Hover"
         }
 
         for key, label_text in color_labels.items():
-            container = ctk.CTkFrame(left_frame)
-            container.pack(fill="x", padx=10, pady=4)
+            container = ctk.CTkFrame(color_picker_frame, fg_color="transparent")
+            container.pack(fill="x", pady=5, padx=5)
+            ctk.CTkLabel(container, text=label_text, font=font, width=150, anchor="w").pack(side="left")
+            hex_entry = ctk.CTkEntry(container, font=font, width=90)
+            hex_entry.pack(side="left", padx=10)
+            color_swatch = ctk.CTkFrame(container, width=28, height=28, border_width=1, cursor="hand2")
+            color_swatch.pack(side="left", padx=5)
 
-            ctk.CTkLabel(container, text=label_text, font=font, width=120, anchor="w").pack(side="left", padx=5)
+            hex_entry.bind("<KeyRelease>", lambda e, k=key: self.update_color_from_entry(k))
+            color_swatch.bind("<Button-1>", lambda e, k=key: self.choose_color(k))
+            self.color_widgets[key] = {'entry': hex_entry, 'swatch': color_swatch}
 
-            hex_label = ctk.CTkLabel(container, text="#000000", font=font, width=70)
-            hex_label.pack(side="left", padx=5)
-
-            color_swatch = ctk.CTkFrame(container, fg_color="#000000", width=100, height=25, corner_radius=3, border_width=1)
-            color_swatch.pack(side="left", padx=10, fill="x", expand=True)
-
-            self.color_widgets[key] = {'label': hex_label, 'swatch': color_swatch}
-
-            # Bind click events to both swatch and label for better UX
-            for widget in [color_swatch, hex_label]:
-                widget.bind("<Button-1>", lambda e, k=key: self.choose_color(k))
-
-        # --- Buttons ---
-        button_frame = ctk.CTkFrame(left_frame)
-        button_frame.pack(fill="x", padx=10, pady=10)
-
+        # --- Buttons (Fixed at bottom of left panel) ---
+        button_frame = ctk.CTkFrame(left_panel)
+        button_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
         apply_theme_button = ctk.CTkButton(button_frame, text="Apply", font=font, command=self.apply_preview_theme)
-        apply_theme_button.pack(side="left", padx=10)
-        Tooltip(apply_theme_button, "Apply the current theme settings for preview.")
-
+        apply_theme_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         save_theme_button = ctk.CTkButton(button_frame, text="Save Theme", font=font, command=self.save_theme)
-        save_theme_button.pack(side="right", padx=10)
-        Tooltip(save_theme_button, self.parent_app.tooltips.get("save_theme_button", ""))
+        save_theme_button.pack(side="right", expand=True, fill="x", padx=(5, 0))
 
-        # --- Advanced Preview Area ---
+        # --- Preview Area (in right panel) ---
         self.preview_frame = ctk.CTkFrame(right_frame, border_width=2)
         self.preview_frame.pack(expand=True, fill="both", padx=10, pady=10)
-
         ctk.CTkLabel(self.preview_frame, text="Theme Preview", font=title_font).pack(pady=5)
-
         self.preview_widgets = {}
-
-        # Label
         self.preview_widgets["label"] = ctk.CTkLabel(self.preview_frame, text="This is a label.")
         self.preview_widgets["label"].pack(pady=5, padx=10)
-
-        # Button
         self.preview_widgets["button"] = ctk.CTkButton(self.preview_frame, text="Click Me")
         self.preview_widgets["button"].pack(pady=5, padx=10)
-
-        # Textbox
         self.preview_widgets["textbox"] = ctk.CTkTextbox(self.preview_frame, height=50)
         self.preview_widgets["textbox"].insert("0.0", "This is a textbox for longer text.\nIt can have multiple lines.")
         self.preview_widgets["textbox"].pack(pady=5, padx=10, fill="x")
-
-        # ComboBox
         self.preview_widgets["combobox"] = ctk.CTkComboBox(self.preview_frame, values=["Option 1", "Option 2"])
         self.preview_widgets["combobox"].pack(pady=5, padx=10)
-
-        # ProgressBar
         self.preview_widgets["progressbar"] = ctk.CTkProgressBar(self.preview_frame)
         self.preview_widgets["progressbar"].set(0.7)
         self.preview_widgets["progressbar"].pack(pady=5, padx=10, fill="x")
-
-        # Switch
         self.preview_widgets["switch"] = ctk.CTkSwitch(self.preview_frame, text="A switch")
         self.preview_widgets["switch"].pack(pady=5, padx=10)
         self.preview_widgets["switch"].select()
 
+    def update_color_from_entry(self, key: str):
+        """Updates the color preview swatch from the hex entry."""
+        widget_set = self.color_widgets.get(key)
+        if not widget_set: return
+        hex_code = widget_set['entry'].get()
+        if re.match(r'^#(?:[0-9a-fA-F]{3}){1,2}$', hex_code):
+            widget_set['swatch'].configure(fg_color=hex_code)
+            self.preview_theme()
+        else:
+            widget_set['swatch'].configure(fg_color="gray") # Indicate invalid color
+
     def choose_color(self, key):
         """Opens a color chooser and updates the widgets for the given color key."""
-        initial_color = self.color_widgets[key]['label'].cget("text")
+        initial_color = self.color_widgets[key]['entry'].get()
         picker = CustomColorPickerPopup(self, initial_color=initial_color)
         new_color = picker.get_color()
         if new_color:
-            self.color_widgets[key]['label'].configure(text=new_color)
+            self.color_widgets[key]['entry'].delete(0, "end")
+            self.color_widgets[key]['entry'].insert(0, new_color)
             self.color_widgets[key]['swatch'].configure(fg_color=new_color)
             self.preview_theme()
 
@@ -3437,31 +3559,23 @@ class ThemeBuilderPopup(ThemedPopup):
             self.parent_app.update_status("Please enter a theme name to apply a preview.", LYRN_WARNING)
             return
 
-        # 1. Update the theme manager with the preview colors
-        preview_colors = {key: widgets['label'].cget("text") for key, widgets in self.color_widgets.items()}
+        preview_colors = {key: widgets['entry'].get() for key, widgets in self.color_widgets.items()}
         self.theme_manager.current_theme_name = f"{theme_name} (Preview)"
         self.theme_manager.current_colors = preview_colors
 
-        # 2. Apply theme to the main application window
         self.parent_app.apply_color_theme()
-
-        # 3. Apply theme to all open popups (Toplevel windows)
-        # The main app is the root, so we check its children.
         for widget in self.parent_app.winfo_children():
             if isinstance(widget, ctk.CTkToplevel) and hasattr(widget, 'apply_theme'):
                 try:
                     widget.apply_theme()
                 except Exception as e:
                     print(f"Could not apply theme to {widget}: {e}")
-
-        # 4. Apply theme to the theme builder itself, as it is also a Toplevel
         self.apply_theme()
-
         self.parent_app.update_status(f"Previewing theme: {theme_name}", LYRN_INFO)
 
     def preview_theme(self):
         """Updates the advanced preview area with the current colors."""
-        colors = {key: widgets['label'].cget("text") for key, widgets in self.color_widgets.items()}
+        colors = {key: widgets['entry'].get() for key, widgets in self.color_widgets.items()}
         primary = colors.get("primary", "#007BFF")
         accent = colors.get("accent", "#28A745")
         frame_bg = colors.get("frame_bg", "#F8F9FA")
@@ -3470,14 +3584,16 @@ class ThemeBuilderPopup(ThemedPopup):
         label_text = colors.get("label_text", "#495057")
         border = colors.get("border_color", "#DEE2E6")
         button_text_color = colors.get("textbox_bg", "#FFFFFF")
-
+        switch_progress = colors.get("switch_progress", accent)
+        switch_button = colors.get("switch_button", primary)
+        progressbar_progress = colors.get("progressbar_progress", primary)
         self.preview_frame.configure(fg_color=frame_bg, border_color=accent)
         self.preview_widgets["label"].configure(text_color=label_text)
         self.preview_widgets["button"].configure(fg_color=primary, text_color=button_text_color)
         self.preview_widgets["textbox"].configure(fg_color=textbox_bg, text_color=textbox_fg, border_color=border)
         self.preview_widgets["combobox"].configure(fg_color=textbox_bg, text_color=textbox_fg, border_color=border, button_color=primary)
-        self.preview_widgets["progressbar"].configure(progress_color=primary)
-        self.preview_widgets["switch"].configure(progress_color=accent, text_color=label_text)
+        self.preview_widgets["progressbar"].configure(progress_color=progressbar_progress)
+        self.preview_widgets["switch"].configure(progress_color=switch_progress, button_color=switch_button, text_color=label_text)
 
     def load_selected_theme(self, theme_name: str):
         """Loads a theme's properties into the editor fields."""
@@ -3489,38 +3605,30 @@ class ThemeBuilderPopup(ThemedPopup):
         theme_colors = theme_data.get("colors", {})
         for key, widgets in self.color_widgets.items():
             color = theme_colors.get(key, "#ffffff")
-            widgets['label'].configure(text=color)
-            widgets['swatch'].configure(fg_color=color)
+            widgets['entry'].delete(0, "end")
+            widgets['entry'].insert(0, color)
+            widgets['swatch'].configure(fg_color=color, border_color=theme_colors.get("border_color", "#ffffff"))
         self.preview_theme()
         self.parent_app.update_status(f"Loaded '{theme_name}' for editing", LYRN_INFO)
 
     def delete_selected_theme(self):
         """Deletes the currently selected theme after confirmation."""
         from confirmation_dialog import ConfirmationDialog
-
         theme_name = self.theme_selector_combo.get()
         if not theme_name or theme_name not in self.theme_manager.themes:
             return
-
         prefs = self.parent_app.settings_manager.ui_settings.get("confirmation_preferences", {})
         if prefs.get("delete_theme"):
             confirmed = True
         else:
-            confirmed, dont_ask_again = ConfirmationDialog.show(
-                self,
-                self.theme_manager,
-                title="Confirm Deletion",
-                message=f"Are you sure you want to permanently delete the theme '{theme_name}'?"
-            )
+            confirmed, dont_ask_again = ConfirmationDialog.show(self, self.theme_manager, title="Confirm Deletion", message=f"Are you sure you want to permanently delete the theme '{theme_name}'?")
             if dont_ask_again:
                 prefs["delete_theme"] = True
                 self.parent_app.settings_manager.ui_settings["confirmation_preferences"] = prefs
                 self.parent_app.settings_manager.save_settings()
-
         if not confirmed:
             self.parent_app.update_status("Theme deletion cancelled", LYRN_WARNING)
             return
-
         filename = f"{theme_name.lower().replace(' ', '_')}.json"
         filepath = os.path.join(self.theme_manager.themes_dir, filename)
         if os.path.exists(filepath):
@@ -3548,10 +3656,8 @@ class ThemeBuilderPopup(ThemedPopup):
         theme_data = {
             "name": theme_name,
             "appearance_mode": "dark",
-            "colors": {}
+            "colors": {key: widgets['entry'].get() for key, widgets in self.color_widgets.items()}
         }
-        for key, widgets in self.color_widgets.items():
-            theme_data["colors"][key] = widgets['label'].cget("text")
         themes_dir = os.path.join(self.parent_app.SCRIPT_DIR, "themes")
         os.makedirs(themes_dir, exist_ok=True)
         filename = f"{theme_name.lower().replace(' ', '_')}.json"
@@ -4474,18 +4580,12 @@ class JobWatcherPopup(ThemedPopup):
                 self.parent_app.settings_manager.save_settings()
 
         if confirmed:
-            job_path = self.automation_controller.job_definitions_path / f"{job_name}.txt"
             try:
-                if job_path.exists():
-                    job_path.unlink()
-                # Also remove from the in-memory dictionary
-                if job_name in self.automation_controller.job_definitions:
-                    del self.automation_controller.job_definitions[job_name]
-
+                self.automation_controller.delete_job_definition(job_name)
                 self.parent_app.update_status(f"Job '{job_name}' deleted.", LYRN_SUCCESS)
                 self.refresh_job_list()
             except Exception as e:
-                self.parent_app.update_status(f"Error deleting job file: {e}", LYRN_ERROR)
+                self.parent_app.update_status(f"Error deleting job: {e}", LYRN_ERROR)
         else:
             self.parent_app.update_status("Deletion cancelled.", LYRN_INFO)
 
@@ -4495,29 +4595,29 @@ class JobWatcherPopup(ThemedPopup):
             self.output_path_label.configure(text=path)
 
 
-class AffordancePopup(ThemedPopup):
-    """A popup window for managing internal affordances with a new text-based editor."""
-    def __init__(self, parent, affordance_manager: AffordanceManager, theme_manager: ThemeManager, language_manager: LanguageManager):
+class OSSToolPopup(ThemedPopup):
+    """A popup window for managing internal OSS Tools with a new text-based editor."""
+    def __init__(self, parent, oss_tool_manager: OSSToolManager, theme_manager: ThemeManager, language_manager: LanguageManager):
         super().__init__(parent=parent, theme_manager=theme_manager)
-        self.affordance_manager = affordance_manager
+        self.oss_tool_manager = oss_tool_manager
         self.language_manager = language_manager
-        self.selected_affordance_name = None
-        self.editing_affordance_name = None
+        self.selected_tool_name = None
+        self.editing_tool_name = None
 
-        self.title("Affordance Editor (OSS Tool Format)")
+        self.title("OSS Tool Editor")
         self.geometry("800x600")
 
         self.tabview = ctk.CTkTabview(self, width=750, height=500)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
 
-        self.tab_viewer = self.tabview.add("Affordance Viewer")
-        self.tab_editor = self.tabview.add("Affordance Editor")
+        self.tab_viewer = self.tabview.add("Tool Viewer")
+        self.tab_editor = self.tabview.add("Tool Editor")
 
         self.create_viewer_tab()
         self.create_editor_tab()
 
-        self.refresh_affordance_list()
-        self.tabview.set("Affordance Viewer")
+        self.refresh_tool_list()
+        self.tabview.set("Tool Viewer")
         self.apply_theme()
 
     def create_viewer_tab(self):
@@ -4529,100 +4629,100 @@ class AffordancePopup(ThemedPopup):
         viewer_content_frame.grid_columnconfigure(0, weight=1)
         viewer_content_frame.grid_rowconfigure(0, weight=1)
 
-        self.affordance_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Affordances")
-        self.affordance_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.tool_list_frame = ctk.CTkScrollableFrame(viewer_content_frame, label_text="Available Tools")
+        self.tool_list_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         button_frame = ctk.CTkFrame(viewer_content_frame)
         button_frame.grid(row=0, column=1, sticky="ns", padx=5, pady=5)
 
-        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_affordance)
+        edit_button = ctk.CTkButton(button_frame, text="Edit", command=self.edit_selected_tool)
         edit_button.pack(padx=10, pady=10, anchor="n")
 
-        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_affordance)
+        delete_button = ctk.CTkButton(button_frame, text="Delete", command=self.delete_selected_tool)
         delete_button.pack(padx=10, pady=10, anchor="n")
 
-        new_button = ctk.CTkButton(button_frame, text="New", command=self.new_affordance)
+        new_button = ctk.CTkButton(button_frame, text="New", command=self.new_tool)
         new_button.pack(padx=10, pady=10, anchor="n")
 
-    def refresh_affordance_list(self):
-        for widget in self.affordance_list_frame.winfo_children():
+    def refresh_tool_list(self):
+        for widget in self.tool_list_frame.winfo_children():
             widget.destroy()
 
-        all_affordances = self.affordance_manager.get_all_affordances()
-        self.selected_affordance_name = None
+        all_tools = self.oss_tool_manager.get_all_tools()
+        self.selected_tool_name = None
 
-        if not all_affordances:
-            ctk.CTkLabel(self.affordance_list_frame, text="No affordances created yet.").pack()
+        if not all_tools:
+            ctk.CTkLabel(self.tool_list_frame, text="No tools created yet.").pack()
             return
 
-        for affordance in sorted(all_affordances, key=lambda a: a.name):
-            label = ctk.CTkLabel(self.affordance_list_frame, text=affordance.name, anchor="w", cursor="hand2")
+        for tool in sorted(all_tools, key=lambda a: a.name):
+            label = ctk.CTkLabel(self.tool_list_frame, text=tool.name, anchor="w", cursor="hand2")
             label.pack(fill="x", padx=10, pady=2)
-            label.bind("<Button-1>", lambda e, name=affordance.name: self.on_affordance_selected(name))
+            label.bind("<Button-1>", lambda e, name=tool.name: self.on_tool_selected(name))
 
-    def on_affordance_selected(self, name):
-        self.selected_affordance_name = name
-        for child in self.affordance_list_frame.winfo_children():
+    def on_tool_selected(self, name):
+        self.selected_tool_name = name
+        for child in self.tool_list_frame.winfo_children():
             if isinstance(child, ctk.CTkLabel):
                 if child.cget("text") == name:
                     child.configure(fg_color=self.theme_manager.get_color("accent"))
                 else:
                     child.configure(fg_color="transparent")
 
-    def edit_selected_affordance(self):
-        if not self.selected_affordance_name:
-            self.parent_app.update_status("No affordance selected to edit.", LYRN_WARNING)
+    def edit_selected_tool(self):
+        if not self.selected_tool_name:
+            self.parent_app.update_status("No tool selected to edit.", LYRN_WARNING)
             return
 
-        affordance = self.affordance_manager.get_affordance(self.selected_affordance_name)
-        if not affordance:
-            self.parent_app.update_status(f"Affordance '{self.selected_affordance_name}' not found.", LYRN_ERROR)
+        tool = self.oss_tool_manager.get_tool(self.selected_tool_name)
+        if not tool:
+            self.parent_app.update_status(f"Tool '{self.selected_tool_name}' not found.", LYRN_ERROR)
             return
 
         self.clear_builder_fields()
-        self.editing_affordance_name = affordance.name
+        self.editing_tool_name = tool.name
 
-        self.name_entry.insert(0, affordance.name)
+        self.name_entry.insert(0, tool.name)
         self.name_entry.configure(state="disabled")
         # The 'definition' is now the primary content, stored in params.
-        self.definition_textbox.insert("1.0", affordance.params.get("definition", ""))
+        self.definition_textbox.insert("1.0", tool.params.get("definition", ""))
 
-        self.tabview.set("Affordance Editor")
+        self.tabview.set("Tool Editor")
 
-    def delete_selected_affordance(self):
+    def delete_selected_tool(self):
         from confirmation_dialog import ConfirmationDialog
-        if not self.selected_affordance_name:
-            self.parent_app.update_status("No affordance selected to delete.", LYRN_WARNING)
+        if not self.selected_tool_name:
+            self.parent_app.update_status("No tool selected to delete.", LYRN_WARNING)
             return
 
-        affordance_name = self.selected_affordance_name
+        tool_name = self.selected_tool_name
         prefs = self.parent_app.settings_manager.ui_settings.get("confirmation_preferences", {})
-        if prefs.get("delete_affordance"):
+        if prefs.get("delete_tool"):
             confirmed = True
         else:
             confirmed, dont_ask_again = ConfirmationDialog.show(
                 self, self.theme_manager,
                 title="Confirm Deletion",
-                message=f"Are you sure you want to permanently delete the affordance '{affordance_name}'?"
+                message=f"Are you sure you want to permanently delete the tool '{tool_name}'?"
             )
             if dont_ask_again:
-                prefs["delete_affordance"] = True
+                prefs["delete_tool"] = True
                 self.parent_app.settings_manager.ui_settings["confirmation_preferences"] = prefs
                 self.parent_app.settings_manager.save_settings()
 
         if confirmed:
-            self.affordance_manager.delete_affordance(affordance_name)
-            self.parent_app.update_status(f"Affordance '{affordance_name}' deleted.", LYRN_SUCCESS)
-            self.refresh_affordance_list()
+            self.oss_tool_manager.delete_tool(tool_name)
+            self.parent_app.update_status(f"Tool '{tool_name}' deleted.", LYRN_SUCCESS)
+            self.refresh_tool_list()
         else:
             self.parent_app.update_status("Deletion cancelled.", LYRN_INFO)
 
-    def new_affordance(self):
+    def new_tool(self):
         self.clear_builder_fields()
-        self.tabview.set("Affordance Editor")
+        self.tabview.set("Tool Editor")
 
     def clear_builder_fields(self):
-        self.editing_affordance_name = None
+        self.editing_tool_name = None
         self.name_entry.configure(state="normal")
         self.name_entry.delete(0, "end")
         self.definition_textbox.delete("1.0", "end")
@@ -4634,10 +4734,10 @@ class AffordancePopup(ThemedPopup):
         editor_frame.grid_rowconfigure(1, weight=1)
 
         # --- Name Entry ---
-        ctk.CTkLabel(editor_frame, text="Affordance Name").pack(anchor="w")
+        ctk.CTkLabel(editor_frame, text="Tool Name").pack(anchor="w")
         self.name_entry = ctk.CTkEntry(editor_frame)
         self.name_entry.pack(fill="x", pady=(0, 10))
-        Tooltip(self.name_entry, "A unique name for this affordance, e.g., 'get_current_weather'.")
+        Tooltip(self.name_entry, "A unique name for this tool, e.g., 'get_current_weather'.")
 
         # --- Definition Textbox ---
         ctk.CTkLabel(editor_frame, text="Tool Definition (TypeScript-like format)").pack(anchor="w")
@@ -4655,31 +4755,31 @@ type get_current_weather = (_: {
 
 
         # --- Save Button ---
-        save_button = ctk.CTkButton(self.tab_editor, text="Save Affordance", command=self.save_affordance)
+        save_button = ctk.CTkButton(self.tab_editor, text="Save Tool", command=self.save_tool)
         save_button.pack(pady=20)
 
-    def save_affordance(self):
+    def save_tool(self):
         name = self.name_entry.get().strip()
         definition = self.definition_textbox.get("1.0", "end-1c").strip()
 
         if not name or not definition:
-            self.parent_app.update_status("Affordance Name and Definition are required.", LYRN_ERROR)
+            self.parent_app.update_status("Tool Name and Definition are required.", LYRN_ERROR)
             return
 
-        if self.editing_affordance_name is None and name in self.affordance_manager.affordances:
-            self.parent_app.update_status(f"Affordance name '{name}' already exists.", LYRN_ERROR)
+        if self.editing_tool_name is None and name in self.oss_tool_manager.tools:
+            self.parent_app.update_status(f"Tool name '{name}' already exists.", LYRN_ERROR)
             return
 
         # For now, we save the raw definition. Parsing will be a separate step.
-        # We can use the 'type' field to mark this as a new format affordance.
+        # We can use the 'type' field to mark this as a new format tool.
         params = {"definition": definition}
-        affordance = Affordance(name=name, type="oss_tool", params=params)
+        tool = OSSTool(name=name, type="oss_tool", params=params)
 
-        self.affordance_manager.add_affordance(affordance)
-        self.parent_app.update_status(f"Affordance '{name}' saved.", LYRN_SUCCESS)
-        self.refresh_affordance_list()
+        self.oss_tool_manager.add_tool(tool)
+        self.parent_app.update_status(f"Tool '{name}' saved.", LYRN_SUCCESS)
+        self.refresh_tool_list()
         self.clear_builder_fields()
-        self.tabview.set("Affordance Viewer")
+        self.tabview.set("Tool Viewer")
 
 
 class MemoryPopup(ThemedPopup):
@@ -4832,7 +4932,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.automation_controller = None
         self.metrics = None
         self.chat_logger = None
-        self.affordance_manager = None
+        self.oss_tool_manager = None
         self.scheduler_manager = None
         self.cycle_manager = None
         self.resource_monitor = None
@@ -4914,7 +5014,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.snapshot_loader = SnapshotLoader(self, self.settings_manager, self.automation_controller)
         self.metrics = EnhancedPerformanceMetrics()
         self.chat_logger = JournalLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
-        self.affordance_manager = AffordanceManager()
+        self.oss_tool_manager = OSSToolManager()
         self.scheduler_manager = SchedulerManager()
         self.cycle_manager = CycleManager()
         self.chat_manager = ChatManager(self.settings_manager.settings["paths"].get("chat", "chat"), self.settings_manager, self.role_mappings)
@@ -5248,6 +5348,10 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.clear_chat_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.clear_chat_button, "Clears the main chat display.")
 
+        self.clear_chat_folder_button = ctk.CTkButton(self.quick_frame, text="🗑️ Clear Chat Folder", command=self.clear_chat_folder)
+        self.clear_chat_folder_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.clear_chat_folder_button, "Deletes all saved chat log files from the chat directory.")
+
         self.settings_button = ctk.CTkButton(self.quick_frame, text="⚙️ Settings", command=self.open_settings)
         self.settings_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.settings_button, self.tooltips.get("settings_button", "Open the settings window"))
@@ -5298,6 +5402,14 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.active_cycle_selector.pack(side="left", expand=True, fill="x")
         self.cycle_toggle_button = ctk.CTkButton(cycle_frame, text="Start", width=60, command=self.toggle_cycle)
         self.cycle_toggle_button.pack(side="left", padx=5)
+
+        # Job Runner
+        job_runner_frame = ctk.CTkFrame(self.job_frame)
+        job_runner_frame.pack(fill="x", padx=10, pady=5)
+        self.job_dropdown = ctk.CTkComboBox(job_runner_frame, values=["No jobs loaded"])
+        self.job_dropdown.pack(side="left", expand=True, fill="x")
+        run_job_button = ctk.CTkButton(job_runner_frame, text="Run", width=60, command=self.run_selected_job_from_dropdown)
+        run_job_button.pack(side="left", padx=5)
 
 
         self.job_watcher_button = ctk.CTkButton(self.job_frame, text="Automation", command=self.open_job_watcher_popup)
@@ -5481,9 +5593,9 @@ class LyrnAIInterface(ctk.CTkToplevel):
         self.personality_button.pack(fill="x", padx=10, pady=3)
         Tooltip(self.personality_button, "Open the Personality slider editor.")
 
-        self.affordance_button = ctk.CTkButton(self.status_frame, text="Affordances", command=self.open_affordance_popup)
-        self.affordance_button.pack(fill="x", padx=10, pady=3)
-        Tooltip(self.affordance_button, "Open the Affordance Editor to manage internal triggers.")
+        self.oss_tool_button = ctk.CTkButton(self.status_frame, text="OSS Tools", command=self.open_oss_tool_popup)
+        self.oss_tool_button.pack(fill="x", padx=10, pady=3)
+        Tooltip(self.oss_tool_button, "Open the OSS Tool Editor to manage tools.")
 
 
         # --- End Relocated Controls ---
@@ -5654,7 +5766,12 @@ class LyrnAIInterface(ctk.CTkToplevel):
                 (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
                 (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color}),
                 (ctk.CTkSlider, {"progress_color": primary_color, "button_color": primary_color, "button_hover_color": button_hover_color}),
-                (ctk.CTkSwitch, {"progress_color": primary_color, "fg_color": primary_color}),
+                (ctk.CTkSwitch, {
+                    "progress_color": tm.get_color("switch_progress", fallback=primary_color),
+                    "button_color": tm.get_color("switch_button", fallback=accent_color),
+                    "button_hover_color": tm.get_color("button_hover", fallback=button_hover_color),
+                    "fg_color": tm.get_color("switch_bg_off", fallback="#555555") # fg_color is the 'off' state
+                }),
                 (ctk.CTkTabview, {"segmented_button_selected_color": primary_color, "segmented_button_selected_hover_color": button_hover_color})
             ]:
                 for widget in self.find_widgets_recursively(self, widget_type):
@@ -5812,14 +5929,14 @@ class LyrnAIInterface(ctk.CTkToplevel):
             self.job_watcher_popup.lift()
             self.job_watcher_popup.focus()
 
-    def open_affordance_popup(self):
-        """Opens the affordance editor popup window."""
-        if not hasattr(self, 'affordance_popup') or not self.affordance_popup.winfo_exists():
-            self.affordance_popup = AffordancePopup(self, self.affordance_manager, self.theme_manager, self.language_manager)
-            self.affordance_popup.focus()
+    def open_oss_tool_popup(self):
+        """Opens the tool editor popup window."""
+        if not hasattr(self, 'oss_tool_popup') or not self.oss_tool_popup.winfo_exists():
+            self.oss_tool_popup = OSSToolPopup(self, self.oss_tool_manager, self.theme_manager, self.language_manager)
+            self.oss_tool_popup.focus()
         else:
-            self.affordance_popup.lift()
-            self.affordance_popup.focus()
+            self.oss_tool_popup.lift()
+            self.oss_tool_popup.focus()
 
     def open_memory_popup(self):
         """Opens the memory manager popup window."""
@@ -5938,6 +6055,20 @@ class LyrnAIInterface(ctk.CTkToplevel):
         if True:
             self.update_status("Performance test is temporarily disabled.", LYRN_WARNING)
             return
+
+    def run_selected_job_from_dropdown(self):
+        """Runs the job selected in the right-sidebar dropdown."""
+        job_name = self.job_dropdown.get()
+        if not job_name or "No jobs" in job_name:
+            self.update_status("No job selected to run.", LYRN_WARNING)
+            return
+
+        trigger_prompt = self.automation_controller.get_job_trigger(job_name)
+        if trigger_prompt:
+            self.execute_job_directly(job_name, trigger_prompt)
+            self.update_status(f"Executing job: {job_name}", LYRN_ACCENT)
+        else:
+            self.update_status(f"Could not load trigger for job '{job_name}'.", LYRN_ERROR)
 
     def on_job_selected(self, job_name: str):
         """Handle manual job selection for testing."""
@@ -6532,7 +6663,6 @@ class LyrnAIInterface(ctk.CTkToplevel):
             # Update time labels
             self.generation_time_label.configure(text=f"Generation Time: {self.format_ms_to_min_sec(self.metrics.generation_time_ms)}")
             self.tokenization_time_label.configure(text=f"Tokenization Time: {self.format_ms_to_min_sec(self.metrics.tokenization_time_ms)}")
-            self.kv_caching_time_label.configure(text=f"KV Caching Time: {self.format_ms_to_min_sec(self.metrics.kv_caching_time_ms)}")
 
         except Exception as e:
             print(f"Error updating metrics: {e}")
