@@ -118,22 +118,22 @@ class ThemedPopup(ctk.CTkToplevel):
             (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
             (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color}),
             (ctk.CTkSwitch, {
-                "progress_color": accent_color,
-                "fg_color": primary_color,
-                "button_color": tm.get_color("button_hover"),
-                "button_hover_color": tm.get_color("button_hover")
+                "fg_color": tm.get_color("switch_bg_off", border_color),
+                "progress_color": tm.get_color("switch_progress", accent_color),
+                "button_color": tm.get_color("switch_button", primary_color),
+                "button_hover_color": tm.get_color("button_hover", button_hover_color)
             }),
-            (ctk.CTkProgressBar, {"progress_color": primary_color}),
+            (ctk.CTkProgressBar, {"progress_color": tm.get_color("progressbar_progress", primary_color)}),
             (ctk.CTkSlider, {
-                "button_color": primary_color,
-                "progress_color": accent_color,
-                "button_hover_color": button_hover_color
+                "button_color": tm.get_color("slider_button", primary_color),
+                "progress_color": tm.get_color("slider_progress", accent_color),
+                "button_hover_color": tm.get_color("button_hover", button_hover_color)
             }),
             (ctk.CTkTabview, {
-                "segmented_button_selected_color": primary_color,
-                "segmented_button_unselected_color": frame_bg,
-                "segmented_button_selected_hover_color": button_hover_color,
-                "segmented_button_unselected_hover_color": accent_color,
+                "segmented_button_selected_color": tm.get_color("tab_selected", primary_color),
+                "segmented_button_unselected_color": tm.get_color("tab_unselected", frame_bg),
+                "segmented_button_selected_hover_color": tm.get_color("tab_selected_hover", button_hover_color),
+                "segmented_button_unselected_hover_color": tm.get_color("tab_unselected_hover", accent_color),
                 "fg_color": frame_bg
             })
         ]

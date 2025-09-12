@@ -1,4 +1,4 @@
-# LYRN-AI LLM Interface v4.0.8
+# LYRN-AI LLM Interface v4.2.3
 
 A modern, professional GUI application for LLM interaction with advanced job automation, system monitoring, and a highly modular architecture.
 
@@ -17,7 +17,7 @@ A modern, professional GUI application for LLM interaction with advanced job aut
 
 2.  **Run Application**:
     ```bash
-    python lyrn_sad_v4.0.8.pyw
+    python lyrn_sad_v4.2.3.pyw
     ```
 
 3.  **First Launch Setup**:
@@ -28,7 +28,7 @@ A modern, professional GUI application for LLM interaction with advanced job aut
 ## Key Files
 
 ### Core Application
-- `lyrn_sad_v4.0.8.pyw` - Main GUI application.
+- `lyrn_sad_v4.2.3.pyw` - Main GUI application.
 - `settings.json` - Auto-generated configuration file for settings, paths, and UI preferences.
 - `automation/` - Contains all background watcher scripts for autonomous operation.
 - `build_prompt/` - Contains all modular components for building the system prompt.
@@ -52,13 +52,16 @@ A modern, professional GUI application for LLM interaction with advanced job aut
     - Watcher scripts that run in the background to handle various automated tasks.
 ✅ **Episodic Memory**: A structured, file-based memory system that saves each chat interaction as a detailed "Verbatim Chat Entry Pair" for advanced search, filtering, and context management.
 ✅ **Topic Indexing Engine**: A long-term memory system that builds a personalized web of meaning from conversations by identifying and indexing topics.
-✅ **System Action Affordances**: The AI can be given the ability to perform system-level actions like opening applications, sending keystrokes, and clicking the mouse.
+✅ **OSS Tool Format**: The AI can be given the ability to perform system-level actions like opening applications, sending keystrokes, and clicking the mouse.
 ✅ **Task and Goal Management**: A system that allows the AI to autonomously track and manage its objectives.
 
-## What's New in v4.0.8
+## License
 
-- **UI Cleanup:** The main UI has been streamlined by consolidating the "Load/Offload Model" buttons into a single toggle and moving the "Episodic Memory" and "Topic Index" buttons into a new "Memory" popup.
-- **Model Preset Fix:** Addressed a bug where selecting a model preset might not reliably update the model selection dropdown in the UI.
+This project is licensed under a custom source-available license. See the [LICENSE](LICENSE) file for details. The key points are:
+- The software is provided "as-is".
+- You are free to use, modify, and redistribute it for non-commercial purposes.
+- Commercial use requires express written permission from the copyright holder (LYRN-AI).
+
 
 ## Architecture
 
