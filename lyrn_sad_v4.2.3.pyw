@@ -789,19 +789,30 @@ class SnapshotLoader:
                 all_tools = self.parent_app.oss_tool_manager.get_all_tools()
 
                 if all_tools:
-                    definitions = [aff.params.get("definition", "") for aff in all_tools if aff.params.get("definition")]
-                    if definitions:
-                        namespace_content = "\n\n".join(definitions)
-                        full_text = f"namespace functions {{\n\n{namespace_content}\n\n}} // namespace functions"
+                    tool_parts = []
+                    tool_begin_bracket = oss_tools_config.get("tool_begin_bracket", "")
+                    tool_end_bracket = oss_tools_config.get("tool_end_bracket", "")
 
-                        main_instructions = oss_tools_config.get("instructions", "")
-                        if main_instructions:
-                            full_text = f"{main_instructions}\n\n{full_text}"
+                    for tool in all_tools:
+                        definition = tool.params.get("definition", "")
+                        if not definition:
+                            continue
 
-                        section_begin_bracket = oss_tools_config.get("begin_bracket", "")
-                        section_end_bracket = oss_tools_config.get("end_bracket", "")
-                        oss_tools_block = f"{section_begin_bracket}\n{full_text}\n{section_end_bracket}"
-                        prompt_parts.append(oss_tools_block)
+                        start_bracket = tool_begin_bracket.replace("*tool_name*", tool.name)
+                        end_bracket = tool_end_bracket.replace("*tool_name*", tool.name)
+                        tool_parts.append(f"{start_bracket}\n{definition}\n{end_bracket}")
+
+                    full_tools_content = "\n\n".join(tool_parts)
+
+                    main_instructions = oss_tools_config.get("instructions", "")
+                    if main_instructions:
+                        full_tools_content = f"{main_instructions}\n\n{full_tools_content}"
+
+                    section_begin_bracket = oss_tools_config.get("begin_bracket", "")
+                    section_end_bracket = oss_tools_config.get("end_bracket", "")
+
+                    oss_tools_block = f"{section_begin_bracket}\n{full_tools_content}\n{section_end_bracket}"
+                    prompt_parts.append(oss_tools_block)
                 continue
 
             component_dir = os.path.join(self.build_prompt_dir, component_name)
@@ -3129,6 +3140,23 @@ class SystemPromptBuilderPopup(ThemedPopup):
             )
             job_button.pack(side="left", expand=True, fill="x")
 
+    def _save_oss_tools_config(self):
+        """Saves the oss_tools configuration."""
+        if "oss_tools" not in self.editor_widgets:
+            return
+
+        w = self.editor_widgets["oss_tools"]
+        config_data = {
+            "instructions": w["instructions_textbox"].get("1.0", "end-1c"),
+            "rwi_text": w["rwi_info_box"].get("1.0", "end-1c"),
+            "begin_bracket": w["section_start_bracket_entry"].get(),
+            "end_bracket": w["section_end_bracket_entry"].get(),
+            "tool_begin_bracket": w["tool_start_bracket_entry"].get(),
+            "tool_end_bracket": w["tool_end_bracket_entry"].get(),
+        }
+        self._save_json(w["config_path"], config_data)
+        self.parent_app.update_status("OSS Tools settings saved.", LYRN_SUCCESS)
+
     def _create_oss_tools_editor(self, parent_frame):
         """Creates the UI for the oss_tools component editor."""
         parent_frame.grid_columnconfigure(0, weight=1)
@@ -3147,6 +3175,9 @@ class SystemPromptBuilderPopup(ThemedPopup):
         view_button = ctk.CTkButton(button_frame, text="View Merged Tools", command=self._view_merged_oss_tools)
         view_button.pack(side="left", padx=5)
 
+        save_button = ctk.CTkButton(button_frame, text="Save", command=self._save_oss_tools_config)
+        save_button.pack(side="left", padx=5)
+
         refresh_button = ctk.CTkButton(button_frame, text="Refresh", command=self._refresh_oss_tools_list)
         refresh_button.pack(side="left", padx=5)
 
@@ -3154,12 +3185,50 @@ class SystemPromptBuilderPopup(ThemedPopup):
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         main_frame.grid_columnconfigure(0, weight=1)
 
+        ctk.CTkLabel(main_frame, text="Tools Section Instructions:").pack(anchor="w", padx=10, pady=(5,0))
+        instructions_textbox = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        instructions_textbox.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        instructions_textbox.insert("1.0", config.get("instructions", ""))
+
+        ctk.CTkLabel(main_frame, text="RWI Info:").pack(anchor="w", padx=10, pady=(5, 0))
+        rwi_info_box = ctk.CTkTextbox(main_frame, height=100, undo=True)
+        rwi_info_box.pack(fill="x", padx=10, pady=(0, 10), expand=True)
+        rwi_info_box.insert("1.0", config.get("rwi_text", ""))
+
+        ctk.CTkLabel(main_frame, text="Tools Section Start Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_start_bracket_entry = ctk.CTkEntry(main_frame)
+        section_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_start_bracket_entry.insert(0, config.get("begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Tools Section End Bracket:").pack(anchor="w", padx=10, pady=(5,0))
+        section_end_bracket_entry = ctk.CTkEntry(main_frame)
+        section_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        section_end_bracket_entry.insert(0, config.get("end_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Tool Start Bracket (*tool_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        tool_start_bracket_entry = ctk.CTkEntry(main_frame)
+        tool_start_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        tool_start_bracket_entry.insert(0, config.get("tool_begin_bracket", ""))
+
+        ctk.CTkLabel(main_frame, text="Individual Tool End Bracket (*tool_name*):").pack(anchor="w", padx=10, pady=(5,0))
+        tool_end_bracket_entry = ctk.CTkEntry(main_frame)
+        tool_end_bracket_entry.pack(fill="x", padx=10, pady=(0, 10))
+        tool_end_bracket_entry.insert(0, config.get("tool_end_bracket", ""))
+
         self.oss_tools_list_frame = ctk.CTkScrollableFrame(main_frame, label_text="Available OSS Tools")
         self.oss_tools_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         self._refresh_oss_tools_list()
 
-        return {} # No widgets to save for this read-only view
+        return {
+            "instructions_textbox": instructions_textbox,
+            "rwi_info_box": rwi_info_box,
+            "section_start_bracket_entry": section_start_bracket_entry,
+            "section_end_bracket_entry": section_end_bracket_entry,
+            "tool_start_bracket_entry": tool_start_bracket_entry,
+            "tool_end_bracket_entry": tool_end_bracket_entry,
+            "config_path": config_path,
+        }
 
     def _refresh_oss_tools_list(self):
         """Clears and repopulates the list of tools."""
@@ -3187,12 +3256,26 @@ class SystemPromptBuilderPopup(ThemedPopup):
             self.parent_app.update_status("No tools found to merge.", LYRN_WARNING)
             return
 
-        # Build the namespace block
-        definitions = [aff.params.get("definition", "") for aff in all_tools if aff.params.get("definition")]
-        namespace_content = "\n\n".join(definitions)
-        full_text = f"namespace functions {{\n\n{namespace_content}\n\n}} // namespace functions"
+        tool_parts = []
+        tool_begin_bracket = config.get("tool_begin_bracket", "")
+        tool_end_bracket = config.get("tool_end_bracket", "")
 
-        self._view_file_with_brackets("Merged OSS Tools Preview", full_text, config, is_content_str=True)
+        for tool in all_tools:
+            definition = tool.params.get("definition", "")
+            if not definition:
+                continue
+
+            start_bracket = tool_begin_bracket.replace("*tool_name*", tool.name)
+            end_bracket = tool_end_bracket.replace("*tool_name*", tool.name)
+            tool_parts.append(f"{start_bracket}\n{definition}\n{end_bracket}")
+
+        full_tools_content = "\n\n".join(tool_parts)
+
+        main_instructions = config.get("instructions", "")
+        if main_instructions:
+            full_tools_content = f"{main_instructions}\n\n{full_tools_content}"
+
+        self._view_file_with_brackets("Merged OSS Tools Preview", full_tools_content, config, is_content_str=True)
 
 
     def _view_job_instructions(self, job_name: str):
@@ -3338,19 +3421,16 @@ class ThemeBuilderPopup(ThemedPopup):
         self.language_manager = language_manager
 
         self.title("Theme Builder")
-        self.geometry("800x650")
-        self.minsize(700, 500)
-
-        # self.grab_set() # Removed to make non-modal
+        self.geometry("800x750") # Increased height
+        self.minsize(700, 600)   # Increased min height
 
         self.create_theme_builder_widgets()
         self.load_selected_theme(self.theme_manager.get_current_theme_name())
         self.preview_theme()
         self.apply_theme()
 
-
     def create_theme_builder_widgets(self):
-        """Create the theme builder tab UI with an advanced preview."""
+        """Create the theme builder tab UI with a fixed layout and improved color pickers."""
         try:
             font = ctk.CTkFont(family="Consolas", size=12)
             title_font = ctk.CTkFont(family="Consolas", size=14, weight="bold")
@@ -3360,150 +3440,115 @@ class ThemeBuilderPopup(ThemedPopup):
 
         # Main frame for the builder
         main_frame = ctk.CTkFrame(self)
-        main_frame.pack(expand=True, fill="both", padx=20, pady=10)
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=1)
+        main_frame.pack(expand=True, fill="both", padx=10, pady=10)
+        main_frame.grid_columnconfigure(0, weight=1) # Left panel
+        main_frame.grid_columnconfigure(1, weight=1) # Right panel
+        main_frame.grid_rowconfigure(0, weight=1)
 
-        # Left side for color pickers
-        left_frame = ctk.CTkScrollableFrame(main_frame, label_text="Color Settings")
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        # --- Left Panel ---
+        left_panel = ctk.CTkFrame(main_frame)
+        left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        left_panel.grid_rowconfigure(2, weight=1) # Make color picker scroll area expand
+        left_panel.grid_columnconfigure(0, weight=1)
 
-        # Right side for preview
+        # --- Right Panel (Preview) ---
         right_frame = ctk.CTkFrame(main_frame)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
 
-        # --- Theme Management ---
-        manage_frame = ctk.CTkFrame(left_frame)
-        manage_frame.pack(fill="x", padx=10, pady=10)
-
+        # --- Theme Management (in left panel) ---
+        manage_frame = ctk.CTkFrame(left_panel)
+        manage_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10,5))
         self.theme_selector_combo = ctk.CTkComboBox(manage_frame, values=self.theme_manager.get_theme_names(), command=self.load_selected_theme)
         self.theme_selector_combo.pack(side="left", expand=True, fill="x", padx=(0,5))
-        Tooltip(self.theme_selector_combo, "Select a theme to edit or delete.")
-
         delete_button = ctk.CTkButton(manage_frame, text="Delete", width=60, command=self.delete_selected_theme)
         delete_button.pack(side="left")
-        Tooltip(delete_button, "Deletes the currently selected theme.")
 
-        # --- Color Pickers ---
-        ctk.CTkLabel(left_frame, text="Theme Name:", font=font).pack(anchor="w", padx=10, pady=(10, 0))
-        self.theme_name_entry = ctk.CTkEntry(left_frame, font=font)
-        self.theme_name_entry.pack(fill="x", padx=10, pady=(0, 10))
+        # --- Theme Name (in left panel) ---
+        name_frame = ctk.CTkFrame(left_panel)
+        name_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
+        ctk.CTkLabel(name_frame, text="Theme Name:", font=font).pack(side="left", padx=(0, 5))
+        self.theme_name_entry = ctk.CTkEntry(name_frame, font=font)
+        self.theme_name_entry.pack(side="left", expand=True, fill="x")
+
+        # --- Color Pickers (Scrollable, in left panel) ---
+        color_picker_frame = ctk.CTkScrollableFrame(left_panel, label_text="Color Settings")
+        color_picker_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
 
         self.color_widgets = {}
         color_labels = {
-            # General
-            "primary": "Primary",
-            "accent": "Accent",
-            "button_hover": "Button Hover",
-            "frame_bg": "Frame Background",
-            "border_color": "Border Color",
-
-            # Text
-            "label_text": "Label Text",
-            "textbox_fg": "Textbox Foreground",
-            "display_text_color": "Display Text",
-            "system_text": "System Text",
-            "user_text": "User Text",
-            "assistant_text": "Assistant Text",
-            "thinking_text": "Thinking Text",
-
-            # Status
-            "success": "Success",
-            "warning": "Warning",
-            "error": "Error",
-            "info": "Info",
-
-            # Widget Specific
-            "textbox_bg": "Textbox Background",
-            "switch_progress": "Switch Progress (On)",
-            "switch_button": "Switch Button",
-            "switch_bg_off": "Switch Background (Off)",
-            "progressbar_progress": "Progressbar Progress",
-            "slider_progress": "Slider Progress",
-            "slider_button": "Slider Button",
-            "tab_selected": "Tab Selected",
-            "tab_unselected": "Tab Unselected",
-            "tab_selected_hover": "Tab Selected Hover",
-            "tab_unselected_hover": "Tab Unselected Hover"
+            "primary": "Primary", "accent": "Accent", "button_hover": "Button Hover",
+            "frame_bg": "Frame Background", "border_color": "Border Color", "label_text": "Label Text",
+            "textbox_fg": "Textbox Foreground", "display_text_color": "Display Text", "system_text": "System Text",
+            "user_text": "User Text", "assistant_text": "Assistant Text", "thinking_text": "Thinking Text",
+            "success": "Success", "warning": "Warning", "error": "Error", "info": "Info",
+            "textbox_bg": "Textbox Background", "switch_progress": "Switch Progress (On)",
+            "switch_button": "Switch Button", "switch_bg_off": "Switch Background (Off)",
+            "progressbar_progress": "Progressbar Progress", "slider_progress": "Slider Progress",
+            "slider_button": "Slider Button", "tab_selected": "Tab Selected", "tab_unselected": "Tab Unselected",
+            "tab_selected_hover": "Tab Selected Hover", "tab_unselected_hover": "Tab Unselected Hover"
         }
 
-        # Create a scrollable frame for the color pickers
-        color_picker_frame = ctk.CTkScrollableFrame(left_frame)
-        color_picker_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-
         for key, label_text in color_labels.items():
-            container = ctk.CTkFrame(color_picker_frame)
-            container.pack(fill="x", padx=10, pady=4)
+            container = ctk.CTkFrame(color_picker_frame, fg_color="transparent")
+            container.pack(fill="x", pady=5, padx=5)
+            ctk.CTkLabel(container, text=label_text, font=font, width=150, anchor="w").pack(side="left")
+            hex_entry = ctk.CTkEntry(container, font=font, width=90)
+            hex_entry.pack(side="left", padx=10)
+            color_swatch = ctk.CTkFrame(container, width=28, height=28, border_width=1, cursor="hand2")
+            color_swatch.pack(side="left", padx=5)
 
-            ctk.CTkLabel(container, text=label_text, font=font, width=120, anchor="w").pack(side="left", padx=5)
+            hex_entry.bind("<KeyRelease>", lambda e, k=key: self.update_color_from_entry(k))
+            color_swatch.bind("<Button-1>", lambda e, k=key: self.choose_color(k))
+            self.color_widgets[key] = {'entry': hex_entry, 'swatch': color_swatch}
 
-            hex_label = ctk.CTkLabel(container, text="#000000", font=font, width=70)
-            hex_label.pack(side="left", padx=5)
-
-            color_swatch = ctk.CTkFrame(container, fg_color="#000000", width=100, height=25, corner_radius=3, border_width=1)
-            color_swatch.pack(side="left", padx=10, fill="x", expand=True)
-
-            self.color_widgets[key] = {'label': hex_label, 'swatch': color_swatch}
-
-            # Bind click events to both swatch and label for better UX
-            for widget in [color_swatch, hex_label]:
-                widget.bind("<Button-1>", lambda e, k=key: self.choose_color(k))
-
-        # --- Buttons ---
-        button_frame = ctk.CTkFrame(left_frame)
-        button_frame.pack(fill="x", padx=10, pady=10)
-
+        # --- Buttons (Fixed at bottom of left panel) ---
+        button_frame = ctk.CTkFrame(left_panel)
+        button_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
         apply_theme_button = ctk.CTkButton(button_frame, text="Apply", font=font, command=self.apply_preview_theme)
-        apply_theme_button.pack(side="left", padx=10)
-        Tooltip(apply_theme_button, "Apply the current theme settings for preview.")
-
+        apply_theme_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         save_theme_button = ctk.CTkButton(button_frame, text="Save Theme", font=font, command=self.save_theme)
-        save_theme_button.pack(side="right", padx=10)
-        Tooltip(save_theme_button, self.parent_app.tooltips.get("save_theme_button", ""))
+        save_theme_button.pack(side="right", expand=True, fill="x", padx=(5, 0))
 
-        # --- Advanced Preview Area ---
+        # --- Preview Area (in right panel) ---
         self.preview_frame = ctk.CTkFrame(right_frame, border_width=2)
         self.preview_frame.pack(expand=True, fill="both", padx=10, pady=10)
-
         ctk.CTkLabel(self.preview_frame, text="Theme Preview", font=title_font).pack(pady=5)
-
         self.preview_widgets = {}
-
-        # Label
         self.preview_widgets["label"] = ctk.CTkLabel(self.preview_frame, text="This is a label.")
         self.preview_widgets["label"].pack(pady=5, padx=10)
-
-        # Button
         self.preview_widgets["button"] = ctk.CTkButton(self.preview_frame, text="Click Me")
         self.preview_widgets["button"].pack(pady=5, padx=10)
-
-        # Textbox
         self.preview_widgets["textbox"] = ctk.CTkTextbox(self.preview_frame, height=50)
         self.preview_widgets["textbox"].insert("0.0", "This is a textbox for longer text.\nIt can have multiple lines.")
         self.preview_widgets["textbox"].pack(pady=5, padx=10, fill="x")
-
-        # ComboBox
         self.preview_widgets["combobox"] = ctk.CTkComboBox(self.preview_frame, values=["Option 1", "Option 2"])
         self.preview_widgets["combobox"].pack(pady=5, padx=10)
-
-        # ProgressBar
         self.preview_widgets["progressbar"] = ctk.CTkProgressBar(self.preview_frame)
         self.preview_widgets["progressbar"].set(0.7)
         self.preview_widgets["progressbar"].pack(pady=5, padx=10, fill="x")
-
-        # Switch
         self.preview_widgets["switch"] = ctk.CTkSwitch(self.preview_frame, text="A switch")
         self.preview_widgets["switch"].pack(pady=5, padx=10)
         self.preview_widgets["switch"].select()
 
+    def update_color_from_entry(self, key: str):
+        """Updates the color preview swatch from the hex entry."""
+        widget_set = self.color_widgets.get(key)
+        if not widget_set: return
+        hex_code = widget_set['entry'].get()
+        if re.match(r'^#(?:[0-9a-fA-F]{3}){1,2}$', hex_code):
+            widget_set['swatch'].configure(fg_color=hex_code)
+            self.preview_theme()
+        else:
+            widget_set['swatch'].configure(fg_color="gray") # Indicate invalid color
+
     def choose_color(self, key):
         """Opens a color chooser and updates the widgets for the given color key."""
-        initial_color = self.color_widgets[key]['label'].cget("text")
+        initial_color = self.color_widgets[key]['entry'].get()
         picker = CustomColorPickerPopup(self, initial_color=initial_color)
         new_color = picker.get_color()
         if new_color:
-            self.color_widgets[key]['label'].configure(text=new_color)
+            self.color_widgets[key]['entry'].delete(0, "end")
+            self.color_widgets[key]['entry'].insert(0, new_color)
             self.color_widgets[key]['swatch'].configure(fg_color=new_color)
             self.preview_theme()
 
@@ -3514,31 +3559,23 @@ class ThemeBuilderPopup(ThemedPopup):
             self.parent_app.update_status("Please enter a theme name to apply a preview.", LYRN_WARNING)
             return
 
-        # 1. Update the theme manager with the preview colors
-        preview_colors = {key: widgets['label'].cget("text") for key, widgets in self.color_widgets.items()}
+        preview_colors = {key: widgets['entry'].get() for key, widgets in self.color_widgets.items()}
         self.theme_manager.current_theme_name = f"{theme_name} (Preview)"
         self.theme_manager.current_colors = preview_colors
 
-        # 2. Apply theme to the main application window
         self.parent_app.apply_color_theme()
-
-        # 3. Apply theme to all open popups (Toplevel windows)
-        # The main app is the root, so we check its children.
         for widget in self.parent_app.winfo_children():
             if isinstance(widget, ctk.CTkToplevel) and hasattr(widget, 'apply_theme'):
                 try:
                     widget.apply_theme()
                 except Exception as e:
                     print(f"Could not apply theme to {widget}: {e}")
-
-        # 4. Apply theme to the theme builder itself, as it is also a Toplevel
         self.apply_theme()
-
         self.parent_app.update_status(f"Previewing theme: {theme_name}", LYRN_INFO)
 
     def preview_theme(self):
         """Updates the advanced preview area with the current colors."""
-        colors = {key: widgets['label'].cget("text") for key, widgets in self.color_widgets.items()}
+        colors = {key: widgets['entry'].get() for key, widgets in self.color_widgets.items()}
         primary = colors.get("primary", "#007BFF")
         accent = colors.get("accent", "#28A745")
         frame_bg = colors.get("frame_bg", "#F8F9FA")
@@ -3550,14 +3587,6 @@ class ThemeBuilderPopup(ThemedPopup):
         switch_progress = colors.get("switch_progress", accent)
         switch_button = colors.get("switch_button", primary)
         progressbar_progress = colors.get("progressbar_progress", primary)
-        slider_progress = colors.get("slider_progress", accent)
-        slider_button = colors.get("slider_button", primary)
-        tab_selected = colors.get("tab_selected", primary)
-        tab_unselected = colors.get("tab_unselected", frame_bg)
-        tab_selected_hover = colors.get("tab_selected_hover", accent)
-        tab_unselected_hover = colors.get("tab_unselected_hover", accent)
-
-
         self.preview_frame.configure(fg_color=frame_bg, border_color=accent)
         self.preview_widgets["label"].configure(text_color=label_text)
         self.preview_widgets["button"].configure(fg_color=primary, text_color=button_text_color)
@@ -3576,38 +3605,30 @@ class ThemeBuilderPopup(ThemedPopup):
         theme_colors = theme_data.get("colors", {})
         for key, widgets in self.color_widgets.items():
             color = theme_colors.get(key, "#ffffff")
-            widgets['label'].configure(text=color)
-            widgets['swatch'].configure(fg_color=color)
+            widgets['entry'].delete(0, "end")
+            widgets['entry'].insert(0, color)
+            widgets['swatch'].configure(fg_color=color, border_color=theme_colors.get("border_color", "#ffffff"))
         self.preview_theme()
         self.parent_app.update_status(f"Loaded '{theme_name}' for editing", LYRN_INFO)
 
     def delete_selected_theme(self):
         """Deletes the currently selected theme after confirmation."""
         from confirmation_dialog import ConfirmationDialog
-
         theme_name = self.theme_selector_combo.get()
         if not theme_name or theme_name not in self.theme_manager.themes:
             return
-
         prefs = self.parent_app.settings_manager.ui_settings.get("confirmation_preferences", {})
         if prefs.get("delete_theme"):
             confirmed = True
         else:
-            confirmed, dont_ask_again = ConfirmationDialog.show(
-                self,
-                self.theme_manager,
-                title="Confirm Deletion",
-                message=f"Are you sure you want to permanently delete the theme '{theme_name}'?"
-            )
+            confirmed, dont_ask_again = ConfirmationDialog.show(self, self.theme_manager, title="Confirm Deletion", message=f"Are you sure you want to permanently delete the theme '{theme_name}'?")
             if dont_ask_again:
                 prefs["delete_theme"] = True
                 self.parent_app.settings_manager.ui_settings["confirmation_preferences"] = prefs
                 self.parent_app.settings_manager.save_settings()
-
         if not confirmed:
             self.parent_app.update_status("Theme deletion cancelled", LYRN_WARNING)
             return
-
         filename = f"{theme_name.lower().replace(' ', '_')}.json"
         filepath = os.path.join(self.theme_manager.themes_dir, filename)
         if os.path.exists(filepath):
@@ -3635,7 +3656,7 @@ class ThemeBuilderPopup(ThemedPopup):
         theme_data = {
             "name": theme_name,
             "appearance_mode": "dark",
-            "colors": {key: widgets['label'].cget("text") for key, widgets in self.color_widgets.items()}
+            "colors": {key: widgets['entry'].get() for key, widgets in self.color_widgets.items()}
         }
         themes_dir = os.path.join(self.parent_app.SCRIPT_DIR, "themes")
         os.makedirs(themes_dir, exist_ok=True)
@@ -5745,7 +5766,12 @@ class LyrnAIInterface(ctk.CTkToplevel):
                 (ctk.CTkScrollableFrame, {"fg_color": frame_bg, "label_fg_color": primary_color}),
                 (ctk.CTkCheckBox, {"fg_color": primary_color, "hover_color": button_hover_color}),
                 (ctk.CTkSlider, {"progress_color": primary_color, "button_color": primary_color, "button_hover_color": button_hover_color}),
-                (ctk.CTkSwitch, {"progress_color": LYRN_PURPLE, "button_color": LYRN_ACCENT, "button_hover_color": button_hover_color}),
+                (ctk.CTkSwitch, {
+                    "progress_color": tm.get_color("switch_progress", fallback=primary_color),
+                    "button_color": tm.get_color("switch_button", fallback=accent_color),
+                    "button_hover_color": tm.get_color("button_hover", fallback=button_hover_color),
+                    "fg_color": tm.get_color("switch_bg_off", fallback="#555555") # fg_color is the 'off' state
+                }),
                 (ctk.CTkTabview, {"segmented_button_selected_color": primary_color, "segmented_button_selected_hover_color": button_hover_color})
             ]:
                 for widget in self.find_widgets_recursively(self, widget_type):
