@@ -671,7 +671,8 @@ class SettingsManager:
 class SnapshotLoader:
     """Loads the static base prompt from the 'build_prompt' directory."""
 
-    def __init__(self, settings_manager: SettingsManager, automation_controller: AutomationController):
+    def __init__(self, parent_app, settings_manager: SettingsManager, automation_controller: AutomationController):
+        self.parent_app = parent_app
         self.settings_manager = settings_manager
         self.automation_controller = automation_controller
         self.build_prompt_dir = os.path.join(SCRIPT_DIR, "build_prompt")
@@ -4910,7 +4911,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
         print("Starting background initialization...")
         self.delta_manager = DeltaManager()
         self.automation_controller = AutomationController()
-        self.snapshot_loader = SnapshotLoader(self.settings_manager, self.automation_controller)
+        self.snapshot_loader = SnapshotLoader(self, self.settings_manager, self.automation_controller)
         self.metrics = EnhancedPerformanceMetrics()
         self.chat_logger = JournalLogger(self.settings_manager.settings["paths"].get("chat", "chat"))
         self.affordance_manager = AffordanceManager()
