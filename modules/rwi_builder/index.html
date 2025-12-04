@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LYRN RWI Builder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="dark">
+
+<div class="page-container">
+    <header>
+        <div>
+            <div class="meta-label">LYRN SYSTEM MODULE</div>
+            <h1 class="hero-title">RWI Prompt Builder</h1>
+        </div>
+        <div class="btn-group">
+            <button onclick="previewPrompt()">View Final Prompt</button>
+            <button class="btn-primary" onclick="buildPrompt()">Rebuild Master Prompt</button>
+        </div>
+    </header>
+
+    <div class="main-grid">
+        <!-- Left Panel: Component List -->
+        <div class="panel">
+            <div class="panel-header">
+                <h3 class="panel-title">Components</h3>
+                <button class="btn-icon" onclick="addNewComponent()">+</button>
+            </div>
+            <div id="components-list">
+                <!-- Components will be populated here -->
+            </div>
+        </div>
+
+        <!-- Right Panel: Editor -->
+        <div class="panel">
+            <div class="panel-header">
+                <h3 class="panel-title" id="editor-title">Editor</h3>
+                <div class="btn-group">
+                    <button class="btn-delete" id="delete-btn" style="display: none;" onclick="deleteCurrentComponent()">Delete</button>
+                    <button class="btn-primary" id="save-btn" onclick="saveCurrentComponent()">Save</button>
+                </div>
+            </div>
+            <div id="editor-container" class="editor-scroll">
+                <p style="color: var(--text-dim); padding: 20px; text-align: center;">Select a component to edit.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast">Operation Successful</div>
+
+<script src="script.js"></script>
+</body>
+</html>
