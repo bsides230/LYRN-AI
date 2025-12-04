@@ -363,7 +363,7 @@ function renderDaySchedulesList() {
 
     schedules.forEach(s => {
         // Display time in local format (AM/PM)
-        const time = new Date(s.scheduled_datetime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+        const time = new Date(s.scheduled_datetime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
         const item = document.createElement('div');
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
@@ -394,6 +394,7 @@ async function addSchedule() {
     const jobName = document.getElementById('scheduler-job-select').value;
     let h = parseInt(document.getElementById('sched-hour').value) || 12;
     const m = parseInt(document.getElementById('sched-minute').value) || 0;
+    const s = parseInt(document.getElementById('sched-second').value) || 0;
     const ampm = document.getElementById('sched-ampm').value;
 
     if (!jobName) return;
@@ -403,7 +404,7 @@ async function addSchedule() {
     if (ampm === 'AM' && h === 12) h = 0;
 
     const dt = new Date(selectedDate);
-    dt.setHours(h, m, 0);
+    dt.setHours(h, m, s);
 
     // Create a local ISO string (YYYY-MM-DDTHH:MM:SS) to send to backend
     // The backend should treat this as "Server Local Time"
