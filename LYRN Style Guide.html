@@ -257,23 +257,81 @@
     .swatch-label { font-family: "JetBrains Mono"; font-size: 10px; color: var(--text-dim); }
     
     /* =========================================
-       9. UTILITIES
+       9. UTILITIES + FOOTER TOGGLE
        ========================================= */
-    .theme-toggle {
-      position: absolute;
-      top: 20px; right: 20px;
-    }
     footer {
       margin-top: 60px;
       padding-top: 20px;
       border-top: 1px solid var(--border-color);
       display: flex;
       justify-content: space-between;
+      align-items: center;
       font-family: "JetBrains Mono", monospace;
       font-size: 10px;
       color: var(--text-dim);
       text-transform: uppercase;
       letter-spacing: 0.1em;
+    }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .theme-toggle-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .theme-switch {
+      position: relative;
+      display: inline-block;
+      width: 34px;
+      height: 18px;
+    }
+
+    .theme-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .theme-switch .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #222;
+      border-radius: 999px;
+      border: 1px solid var(--border-color);
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .theme-switch .slider::before {
+      content: "";
+      position: absolute;
+      height: 12px;
+      width: 12px;
+      left: 2px;
+      top: 2px;
+      border-radius: 50%;
+      background-color: #ffffff;
+      transition: transform 0.2s ease;
+    }
+
+    .theme-switch input:checked + .slider {
+      background-color: var(--brand-purple-dim);
+      border-color: var(--brand-purple);
+    }
+
+    .theme-switch input:checked + .slider::before {
+      transform: translateX(14px);
     }
   </style>
 </head>
@@ -281,8 +339,6 @@
 
 <div class="page-container">
   
-  <button class="theme-toggle" onclick="toggleTheme()">[ Toggle Theme ]</button>
-
   <header>
     <div class="meta-label">LYRN · DESIGN SYSTEM</div>
     <h1 class="hero-title">Interface Style Guide</h1>
@@ -404,18 +460,31 @@
 
   <footer>
     <span>LYRN SYSTEMS // THE SIMULATION COMPANY</span>
-    <span>STYLE GUIDE // EOF</span>
+    <div class="footer-right">
+      <span>STYLE GUIDE // EOF</span>
+      <label class="theme-toggle-inline">
+        THEME
+        <span class="theme-switch">
+          <input type="checkbox" id="themeToggle" checked onchange="toggleTheme()" />
+          <span class="slider"></span>
+        </span>
+      </label>
+    </div>
   </footer>
 
 </div>
 
 <script>
-    // Simple theme toggler to test Light/Dark modes
-    function toggleTheme() {
-      const body = document.body;
-      const currentTheme = body.getAttribute('data-theme');
-      body.setAttribute('data-theme', currentTheme === 'dark' ? 'light' : 'dark');
+  function toggleTheme() {
+    const body = document.body;
+    const checkbox = document.getElementById('themeToggle');
+    if (!checkbox) return;
+    if (checkbox.checked) {
+      body.setAttribute('data-theme', 'dark');
+    } else {
+      body.setAttribute('data-theme', 'light');
     }
+  }
 </script>
 
 </body>
