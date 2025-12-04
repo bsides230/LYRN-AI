@@ -42,6 +42,8 @@ class RWIServerHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_get_component(component_name)
             elif path_parts[1] == 'preview':
                 self.handle_get_preview()
+            elif path_parts[1] == 'settings':
+                self.handle_get_settings()
             else:
                 self._error("Endpoint not found", 404)
             return
@@ -69,6 +71,8 @@ class RWIServerHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_save_component(component_name, data)
             elif path_parts[1] == 'build':
                 self.handle_build_prompt()
+            elif path_parts[1] == 'settings':
+                self.handle_save_settings(data)
             else:
                 self._error("Endpoint not found", 404)
             return
@@ -278,6 +282,37 @@ class RWIServerHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(content.encode('utf-8'))
             else:
                 self._error("Master prompt not found", 404)
+        except Exception as e:
+            self._error(str(e), 500)
+
+    def handle_get_settings(self):
+        config_path = os.path.join(APP_ROOT, "build_prompt", "builder_config.json")
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            else:
+                config = {}
+            self._set_headers()
+            self.wfile.write(json.dumps(config).encode('utf-8'))
+        except Exception as e:
+            self._error(str(e), 500)
+
+    def handle_save_settings(self, data):
+        config_path = os.path.join(APP_ROOT, "build_prompt", "builder_config.json")
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    current_config = json.load(f)
+            else:
+                current_config = {}
+
+            current_config.update(data)
+
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(current_config, f, indent=2)
+            self._set_headers()
+            self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
         except Exception as e:
             self._error(str(e), 500)
 

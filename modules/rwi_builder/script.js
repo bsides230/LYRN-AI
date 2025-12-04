@@ -7,8 +7,62 @@ const API_BASE = '/api';
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
+    fetchSettings();
     fetchComponents();
+
+    // Load theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if(savedTheme === 'light') {
+        document.body.setAttribute('data-theme', 'light');
+        const themeToggle = document.getElementById('theme-toggle');
+        if(themeToggle) themeToggle.checked = true;
+    }
 });
+
+// --- Settings & Theme ---
+
+async function fetchSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/settings`);
+        if (response.ok) {
+            const settings = await response.json();
+            const locked = settings.master_prompt_locked || false;
+            const lockToggle = document.getElementById('lock-toggle');
+            if(lockToggle) lockToggle.checked = locked;
+            updateLockState(locked);
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function toggleLock(locked) {
+    updateLockState(locked);
+    try {
+        await fetch(`${API_BASE}/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ master_prompt_locked: locked })
+        });
+        showToast(locked ? "File Locked" : "File Unlocked");
+    } catch (e) {
+        showToast("Error saving lock state", true);
+    }
+}
+
+function updateLockState(locked) {
+    const btn = document.getElementById('rebuild-btn');
+    if (btn) {
+        btn.disabled = locked;
+        btn.title = locked ? "Master Prompt is locked" : "";
+        btn.style.opacity = locked ? 0.5 : 1;
+        btn.style.cursor = locked ? 'not-allowed' : 'pointer';
+    }
+}
+
+function toggleTheme(isLight) {
+    const theme = isLight ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+}
 
 // --- API Calls ---
 
@@ -112,20 +166,25 @@ function renderComponentsList() {
     const listEl = document.getElementById('components-list');
     listEl.innerHTML = '';
 
-    // Sort: Pinned (negative order/RWI usually) first, then by order
-    // But RWI usually has specific handling. Assuming standard list.
-    // The backend should send them sorted or we sort here.
-    // Assuming 'order' property exists.
+    // Sort: Pinned first, then by order
+    currentComponents.sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        return (a.order || 0) - (b.order || 0);
+    });
 
-    currentComponents.sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Normalize order
+    currentComponents.forEach((c, i) => c.order = i);
 
     currentComponents.forEach((comp, index) => {
         const item = document.createElement('div');
         item.className = `component-item ${selectedComponent === comp.name ? 'selected' : ''}`;
-        if (comp.name === 'RWI') item.classList.add('pinned');
+        if (comp.pinned) item.classList.add('pinned');
 
         item.innerHTML = `
             <span class="component-handle">::</span>
+            <button class="btn-icon pin-btn" onclick="event.stopPropagation(); togglePin('${comp.name}')" title="${comp.pinned ? 'Unpin' : 'Pin'}" style="margin-right:8px; border:none; padding:2px;">
+                ${comp.pinned ? '📌' : '📍'}
+            </button>
             <span class="component-name">${comp.name}</span>
             <label class="switch component-toggle" onclick="event.stopPropagation()">
                 <input type="checkbox" ${comp.active ? 'checked' : ''} onchange="toggleComponent('${comp.name}', this.checked)">
@@ -166,6 +225,15 @@ function toggleComponent(name, active) {
     if (comp) {
         comp.active = active;
         updateComponentsList(currentComponents);
+    }
+}
+
+function togglePin(name) {
+    const comp = currentComponents.find(c => c.name === name);
+    if (comp) {
+        comp.pinned = !comp.pinned;
+        renderComponentsList(); // Re-sorts and updates visual
+        updateComponentsList(currentComponents); // Saves
     }
 }
 

@@ -20,3 +20,23 @@ This update introduces a new HTML-based module for building the RWI system promp
 
 ### Logging
 - No changes to logging mechanisms were necessary for this update.
+
+## v4.2.9 - RWI Builder Enhancements (2025-12-05)
+
+This update adds requested features to the HTML RWI Builder.
+
+- **RWI Builder Improvements:**
+    - **File Lock:** Added a toggle to lock the master prompt from being overwritten by the builder. The state is saved in `build_prompt/builder_config.json`.
+    - **Pinning:** Added functionality to pin components to the top of the list. Order and pin status are automatically saved.
+    - **Theme Toggle:** Added a theme toggle in the new footer to switch between Light and Dark modes.
+    - **Renamed HTML:** Renamed `index.html` to `rwi_builder.html` for better linking structure.
+
+- **GUI Changes:**
+    - Updated `lyrn_sad_v4.2.9.py` to point to the new `rwi_builder.html` URL.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.2.9.py`.
+    - The previous version `lyrn_sad_v4.2.8.py` has been archived in `deprecated/Old/`.
+
+### Logging
+- Updated RWI Server to handle settings endpoints.

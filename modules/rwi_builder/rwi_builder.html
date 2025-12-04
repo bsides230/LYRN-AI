@@ -15,9 +15,16 @@
             <div class="meta-label">LYRN SYSTEM MODULE</div>
             <h1 class="hero-title">RWI Prompt Builder</h1>
         </div>
-        <div class="btn-group">
+        <div class="btn-group" style="align-items: center;">
+            <div class="lock-control" style="display: flex; align-items: center; margin-right: 15px; gap: 10px;">
+                 <span style="font-family: 'JetBrains Mono'; font-size: 11px; text-transform: uppercase; color: var(--text-dim);">Lock File</span>
+                 <label class="switch">
+                    <input type="checkbox" id="lock-toggle" onchange="toggleLock(this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
             <button onclick="previewPrompt()">View Final Prompt</button>
-            <button class="btn-primary" onclick="buildPrompt()">Rebuild Master Prompt</button>
+            <button class="btn-primary" id="rebuild-btn" onclick="buildPrompt()">Rebuild Master Prompt</button>
         </div>
     </header>
 
@@ -48,6 +55,19 @@
         </div>
     </div>
 </div>
+
+<footer style="border-top: 1px solid var(--border-color); padding: 15px 20px; margin-top: 0; background: var(--bg-panel);">
+    <div style="max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: var(--text-dim);">LYRN-AI RWI Builder v1.1</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+             <span style="font-family: 'JetBrains Mono'; font-size: 11px; text-transform: uppercase; color: var(--text-dim);">Theme</span>
+             <label class="switch">
+                <input type="checkbox" id="theme-toggle" onchange="toggleTheme(this.checked)">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+</footer>
 
 <div id="toast">Operation Successful</div>
 

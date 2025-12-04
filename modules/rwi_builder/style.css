@@ -158,9 +158,14 @@ header {
   background: var(--brand-purple-dim);
 }
 
-.component-item.pinned .component-name::after {
-    content: " 📌";
-    font-size: 10px;
+.pin-btn {
+    opacity: 0.4;
+    transition: opacity 0.2s;
+    font-size: 14px;
+}
+.pin-btn:hover,
+.component-item.pinned .pin-btn {
+    opacity: 1;
 }
 
 .component-handle {
