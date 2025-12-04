@@ -187,14 +187,14 @@ class JobManagerServerHandler(http.server.SimpleHTTPRequestHandler):
                 {
                     "id": s.id,
                     "job_name": s.job_name,
-                    "scheduled_datetime": s.scheduled_datetime.isoformat(),
-                    "created_at": s.created_at.isoformat()
+                    "scheduled_datetime": s.scheduled_datetime.isoformat()
                 }
                 for s in schedules
             ]
             self._set_headers()
             self.wfile.write(json.dumps(schedules_data).encode('utf-8'))
         except Exception as e:
+            traceback.print_exc()
             self._error(str(e), 500)
 
     def handle_add_schedule(self, data):
@@ -225,21 +225,23 @@ class JobManagerServerHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_get_cycles(self):
         try:
-            cycles = self.server.app.cycle_manager.get_cycles()
+            cycles = self.server.app.cycle_manager.cycles
             self._set_headers()
             self.wfile.write(json.dumps(cycles).encode('utf-8'))
         except Exception as e:
+            traceback.print_exc()
             self._error(str(e), 500)
 
     def handle_save_cycle(self, name, data):
         try:
             triggers = data.get('triggers', [])
-            if name not in self.server.app.cycle_manager.get_cycles():
+            if name not in self.server.app.cycle_manager.cycles:
                 self.server.app.cycle_manager.create_cycle(name)
             self.server.app.cycle_manager.update_cycle_triggers(name, triggers)
             self._set_headers()
             self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
         except Exception as e:
+            traceback.print_exc()
             self._error(str(e), 500)
 
     def handle_delete_cycle(self, name):
