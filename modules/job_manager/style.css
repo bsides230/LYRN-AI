@@ -172,6 +172,20 @@ header {
   color: var(--text-head);
 }
 
+.pin-icon {
+    cursor: pointer;
+    margin-left: 10px;
+    opacity: 0.3;
+    transition: opacity 0.2s;
+    font-size: 14px;
+}
+.pin-icon:hover {
+    opacity: 0.7;
+}
+.pin-icon.pinned {
+    opacity: 1.0;
+}
+
 /* Editor Area */
 .editor-scroll {
     overflow-y: auto;

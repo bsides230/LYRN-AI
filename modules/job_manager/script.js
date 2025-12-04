@@ -34,8 +34,6 @@ function switchTab(tabId) {
         refreshScheduler();
     } else if (tabId === 'cycles') {
         fetchCycles();
-    } else if (tabId === 'reflection') {
-        populateReflectionJobSelect();
     }
 }
 
@@ -88,12 +86,38 @@ function renderJobsList() {
     const jobNames = Object.keys(currentJobs).sort();
 
     jobNames.forEach(name => {
+        const job = currentJobs[name];
+        const isPinned = job.pinned === true;
         const item = document.createElement('div');
         item.className = `list-item ${selectedJob === name ? 'selected' : ''}`;
-        item.innerHTML = `<span class="item-name">${name}</span>`;
-        item.onclick = () => selectJob(name);
+
+        item.innerHTML = `
+            <span class="item-name">${name}</span>
+            <span class="pin-icon ${isPinned ? 'pinned' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}" onclick="togglePin(event, '${name}')">📌</span>
+        `;
+        item.onclick = (e) => {
+            if(e.target.classList.contains('pin-icon')) return;
+            selectJob(name);
+        };
         listEl.appendChild(item);
     });
+}
+
+async function togglePin(event, name) {
+    event.stopPropagation();
+    try {
+        const response = await fetch(`${API_BASE}/pin_job`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name })
+        });
+        if (!response.ok) throw new Error('Failed to toggle pin');
+
+        fetchJobs(); // Refresh list
+        showToast(`Toggled pin for ${name}`);
+    } catch (error) {
+        showToast(`Error: ${error.message}`, true);
+    }
 }
 
 function selectJob(name) {
@@ -173,6 +197,13 @@ async function saveCurrentJob() {
 
 async function deleteCurrentJob() {
     if (!selectedJob || selectedJob === '_NEW_') return;
+
+    const job = currentJobs[selectedJob];
+    if (job && job.pinned) {
+        showToast("Cannot delete pinned job", true);
+        return;
+    }
+
     if (!confirm(`Delete job '${selectedJob}'?`)) return;
 
     try {
@@ -526,45 +557,3 @@ async function deleteCurrentCycle() {
     }
 }
 
-// ==========================================
-// REFLECTION
-// ==========================================
-
-function populateReflectionJobSelect() {
-    populateJobSelect('reflection-target-job');
-}
-
-async function runReflectionManual() {
-    const jobName = document.getElementById('reflection-target-job').value;
-    const instructions = document.getElementById('reflection-instructions').value;
-    const goldStandard = document.getElementById('reflection-gold-standard').value;
-    const iterations = parseInt(document.getElementById('reflection-iterations').value) || 1;
-    const batchSize = parseInt(document.getElementById('reflection-batch-size').value) || 0;
-    const autoUpdate = document.getElementById('reflection-auto-update').checked;
-    const autoContinue = document.getElementById('reflection-auto-continue').checked;
-
-    if (!jobName) return showToast("Select a job", true);
-    if (!instructions) return showToast("Enter instructions", true);
-
-    const data = {
-        original_job_name: jobName,
-        instructions: instructions,
-        gold_standard: goldStandard,
-        iterations: iterations,
-        batch_size: batchSize,
-        auto_update: autoUpdate,
-        auto_continue: autoContinue
-    };
-
-    try {
-        const response = await fetch(`${API_BASE}/run_reflection`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!response.ok) throw new Error('Failed to queue reflection');
-        showToast('Reflection Job Queued');
-    } catch (error) {
-        showToast(`Error: ${error.message}`, true);
-    }
-}

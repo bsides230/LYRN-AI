@@ -40,3 +40,27 @@ This update adds requested features to the HTML RWI Builder.
 
 ### Logging
 - Updated RWI Server to handle settings endpoints.
+
+## v4.2.11 - HTML Job Manager Finalization (2025-12-05)
+
+This update finalizes the port of the Job Manager to an HTML-based module, fixing initialization issues and removing legacy code.
+
+- **Job Manager Fixes:**
+    - **Initialization:** Fixed an issue where the Job Manager server started before backend managers were initialized, causing tabs to be empty. Server start is now deferred until initialization is complete.
+    - **Fetching:** Updated server logic to access managers dynamically via the main app instance.
+
+- **Feature Updates:**
+    - **Reflection Removed:** Completely removed the "Reflection" cycle functionality, including the tab in the UI, backend endpoints, and execution logic.
+    - **Pinning Implemented:** Added "Pinning" functionality to the HTML Job Manager. Pinned jobs are now visually distinct and protected from deletion.
+    - **Execution:** Verified that jobs triggered from the web interface correctly execute in the main application's context.
+
+- **Cleanup:**
+    - **Legacy UI Removed:** Deleted `JobWatcherPopup`, `DaySchedulePopup`, `JobBuilderPopup`, `JobInstructionViewerPopup`, and `DraggableListbox` from the main Python application.
+    - **Logic Ported:** Ported the logic for managing active jobs (pinning) from `JobWatcherPopup` to `LyrnAIInterface`.
+
+- **Versioning:**
+    - The main application file has been versioned to `lyrn_sad_v4.2.11.py`.
+    - The previous version `lyrn_sad_v4.2.10.py` has been archived in `deprecated/Old/`.
+
+### Logging
+- Added traceback printing to Job Manager Server for better error visibility.
