@@ -29,18 +29,15 @@
     </header>
 
     <div class="main-grid">
-        <!-- Left Panel: Component List -->
         <div class="panel">
             <div class="panel-header">
                 <h3 class="panel-title">Components</h3>
                 <button class="btn-icon" onclick="addNewComponent()">+</button>
             </div>
             <div id="components-list">
-                <!-- Components will be populated here -->
-            </div>
+                </div>
         </div>
 
-        <!-- Right Panel: Editor -->
         <div class="panel">
             <div class="panel-header">
                 <h3 class="panel-title" id="editor-title">Editor</h3>
@@ -54,20 +51,21 @@
             </div>
         </div>
     </div>
-</div>
 
-<footer style="border-top: 1px solid var(--border-color); padding: 15px 20px; margin-top: 0; background: var(--bg-panel);">
-    <div style="max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: var(--text-dim);">LYRN-AI RWI Builder v1.1</span>
-        <div style="display: flex; align-items: center; gap: 10px;">
-             <span style="font-family: 'JetBrains Mono'; font-size: 11px; text-transform: uppercase; color: var(--text-dim);">Theme</span>
-             <label class="switch">
-                <input type="checkbox" id="theme-toggle" onchange="toggleTheme(this.checked)">
-                <span class="slider"></span>
+    <footer>
+        <span>LYRN SYSTEMS // THE SIMULATION COMPANY</span>
+        <div class="footer-right">
+            <span>RWI BUILDER // V1.1</span>
+            <label class="theme-toggle-inline">
+                THEME
+                <span class="switch">
+                    <input type="checkbox" id="theme-toggle" onchange="toggleTheme(this.checked)">
+                    <span class="slider"></span>
+                </span>
             </label>
         </div>
-    </div>
-</footer>
+    </footer>
+</div>
 
 <div id="toast">Operation Successful</div>
 

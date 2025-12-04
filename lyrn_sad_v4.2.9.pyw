@@ -4447,7 +4447,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def setup_window(self):
         """Configure main window with LYRN-AI branding"""
-        self.title("LYRN-AI Dashboard v4.2.7")
+        self.title("LYRN-AI Dashboard v4.2.9")
         size = self.settings_manager.ui_settings.get("window_size", "1400x900")
         self.geometry(size)
         self.minsize(1200, 800)
@@ -5167,7 +5167,7 @@ class LyrnAIInterface(ctk.CTkToplevel):
 
     def open_prompt_builder(self):
         """Opens the RWI Builder in the default web browser."""
-        webbrowser.open("http://localhost:8000")
+        webbrowser.open("http://localhost:8000/rwi_builder.html")
 
     def delete_component_by_name(self, component_name: str):
         build_prompt_dir = Path(SCRIPT_DIR) / "build_prompt"

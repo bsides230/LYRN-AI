@@ -2,41 +2,49 @@
   {
     "name": "RWI",
     "order": 0,
-    "active": true
+    "active": true,
+    "pinned": true
   },
   {
     "name": "system_instructions",
     "order": 1,
-    "active": true
+    "active": true,
+    "pinned": false
   },
   {
     "name": "system_rules",
     "order": 2,
-    "active": true
+    "active": true,
+    "pinned": false
   },
   {
     "name": "ai_preferences",
     "order": 3,
-    "active": true
+    "active": true,
+    "pinned": false
   },
   {
     "name": "personality",
     "order": 4,
-    "active": true
+    "active": true,
+    "pinned": false
   },
   {
     "name": "jobs",
     "order": 5,
-    "active": true
-  },
-  {
-    "name": "oss_tools",
-    "order": 6,
-    "active": false
+    "active": true,
+    "pinned": false
   },
   {
     "name": "user_preferences",
+    "order": 6,
+    "active": false,
+    "pinned": false
+  },
+  {
+    "name": "oss_tools",
     "order": 7,
-    "active": false
+    "active": false,
+    "pinned": false
   }
 ]
