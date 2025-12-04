@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Prompt Builder</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body data-theme="dark">
+    <div class="page-container">
+        <header>
+            <div class="meta-label">LYRN · SYSTEM PROMPT BUILDER</div>
+            <div class="header-content">
+                <h1 class="hero-title">System Prompt</h1>
+                <div class="header-actions">
+                    <button class="btn-primary" id="rebuild-btn">Rebuild Master Prompt</button>
+                    <button id="view-final-btn">View Final Prompt</button>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="lock-master-switch">
+                        <span class="slider"></span>
+                        <span class="label-text">Lock Master Prompt</span>
+                    </label>
+                </div>
+            </div>
+            <p style="color: var(--text-dim);">Manage and assemble the master system prompt from modular components.</p>
+        </header>
+
+        <div class="main-layout">
+            <!-- Left Panel: Component List -->
+            <aside class="sidebar">
+                <div class="section-divider">Components</div>
+                <div id="component-list" class="component-list">
+                    <!-- Components injected here by JS -->
+                </div>
+                <div class="sidebar-actions">
+                    <button id="add-component-btn" class="btn-small">+ Add Component</button>
+                </div>
+            </aside>
+
+            <!-- Right Panel: Editor -->
+            <main class="editor-area">
+                <div id="editor-placeholder" class="editor-placeholder">
+                    Select a component to edit.
+                </div>
+                <div id="editor-container" class="editor-container" style="display: none;">
+                    <div class="editor-header">
+                        <h2 id="editor-title">Component Name</h2>
+                        <div class="editor-actions">
+                            <button id="delete-component-btn" class="btn-small" style="margin-right:10px; color:#ff5c5c; border-color:#ff5c5c;">Delete</button>
+                            <button id="save-component-btn" class="btn-primary">Save Changes</button>
+                        </div>
+                    </div>
+
+                    <div id="editor-content">
+                        <!-- Dynamic Editor Content -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Templates for different editor types -->
+    <template id="tpl-generic-editor">
+        <div class="form-group">
+            <label>Begin Bracket</label>
+            <input type="text" class="input-code" name="begin_bracket">
+        </div>
+        <div class="form-group">
+            <label>End Bracket</label>
+            <input type="text" class="input-code" name="end_bracket">
+        </div>
+        <div class="form-group">
+            <label>RWI Info (Meta instructions)</label>
+            <textarea class="input-code" name="rwi_text" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Content / Prompt</label>
+            <textarea class="input-code" name="content" rows="15"></textarea>
+        </div>
+    </template>
+
+    <template id="tpl-rwi-editor">
+        <div class="form-group">
+            <label>Begin Bracket</label>
+            <input type="text" class="input-code" name="begin_bracket">
+        </div>
+        <div class="form-group">
+            <label>End Bracket</label>
+            <input type="text" class="input-code" name="end_bracket">
+        </div>
+        <div class="form-group">
+            <label>RWI Introduction (Core Logic)</label>
+            <textarea class="input-code" name="content" rows="15"></textarea>
+        </div>
+    </template>
+
+    <template id="tpl-personality-editor">
+        <div class="form-group">
+            <label>Begin Bracket</label>
+            <input type="text" class="input-code" name="begin_bracket">
+        </div>
+        <div class="form-group">
+            <label>End Bracket</label>
+            <input type="text" class="input-code" name="end_bracket">
+        </div>
+        <div class="form-group">
+            <label>RWI Info</label>
+            <textarea class="input-code" name="rwi_text" rows="2"></textarea>
+        </div>
+
+        <div class="section-divider">Traits</div>
+        <div id="traits-list"></div>
+        <button id="add-trait-btn" class="btn-small" style="margin-top:10px;">+ Add Trait</button>
+    </template>
+
+    <!-- Modal for viewing final prompt -->
+    <div id="modal-overlay" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Final Master Prompt</h3>
+                <button id="close-modal-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="modal-content" readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
