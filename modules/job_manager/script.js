@@ -94,9 +94,10 @@ function renderJobsList() {
         item.innerHTML = `
             <span class="item-name">${name}</span>
             <span class="pin-icon ${isPinned ? 'pinned' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}" onclick="togglePin(event, '${name}')">📌</span>
+            <span class="btn-icon" style="color: var(--error-color); cursor: pointer;" title="Delete" onclick="deleteJob(event, '${name}')">✕</span>
         `;
         item.onclick = (e) => {
-            if(e.target.classList.contains('pin-icon')) return;
+            if(e.target.classList.contains('pin-icon') || e.target.classList.contains('btn-icon')) return;
             selectJob(name);
         };
         listEl.appendChild(item);
@@ -125,7 +126,9 @@ function selectJob(name) {
     renderJobsList();
 
     document.getElementById('job-editor-title').innerText = `Editing: ${name}`;
-    document.getElementById('delete-job-btn').style.display = 'block';
+    // Run button only for existing jobs
+    const runBtn = document.getElementById('run-job-btn');
+    if(runBtn) runBtn.style.display = 'block';
 
     const jobData = currentJobs[name];
     renderJobEditor(name, jobData);
@@ -136,7 +139,8 @@ function addNewJob() {
     renderJobsList(); // Updates selection visual
 
     document.getElementById('job-editor-title').innerText = 'New Job';
-    document.getElementById('delete-job-btn').style.display = 'none';
+    const runBtn = document.getElementById('run-job-btn');
+    if(runBtn) runBtn.style.display = 'none';
 
     renderJobEditor('_NEW_', { instructions: '', trigger: '' });
 }
@@ -195,24 +199,27 @@ async function saveCurrentJob() {
     }
 }
 
-async function deleteCurrentJob() {
-    if (!selectedJob || selectedJob === '_NEW_') return;
+async function deleteJob(event, name) {
+    if(event) event.stopPropagation();
 
-    const job = currentJobs[selectedJob];
+    const job = currentJobs[name];
     if (job && job.pinned) {
         showToast("Cannot delete pinned job", true);
         return;
     }
 
-    if (!confirm(`Delete job '${selectedJob}'?`)) return;
+    if (!confirm(`Delete job '${name}'?`)) return;
 
     try {
-        const response = await fetch(`${API_BASE}/job/${selectedJob}`, { method: 'DELETE' });
+        const response = await fetch(`${API_BASE}/job/${encodeURIComponent(name)}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Delete failed');
-        showToast(`Deleted ${selectedJob}`);
-        selectedJob = null;
-        document.getElementById('job-editor-container').innerHTML = '<p style="color: var(--text-dim); padding: 20px; text-align: center;">Select a job to edit.</p>';
-        document.getElementById('delete-job-btn').style.display = 'none';
+        showToast(`Deleted ${name}`);
+        if(selectedJob === name) {
+            selectedJob = null;
+            document.getElementById('job-editor-container').innerHTML = '<p style="color: var(--text-dim); padding: 20px; text-align: center;">Select a job to edit.</p>';
+            const runBtn = document.getElementById('run-job-btn');
+            if(runBtn) runBtn.style.display = 'none';
+        }
         fetchJobs();
     } catch (error) {
         showToast(`Delete error: ${error.message}`, true);
@@ -355,7 +362,8 @@ function renderDaySchedulesList() {
     schedules.sort((a,b) => new Date(a.scheduled_datetime) - new Date(b.scheduled_datetime));
 
     schedules.forEach(s => {
-        const time = new Date(s.scheduled_datetime).toLocaleTimeString();
+        // Display time in local format (AM/PM)
+        const time = new Date(s.scheduled_datetime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
         const item = document.createElement('div');
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
@@ -384,14 +392,23 @@ function populateJobSelect(selectId) {
 
 async function addSchedule() {
     const jobName = document.getElementById('scheduler-job-select').value;
-    const h = parseInt(document.getElementById('sched-hour').value) || 0;
+    let h = parseInt(document.getElementById('sched-hour').value) || 12;
     const m = parseInt(document.getElementById('sched-minute').value) || 0;
-    const s = parseInt(document.getElementById('sched-second').value) || 0;
+    const ampm = document.getElementById('sched-ampm').value;
 
     if (!jobName) return;
 
+    // Convert 12h to 24h
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+
     const dt = new Date(selectedDate);
-    dt.setHours(h, m, s);
+    dt.setHours(h, m, 0);
+
+    // Create a local ISO string (YYYY-MM-DDTHH:MM:SS) to send to backend
+    // The backend should treat this as "Server Local Time"
+    const offsetMs = dt.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(dt.getTime() - offsetMs)).toISOString().slice(0, -1);
 
     try {
         const response = await fetch(`${API_BASE}/schedule`, {
@@ -399,7 +416,7 @@ async function addSchedule() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 job_name: jobName,
-                scheduled_datetime: dt.toISOString()
+                scheduled_datetime: localISOTime // Send naive local time (or pretend UTC)
             })
         });
         if (!response.ok) throw new Error('Failed to add schedule');
@@ -450,8 +467,14 @@ function renderCyclesList() {
     cycleNames.forEach(name => {
         const item = document.createElement('div');
         item.className = `list-item ${selectedCycle === name ? 'selected' : ''}`;
-        item.innerHTML = `<span class="item-name">${name}</span>`;
-        item.onclick = () => selectCycle(name);
+        item.innerHTML = `
+            <span class="item-name">${name}</span>
+            <span class="btn-icon" style="color: var(--error-color); cursor: pointer;" title="Delete" onclick="deleteCycle(event, '${name}')">✕</span>
+        `;
+        item.onclick = (e) => {
+            if(e.target.classList.contains('btn-icon')) return;
+            selectCycle(name);
+        };
         listEl.appendChild(item);
     });
 }
@@ -461,7 +484,6 @@ function selectCycle(name) {
     renderCyclesList();
 
     document.getElementById('cycle-editor-title').innerText = `Cycle: ${name}`;
-    document.getElementById('delete-cycle-btn').style.display = 'block';
 
     const cycleData = currentCycles[name];
     renderCycleEditor(name, cycleData);
@@ -472,7 +494,6 @@ function addNewCycle() {
     renderCyclesList();
 
     document.getElementById('cycle-editor-title').innerText = 'New Cycle';
-    document.getElementById('delete-cycle-btn').style.display = 'none';
 
     renderCycleEditor('_NEW_', { triggers: [] });
 }
@@ -540,17 +561,19 @@ async function saveCurrentCycle() {
     }
 }
 
-async function deleteCurrentCycle() {
-    if (!selectedCycle || selectedCycle === '_NEW_') return;
-    if (!confirm(`Delete cycle '${selectedCycle}'?`)) return;
+async function deleteCycle(event, name) {
+    if(event) event.stopPropagation();
+
+    if (!confirm(`Delete cycle '${name}'?`)) return;
 
     try {
-        const response = await fetch(`${API_BASE}/cycle/${selectedCycle}`, { method: 'DELETE' });
+        const response = await fetch(`${API_BASE}/cycle/${encodeURIComponent(name)}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Delete failed');
-        showToast(`Deleted ${selectedCycle}`);
-        selectedCycle = null;
-        document.getElementById('cycle-editor-container').innerHTML = '';
-        document.getElementById('delete-cycle-btn').style.display = 'none';
+        showToast(`Deleted ${name}`);
+        if(selectedCycle === name) {
+            selectedCycle = null;
+            document.getElementById('cycle-editor-container').innerHTML = '<p style="color: var(--text-dim); padding: 20px; text-align: center;">Select a cycle to edit.</p>';
+        }
         fetchCycles();
     } catch (error) {
         showToast(`Delete error: ${error.message}`, true);

@@ -205,7 +205,9 @@ class JobManagerServerHandler(http.server.SimpleHTTPRequestHandler):
                 self._error("Missing job_name or scheduled_datetime")
                 return
 
-            dt = datetime.fromisoformat(dt_iso.replace('Z', '+00:00'))
+            # The frontend sends a naive ISO string representing the user's local wall-clock time
+            # We parse it directly as naive (server local time)
+            dt = datetime.fromisoformat(dt_iso.replace('Z', '')) # Remove Z if present just in case
             if dt.tzinfo is not None:
                 dt = dt.replace(tzinfo=None)
 
@@ -246,7 +248,9 @@ class JobManagerServerHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_delete_cycle(self, name):
         try:
-            self.server.app.cycle_manager.delete_cycle(name)
+            # Decode name in case of special chars/spaces if not handled by urlparse fully
+            decoded_name = urllib.parse.unquote(name)
+            self.server.app.cycle_manager.delete_cycle(decoded_name)
             self._set_headers()
             self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
         except Exception as e:

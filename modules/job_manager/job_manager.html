@@ -15,9 +15,6 @@
             <div class="meta-label">LYRN SYSTEM MODULE</div>
             <h1 class="hero-title">Job Manager</h1>
         </div>
-        <div class="btn-group">
-            <button class="btn-primary" onclick="runJob()">Run Job</button>
-        </div>
     </header>
 
     <div class="nav-tabs">
@@ -42,7 +39,7 @@
             <div class="panel-header">
                 <h3 class="panel-title" id="job-editor-title">Job Editor</h3>
                 <div class="btn-group">
-                    <button class="btn-delete" id="delete-job-btn" style="display: none;" onclick="deleteCurrentJob()">Delete</button>
+                    <button class="btn-primary" id="run-job-btn" style="display: none; margin-right: 10px;" onclick="runJob()">Run Job</button>
                     <button class="btn-primary" id="save-job-btn" onclick="saveCurrentJob()">Save</button>
                 </div>
             </div>
@@ -85,7 +82,6 @@
             <div class="panel-header">
                 <h3 class="panel-title" id="cycle-editor-title">Cycle Editor</h3>
                  <div class="btn-group">
-                    <button class="btn-delete" id="delete-cycle-btn" style="display: none;" onclick="deleteCurrentCycle()">Delete Cycle</button>
                     <button class="btn-primary" id="save-cycle-btn" onclick="saveCurrentCycle()">Save Cycle</button>
                 </div>
             </div>
@@ -131,9 +127,12 @@
             <div class="form-group">
                 <label>Time</label>
                 <div style="display: flex; gap: 10px;">
-                    <input type="number" id="sched-hour" placeholder="HH" min="0" max="23" style="width: 60px;">
+                    <input type="number" id="sched-hour" placeholder="HH" min="1" max="12" style="width: 60px;">
                     <input type="number" id="sched-minute" placeholder="MM" min="0" max="59" style="width: 60px;">
-                    <input type="number" id="sched-second" placeholder="SS" min="0" max="59" style="width: 60px;">
+                    <select id="sched-ampm" style="width: 70px; background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;">
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                    </select>
                 </div>
             </div>
             <button class="btn-primary" onclick="addSchedule()">Schedule</button>
