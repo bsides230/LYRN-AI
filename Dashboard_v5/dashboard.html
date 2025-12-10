@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LYRN Dashboard v0.24</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+    <style>
+        /* =========================================
+           1. CORE VARIABLES & THEME
+           ========================================= */
+        :root {
+            /* DARK MODE DEFAULTS */
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --brand-purple: #7c5cff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.1);
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #222222;
+            
+            /* DOCK TOKENS */
+            --dock-bg: rgba(10, 10, 10, 0.85);
+            --dock-border: rgba(255, 255, 255, 0.1);
+            --dock-blur: 20px;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --brand-purple: #6a4ce0;
+            --brand-purple-dim: rgba(106, 76, 224, 0.1);
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --dock-bg: rgba(255, 255, 255, 0.85);
+            --dock-border: rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; }
+        
+        body {
+            margin: 0; padding: 0; width: 100vw; 
+            min-height: 100vh; overflow: hidden; 
+            background-color: var(--bg-core);
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--text-body);
+            transition: background-color 0.5s ease;
+            background-image:
+                repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(124, 92, 255, 0.03) 10px, rgba(124, 92, 255, 0.03) 11px),
+                radial-gradient(circle at 50% 0%, rgba(124, 92, 255, 0.15) 0%, transparent 60%);
+            background-size: auto, 100% 100%;
+            background-attachment: fixed;
+        }
+        
+        /* UTILITY: Prevent Selection during Drag */
+        body.no-select * {
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+
+        /* =========================================
+           2. WINDOW SYSTEM
+           ========================================= */
+        #desktop-area { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; pointer-events: none; }
+        
+        .lyrn-window {
+            pointer-events: auto;
+            position: absolute; background: var(--bg-panel); border: 1px solid var(--border-color);
+            display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            border-radius: 8px; width: 800px; height: 600px;
+            min-width: 300px; min-height: 200px;
+            transition: box-shadow 0.2s, opacity 0.2s, transform 0.2s;
+            opacity: 0; transform: scale(0.95);
+            animation: openWin 0.2s forwards ease-out;
+        }
+        
+        @keyframes openWin { to { opacity: 1; transform: scale(1); } }
+
+        .lyrn-window.active {
+            border-color: var(--brand-purple);
+            box-shadow: 0 25px 70px rgba(0,0,0,0.7), 0 0 15px var(--brand-purple-dim);
+        }
+        
+        /* PINNED STATE: Ensures window is always very high z-index but BELOW dock */
+        .lyrn-window.pinned {
+            z-index: 9999 !important; 
+            border: 1px solid var(--brand-purple);
+            box-shadow: 0 0 0 1px var(--brand-purple), 0 25px 70px rgba(0,0,0,0.7);
+        }
+
+        .window-header {
+            height: 36px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center; padding: 0 8px 0 12px;
+            cursor: grab; user-select: none; flex-shrink: 0;
+        }
+        .window-header:active { cursor: grabbing; }
+        
+        .window-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; color: var(--text-dim); }
+        
+        .win-controls { display: flex; align-items: center; gap: 4px; }
+        
+        .win-btn {
+            background: transparent; border: none; color: var(--text-dim);
+            width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 12px;
+            transition: all 0.2s;
+        }
+        .win-btn:hover { background: var(--brand-purple-dim); color: var(--text-head); }
+        .win-btn.is-pinned { color: var(--brand-purple); transform: rotate(45deg); }
+        .win-btn.close-btn:hover { background: rgba(255, 68, 68, 0.1); color: #ff4444; }
+
+        .window-content { flex: 1; position: relative; background: var(--bg-core); overflow: hidden; }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        .iframe-shield { position: absolute; top:0; left:0; width:100%; height:100%; z-index:10; display:none; }
+        .lyrn-window.is-dragging .iframe-shield, 
+        .lyrn-window.is-resizing .iframe-shield { display: block; }
+
+        .resize-handle {
+            position: absolute; bottom: 0; right: 0;
+            z-index: 20; opacity: 0.5; transition: opacity 0.2s;
+        }
+        .resize-handle:hover { opacity: 1; background: var(--brand-purple-dim); }
+
+        /* =========================================
+           3. FLOATING DOCK & SETTINGS
+           ========================================= */
+        #floating-dock {
+            position: fixed;
+            /* GLOBAL Z-INDEX: Higher than any window */
+            z-index: 20000; 
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end; 
+            width: 50px; height: 30px; 
+            bottom: 30px; right: 30px;
+            transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        #floating-dock.is-dragging { transition: none !important; }
+
+        /* DOCK CONTENT (Icons) */
+        #dock-content {
+            position: absolute; bottom: 100%; margin-bottom: 12px;
+            display: flex; gap: 8px; padding: 10px;
+            background: var(--dock-bg); backdrop-filter: blur(var(--dock-blur));
+            border: 1px solid var(--dock-border); border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            opacity: 1; pointer-events: auto;
+            transform-origin: bottom center;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 20; 
+        }
+        
+        #floating-dock.dock-collapsed:not(.pinned-open) #dock-content {
+            opacity: 0;
+            transform: translateY(10px) scale(0.8);
+            pointer-events: none;
+            visibility: hidden;
+        }
+
+        /* DOCK HANDLE */
+        #dock-handle {
+            width: 50px; height: 30px;
+            background: var(--dock-bg); backdrop-filter: blur(var(--dock-blur));
+            border: 1px solid var(--dock-border); border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            cursor: grab; 
+            z-index: 10;
+        }
+        #dock-handle:active { cursor: grabbing; transform: scale(0.95); }
+        .handle-bar {
+            width: 20px; height: 4px; background-color: #ffffff;
+            border-radius: 2px; box-shadow: 0 0 6px var(--brand-purple), 0 0 12px var(--brand-purple);
+        }
+
+        .dock-btn {
+            background: transparent; border: 1px solid transparent; color: var(--text-dim);
+            border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; position: relative;
+        }
+        .dock-btn:hover {
+            background: var(--brand-purple-dim); color: var(--brand-purple); border-color: var(--brand-purple);
+            transform: translateY(-2px);
+        }
+        .dock-btn.is-open::before {
+            content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+            width: 4px; height: 4px; border-radius: 50%; background: var(--brand-purple);
+            box-shadow: 0 0 5px var(--brand-purple);
+        }
+
+        /* SETTINGS POPUP */
+        #settings-popup {
+            position: absolute; bottom: 100%; right: 0; 
+            margin-bottom: 20px; width: 220px;
+            background: var(--dock-bg); backdrop-filter: blur(var(--dock-blur));
+            border: 1px solid var(--dock-border); border-radius: 12px;
+            padding: 15px; color: var(--text-body);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            display: none; flex-direction: column; gap: 15px;
+            pointer-events: auto; cursor: default;
+            z-index: 30;
+        }
+        #settings-popup.show { display: flex; animation: popupFade 0.2s ease-out; }
+        @keyframes popupFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .settings-section { display: flex; flex-direction: column; gap: 8px; }
+        .settings-header { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-bottom: 4px; }
+        
+        .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        
+        /* Custom Checkbox/Switch */
+        .toggle-switch { position: relative; width: 32px; height: 18px; display: inline-block; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; border-radius: 18px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: var(--text-dim); transition: .4s; border-radius: 50%; }
+        input:checked + .toggle-slider { background-color: var(--brand-purple); }
+        input:checked + .toggle-slider:before { transform: translateX(14px); background-color: white; }
+
+        /* DESKTOP LAYOUT */
+        @media (min-width: 901px) {
+            #dock-content { flex-direction: row; left: 50%; transform: translateX(-50%); }
+            #floating-dock.dock-collapsed:not(.pinned-open) #dock-content { transform: translateX(-50%) translateY(10px) scale(0.8); }
+            .dock-btn { width: 44px; height: 44px; font-size: 20px; }
+            
+            .resize-handle {
+                width: 15px; height: 15px; cursor: nwse-resize;
+                border-bottom: 2px solid var(--border-color);
+                border-right: 2px solid var(--border-color);
+                border-bottom-right-radius: 8px;
+            }
+
+            .dock-btn::after {
+                content: attr(title); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+                background: var(--bg-panel); border: 1px solid var(--border-color); color: var(--text-head);
+                font-size: 10px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; opacity: 0; 
+                pointer-events: none; font-family: 'JetBrains Mono'; transition: opacity 0.2s;
+            }
+            .dock-btn:hover::after { opacity: 1; }
+
+            /* =========================================
+               4. FIXED CENTER DOCK (Desktop Only)
+               ========================================= */
+            #floating-dock.fixed-mode {
+                /* Force position to bottom center */
+                top: auto !important;
+                left: 50% !important;
+                bottom: 30px !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                
+                /* Reset container size to fit content */
+                width: auto; height: auto;
+                transition: bottom 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+
+            /* Hide the drag handle in fixed mode */
+            #floating-dock.fixed-mode #dock-handle { display: none; }
+
+            /* Reposition content to sit naturally */
+            #floating-dock.fixed-mode #dock-content {
+                position: relative;
+                bottom: auto; margin-bottom: 0; left: auto;
+                transform: none !important; opacity: 1 !important; visibility: visible;
+                
+                /* Premium Styling Overrides */
+                background: rgba(15, 15, 15, 0.6);
+                backdrop-filter: blur(25px) saturate(180%);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+                padding: 12px 16px; gap: 12px; border-radius: 24px;
+            }
+
+            /* Light Mode Specifics for Fixed Dock */
+            body[data-theme="light"] #floating-dock.fixed-mode #dock-content {
+                background: rgba(255, 255, 255, 0.65);
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.6);
+            }
+
+            /* "Magnification" Hover Effect */
+            #floating-dock.fixed-mode .dock-btn {
+                transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                margin: 0 2px;
+            }
+            #floating-dock.fixed-mode .dock-btn:hover {
+                transform: translateY(-8px) scale(1.2);
+                background: var(--brand-purple); color: white;
+                box-shadow: 0 10px 20px var(--brand-purple-dim);
+                z-index: 100; margin: 0 8px;
+            }
+            
+            /* Reposition Settings Popup in Fixed Mode */
+            #floating-dock.fixed-mode #settings-popup {
+                bottom: 100%; right: 50%; transform: translateX(50%);
+                margin-bottom: 20px; transform-origin: bottom center;
+            }
+            #floating-dock.fixed-mode #settings-popup.show {
+                animation: popupFixedUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            }
+            @keyframes popupFixedUp { from { opacity: 0; transform: translateX(50%) translateY(20px) scale(0.9); } to { opacity: 1; transform: translateX(50%) translateY(0) scale(1); } }
+        }
+
+        /* MOBILE LAYOUT */
+        @media (max-width: 900px) {
+            body { overflow-y: auto; height: auto; }
+            #desktop-area { position: relative; height: auto; padding: 20px; padding-bottom: 120px; }
+            .lyrn-window { position: relative !important; width: 100% !important; height: 500px; margin-bottom: 20px; }
+            
+            #dock-content { flex-direction: column-reverse; left: 50%; transform: translateX(-50%); }
+            #floating-dock.dock-collapsed:not(.pinned-open) #dock-content { transform: translateX(-50%) translateY(10px) scale(0.8); }
+            .dock-btn { width: 40px; height: 40px; font-size: 18px; }
+            .dock-btn::after { display: none; }
+            
+            /* Hide Fixed Dock toggle on mobile */
+            .desktop-only-setting { display: none !important; }
+
+            .resize-handle {
+                width: 100%; height: 24px; bottom: 0; left: 0;
+                cursor: ns-resize;
+                display: flex; align-items: center; justify-content: center;
+            }
+            .resize-handle::before {
+                content: ''; width: 40px; height: 4px; background: var(--border-color); border-radius: 2px;
+            }
+            
+            #settings-popup { right: -20px; bottom: 120%; }
+        }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div id="desktop-area"></div>
+
+    <div id="floating-dock" class="dock-collapsed">
+        <div id="settings-popup">
+            <div class="settings-section">
+                <div class="settings-header">Quick Settings</div>
+                <div class="settings-row">
+                    <span>Dark Mode</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="settings-row" id="row-dock-pin">
+                    <span>Pin Dock Open</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-dock-pin" onchange="toggleDockPin(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="settings-row desktop-only-setting">
+                    <span>Fixed Center Dock</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-dock-fixed" onchange="toggleFixedDock(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="settings-section">
+                <div class="settings-header">Modules</div>
+                <div id="module-list-container"></div>
+            </div>
+        </div>
+
+        <div id="dock-content"></div>
+
+        <div id="dock-handle" title="Drag to move, Click to toggle">
+            <div class="handle-bar"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           CONFIG: DOCK APP MANIFEST
+           ========================================================================= */
+        const MODULE_REGISTRY = [
+            // IMPORTANT: 'file' path is relative to the dashboard. 
+            // If dashboard is in root, use "modules/Snapshot Builder.html".
+            { id: "mod_builder", file: "Snapshot Builder.html", name: "Snapshot Builder", icon: "🛠️" },
+        ];
+        /* ========================================================================= */
+
+        /* --- GLOBAL STATE --- */
+        let zIndexCounter = 100;
+        let activeWindows = new Set();
+        const GRID_SIZE = 20; 
+        
+        let appSettings = {
+            activeModules: ['mod_builder'], 
+            dockPinned: false,
+            dockFixed: false,
+            theme: 'dark'
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            renderDock();
+            initFloatingDock();
+            initSettingsUI();
+            
+            document.body.setAttribute('data-theme', appSettings.theme);
+            document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
+            
+            if(appSettings.dockPinned) {
+                document.getElementById('floating-dock').classList.add('pinned-open');
+                document.getElementById('setting-dock-pin').checked = true;
+            }
+
+            if(appSettings.dockFixed) {
+                toggleFixedDock(true, false); // Don't save on load
+                document.getElementById('setting-dock-fixed').checked = true;
+            }
+        });
+
+        function loadSettings() {
+            const saved = localStorage.getItem('lyrn-settings');
+            if(saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appSettings = { ...appSettings, ...parsed };
+                } catch(e) { console.error("Settings parse error", e); }
+            }
+        }
+
+        function saveSettings() {
+            localStorage.setItem('lyrn-settings', JSON.stringify(appSettings));
+        }
+
+        // 1. RENDER DOCK & MODULE LIST
+        function renderDock() {
+            const container = document.getElementById('dock-content');
+            const modContainer = document.getElementById('module-list-container');
+            
+            container.innerHTML = '';
+            modContainer.innerHTML = '';
+            
+            MODULE_REGISTRY.forEach(mod => {
+                const isActive = appSettings.activeModules.includes(mod.id);
+                
+                // Settings List
+                const row = document.createElement('div');
+                row.className = 'settings-row';
+                row.innerHTML = `
+                    <span>${mod.name}</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleModuleActive('${mod.id}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                `;
+                modContainer.appendChild(row);
+
+                // Dock Button
+                if(isActive) {
+                    const btn = document.createElement('button');
+                    btn.className = 'dock-btn';
+                    btn.id = 'btn_' + mod.id; 
+                    btn.title = mod.name;
+                    btn.innerHTML = mod.icon;
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleWindow(mod);
+                        if(window.innerWidth <= 900 && !appSettings.dockPinned) {
+                            document.getElementById('floating-dock').classList.add('dock-collapsed');
+                        }
+                    };
+                    container.appendChild(btn);
+                }
+            });
+            
+            // Separator
+            const sep = document.createElement('div');
+            sep.style.cssText = window.innerWidth <= 900 
+                ? "height:1px; width:20px; background:var(--border-color); opacity:0.5; margin:4px auto;"
+                : "width:1px; height:20px; background:var(--border-color); opacity:0.5; margin:0 4px;";
+            container.appendChild(sep);
+
+            // Settings Button
+            const settingsBtn = document.createElement('button');
+            settingsBtn.className = 'dock-btn';
+            settingsBtn.innerHTML = '⚙️';
+            settingsBtn.title = 'Settings';
+            settingsBtn.id = 'btn_settings';
+            settingsBtn.onclick = (e) => {
+                e.stopPropagation();
+                const popup = document.getElementById('settings-popup');
+                popup.classList.toggle('show');
+            };
+            container.appendChild(settingsBtn);
+        }
+
+        function toggleModuleActive(modId, isChecked) {
+            if(isChecked) {
+                if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId);
+            } else {
+                appSettings.activeModules = appSettings.activeModules.filter(id => id !== modId);
+            }
+            saveSettings();
+            renderDock(); 
+        }
+
+        function toggleTheme(isDark) {
+            const theme = isDark ? 'dark' : 'light';
+            document.body.setAttribute('data-theme', theme);
+            appSettings.theme = theme;
+            saveSettings();
+            
+            document.querySelectorAll('iframe').forEach(frame => {
+                frame.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
+            });
+        }
+
+        function toggleDockPin(pinned) {
+            appSettings.dockPinned = pinned;
+            const dock = document.getElementById('floating-dock');
+            if(pinned) dock.classList.add('pinned-open');
+            else dock.classList.remove('pinned-open');
+            saveSettings();
+        }
+
+        function toggleFixedDock(isFixed, save = true) {
+            appSettings.dockFixed = isFixed;
+            const dock = document.getElementById('floating-dock');
+            const pinRow = document.getElementById('row-dock-pin');
+            
+            if (isFixed) {
+                dock.classList.add('fixed-mode');
+                // Disable Pin toggle visually as Fixed mode implies pinned
+                if(pinRow) {
+                    pinRow.style.opacity = '0.3';
+                    pinRow.style.pointerEvents = 'none';
+                }
+            } else {
+                dock.classList.remove('fixed-mode');
+                // Restore Floating Position
+                const savedPos = localStorage.getItem('lyrn-dock-xy');
+                if (savedPos) {
+                    const { left, top } = JSON.parse(savedPos);
+                    dock.style.left = left + 'px';
+                    dock.style.top = top + 'px';
+                    dock.style.transform = 'none';
+                }
+                // Enable Pin toggle
+                if(pinRow) {
+                    pinRow.style.opacity = '1';
+                    pinRow.style.pointerEvents = 'auto';
+                }
+            }
+            if (save) saveSettings();
+        }
+
+        function initSettingsUI() {
+            document.addEventListener('click', (e) => {
+                const popup = document.getElementById('settings-popup');
+                const btn = document.getElementById('btn_settings');
+                if(popup.classList.contains('show') && !popup.contains(e.target) && !btn.contains(e.target)) {
+                    popup.classList.remove('show');
+                }
+            });
+        }
+
+        // 2. WINDOW SYSTEM
+        function toggleWindow(mod) {
+            const winId = 'win_' + mod.id;
+            const existingWin = document.getElementById(winId);
+            const btn = document.getElementById('btn_' + mod.id);
+
+            if (existingWin) {
+                existingWin.style.opacity = '0';
+                existingWin.style.transform = 'scale(0.9)';
+                setTimeout(() => existingWin.remove(), 200);
+                activeWindows.delete(mod.id);
+                if(btn) btn.classList.remove('is-open');
+            } else {
+                createWindow(mod, winId);
+                activeWindows.add(mod.id);
+                if(btn) btn.classList.add('is-open');
+            }
+        }
+
+        function createWindow(mod, id) {
+            const isMobile = window.innerWidth <= 900;
+            const area = document.getElementById('desktop-area');
+            
+            const win = document.createElement('div');
+            win.className = 'lyrn-window active';
+            win.id = id;
+            win.style.zIndex = ++zIndexCounter;
+            
+            win.onmousedown = () => {
+                if(!win.classList.contains('pinned')) win.style.zIndex = ++zIndexCounter;
+            };
+
+            if(!isMobile) {
+                const offset = (activeWindows.size * 30) % 150;
+                win.style.left = (100 + offset) + 'px';
+                win.style.top = (50 + offset) + 'px';
+            }
+
+            win.innerHTML = `
+                <div class="window-header">
+                    <span class="window-title">${mod.name}</span>
+                    <div class="win-controls">
+                         <button class="win-btn" title="Pin Window" onclick="togglePinWindow(this)">📌</button>
+                         <button class="win-btn close-btn" title="Close" onclick="toggleWindow({id: '${mod.id}'})">✕</button>
+                    </div>
+                </div>
+                <div class="window-content">
+                    <div class="iframe-shield"></div>
+                    <iframe src="modules/${mod.file}" onload="syncFrameTheme(this)"></iframe>
+                </div>
+                <div class="resize-handle"></div>
+            `;
+            
+            area.appendChild(win);
+            setupWindowInteractions(win, isMobile);
+        }
+
+        window.syncFrameTheme = (iframe) => {
+            iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
+        };
+
+        window.togglePinWindow = (btn) => {
+            const win = btn.closest('.lyrn-window');
+            if(win.classList.contains('pinned')) {
+                win.classList.remove('pinned');
+                btn.classList.remove('is-pinned');
+                win.style.zIndex = ++zIndexCounter; 
+            } else {
+                win.classList.add('pinned');
+                btn.classList.add('is-pinned');
+            }
+        };
+
+        // 3. DRAG & RESIZE LOGIC
+        function setupWindowInteractions(win, isMobile) {
+            if(!isMobile) {
+                const header = win.querySelector('.window-header');
+                header.onmousedown = (e) => {
+                    if(e.target.closest('button')) return; 
+                    
+                    if(!win.classList.contains('pinned')) win.style.zIndex = ++zIndexCounter;
+                    win.classList.add('is-dragging');
+                    document.body.classList.add('no-select');
+                    
+                    const sx = e.clientX, sy = e.clientY;
+                    const il = win.offsetLeft, it = win.offsetTop;
+                    const winW = win.offsetWidth, winH = win.offsetHeight;
+                    const screenW = window.innerWidth, screenH = window.innerHeight;
+
+                    const moveHandler = (me) => {
+                        let rawLeft = il + (me.clientX - sx);
+                        let rawTop = it + (me.clientY - sy);
+                        let snapLeft = Math.round(rawLeft / GRID_SIZE) * GRID_SIZE;
+                        let snapTop = Math.round(rawTop / GRID_SIZE) * GRID_SIZE;
+                        const maxLeft = screenW - winW;
+                        const maxTop = screenH - winH;
+                        
+                        win.style.left = Math.max(0, Math.min(snapLeft, maxLeft)) + 'px';
+                        win.style.top = Math.max(0, Math.min(snapTop, maxTop)) + 'px';
+                    };
+
+                    const upHandler = () => {
+                        win.classList.remove('is-dragging');
+                        document.body.classList.remove('no-select');
+                        document.removeEventListener('mousemove', moveHandler);
+                        document.removeEventListener('mouseup', upHandler);
+                    };
+                    document.addEventListener('mousemove', moveHandler);
+                    document.addEventListener('mouseup', upHandler);
+                };
+            }
+
+            const resizer = win.querySelector('.resize-handle');
+            resizer.onmousedown = (e) => {
+                e.stopPropagation();
+                if(!win.classList.contains('pinned')) win.style.zIndex = ++zIndexCounter;
+                win.classList.add('is-resizing');
+                document.body.classList.add('no-select');
+
+                const startX = e.clientX, startY = e.clientY;
+                const startW = win.offsetWidth, startH = win.offsetHeight;
+
+                const resizeMove = (me) => {
+                    const dx = me.clientX - startX;
+                    const dy = me.clientY - startY;
+                    let newH = startH + dy;
+                    if (!isMobile) newH = Math.round(newH / GRID_SIZE) * GRID_SIZE;
+                    if (newH > 100) win.style.height = newH + 'px';
+
+                    if (!isMobile) {
+                        let newW = startW + dx;
+                        newW = Math.round(newW / GRID_SIZE) * GRID_SIZE;
+                        if (newW > 200) win.style.width = newW + 'px';
+                    }
+                };
+
+                const resizeUp = () => {
+                    win.classList.remove('is-resizing');
+                    document.body.classList.remove('no-select');
+                    document.removeEventListener('mousemove', resizeMove);
+                    document.removeEventListener('mouseup', resizeUp);
+                };
+
+                document.addEventListener('mousemove', resizeMove);
+                document.addEventListener('mouseup', resizeUp);
+            };
+            
+            resizer.ontouchstart = (e) => {
+                e.stopPropagation();
+                win.classList.add('is-resizing');
+                const startY = e.touches[0].clientY;
+                const startH = win.offsetHeight;
+
+                const touchMove = (te) => {
+                    const dy = te.touches[0].clientY - startY;
+                    let newH = startH + dy;
+                    if (newH > 100) win.style.height = newH + 'px';
+                };
+                const touchEnd = () => {
+                    win.classList.remove('is-resizing');
+                    document.removeEventListener('touchmove', touchMove);
+                    document.removeEventListener('touchend', touchEnd);
+                };
+                document.addEventListener('touchmove', touchMove, {passive: false});
+                document.addEventListener('touchend', touchEnd);
+            };
+        }
+
+        // 4. FLOATING DOCK LOGIC
+        function initFloatingDock() {
+            const dock = document.getElementById('floating-dock');
+            const handle = document.getElementById('dock-handle');
+            
+            const savedPos = localStorage.getItem('lyrn-dock-xy');
+            if (savedPos && !appSettings.dockFixed) {
+                try {
+                    const { left, top } = JSON.parse(savedPos);
+                    const maxL = window.innerWidth - 60;
+                    const maxT = window.innerHeight - 40;
+                    dock.style.bottom = 'auto'; dock.style.right = 'auto';
+                    dock.style.left = Math.min(Math.max(10, left), maxL) + 'px';
+                    dock.style.top = Math.min(Math.max(10, top), maxT) + 'px';
+                } catch(e) {}
+            }
+
+            let isDragging = false, hasMoved = false;
+            let startX, startY, initL, initT;
+
+            const startDrag = (e) => {
+                if(appSettings.dockFixed) return; // Disable drag in fixed mode
+                
+                isDragging = true; hasMoved = false;
+                dock.classList.add('is-dragging');
+                document.body.classList.add('no-select');
+
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                startX = clientX; startY = clientY;
+
+                const rect = dock.getBoundingClientRect();
+                initL = rect.left; initT = rect.top;
+                dock.style.bottom = 'auto'; dock.style.right = 'auto';
+                dock.style.left = initL + 'px'; dock.style.top = initT + 'px';
+                
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onEnd);
+                document.addEventListener('touchmove', onMove, {passive:false});
+                document.addEventListener('touchend', onEnd);
+            };
+
+            const onMove = (e) => {
+                if(!isDragging) return;
+                e.preventDefault();
+                const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                
+                if(Math.abs(clientX - startX) > 6 || Math.abs(clientY - startY) > 6) hasMoved = true;
+                dock.style.left = (initL + (clientX - startX)) + 'px';
+                dock.style.top = (initT + (clientY - startY)) + 'px';
+            };
+
+            const onEnd = () => {
+                isDragging = false;
+                dock.classList.remove('is-dragging');
+                document.body.classList.remove('no-select');
+                
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onEnd);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onEnd);
+
+                if(!hasMoved) {
+                    if(!appSettings.dockPinned && !appSettings.dockFixed) {
+                        dock.classList.toggle('dock-collapsed');
+                    }
+                } else {
+                    const rect = dock.getBoundingClientRect();
+                    const snapL = Math.round(rect.left / GRID_SIZE) * GRID_SIZE;
+                    const snapT = Math.round(rect.top / GRID_SIZE) * GRID_SIZE;
+                    dock.style.left = snapL + 'px';
+                    dock.style.top = snapT + 'px';
+                    localStorage.setItem('lyrn-dock-xy', JSON.stringify({left: snapL, top: snapT}));
+                }
+            };
+
+            handle.addEventListener('mousedown', startDrag);
+            handle.addEventListener('touchstart', startDrag, {passive: false});
+        }
+    </script>
+</body>
+</html>

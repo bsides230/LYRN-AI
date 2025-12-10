@@ -3,23 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LYRN Snapshot Builder (Isolated)</title>
+  <title>LYRN Snapshot Builder (Module)</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 
   <style>
-    /* =========================================
-       THEME VARIABLES (Core Colors)
-       ========================================= */
+    /* [ ... CORE VARIABLES ... ] */
     :root {
       --bg-core: #050505;
       --bg-panel: #0a0a0a;
       --bg-input: #050505; 
       --brand-purple: #7c5cff;
       --brand-purple-dim: rgba(124, 92, 255, 0.1);
-      --brand-purple-glow: rgba(124, 92, 255, 0.5);
       --text-head: #ffffff;
       --text-body: #b0b0b0;
       --text-dim: #666666;
@@ -32,128 +29,113 @@
       --btn-border: #444444;
       --btn-bg: rgba(255,255,255,0.03);
     }
+    
+    body[data-theme="light"] {
+        --bg-core: #eef0f4;
+        --bg-panel: #ffffff;
+        --bg-input: #ffffff;
+        --brand-purple: #6a4ce0;
+        --brand-purple-dim: rgba(106, 76, 224, 0.1);
+        --text-head: #111111;
+        --text-body: #333333;
+        --text-dim: #555555;
+        --border-color: #d1d5db;
+        --input-focus-bg: #f9fafb;
+        --btn-text: #333;
+        --btn-border: #ccc;
+        --btn-bg: rgba(0,0,0,0.03);
+    }
 
-    /* =========================================
-       GLOBAL RESET & LAYOUT
-       ========================================= */
     * { box-sizing: border-box; }
 
+    /* --- THEMED SCROLLBARS --- */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
     body {
-      margin: 0;
-      padding: 40px;
-      background-color: var(--bg-core);
-      color: var(--text-body);
+      margin: 0; padding: 0;
+      background-color: var(--bg-core); color: var(--text-body);
       font-family: 'Inter', system-ui, sans-serif;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background-image:
-          repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(124, 92, 255, 0.05) 10px, rgba(124, 92, 255, 0.05) 11px),
-          radial-gradient(circle at 50% 0%, rgba(124, 92, 255, 0.25) 0%, transparent 60%);
-      background-size: auto, 100% 100%;
-      background-attachment: fixed;
+      height: 100vh; width: 100vw; overflow: hidden;
     }
 
     h1, h2, h3 { font-family: 'JetBrains Mono', monospace; color: var(--text-head); margin: 0; }
 
-    /* =========================================
-       BUTTONS & UTILS
-       ========================================= */
+    /* UI ELEMENTS */
     button {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      background: var(--btn-bg); 
-      border: 1px solid var(--btn-border); 
-      color: var(--btn-text);
-      padding: 8px 16px;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      transition: all 0.2s ease;
-      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; background: var(--btn-bg); 
+      border: 1px solid var(--btn-border); color: var(--btn-text); padding: 8px 12px;
+      cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s ease; border-radius: 4px;
+      white-space: nowrap;
     }
     button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
     button.btn-primary { background: var(--brand-purple); color: #ffffff; border-color: var(--brand-purple); font-weight: 600; }
     button.btn-primary:hover { background: #6a4ce0; }
-    
-    .btn-group { display: flex; align-items: center; gap: 10px; }
-    .btn-square { width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .btn-group { display: flex; align-items: center; gap: 8px; }
+    .btn-square { width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
     .btn-delete:hover { border-color: #ff4444; color: #ff4444; }
     .btn-save:hover { border-color: var(--success-color); color: var(--success-color); }
+    
     .hidden { display: none !important; }
     .btn-hidden { display: none !important; }
 
-    /* =========================================
-       RWI BUILDER MODULE STYLES
-       ========================================= */
+    /* LAYOUT */
     .rwi-wrapper {
       background: var(--bg-core);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      height: 700px;
-      width: 100%;
-      max-width: 1100px; /* Constrain width for isolated view */
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      box-shadow: 0 0 50px rgba(0,0,0,0.5);
-      overflow: hidden;
+      height: 100vh; width: 100%;
+      display: flex; flex-direction: column; position: relative;
     }
 
-    /* Header */
-    .rwi-wrapper header {
-      border-bottom: 1px solid var(--border-color);
-      padding: 15px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--bg-panel);
-      flex-shrink: 0;
+    header {
+      border-bottom: 1px solid var(--border-color); padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel); flex-shrink: 0;
     }
     
     .meta-label { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--brand-purple); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; display: block; }
     .panel-title { font-size: 14px; font-weight: 600; }
     .version-tag { font-family: 'JetBrains Mono'; font-size: 10px; border: 1px solid var(--border-color); color: var(--text-dim); padding: 2px 6px; border-radius: 4px; margin-left: 10px; }
 
-    /* Main Grid */
-    .rwi-wrapper .main-grid { display: grid; grid-template-columns: 280px 1fr; flex: 1; overflow: hidden; }
+    /* GRID & PANELS */
+    .main-grid { display: grid; grid-template-columns: 260px 1fr; flex: 1; overflow: hidden; }
     
-    /* Left Panel (Components) */
-    .rwi-wrapper .left-panel { border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.2); overflow-y: auto; }
-    .rwi-wrapper .panel-header { padding: 10px 15px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+    .left-panel { border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.02); overflow-y: auto; display: flex; flex-direction: column; }
+    .panel-header { padding: 10px 15px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
     
-    .component-item { display: flex; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 12px; transition: background 0.2s; }
+    .component-list-scroll { flex: 1; overflow-y: auto; }
+    
+    .component-item { display: flex; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; transition: background 0.2s; }
     .component-item:hover { background: var(--bg-panel); }
     .component-item.selected { background: var(--brand-purple-dim); border-left: 3px solid var(--brand-purple); }
     .component-name { flex: 1; color: var(--text-body); margin: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     
-    /* Right Panel (Editor) */
-    .rwi-wrapper .panel { overflow-y: auto; height: 100%; position: relative; }
-    .editor-scroll { padding: 20px; }
+    .panel { overflow-y: auto; height: 100%; position: relative; display: flex; flex-direction: column; }
+    .editor-scroll { padding: 20px; flex: 1; overflow-y: auto; }
+    
+    /* FORMS */
     .form-group { margin-bottom: 15px; }
     .form-group label { display: block; font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; font-family: 'JetBrains Mono'; }
     
-    .rwi-wrapper input[type="text"], .rwi-wrapper textarea {
+    input[type="text"], textarea {
       width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-head); padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; border-radius: 4px;
     }
-    .rwi-wrapper input[type="text"]:focus, .rwi-wrapper textarea:focus { border-color: var(--brand-purple); outline: none; background: var(--input-focus-bg); }
+    input[type="text"]:focus, textarea:focus { border-color: var(--brand-purple); outline: none; background: var(--input-focus-bg); }
 
-    /* Switch / Toggle */
-    .switch { position: relative; display: inline-block; width: 30px; height: 16px; }
+    /* SWITCH */
+    .switch { position: relative; display: inline-block; width: 26px; height: 14px; }
     .switch input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-input); transition: .4s; border-radius: 16px; border: 1px solid var(--border-color); }
-    .slider:before { position: absolute; content: ""; height: 10px; width: 10px; left: 2px; bottom: 2px; background-color: var(--text-dim); transition: .4s; border-radius: 50%; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-input); transition: .4s; border-radius: 14px; border: 1px solid var(--border-color); }
+    .slider:before { position: absolute; content: ""; height: 8px; width: 8px; left: 2px; bottom: 2px; background-color: var(--text-dim); transition: .4s; border-radius: 50%; }
     input:checked + .slider { background-color: var(--brand-purple); border-color: var(--brand-purple); }
-    input:checked + .slider:before { transform: translateX(14px); background-color: #fff; }
+    input:checked + .slider:before { transform: translateX(12px); background-color: #fff; }
 
-    /* Footer Bar */
-    .rwi-footer-bar { padding: 10px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); }
-    .rwi-footer-note { margin-top: 10px; font-size: 11px; color: var(--text-dim); text-align: center; font-family: 'JetBrains Mono'; }
+    /* FOOTER & TOAST */
+    .rwi-footer-bar { padding: 8px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); font-size: 10px; font-family: 'JetBrains Mono'; color: var(--text-dim); flex-shrink: 0; }
 
-    /* Toast Notification */
     #rwi-toast {
-        position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
         background: var(--bg-panel); border: 1px solid var(--brand-purple);
         color: var(--text-head); padding: 10px 20px; border-radius: 4px;
         font-family: 'JetBrains Mono', monospace; font-size: 12px;
@@ -162,9 +144,7 @@
     }
     #rwi-toast.show { opacity: 1; }
 
-    /* =========================================
-       MODAL STYLES
-       ========================================= */
+    /* MODAL */
     .modal-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(2px);
@@ -176,61 +156,18 @@
         display: flex; flex-direction: column; border-radius: 8px; animation: slideUp 0.3s ease-out;
     }
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    
     .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
     .modal-body { flex: 1; padding: 0; overflow: hidden; position: relative; }
     .modal-body textarea { width: 100%; height: 100%; background: var(--bg-core); color: var(--text-body); font-family: 'JetBrains Mono', monospace; font-size: 12px; border: none; padding: 20px; resize: none; outline: none; }
     .modal-text-display { padding: 30px; overflow-y: auto; font-size: 14px; line-height: 1.6; color: var(--text-body); }
     .modal-footer { padding: 15px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
 
-    /* =========================================
-       FLOATING DOCK STYLES
-       ========================================= */
-    #floating-dock {
-        position: fixed; bottom: 30px; right: 30px;
-        display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-        background: transparent; border: none; z-index: 10000;
-        width: 50px; height: 30px;
-        transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-    }
-    #floating-dock.is-dragging { transition: none !important; }
-
-    #dock-content {
-        position: absolute; bottom: 100%; left: 0; width: 100%;
-        display: flex; flex-direction: column; gap: 8px; padding: 8px; padding-bottom: 12px;
-        background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 5px;
-        opacity: 1; transform: translateY(0) scale(1); transform-origin: bottom center;
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); pointer-events: auto;
-    }
-    #floating-dock.dock-collapsed #dock-content { opacity: 0; transform: translateY(10px) scale(0.8); pointer-events: none; }
-
-    .dock-btn {
-        width: 32px !important; height: 32px !important; border-radius: 6px !important;
-        background: transparent; border: 1px solid transparent; color: var(--text-dim);
-        display: flex; align-items: center; justify-content: center; font-size: 16px; padding: 0 !important;
-    }
-    .dock-btn:hover { background: var(--brand-purple-dim); color: var(--brand-purple); border-color: var(--brand-purple); }
-
-    /* Dock Handle */
-    #dock-handle {
-        width: 50px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: grab;
-        background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 15px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: background 0.2s, transform 0.2s;
-    }
-    #dock-handle:active { cursor: grabbing; transform: scale(0.95); }
-    .handle-bar {
-        width: 20px; height: 4px; background-color: #ffffff; border-radius: 2px;
-        box-shadow: 0 0 6px var(--brand-purple), 0 0 12px var(--brand-purple); transition: all 0.3s;
-    }
-    #floating-dock:hover .handle-bar { box-shadow: 0 0 8px var(--brand-purple), 0 0 16px var(--brand-purple), 0 0 24px var(--brand-purple); }
-
-    /* Mobile Responsive tweak */
+    /* RESPONSIVE */
     @media (max-width: 768px) {
-        .rwi-wrapper .main-grid { grid-template-columns: 1fr; }
-        .rwi-wrapper .left-panel { height: 250px; border-right: none; border-bottom: 1px solid var(--border-color); }
-        .rwi-wrapper header { flex-direction: column; gap: 15px; text-align: center; }
-        .rwi-wrapper header .btn-group { flex-wrap: wrap; justify-content: center; }
+        .main-grid { grid-template-columns: 1fr; grid-template-rows: 200px 1fr; }
+        .left-panel { border-right: none; border-bottom: 1px solid var(--border-color); }
+        header { flex-direction: column; gap: 10px; text-align: center; height: auto; }
+        header .btn-group { flex-wrap: wrap; justify-content: center; }
     }
   </style>
 </head>
@@ -240,13 +177,13 @@
     <header>
         <div>
             <div class="meta-label">LYRN SYSTEM MODULE</div>
-            <h1 class="panel-title">RWI Prompt Builder <span class="version-tag">v1.1</span></h1>
+            <h1 class="panel-title">Snapshot Builder <span class="version-tag">v2.0</span></h1>
         </div>
         <div class="btn-group">
             <input type="file" id="sns-file-input" style="display: none;" accept=".sns" onchange="rwiLoadSNS(this)">
-            <button onclick="document.getElementById('sns-file-input').click()">Load .SNS</button>
-            <button onclick="rwiSaveSNS()">Save .SNS</button>
-            <button onclick="rwiPreview()">View Final</button>
+            <button onclick="document.getElementById('sns-file-input').click()">Load</button>
+            <button onclick="rwiSaveSNS()">Save</button>
+            <button onclick="rwiPreview()">View</button>
             <button class="btn-primary" id="rebuild-btn" onclick="rwiBuild()">Rebuild</button>
             <button class="btn-icon btn-square" onclick="rwiShowHelp()" title="Help">?</button>
         </div>
@@ -257,12 +194,12 @@
             <div class="panel-header">
                 <h3 class="panel-title">Components</h3>
                 <div style="display: flex; gap: 5px;">
-                    <button class="btn-arrow btn-square" onclick="moveSelected(-1)" title="Move Up">↑</button>
-                    <button class="btn-arrow btn-square" onclick="moveSelected(1)" title="Move Down">↓</button>
+                    <button class="btn-square" onclick="moveSelected(-1)" title="Move Up">↑</button>
+                    <button class="btn-square" onclick="moveSelected(1)" title="Move Down">↓</button>
                     <button class="btn-square" onclick="rwiAddNew()" title="Add New">+</button>
                 </div>
             </div>
-            <div id="components-list"></div>
+            <div id="components-list" class="component-list-scroll"></div>
         </div>
 
         <div class="panel">
@@ -280,20 +217,9 @@
     </div>
 
     <div class="rwi-footer-bar">
-         <span style="font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono';">RWI SYSTEM // V1.1 // ISOLATED RUNTIME</span>
+         <span>RWI SYSTEM // V2.0 // MODULE RUNTIME</span>
+         <span>READY</span>
     </div>
-  </div>
-
-  <div id="floating-dock" class="dock-collapsed">
-      <div id="dock-content">
-          <button class="dock-btn" title="Placeholder 1">A</button>
-          <button class="dock-btn" title="Placeholder 2">B</button>
-          <button class="dock-btn" title="Placeholder 3">C</button>
-      </div>
-
-      <div id="dock-handle" title="Drag to move, Click to toggle">
-          <div class="handle-bar"></div>
-      </div>
   </div>
 
   <div id="rwi-toast">Operation Successful</div>
@@ -318,7 +244,13 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
         initRWIBuilder();
-        initFloatingToggle();
+        
+        // Theme Sync
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', event.data.theme);
+            }
+        });
     });
 
     /* =========================================
@@ -332,8 +264,7 @@
             { name: "system_instructions", pinned: true, active: true, order: 1, config: { begin_bracket: "###SYSTEM_INSTRUCTIONS_START###", end_bracket: "###SYSTEM_INSTRUCTIONS_END###", rwi_text: "Core system instructions." }, content: `This model operates as part of the LYRN cognitive architecture...` },
             { name: "system_rules", pinned: true, active: true, order: 2, config: { begin_bracket: "###SYSTEM_RULES_START###", end_bracket: "###SYSTEM_RULES_END###", rwi_text: "Hard constraints." }, content: `PRIORITY_OVERRIDES:\n- Follow user directives...` },
             { name: "ai_preferences", pinned: false, active: true, order: 3, config: { begin_bracket: "###AI_PREFERENCES_START###", end_bracket: "###AI_PREFERENCES_END###", rwi_text: "AI-specific preferences." }, content: `Name: Greg\nBirthday: March 11, 1976` },
-            { name: "personality", pinned: false, active: true, order: 4, config: { begin_bracket: "###PERSONALITY_START###", end_bracket: "###PERSONALITY_END###", rwi_text: "AI identity." }, content: `"Creativity = 0700"\n"Consistency = 0800"` },
-            { name: "user_preferences", pinned: false, active: true, order: 5, config: { begin_bracket: "###USER_PREFERENCES_START###", end_bracket: "###USER_PREFERENCES_END###", rwi_text: "User knobs." }, content: `Reserved for user-specific preferences...` }
+            { name: "personality", pinned: false, active: true, order: 4, config: { begin_bracket: "###PERSONALITY_START###", end_bracket: "###PERSONALITY_END###", rwi_text: "AI identity." }, content: `"Creativity = 0700"\n"Consistency = 0800"` }
         ];
 
         let selectedComponent = null;
@@ -367,14 +298,13 @@
                 comp.order = index;
                 const item = document.createElement('div');
                 item.className = `component-item ${selectedComponent === comp.name ? 'selected' : ''}`;
-                item.title = comp.config.rwi_text || comp.name;
-
+                
                 let pinStatusHtml = comp.name === 'rwi' 
-                    ? `<span style="font-size:10px; color:var(--brand-purple); margin-right:8px; font-weight:bold;">SYSTEM</span>`
-                    : `<button class="pin-btn" data-name="${comp.name}" style="background:none; border:none; padding:0; margin-right:5px; font-size:14px; color:var(--text-dim);">${comp.pinned ? '📌' : '📍'}</button>`;
+                    ? `<span style="font-size:10px; color:var(--brand-purple); margin-right:8px; font-weight:bold;">SYS</span>`
+                    : `<button class="pin-btn" style="background:none; border:none; padding:0; margin-right:5px; font-size:12px; color:var(--text-dim);">${comp.pinned ? '📌' : '📍'}</button>`;
 
                 let toggleHtml = comp.name !== 'rwi' 
-                    ? `<label class="switch component-toggle" onclick="event.stopPropagation()"><input type="checkbox" ${comp.active ? 'checked' : ''} data-name="${comp.name}"><span class="slider"></span></label>`
+                    ? `<label class="switch component-toggle" onclick="event.stopPropagation()"><input type="checkbox" ${comp.active ? 'checked' : ''}><span class="slider"></span></label>`
                     : '';
 
                 item.innerHTML = `${pinStatusHtml}<span class="component-name">${comp.name}</span>${toggleHtml}`;
@@ -544,7 +474,7 @@
         
         window.rwiShowHelp = () => {
             document.getElementById('modal-title').innerText = "RWI Builder Guide";
-            document.getElementById('modal-html-content').innerHTML = `<p><strong>RWI Builder v1.1 Guide</strong></p><ul><li>Edit, reorder, and toggle components.</li><li>Export .sns files for the dashboard.</li><li>Files are JSON compatible for LYRN v5.</li></ul>`;
+            document.getElementById('modal-html-content').innerHTML = `<p><strong>RWI Builder v2.0 Guide</strong></p><ul><li>Edit, reorder, and toggle components.</li><li>Export .sns files for the dashboard.</li><li>Files are JSON compatible for LYRN v5.</li></ul>`;
             document.getElementById('modal-content').classList.add('hidden');
             document.getElementById('modal-html-content').classList.remove('hidden');
             document.getElementById('copy-btn').classList.add('btn-hidden'); 
@@ -555,118 +485,22 @@
         window.closeModal = () => document.getElementById('preview-modal').classList.add('hidden');
         window.copyModalContent = () => { document.getElementById('modal-content').select(); document.execCommand('copy'); showToast("Copied!"); }
         
+        function showToast(msg, error=false) {
+            const t = document.getElementById('rwi-toast');
+            if(!t) return;
+            t.innerText = msg;
+            t.style.borderColor = error ? 'var(--error-color)' : 'var(--brand-purple)';
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return "";
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+        
         // Initial Select
         selectComponent("rwi");
-    }
-
-    /* =========================================
-       FLOATING DOCK LOGIC
-       ========================================= */
-    function initFloatingToggle() {
-        const dock = document.getElementById('floating-dock');
-        const handle = document.getElementById('dock-handle');
-        
-        if (!dock || !handle) return;
-
-        let isDragging = false;
-        let startX, startY, initialLeft, initialTop;
-        let hasMoved = false;
-
-        const savedPos = localStorage.getItem('lyrn-dock-pos');
-        if (savedPos) {
-            try {
-                const { left, top } = JSON.parse(savedPos);
-                dock.style.bottom = 'auto'; dock.style.right = 'auto';
-                const maxLeft = window.innerWidth - 60; 
-                const maxTop = window.innerHeight - 40;
-                dock.style.left = `${Math.min(Math.max(20, left), maxLeft)}px`;
-                dock.style.top = `${Math.min(Math.max(20, top), maxTop)}px`;
-            } catch (e) { console.error("Failed to load dock position", e); }
-        }
-
-        handle.addEventListener('mousedown', startDrag);
-        handle.addEventListener('touchstart', startDrag, {passive: false});
-
-        function startDrag(e) {
-            isDragging = true; hasMoved = false; 
-            dock.classList.add('is-dragging');
-
-            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-
-            startX = clientX; startY = clientY;
-            const rect = dock.getBoundingClientRect();
-            initialLeft = rect.left; initialTop = rect.top;
-
-            dock.style.bottom = 'auto'; dock.style.right = 'auto';
-            dock.style.left = `${initialLeft}px`; dock.style.top = `${initialTop}px`;
-
-            document.addEventListener('mousemove', onDrag);
-            document.addEventListener('mouseup', stopDrag);
-            document.addEventListener('touchmove', onDrag, {passive: false});
-            document.addEventListener('touchend', stopDrag);
-        }
-
-        function onDrag(e) {
-            if (!isDragging) return;
-            e.preventDefault(); 
-            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-            const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-            const dx = clientX - startX; const dy = clientY - startY;
-
-            if (Math.abs(dx) + Math.abs(dy) > 5) hasMoved = true;
-
-            let newLeft = initialLeft + dx; let newTop = initialTop + dy;
-            const maxLeft = window.innerWidth - dock.offsetWidth;
-            const maxTop = window.innerHeight - dock.offsetHeight;
-
-            if (newLeft < 0) newLeft = 0; if (newLeft > maxLeft) newLeft = maxLeft;
-            if (newTop < 0) newTop = 0; if (newTop > maxTop) newTop = maxTop;
-
-            dock.style.left = `${newLeft}px`; dock.style.top = `${newTop}px`;
-        }
-
-        function stopDrag() {
-            isDragging = false; dock.classList.remove('is-dragging');
-            document.removeEventListener('mousemove', onDrag);
-            document.removeEventListener('mouseup', stopDrag);
-            document.removeEventListener('touchmove', onDrag);
-            document.removeEventListener('touchend', stopDrag);
-
-            if (hasMoved) {
-                const rect = dock.getBoundingClientRect();
-                const gridSize = 40; 
-                let finalLeft = Math.round(rect.left / gridSize) * gridSize;
-                let finalTop = Math.round(rect.top / gridSize) * gridSize;
-
-                const maxLeft = window.innerWidth - rect.width - 20;
-                const maxTop = window.innerHeight - rect.height - 20;
-
-                if (finalLeft < 20) finalLeft = 20; if (finalLeft > maxLeft) finalLeft = maxLeft;
-                if (finalTop < 20) finalTop = 20; if (finalTop > maxTop) finalTop = maxTop;
-
-                dock.style.left = `${finalLeft}px`; dock.style.top = `${finalTop}px`;
-                localStorage.setItem('lyrn-dock-pos', JSON.stringify({ left: finalLeft, top: finalTop }));
-            }
-        }
-
-        handle.addEventListener('click', (e) => {
-            if (!hasMoved) dock.classList.toggle('dock-collapsed');
-        });
-    }
-
-    function showToast(msg, error=false) {
-        const t = document.getElementById('rwi-toast');
-        if(!t) return;
-        t.innerText = msg;
-        t.style.borderColor = error ? 'var(--error-color)' : 'var(--brand-purple)';
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3000);
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return "";
-        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
   </script>
 </body>
