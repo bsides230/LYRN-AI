@@ -63,6 +63,8 @@
     
          <div class="nav-links">
             <a href="#home" class="nav-link">Home</a>
+            <a href="#" class="nav-link" onclick="document.getElementById('nav-chat-btn').click(); return false;">Chat</a>
+            <a href="#" class="nav-link" onclick="document.getElementById('nav-settings-btn').click(); return false;">Settings</a>
             <a href="#embodied" class="nav-link">Embodied</a>
             <a href="#memory" class="nav-link">Memory</a>
             <a href="#reflection" class="nav-link">Reflection</a>
@@ -76,6 +78,8 @@
     
          <div class="nav-actions">
             <button id="nav-dashboard-btn" class="theme-button">v5 PREVIEW</button>
+            <button id="nav-chat-btn" class="theme-button hidden-trigger">CHAT</button>
+            <button id="nav-settings-btn" class="theme-button hidden-trigger">SETTINGS</button>
             <a href="#snapshot-demo" class="theme-button">SNAPSHOT BUILDER</a>
             <button id="themeButton" class="theme-button">LIGHT MODE</button>
          </div>
@@ -903,6 +907,8 @@
       
       <div id="dock-content">
           <button id="dock-dashboard-btn" class="dock-btn" title="Open Dashboard">💻</button>
+          <button id="dock-chat-btn" class="dock-btn" title="Chat Interface">💬</button>
+          <button id="dock-settings-btn" class="dock-btn" title="Settings">⚙️</button>
           <button id="floating-builder-btn" class="dock-btn" title="Snapshot Builder" onclick="document.getElementById('snapshot-demo').scrollIntoView({behavior: 'smooth'})">🛠️</button>
           <button class="dock-btn" title="GitHub Repo" onclick="window.open('https://github.com/bsides230/LYRN', '_blank')">🐙</button>
           <button id="floating-menu-btn" class="dock-btn" title="Navigation">☰</button>
