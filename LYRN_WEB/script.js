@@ -38,6 +38,30 @@ function initDashboardOverlay() {
         }
     });
 
+    // Chat Module
+    const chatTriggers = ['nav-chat-btn', 'dock-chat-btn'];
+    chatTriggers.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                openDash('modules/Chat Interface.html');
+            });
+        }
+    });
+
+    // Settings Module
+    const settingsTriggers = ['nav-settings-btn', 'dock-settings-btn'];
+    settingsTriggers.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                openDash('modules/Settings.html');
+            });
+        }
+    });
+
     // 2. Dev Dashboard Trigger (Footer EOF)
     const devBtn = document.getElementById('eof-trigger');
     if (devBtn) {
