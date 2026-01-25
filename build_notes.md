@@ -64,3 +64,15 @@ This update finalizes the port of the Job Manager to an HTML-based module, fixin
 
 ### Logging
 - Added traceback printing to Job Manager Server for better error visibility.
+
+## LYRN Dashboard v5 - Inventory Module (2025-12-05)
+
+Implemented a standalone Inventory Module for the upcoming Dashboard v5.
+
+- **Inventory Interface:**
+    - Created `LYRN_v5/modules/Inventory.html` as a standalone single-file module.
+    - Implemented a Grid View for inventory items and a specific "Equipped" tab.
+    - Included a Details Panel that displays item information on selection.
+    - Implemented an "Equip/Unequip" toggle button.
+    - Added a Settings modal to configure the remote API endpoint (URL/Port), persisting to `localStorage`.
+    - **No Backend:** This module is purely frontend and uses `fetch` to communicate with a configurable API. Included mock data fallback for offline verification.
