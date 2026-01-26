@@ -578,13 +578,18 @@
            CONFIG & STATE
            ========================================================================= */
         const MODULE_REGISTRY = [
-            { id: "mod_builder", file: "Snapshot Builder.html", name: "Snapshot Builder", icon: "🛠️" },
+            { id: "mod_chat", file: "Chat Interface.html", name: "Chat Interface", icon: "💬" },
+            { id: "mod_system", file: "SystemMonitor.html", name: "System Monitor", icon: "🖥️" },
+            { id: "mod_model", file: "ModelController.html", name: "Model Control", icon: "🧠" },
+            { id: "mod_logs", file: "LogViewer.html", name: "Log Viewer", icon: "📋" },
             { id: "mod_job_manager", file: "Job Manager.html", name: "Job Automation", icon: "🤖" },
+            { id: "mod_builder", file: "Snapshot Builder.html", name: "Snapshot Builder", icon: "🛠️" },
             { id: "mod_asset_shop", file: "Asset Shop.html", name: "Asset Shop", icon: "🛍️" },
+            { id: "mod_settings", file: "Settings.html", name: "Config Editor", icon: "⚙️" },
         ];
 
         let appSettings = {
-            activeModules: ['mod_builder', 'mod_job_manager', 'mod_asset_shop'],
+            activeModules: ['mod_chat', 'mod_system', 'mod_model', 'mod_job_manager'],
             dockPinned: true, 
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
