@@ -342,8 +342,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         // Init logic
-        renderJobsList();
-        renderCyclesList();
+        fetchData();
         initScheduler();
 
         // Theme Sync
@@ -356,6 +355,20 @@
             }
         });
     });
+
+    async function fetchData() {
+        try {
+            const jobsRes = await fetch('/api/jobs');
+            DATA.jobs = await jobsRes.json();
+            renderJobsList();
+
+            const cyclesRes = await fetch('/api/cycles');
+            DATA.cycles = await cyclesRes.json();
+            renderCyclesList();
+        } catch(e) {
+            showToast("Failed to load data", true);
+        }
+    }
 
     /* =========================================
        TABS & NAVIGATION
@@ -479,20 +492,31 @@
         container.innerHTML = html;
     }
 
-    function saveJob() {
+    async function saveJob() {
         const isNew = UI.selectedJob === '_NEW_';
         const name = isNew ? document.getElementById('edit-job-name').value.trim() : UI.selectedJob;
         if (!name) return showToast("Name required", true);
 
-        DATA.jobs[name] = {
+        const jobData = {
+            name: name,
             instructions: document.getElementById('edit-job-inst').value,
             trigger: document.getElementById('edit-job-trig').value
         };
 
-        if (isNew) UI.selectedJob = name;
-        renderJobsList();
-        selectJob(name);
-        showToast("Job Saved");
+        try {
+            const res = await fetch('/api/jobs', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(jobData)
+            });
+            if(!res.ok) throw new Error("Save failed");
+
+            DATA.jobs[name] = jobData; // Optimistic update
+            if (isNew) UI.selectedJob = name;
+            renderJobsList();
+            selectJob(name);
+            showToast("Job Saved");
+        } catch(e) { showToast("Save failed", true); }
     }
 
     /* =========================================
@@ -536,19 +560,28 @@
         container.innerHTML = html;
     }
 
-    function saveCycle() {
+    async function saveCycle() {
         const isNew = UI.selectedCycle === '_NEW_';
         const name = isNew ? document.getElementById('edit-cycle-name').value.trim() : UI.selectedCycle;
         if (!name) return showToast("Name required", true);
 
         try {
             const trigs = JSON.parse(document.getElementById('edit-cycle-json').value);
+            const cycleData = { name: name, triggers: trigs };
+
+            const res = await fetch('/api/cycles', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(cycleData)
+            });
+            if(!res.ok) throw new Error("Save failed");
+
             DATA.cycles[name] = { triggers: trigs };
             if (isNew) UI.selectedCycle = name;
             renderCyclesList();
             selectCycle(name);
             showToast("Cycle Saved");
-        } catch(e) { showToast("Invalid JSON", true); }
+        } catch(e) { showToast("Invalid JSON or API Error", true); }
     }
 
     /* =========================================
@@ -559,14 +592,19 @@
         if (type === 'cycle') { UI.selectedCycle = '_NEW_'; selectCycle('_NEW_'); }
     }
 
-    function deleteCurrentItem(type) {
+    async function deleteCurrentItem(type) {
         const name = type === 'job' ? UI.selectedJob : UI.selectedCycle;
         if (!name || name === '_NEW_') return;
         if (!confirm(`Delete ${name}?`)) return;
 
-        if (type === 'job') { delete DATA.jobs[name]; UI.selectedJob = null; renderJobsList(); selectJob(null); }
-        if (type === 'cycle') { delete DATA.cycles[name]; UI.selectedCycle = null; renderCyclesList(); selectCycle(null); }
-        showToast("Deleted");
+        try {
+            const endpoint = type === 'job' ? `/api/jobs/${name}` : `/api/cycles/${name}`;
+            await fetch(endpoint, { method: 'DELETE' });
+
+            if (type === 'job') { delete DATA.jobs[name]; UI.selectedJob = null; renderJobsList(); selectJob(null); }
+            if (type === 'cycle') { delete DATA.cycles[name]; UI.selectedCycle = null; renderCyclesList(); selectCycle(null); }
+            showToast("Deleted");
+        } catch(e) { showToast("Delete failed", true); }
     }
 
     function escapeHtml(text) {

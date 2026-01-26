@@ -211,15 +211,12 @@
        GLOBAL STATE
        ========================================= */
     let CONFIG = {
-        apiUrl: "http://localhost:8005/api/chat"
+        apiUrl: "/api/chat"
     };
 
     let isProcessing = false;
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Init logic
-        loadConfig();
-
         // Input binding
         const input = document.getElementById('chat-input');
         input.addEventListener('keydown', (e) => {
@@ -237,6 +234,8 @@
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
         });
+
+        updateStatusDisplay();
     });
 
     function showToast(msg, error=false) {
@@ -247,48 +246,13 @@
         setTimeout(() => t.classList.remove('show'), 3000);
     }
 
-    /* =========================================
-       CONFIG & API
-       ========================================= */
-    function loadConfig() {
-        // 1. Try LocalStorage
-        try {
-            const stored = localStorage.getItem('lyrn_api_config');
-            if (stored) {
-                const map = JSON.parse(stored);
-                if (map["Chat"]) {
-                    CONFIG.apiUrl = map["Chat"];
-                    console.log("Loaded API URL from LocalStorage:", CONFIG.apiUrl);
-                }
-            }
-        } catch (e) { console.warn("LocalStorage access failed", e); }
-
-        updateStatusDisplay();
-    }
-
     function handleFileLoad(input) {
-        const file = input.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const json = JSON.parse(e.target.result);
-                if (json["Chat"]) {
-                    CONFIG.apiUrl = json["Chat"];
-                    updateStatusDisplay();
-                    showToast("Config Loaded");
-                } else {
-                    showToast("No 'Chat' endpoint in config", true);
-                }
-            } catch (err) { showToast("Invalid JSON", true); }
-        };
-        reader.readAsText(file);
-        input.value = '';
+        // Kept for consistency, but less needed now
+        showToast("Config Import Deprecated");
     }
 
     function updateStatusDisplay() {
         document.getElementById('endpoint-display').innerText = `API: ${CONFIG.apiUrl}`;
-        // Simple connectivity check (optional)
         document.getElementById('api-status').innerText = "Ready";
     }
 
@@ -321,11 +285,42 @@
 
             if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
-            const data = await response.json();
+            // Handle Streaming Response (NDJSON)
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullText = "";
 
-            // Remove loading indicator
             responseBubble.classList.remove('typing');
-            responseBubble.innerText = data.response || "[No response content]";
+            responseBubble.style.fontStyle = 'normal';
+            responseBubble.style.color = 'inherit';
+            responseBubble.innerText = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const json = JSON.parse(line);
+                        if (json.content) {
+                            fullText += json.content;
+                            responseBubble.innerText = fullText;
+
+                            // Auto-scroll
+                            const history = document.getElementById('chat-history');
+                            history.scrollTop = history.scrollHeight;
+                        }
+                        if (json.error) {
+                            fullText += `\n[Error: ${json.error}]`;
+                            responseBubble.innerText = fullText;
+                        }
+                    } catch (e) { console.warn("Stream parse error", e); }
+                }
+            }
 
         } catch (err) {
             responseBubble.classList.remove('typing');
