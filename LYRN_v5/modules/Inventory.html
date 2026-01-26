@@ -293,13 +293,70 @@
         }
     };
 
+    // TEMPLATE DEFINITIONS (Based on Templates.txt)
+    const TEMPLATES = {
+        'default': [ // t61 item
+            { id: 'type', label: 'Type' },
+            { id: 'condition', label: 'Condition' },
+            { id: 'material', label: 'Material' },
+            { id: 'weight', label: 'Weight' },
+            { id: 'value', label: 'Value' },
+            { id: 'traits', label: 'Traits', fullWidth: true },
+            { id: 'description', label: 'Description', fullWidth: true }
+        ],
+        'Consumable': [ // t21
+            { id: 'type', label: 'Type' },
+            { id: 'effects', label: 'Effects', fullWidth: true },
+            { id: 'duration', label: 'Duration' },
+            { id: 'expiry', label: 'Expiry' },
+            { id: 'ingredients', label: 'Ingredients', fullWidth: true },
+            { id: 'weight', label: 'Weight' },
+            { id: 'description', label: 'Description', fullWidth: true }
+        ],
+        'Weapon': [ // t63
+            { id: 'type', label: 'Type' },
+            { id: 'subtype', label: 'Subtype' },
+            { id: 'damage_value', label: 'Damage' },
+            { id: 'damage_type', label: 'Dmg Type' },
+            { id: 'condition', label: 'Condition' },
+            { id: 'weight', label: 'Weight' },
+            { id: 'traits', label: 'Traits', fullWidth: true },
+            { id: 'notes', label: 'Notes', fullWidth: true }
+        ],
+        'Armor': [ // t62 clothing
+            { id: 'type', label: 'Type' },
+            { id: 'material', label: 'Material' },
+            { id: 'armor_value', label: 'Armor Rating' },
+            { id: 'warmth_rating', label: 'Warmth' },
+            { id: 'size', label: 'Size' },
+            { id: 'condition', label: 'Condition' },
+            { id: 'pockets', label: 'Pockets' },
+            { id: 'notes', label: 'Notes', fullWidth: true }
+        ]
+    };
+
     // MOCK DATA FOR DEMO/DEV WITHOUT BACKEND
     const MOCK_DATA = [
-        { id: "uuid-1", name: "Rusty Sword", qty: 1, equipped: true, icon: "⚔️", category: "Weapon" },
-        { id: "uuid-2", name: "Health Potion", qty: 5, equipped: false, icon: "🧪", category: "Consumable" },
-        { id: "uuid-3", name: "Iron Shield", qty: 1, equipped: true, icon: "🛡️", category: "Armor" },
-        { id: "uuid-4", name: "Map of Realm", qty: 1, equipped: false, icon: "🗺️", category: "Key Item" },
-        { id: "uuid-5", name: "Gold Coin", qty: 150, equipped: false, icon: "💰", category: "Currency" }
+        {
+            id: "uuid-1", name: "Rusty Sword", qty: 1, equipped: true, icon: "⚔️", category: "Weapon",
+            type: "Melee", subtype: "Sword", damage_value: "1d6", damage_type: "Slashing", condition: "Poor", weight: "3.0", traits: "Rusty"
+        },
+        {
+            id: "uuid-2", name: "Health Potion", qty: 5, equipped: false, icon: "🧪", category: "Consumable",
+            type: "Potion", effects: "Restores 2d4+2 HP", duration: "Instant", expiry: "None", ingredients: "Red Herb, Water", weight: "0.5", description: "A standard healing potion."
+        },
+        {
+            id: "uuid-3", name: "Iron Shield", qty: 1, equipped: true, icon: "🛡️", category: "Armor",
+            type: "Shield", material: "Iron", armor_value: "+2 AC", warmth_rating: "0", size: "Medium", condition: "Good", weight: "6.0"
+        },
+        {
+            id: "uuid-4", name: "Map of Realm", qty: 1, equipped: false, icon: "🗺️", category: "Key Item",
+            description: "A tattered map of the known world.", weight: "0.1", value: "50g"
+        },
+        {
+            id: "uuid-5", name: "Gold Coin", qty: 150, equipped: false, icon: "💰", category: "Currency",
+            value: "1g", weight: "0.02"
+        }
     ];
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -357,13 +414,9 @@
             if (!res.ok) throw new Error("API Error");
             return await res.json();
         } catch (err) {
-            // MOCK DETAILS
-            return {
-                description: "A standard item found in the world. It looks used but functional.",
-                weight: "2.5 lbs",
-                value: "15g",
-                durability: "45/100"
-            };
+            // MOCK DETAILS (Return the item itself from STATE for simplicity in this demo)
+            const item = STATE.items.find(i => i.id === id);
+            return item || {};
         }
     }
 
@@ -444,39 +497,50 @@
         content.innerHTML = '<p style="color:var(--text-dim); text-align:center;">Loading details...</p>';
         actions.classList.add('hidden');
 
-        // Fetch Details
+        // Fetch Details (or use local mock)
         const details = await fetchItemDetails(id);
 
-        // Render Details
-        content.innerHTML = `
+        // Merge item list data with detailed data
+        const fullItem = { ...item, ...details };
+
+        // Determine Template
+        const template = TEMPLATES[fullItem.category] || TEMPLATES['default'];
+
+        // Header
+        let html = `
             <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
-                <div style="font-size:40px; background:var(--bg-core); width:60px; height:60px; display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid var(--border-color);">${item.icon || '📦'}</div>
+                <div style="font-size:40px; background:var(--bg-core); width:60px; height:60px; display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid var(--border-color);">${fullItem.icon || '📦'}</div>
                 <div>
-                    <h2 style="font-size:16px;">${item.name}</h2>
-                    <span style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">${item.category || 'Item'}</span>
+                    <h2 style="font-size:16px;">${fullItem.name}</h2>
+                    <span style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">${fullItem.category || 'Item'}</span>
                 </div>
             </div>
 
-            <div class="detail-row">
-                <span class="detail-label">Description</span>
-                <span class="detail-value">${details.description || 'No description available.'}</span>
+            <div style="margin-bottom: 20px;">
+                <span class="detail-label">Quantity</span>
+                <span class="detail-value highlight" style="font-size:14px;">x${fullItem.qty}</span>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                 <div class="detail-row">
-                    <span class="detail-label">Quantity</span>
-                    <span class="detail-value highlight">${item.qty}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Value</span>
-                    <span class="detail-value highlight">${details.value || '0g'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Weight</span>
-                    <span class="detail-value highlight">${details.weight || '0.0'}</span>
-                </div>
-            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
         `;
+
+        // Render Fields based on Template
+        template.forEach(field => {
+            const val = fullItem[field.id];
+            if (!val && val !== 0) return; // Skip empty fields
+
+            const style = field.fullWidth ? 'grid-column: 1 / -1;' : '';
+            html += `
+                <div class="detail-row" style="${style}">
+                    <span class="detail-label">${field.label}</span>
+                    <span class="detail-value">${val}</span>
+                </div>
+            `;
+        });
+
+        html += `</div>`; // Close grid
+
+        content.innerHTML = html;
 
         // Actions
         const btn = document.getElementById('btn-equip');

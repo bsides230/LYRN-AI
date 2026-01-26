@@ -381,44 +381,75 @@
     const STORAGE_KEY = 'lyrn_npc_data';
 
     // Default Template (System fields like sys_name are special)
+    // Based on t55 npc: name|age|sex|health|occupation|personality|home|description|inventory|skills|chat|calls|texts|contact_info|movement_speed|notes
     const DEFAULT_TEMPLATE = [
-        // CORE INFO
-        { id: 'sys_name', label: 'Name', type: 'text', x: 20, y: 20, width: 300, height: 60, system: true },
-        { id: 'sys_location', label: 'Location', type: 'text', x: 340, y: 20, width: 200, height: 60, system: true },
-        { id: 'sys_relationship', label: 'Relation', type: 'text', x: 560, y: 20, width: 200, height: 60, system: true },
+        // ROW 1: Basics
+        { id: 'name', label: 'Name', type: 'text', x: 20, y: 20, width: 300, height: 60, system: true },
+        { id: 'home', label: 'Home / Location', type: 'text', x: 340, y: 20, width: 240, height: 60, system: true },
+        { id: 'occupation', label: 'Occupation', type: 'text', x: 600, y: 20, width: 180, height: 60 },
 
-        { id: 'desc', label: 'Description', type: 'textarea', x: 20, y: 100, width: 740, height: 150 },
-        { id: 'tags', label: 'Tags / Keywords', type: 'text', x: 20, y: 270, width: 740, height: 50 },
+        // ROW 2: Demographics
+        { id: 'age', label: 'Age', type: 'text', x: 20, y: 90, width: 80, height: 60 },
+        { id: 'sex', label: 'Sex', type: 'text', x: 110, y: 90, width: 80, height: 60 },
+        { id: 'health', label: 'Health', type: 'text', x: 200, y: 90, width: 120, height: 60 },
+        { id: 'movement_speed', label: 'Speed', type: 'text', x: 330, y: 90, width: 120, height: 60 },
+        // Extra system field for UI filtering
+        { id: 'relationship', label: 'Relation', type: 'text', x: 460, y: 90, width: 150, height: 60, system: true },
+        { id: 'is_met', label: 'Met?', type: 'checkbox', x: 630, y: 100, width: 80, height: 40, system: true },
 
-        // CONTACT / META
-        { id: 'sys_is_met', label: 'Has Met Player?', type: 'checkbox', x: 600, y: 340, width: 160, height: 40, system: true },
+        // ROW 3: Description & Personality
+        { id: 'description', label: 'Description', type: 'textarea', x: 20, y: 160, width: 370, height: 150 },
+        { id: 'personality', label: 'Personality', type: 'textarea', x: 410, y: 160, width: 370, height: 150 },
 
-        // NOTES
-        { id: 'notes', label: 'GM Notes', type: 'textarea', x: 20, y: 340, width: 560, height: 400 },
-        { id: 'image_url', label: 'Avatar URL', type: 'text', x: 600, y: 400, width: 160, height: 60 },
+        // ROW 4: Details
+        { id: 'skills', label: 'Skills', type: 'textarea', x: 20, y: 320, width: 370, height: 100 },
+        { id: 'contact_info', label: 'Contact Info', type: 'textarea', x: 410, y: 320, width: 370, height: 100 },
+
+        // ROW 5: Inventory & Notes
+        { id: 'inventory', label: 'Inventory', type: 'textarea', x: 20, y: 430, width: 370, height: 150 },
+        { id: 'notes', label: 'Notes', type: 'textarea', x: 410, y: 430, width: 370, height: 150 },
+
+        // Logs (Placeholders as text areas for now)
+        { id: 'chat', label: 'Chat Logs', type: 'textarea', x: 20, y: 600, width: 240, height: 150 },
+        { id: 'calls', label: 'Call Logs', type: 'textarea', x: 280, y: 600, width: 240, height: 150 },
+        { id: 'texts', label: 'Text Logs', type: 'textarea', x: 540, y: 600, width: 240, height: 150 },
     ];
 
     // Mock NPCs
     const MOCK_NPCS = [
         {
             id: 'npc-001',
-            sys_name: 'Jane Doe',
-            sys_location: 'Central Plaza',
-            sys_relationship: 'Neutral',
-            sys_is_met: true,
-            desc: 'A mysterious merchant who always seems to have what you need.',
-            tags: 'Merchant, Quest Giver',
-            notes: 'Secretly works for the resistance.'
+            name: 'Jane Doe',
+            home: 'Central Plaza',
+            relationship: 'Neutral',
+            is_met: true,
+            occupation: 'Merchant',
+            description: 'A mysterious merchant who always seems to have what you need.',
+            skills: 'Bartering, Appraising',
+            notes: 'Secretly works for the resistance.',
+            age: '34',
+            sex: 'F',
+            health: 'Good',
+            personality: 'Enigmatic, helpful',
+            contact_info: 'Radio: 102.5',
+            inventory: 'Keys, Datapad'
         },
         {
             id: 'npc-002',
-            sys_name: 'Baron Von Evil',
-            sys_location: 'Dark Castle',
-            sys_relationship: 'Hostile',
-            sys_is_met: false,
-            desc: 'The ruler of the dark lands.',
-            tags: 'Boss, Villain',
-            notes: ''
+            name: 'Baron Von Evil',
+            home: 'Dark Castle',
+            relationship: 'Hostile',
+            is_met: false,
+            occupation: 'Warlord',
+            description: 'The ruler of the dark lands.',
+            skills: 'Intimidation, Strategy',
+            notes: 'Objective: Defeat him.',
+            age: '55',
+            sex: 'M',
+            health: 'Excellent',
+            personality: 'Cruel, Arrogant',
+            contact_info: 'Unknown',
+            inventory: 'Scepter of Doom'
         }
     ];
 
@@ -506,16 +537,16 @@
         // Filter
         const filtered = STATE.npcs.filter(npc => {
             // Dev Mode Check
-            if (!STATE.config.devMode && !npc.sys_is_met) return false;
+            if (!STATE.config.devMode && !npc.is_met) return false;
 
             // Search
-            const nameMatch = (npc.sys_name || '').toLowerCase().includes(search);
-            const tagMatch = (npc.tags || '').toLowerCase().includes(search);
-            if (!nameMatch && !tagMatch) return false;
+            const nameMatch = (npc.name || '').toLowerCase().includes(search);
+            const descMatch = (npc.description || '').toLowerCase().includes(search);
+            if (!nameMatch && !descMatch) return false;
 
             // Dropdowns
-            if (locFilter && npc.sys_location !== locFilter) return false;
-            if (relFilter && npc.sys_relationship !== relFilter) return false;
+            if (locFilter && npc.home !== locFilter) return false;
+            if (relFilter && npc.relationship !== relFilter) return false;
 
             return true;
         });
@@ -527,10 +558,10 @@
             card.onclick = () => selectNPC(npc.id);
 
             card.innerHTML = `
-                <div class="npc-name">${npc.sys_name || 'Unnamed NPC'}</div>
+                <div class="npc-name">${npc.name || 'Unnamed NPC'}</div>
                 <div class="npc-meta">
-                    <span>${npc.sys_location || 'Unknown Loc'}</span>
-                    <span class="status-badge">${npc.sys_relationship || 'Neutral'}</span>
+                    <span>${npc.home || 'Unknown Loc'}</span>
+                    <span class="status-badge">${npc.relationship || 'Neutral'}</span>
                 </div>
             `;
             container.appendChild(card);
@@ -541,7 +572,7 @@
 
     function updateFilterOptions() {
         // Collect unique locations dynamically
-        const locs = new Set(STATE.npcs.map(n => n.sys_location).filter(Boolean));
+        const locs = new Set(STATE.npcs.map(n => n.home).filter(Boolean));
         const sel = document.getElementById('filter-location');
         const currentVal = sel.value;
 
@@ -571,7 +602,7 @@
 
         // Enable Save Button
         document.getElementById('btn-save-current').disabled = false;
-        document.getElementById('btn-save-current').innerText = `Download ${getNPC(id).sys_name} (JSON)`;
+        document.getElementById('btn-save-current').innerText = `Download ${getNPC(id).name} (JSON)`;
 
         renderCanvas();
     }
@@ -775,10 +806,10 @@
 
         const newNPC = {
             id: 'npc-' + Date.now(),
-            sys_name: name,
-            sys_location: 'Unknown',
-            sys_relationship: 'Neutral',
-            sys_is_met: true
+            name: name,
+            home: 'Unknown',
+            relationship: 'Neutral',
+            is_met: true
             // other fields undefined, will be empty
         };
 
@@ -795,7 +826,7 @@
     function downloadCurrentNPC() {
         const npc = getNPC(STATE.selectedId);
         if (!npc) return;
-        downloadJSON(npc, `npc_${npc.sys_name.replace(/\s+/g, '_')}.json`);
+        downloadJSON(npc, `npc_${npc.name.replace(/\s+/g, '_')}.json`);
     }
 
     function exportAllNPCs() {
