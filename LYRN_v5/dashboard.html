@@ -102,6 +102,20 @@
         .bar-btn.close-iframe-btn { color: #ff4444; margin-left: 10px; }
         #btn-close-iframe { display: none; }
 
+        /* STATUS LIGHT */
+        .status-light {
+            width: 12px; height: 12px; border-radius: 50%;
+            background-color: #ff4444; /* Default Red */
+            margin-right: 12px;
+            box-shadow: 0 0 5px rgba(255, 68, 68, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+        .status-light.green { background-color: #00cc66; box-shadow: 0 0 8px rgba(0, 204, 102, 0.6); }
+        .status-light.yellow { background-color: #ffbb33; box-shadow: 0 0 8px rgba(255, 187, 51, 0.6); }
+        .status-light:hover { transform: scale(1.2); }
+
         /* =========================================
            WINDOW SYSTEM
            ========================================= */
@@ -502,7 +516,8 @@
 
     <div id="top-system-bar">
         <div class="bar-section">
-            <span class="system-text" id="sys-cpu">CPU: 0%</span>
+            <div id="sys-status-light" class="status-light" title="Status: Disconnected (Red)" onclick="openConnectionPopup()"></div>
+            <span class="system-text" id="sys-cpu"></span>
             <span class="system-text" id="sys-date">...</span>
             <span class="system-text" id="sys-clock">...</span>
             <span class="system-text" id="sys-battery"></span>
@@ -544,6 +559,7 @@
     <div id="connection-popup">
         <div class="window-header">
             <span class="window-title">Core Connection</span>
+            <button class="win-btn" onclick="skipConnection()">✕</button>
         </div>
         <div class="welcome-content">
             <span class="welcome-title">Backend Configuration</span>
@@ -552,12 +568,20 @@
             <div id="conn-status" style="margin-top:10px; font-size:11px; color:var(--text-dim);"></div>
         </div>
         <div class="welcome-footer">
-            <button class="cta-btn" onclick="testAndSaveConnection()">CONNECT</button>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="chk-no-startup-conn" onchange="toggleStartupConn(this.checked)">
+                Don't show on startup
+            </label>
+            <div style="display:flex; gap:10px;">
+                <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="skipConnection()">SKIP</button>
+                <button class="cta-btn" onclick="testAndSaveConnection()">CONNECT</button>
+            </div>
         </div>
     </div>
 
     <div id="settings-popup">
         <div class="settings-header">General</div>
+        <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
         <div class="settings-row">
             <span>Dark Mode</span>
             <label class="toggle-switch">
@@ -1180,17 +1204,42 @@
         }
         
         function checkConnection() {
+            // Restore checkbox state
+            const hidden = localStorage.getItem('lyrn-conn-hidden');
+            document.getElementById('chk-no-startup-conn').checked = (hidden === 'true');
+
             const stored = localStorage.getItem('lyrn_core_url');
-            if (!stored) {
-                // Suggest current origin if http
-                if (window.location.protocol.startsWith('http')) {
-                     document.getElementById('inp-core-url').value = window.location.origin;
-                }
-                document.getElementById('connection-popup').style.display = 'flex';
-            } else {
+
+            // If we have a stored URL, try to use it regardless
+            if (stored) {
                 coreUrl = stored;
-                initBackendMonitor();
+                document.getElementById('inp-core-url').value = stored;
+            } else if (window.location.protocol.startsWith('http')) {
+                 document.getElementById('inp-core-url').value = window.location.origin;
             }
+
+            // Always start monitoring (it handles failures gracefully)
+            initBackendMonitor();
+
+            // Only show popup if NO URL stored AND user hasn't hidden it
+            if (!stored && hidden !== 'true') {
+                document.getElementById('connection-popup').style.display = 'flex';
+            }
+        }
+
+        function openConnectionPopup() {
+            const stored = localStorage.getItem('lyrn_core_url');
+            if(stored) document.getElementById('inp-core-url').value = stored;
+            document.getElementById('connection-popup').style.display = 'flex';
+            document.getElementById('settings-popup').classList.remove('show');
+        }
+
+        function skipConnection() {
+            document.getElementById('connection-popup').style.display = 'none';
+        }
+
+        function toggleStartupConn(isChecked) {
+            localStorage.setItem('lyrn-conn-hidden', isChecked);
         }
 
         async function testAndSaveConnection() {
@@ -1202,6 +1251,8 @@
             statusEl.innerText = "Testing...";
             statusEl.style.color = "var(--text-dim)";
             
+            updateStatusLight('yellow', 'Testing Connection...');
+
             try {
                 const res = await fetch(url + '/health');
                 const data = await res.json();
@@ -1215,33 +1266,48 @@
                     document.querySelectorAll('iframe').forEach(f => {
                         f.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: url }, '*');
                     });
+
+                    updateStatusLight('green', 'Connected to Core');
                 } else {
                     throw new Error("Invalid response");
                 }
             } catch (e) {
                 statusEl.innerText = "Connection Failed: " + e.message;
                 statusEl.style.color = "var(--error-color)";
+                updateStatusLight('red', 'Connection Failed');
             }
         }
 
+        let monitorInterval = null;
         function initBackendMonitor() {
-            // Initial call
+            if(monitorInterval) clearInterval(monitorInterval);
             fetchStats();
-            setInterval(fetchStats, 2000);
+            monitorInterval = setInterval(fetchStats, 2000);
         }
 
         async function fetchStats() {
+            if(!coreUrl) {
+                updateStatusLight('red', 'No Connection Configured');
+                return;
+            }
             try {
                 const res = await fetch(coreUrl + '/health');
                 const data = await res.json();
                 const cpuText = `CPU: ${data.cpu}%`;
                 const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
+
                 document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
-                document.getElementById('sys-cpu').style.color = "#7c5cff";
+                updateStatusLight('green', 'Connected: System Normal');
             } catch (e) {
-                document.getElementById('sys-cpu').innerText = "DISCONNECTED";
-                document.getElementById('sys-cpu').style.color = "var(--error-color)";
+                document.getElementById('sys-cpu').innerText = "";
+                updateStatusLight('red', 'Disconnected / Offline');
             }
+        }
+
+        function updateStatusLight(status, title) {
+            const el = document.getElementById('sys-status-light');
+            el.className = 'status-light ' + status;
+            el.title = title || status;
         }
 
         function initSystemMonitor() { 
