@@ -28,6 +28,9 @@
             --dock-blur: 20px;
 
             --font-size-base: 12px;
+
+            --bg-input: #050505;
+            --error-color: #ff4444;
         }
 
         body[data-theme="light"] {
@@ -42,6 +45,7 @@
             --border-color: #d1d5db;
             --dock-bg: rgba(255, 255, 255, 0.6);
             --dock-border: rgba(0, 0, 0, 0.1);
+            --bg-input: #ffffff;
         }
 
         * { box-sizing: border-box; }
@@ -367,8 +371,8 @@
             width: 12px; height: 12px; border-radius: 50%; background: var(--brand-purple); cursor: pointer;
         }
 
-        /* WELCOME POPUP */
-        #welcome-popup {
+        /* WELCOME POPUP & CONNECTION POPUP */
+        #welcome-popup, #connection-popup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: var(--bg-panel);
             border: 1px solid var(--brand-purple);
@@ -537,6 +541,21 @@
         </div>
     </div>
 
+    <div id="connection-popup">
+        <div class="window-header">
+            <span class="window-title">Core Connection</span>
+        </div>
+        <div class="welcome-content">
+            <span class="welcome-title">Backend Configuration</span>
+            <p>Please enter the URL of the Python Core backend.</p>
+            <input type="text" id="inp-core-url" placeholder="http://localhost:8000" style="width:100%; padding:8px; margin-top:10px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); font-family:'JetBrains Mono';">
+            <div id="conn-status" style="margin-top:10px; font-size:11px; color:var(--text-dim);"></div>
+        </div>
+        <div class="welcome-footer">
+            <button class="cta-btn" onclick="testAndSaveConnection()">CONNECT</button>
+        </div>
+    </div>
+
     <div id="settings-popup">
         <div class="settings-header">General</div>
         <div class="settings-row">
@@ -581,10 +600,11 @@
             { id: "mod_builder", file: "Snapshot Builder.html", name: "Snapshot Builder", icon: "🛠️" },
             { id: "mod_job_manager", file: "Job Manager.html", name: "Job Automation", icon: "🤖" },
             { id: "mod_asset_shop", file: "Asset Shop.html", name: "Asset Shop", icon: "🛍️" },
+            { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
         ];
 
         let appSettings = {
-            activeModules: ['mod_builder', 'mod_job_manager', 'mod_asset_shop'],
+            activeModules: ['mod_builder', 'mod_job_manager', 'mod_asset_shop', 'mod_server_status'],
             dockPinned: true, 
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
@@ -597,15 +617,18 @@
         
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
+        let coreUrl = "http://localhost:8000";
+
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
             renderDock();
             initDockDrag();
             startClock();
-            startCpuMonitor();
+            // startCpuMonitor();
             initSystemMonitor(); 
             checkIfIframe();
             checkWelcome();
+            checkConnection();
             
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
             document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
@@ -1156,15 +1179,69 @@
             }
         }
         
-        function startCpuMonitor() {
-            const el = document.getElementById('sys-cpu');
-            if(!el) return;
-            const cores = navigator.hardwareConcurrency || 4; 
+        function checkConnection() {
+            const stored = localStorage.getItem('lyrn_core_url');
+            if (!stored) {
+                // Suggest current origin if http
+                if (window.location.protocol.startsWith('http')) {
+                     document.getElementById('inp-core-url').value = window.location.origin;
+                }
+                document.getElementById('connection-popup').style.display = 'flex';
+            } else {
+                coreUrl = stored;
+                initBackendMonitor();
+            }
+        }
+
+        async function testAndSaveConnection() {
+            const inp = document.getElementById('inp-core-url');
+            let url = inp.value.replace(/\/$/, "");
+            if(!url) url = "http://localhost:8000";
+
+            const statusEl = document.getElementById('conn-status');
+            statusEl.innerText = "Testing...";
+            statusEl.style.color = "var(--text-dim)";
             
-            setInterval(() => {
-                const load = Math.floor(Math.random() * 30) + 10; 
-                el.innerText = `CORE_${cores} :: ${load}%`;
-            }, 2000);
+            try {
+                const res = await fetch(url + '/health');
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    localStorage.setItem('lyrn_core_url', url);
+                    coreUrl = url;
+                    document.getElementById('connection-popup').style.display = 'none';
+                    initBackendMonitor();
+
+                    // Broadcast to modules
+                    document.querySelectorAll('iframe').forEach(f => {
+                        f.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: url }, '*');
+                    });
+                } else {
+                    throw new Error("Invalid response");
+                }
+            } catch (e) {
+                statusEl.innerText = "Connection Failed: " + e.message;
+                statusEl.style.color = "var(--error-color)";
+            }
+        }
+
+        function initBackendMonitor() {
+            // Initial call
+            fetchStats();
+            setInterval(fetchStats, 2000);
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch(coreUrl + '/health');
+                const data = await res.json();
+                const cpuText = `CPU: ${data.cpu}%`;
+                const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
+                document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
+                document.getElementById('sys-cpu').style.color = "#7c5cff";
+            } catch (e) {
+                document.getElementById('sys-cpu').innerText = "DISCONNECTED";
+                document.getElementById('sys-cpu').style.color = "var(--error-color)";
+            }
         }
 
         function initSystemMonitor() { 
