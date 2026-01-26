@@ -6,6 +6,3 @@ pynvml
 
 pyautogui
 pygetwindow
-fastapi
-uvicorn
-python-multipart
