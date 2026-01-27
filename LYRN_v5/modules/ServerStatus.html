@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Server Status</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --brand-purple: #7c5cff;
+            --border-color: #222222;
+        }
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 20px;
+            font-size: 13px;
+        }
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 16px;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .stat-label { font-weight: 500; }
+        .stat-value { font-family: 'JetBrains Mono', monospace; color: var(--brand-purple); }
+        .status-indicator {
+            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            background-color: #444; margin-right: 8px;
+        }
+        .status-indicator.connected { background-color: #00ff88; box-shadow: 0 0 8px #00ff88; }
+        .status-indicator.error { background-color: #ff4444; }
+
+        #connection-info { margin-bottom: 20px; font-size: 11px; color: #666; font-family: 'JetBrains Mono'; }
+    </style>
+</head>
+<body>
+    <div id="connection-info">
+        <span id="status-dot" class="status-indicator"></span>
+        <span id="url-display">Waiting for connection...</span>
+    </div>
+
+    <h2>System Resources</h2>
+    <div class="stat-row">
+        <span class="stat-label">CPU Usage</span>
+        <span class="stat-value" id="val-cpu">--%</span>
+    </div>
+    <div class="stat-row">
+        <span class="stat-label">RAM Usage</span>
+        <span class="stat-value" id="val-ram">--%</span>
+    </div>
+    <div class="stat-row">
+        <span class="stat-label">Disk Usage</span>
+        <span class="stat-value" id="val-disk">--%</span>
+    </div>
+
+    <h2 style="margin-top: 20px;">GPU Status</h2>
+    <div id="gpu-container">
+        <div class="stat-row">
+            <span class="stat-label">No GPU Detected</span>
+        </div>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let intervalId = null;
+
+        // Listen for URL updates from parent
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = e.data.url;
+                startMonitoring();
+            }
+            if (e.data.type === 'THEME_CHANGE') {
+                // Handle theme if needed
+            }
+        });
+
+        function startMonitoring() {
+            if(intervalId) clearInterval(intervalId);
+
+            const urlDisplay = document.getElementById('url-display');
+            if(!coreUrl) {
+                urlDisplay.innerText = "No Core URL set";
+                return;
+            }
+
+            urlDisplay.innerText = "Connected: " + coreUrl;
+            fetchStats();
+            intervalId = setInterval(fetchStats, 2000);
+        }
+
+        async function fetchStats() {
+            const dot = document.getElementById('status-dot');
+            try {
+                const res = await fetch(coreUrl + '/health');
+                if(!res.ok) throw new Error("API Error");
+
+                const data = await res.json();
+
+                dot.className = "status-indicator connected";
+
+                document.getElementById('val-cpu').innerText = data.cpu + '%';
+                document.getElementById('val-ram').innerText = Math.round(data.ram.percent) + '% (' + data.ram.used_gb.toFixed(1) + 'GB)';
+                document.getElementById('val-disk').innerText = data.disk.percent + '%';
+
+                const gpuContainer = document.getElementById('gpu-container');
+                if(data.gpu && data.gpu.vram_percent !== undefined) {
+                    gpuContainer.innerHTML = `
+                        <div class="stat-row">
+                            <span class="stat-label">GPU (0)</span>
+                            <span class="stat-value">${data.gpu.vram_percent.toFixed(1)}% / ${data.gpu.vram_used_gb.toFixed(1)}GB</span>
+                        </div>
+                    `;
+                } else {
+                    gpuContainer.innerHTML = '<div class="stat-row"><span class="stat-label">No GPU Active</span></div>';
+                }
+
+            } catch(e) {
+                dot.className = "status-indicator error";
+                console.error(e);
+            }
+        }
+
+        // Init
+        if(coreUrl) startMonitoring();
+    </script>
+</body>
+</html>
