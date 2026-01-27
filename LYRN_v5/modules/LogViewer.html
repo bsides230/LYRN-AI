@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Log Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --brand-purple: #7c5cff;
+            --border-color: #222222;
+            --bg-panel: #111111;
+
+            --log-info: #3B82F6;
+            --log-warn: #F59E0B;
+            --log-error: #EF4444;
+            --log-success: #10B981;
+        }
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 20px;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 16px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+        button {
+            background-color: #222;
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover { background-color: #333; }
+        button.active { background-color: var(--brand-purple); border-color: var(--brand-purple); }
+
+        .spacer { flex-grow: 1; }
+
+        /* Log Container */
+        #log-container {
+            flex-grow: 1;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            line-height: 1.4;
+            display: flex;
+        }
+        .log-ts { color: #555; margin-right: 8px; flex-shrink: 0; }
+        .log-level { margin-right: 8px; font-weight: bold; width: 50px; flex-shrink: 0; }
+        .log-source { color: #888; margin-right: 8px; width: 100px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log-msg { color: var(--text-body); word-break: break-all; }
+
+        .level-Info { color: var(--log-info); }
+        .level-Warn { color: var(--log-warn); }
+        .level-Error { color: var(--log-error); }
+        .level-Success { color: var(--log-success); }
+
+        #status-indicator {
+            width: 8px; height: 8px; border-radius: 50%; background: #444; margin-right: 5px;
+        }
+        #status-indicator.connected { background: var(--log-success); box-shadow: 0 0 5px var(--log-success); }
+        #status-indicator.disconnected { background: var(--log-error); }
+
+    </style>
+</head>
+<body>
+
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <h2>System Logs</h2>
+        <div style="display: flex; align-items: center; font-size: 11px; color: #666;">
+            <div id="status-indicator"></div>
+            <span id="connection-status">Disconnected</span>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="btn-clear">Clear</button>
+        <div class="spacer"></div>
+        <label><input type="checkbox" id="chk-autoscroll" checked> Auto-scroll</label>
+        <span style="width: 10px;"></span>
+        <span>Filter:</span>
+        <label><input type="checkbox" class="filter-chk" value="Info" checked> Info</label>
+        <label><input type="checkbox" class="filter-chk" value="Warn" checked> Warn</label>
+        <label><input type="checkbox" class="filter-chk" value="Error" checked> Error</label>
+    </div>
+
+    <div id="log-container"></div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let eventSource = null;
+        const logContainer = document.getElementById('log-container');
+        const statusDot = document.getElementById('status-indicator');
+        const statusText = document.getElementById('connection-status');
+        const chkAutoScroll = document.getElementById('chk-autoscroll');
+
+        // --- Filters ---
+        const activeFilters = new Set(['Info', 'Warn', 'Error']);
+        document.querySelectorAll('.filter-chk').forEach(chk => {
+            chk.addEventListener('change', (e) => {
+                if(e.target.checked) activeFilters.add(e.target.value);
+                else activeFilters.delete(e.target.value);
+                refilterLogs();
+            });
+        });
+
+        document.getElementById('btn-clear').addEventListener('click', () => {
+            logContainer.innerHTML = '';
+        });
+
+        // Listen for URL updates from parent dashboard
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = e.data.url;
+                connectSSE();
+            }
+        });
+
+        function connectSSE() {
+            if(eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            if(!coreUrl) {
+                updateStatus(false, "No URL");
+                return;
+            }
+
+            updateStatus(false, "Connecting...");
+
+            // Append /api/logs
+            const sseUrl = coreUrl.replace(/\/$/, '') + '/api/logs';
+            eventSource = new EventSource(sseUrl);
+
+            eventSource.onopen = () => {
+                updateStatus(true, "Connected");
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    appendLog(data);
+                } catch(e) {
+                    console.error("Parse error", e);
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                updateStatus(false, "Connection Lost");
+                // EventSource auto-reconnects, but visually we show lost
+            };
+        }
+
+        function updateStatus(connected, text) {
+            statusDot.className = connected ? 'connected' : 'disconnected';
+            statusText.innerText = text;
+        }
+
+        function appendLog(log) {
+            // log = { ts, level, msg, source }
+            const div = document.createElement('div');
+            div.className = `log-entry level-${log.level}`;
+            div.dataset.level = log.level;
+
+            // Format TS (ISO to HH:MM:SS)
+            const time = new Date(log.ts).toLocaleTimeString('en-US', { hour12: false });
+
+            div.innerHTML = `
+                <div class="log-ts">${time}</div>
+                <div class="log-level level-${log.level}">${log.level}</div>
+                <div class="log-source" title="${log.source}">${log.source}</div>
+                <div class="log-msg">${escapeHtml(log.msg)}</div>
+            `;
+
+            // Filter check
+            if(!activeFilters.has(log.level) && log.level !== 'Success') { // Default success to show if not filtered explicitly?
+                // Wait, success wasn't in filters. Treat it like Info?
+                // Actually my filter logic is exact match.
+                div.style.display = 'none';
+            }
+
+            logContainer.appendChild(div);
+
+            // Limit buffer size to avoid DOM lag
+            if(logContainer.childElementCount > 1000) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+
+            if(chkAutoScroll.checked) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        function refilterLogs() {
+            const entries = logContainer.children;
+            for(let i=0; i<entries.length; i++) {
+                const level = entries[i].dataset.level;
+                if(activeFilters.has(level)) {
+                    entries[i].style.display = 'flex';
+                } else {
+                    entries[i].style.display = 'none';
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return text;
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Init
+        if(coreUrl) connectSSE();
+    </script>
+</body>
+</html>

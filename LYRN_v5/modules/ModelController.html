@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Model Controller</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --brand-purple: #7c5cff;
+            --border-color: #222222;
+            --bg-panel: #111111;
+
+            --status-loaded: #10B981;
+            --status-loading: #F59E0B;
+            --status-error: #EF4444;
+            --status-unloaded: #666;
+        }
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 20px;
+            font-size: 13px;
+        }
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 16px;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .section { margin-bottom: 20px; }
+        .label { font-weight: 500; display: block; margin-bottom: 5px; color: var(--text-head); }
+        .sub-label { font-size: 11px; color: #666; margin-bottom: 5px; }
+
+        input[type="text"], input[type="number"] {
+            background: #111;
+            border: 1px solid #333;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        input:focus { outline: none; border-color: var(--brand-purple); }
+
+        .row { display: flex; gap: 10px; }
+        .col { flex: 1; }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            transition: background 0.2s;
+            width: 100%;
+        }
+        button.primary { background: var(--brand-purple); color: white; }
+        button.primary:hover { background: #6b4cdb; }
+        button.danger { background: #333; color: #ff6666; border: 1px solid #553333; }
+        button.danger:hover { background: #442222; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Status Display */
+        #status-box {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #status-text { font-family: 'JetBrains Mono', monospace; font-weight: bold; text-transform: uppercase; }
+
+        .status-loaded { color: var(--status-loaded); }
+        .status-loading { color: var(--status-loading); }
+        .status-unloading { color: var(--status-loading); }
+        .status-error { color: var(--status-error); }
+        .status-unloaded { color: var(--status-unloaded); }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px 15px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .info-key { color: #666; }
+        .info-val { color: #ddd; font-family: 'JetBrains Mono', monospace; }
+
+        #error-msg {
+            color: var(--status-error);
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>AI Model Controller</h2>
+
+    <div class="section">
+        <div class="label">Current Status</div>
+        <div id="status-box">
+            <span id="status-text" class="status-unloaded">UNLOADED</span>
+            <div id="loading-spinner" style="display:none;">⏳</div>
+        </div>
+        <div class="info-grid">
+            <div class="info-key">Active Model:</div>
+            <div class="info-val" id="val-model">None</div>
+            <div class="info-key">Context Size:</div>
+            <div class="info-val" id="val-nctx">-</div>
+            <div class="info-key">GPU Layers:</div>
+            <div class="info-val" id="val-ngpu">-</div>
+        </div>
+        <div id="error-msg"></div>
+    </div>
+
+    <div class="section">
+        <div class="label">Load Model</div>
+        <div class="sub-label">Full file path to .gguf model</div>
+        <input type="text" id="inp-path" placeholder="/path/to/model.gguf" />
+
+        <div class="row">
+            <div class="col">
+                <div class="sub-label">Context (n_ctx)</div>
+                <input type="number" id="inp-nctx" value="2048" />
+            </div>
+            <div class="col">
+                <div class="sub-label">GPU Layers</div>
+                <input type="number" id="inp-ngpu" value="0" />
+            </div>
+        </div>
+
+        <div class="row" style="margin-top: 10px;">
+            <div class="col">
+                <button id="btn-load" class="primary">Load Model</button>
+            </div>
+            <div class="col">
+                <button id="btn-unload" class="danger">Unload</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let pollInterval = null;
+        let currentState = "unloaded";
+
+        const els = {
+            statusText: document.getElementById('status-text'),
+            valModel: document.getElementById('val-model'),
+            valCtx: document.getElementById('val-nctx'),
+            valGpu: document.getElementById('val-ngpu'),
+            inpPath: document.getElementById('inp-path'),
+            inpCtx: document.getElementById('inp-nctx'),
+            inpGpu: document.getElementById('inp-ngpu'),
+            btnLoad: document.getElementById('btn-load'),
+            btnUnload: document.getElementById('btn-unload'),
+            spinner: document.getElementById('loading-spinner'),
+            errorMsg: document.getElementById('error-msg')
+        };
+
+        // Listen for URL updates
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = e.data.url;
+                startPolling();
+            }
+        });
+
+        els.btnLoad.addEventListener('click', loadModel);
+        els.btnUnload.addEventListener('click', unloadModel);
+
+        function startPolling() {
+            if(pollInterval) clearInterval(pollInterval);
+            if(!coreUrl) return;
+            fetchStatus();
+            pollInterval = setInterval(fetchStatus, 1000);
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch(coreUrl + '/api/model/status');
+                if(!res.ok) throw new Error("API Error");
+                const data = await res.json();
+                updateUI(data);
+            } catch(e) {
+                console.error(e);
+                els.statusText.innerText = "CONNECTION ERROR";
+                els.statusText.className = "status-error";
+            }
+        }
+
+        function updateUI(data) {
+            // data = { state, model_name, n_ctx, n_gpu_layers }
+            currentState = data.state;
+
+            els.statusText.innerText = data.state.toUpperCase();
+            els.statusText.className = `status-${data.state}`;
+
+            els.valModel.innerText = data.model_name || "None";
+            els.valCtx.innerText = data.n_ctx || "-";
+            els.valGpu.innerText = data.n_gpu_layers !== null ? data.n_gpu_layers : "-";
+
+            // Show/Hide spinner
+            if(data.state === 'loading' || data.state === 'unloading') {
+                els.spinner.style.display = 'block';
+                els.btnLoad.disabled = true;
+                els.btnUnload.disabled = true;
+            } else {
+                els.spinner.style.display = 'none';
+                els.btnLoad.disabled = (data.state === 'loaded');
+                els.btnUnload.disabled = (data.state === 'unloaded' || data.state === 'error'); // Can try unload on error? Usually yes to reset.
+                if(data.state === 'error') els.btnUnload.disabled = false;
+            }
+        }
+
+        async function loadModel() {
+            const path = els.inpPath.value.trim();
+            if(!path) return alert("Please enter a model path");
+
+            els.errorMsg.style.display = 'none';
+            els.btnLoad.disabled = true;
+
+            const payload = {
+                model_path: path,
+                config: {
+                    n_ctx: parseInt(els.inpCtx.value),
+                    n_gpu_layers: parseInt(els.inpGpu.value)
+                }
+            };
+
+            try {
+                const res = await fetch(coreUrl + '/api/model/load', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const json = await res.json();
+                if(!res.ok) throw new Error(json.message || "Load failed");
+                // UI update will happen via polling
+            } catch(e) {
+                els.errorMsg.innerText = e.message;
+                els.errorMsg.style.display = 'block';
+                els.btnLoad.disabled = false;
+            }
+        }
+
+        async function unloadModel() {
+            els.errorMsg.style.display = 'none';
+            els.btnUnload.disabled = true;
+
+            try {
+                const res = await fetch(coreUrl + '/api/model/unload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const json = await res.json();
+                if(!res.ok) throw new Error(json.message || "Unload failed");
+            } catch(e) {
+                els.errorMsg.innerText = e.message;
+                els.errorMsg.style.display = 'block';
+                els.btnUnload.disabled = false;
+            }
+        }
+
+        // Try to pre-fill from localStorage if wanted, or just leave blank.
+        // Also check if we have a default model path in settings to hint?
+        // No easy way to get settings from frontend yet without another endpoint.
+
+        // Init
+        if(coreUrl) startPolling();
+    </script>
+</body>
+</html>
