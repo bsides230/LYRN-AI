@@ -3,3 +3,14 @@ __pycache__/
 /chat
 /episodic_memory
 active_chat.txt
+
+# Runtime flags
+global_flags/automation.txt
+global_flags/next_job.txt
+global_flags/llm_status.txt
+
+# Automation runtime state
+automation/job_queue.json
+automation/chunk_queue.json
+automation/job_run_counts.json
+automation/job_log.json
