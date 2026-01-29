@@ -113,6 +113,7 @@
         .preset-btn.active { background: var(--brand-purple); color: white; border-color: var(--brand-purple); }
 
         .save-preset-btn { width: auto; padding: 0 15px; }
+        .default-preset-btn { width: auto; padding: 0 10px; font-size: 10px; letter-spacing: 0.5px; }
 
         /* Tooltip for Presets */
         .preset-tooltip {
@@ -350,6 +351,25 @@
         function renderPresets() {
             els.presetsList.innerHTML = '';
 
+            // Render Default Slot
+            const defBtn = document.createElement('button');
+            defBtn.className = 'preset-btn default-preset-btn';
+            defBtn.innerText = 'DEFAULT';
+
+            const defData = presets["default"];
+            if(defData) {
+                const tip = document.createElement('div');
+                tip.className = 'preset-tooltip';
+                const name = defData.model_path ? defData.model_path.split('/').pop() : 'Unknown';
+                tip.innerText = `Model: ${name}\nCtx: ${defData.n_ctx}\nGPU: ${defData.n_gpu_layers}`;
+                defBtn.appendChild(tip);
+                defBtn.onclick = () => loadPreset("default");
+            } else {
+                defBtn.style.opacity = '0.5';
+                defBtn.onclick = () => alert("Default preset empty. Set params and click Save, then enter 'default'.");
+            }
+            els.presetsList.appendChild(defBtn);
+
             // Render 1-5 slots
             for(let i=1; i<=5; i++) {
                 const btn = document.createElement('button');
@@ -397,8 +417,26 @@
         }
 
         async function savePreset() {
-            const id = prompt("Enter preset number (1-5) to save current config:");
-            if(!id || isNaN(id) || id < 1 || id > 5) return;
+            const input = prompt("Enter preset number (1-5) or 'default' to save:");
+            if(!input) return;
+
+            let id = input.trim().toLowerCase();
+
+            // Allow 'd' as shortcut for default
+            if(id === 'd') id = 'default';
+
+            const isNum = !isNaN(id);
+            if(isNum) {
+                if(id < 1 || id > 5) {
+                    alert("Please enter a number between 1 and 5.");
+                    return;
+                }
+            } else {
+                if(id !== 'default') {
+                    alert("Invalid input. Enter 1-5 or 'default'.");
+                    return;
+                }
+            }
 
             const config = getConfigFromInputs();
 
