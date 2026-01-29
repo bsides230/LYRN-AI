@@ -1,30 +1,29 @@
 import os
+import sys
 import psutil
 import asyncio
 import json
 import datetime
 import threading
-import gc
+import subprocess
 import collections
 import time
 from typing import Optional, List, Dict, Any
+from pathlib import Path
 
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
+from settings_manager import SettingsManager
+
 try:
     import pynvml
 except ImportError:
     pynvml = None
-
-try:
-    from llama_cpp import Llama
-except ImportError:
-    Llama = None
 
 # Global reference to the main event loop
 main_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -64,10 +63,6 @@ class JournalLogger:
         q = asyncio.Queue()
         async with self.lock:
             self.subscribers.add(q)
-            # Optionally send recent history upon connection
-            # for event in self.history:
-            #    await q.put(event)
-            pass
 
         try:
             while True:
@@ -88,114 +83,102 @@ class JournalLogger:
 
 # Global Logger
 logger = JournalLogger()
+settings_manager = SettingsManager()
 
-# --- Model Controller ---
-class ModelController:
+# --- Worker Controller ---
+class WorkerController:
+    """Manages the headless worker process."""
     def __init__(self):
-        self.llm: Optional[Any] = None
-        self.status = "unloaded" # unloaded, loading, loaded, unloading, error
-        self.model_path = ""
-        self.model_params = {}
+        self.process: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
+        self.worker_script = "headless_lyrn_worker.py"
 
     def get_status(self):
         with self._lock:
+            running = self.process is not None and self.process.poll() is None
+
+            # Check LLM status flag if running
+            llm_status = "unknown"
+            if running:
+                try:
+                    flag_path = Path("global_flags/llm_status.txt")
+                    if flag_path.exists():
+                        llm_status = flag_path.read_text().strip()
+                except Exception:
+                    pass
+            else:
+                llm_status = "stopped"
+
             return {
-                "state": self.status,
-                "model_name": os.path.basename(self.model_path) if self.model_path else None,
-                "n_ctx": self.model_params.get("n_ctx"),
-                "n_gpu_layers": self.model_params.get("n_gpu_layers")
+                "running": running,
+                "pid": self.process.pid if running else None,
+                "llm_status": llm_status
             }
 
-    def load_model_thread(self, path: str, config: Dict[str, Any]):
-        def log(level, msg):
-            if main_loop:
-                 asyncio.run_coroutine_threadsafe(logger.emit(level, msg, "ModelController"), main_loop)
-            else:
-                 print(f"[{level}] ModelController: {msg}")
+    def start_worker(self):
+        with self._lock:
+            if self.process is not None and self.process.poll() is None:
+                return {"success": False, "message": "Worker already running."}
 
+            try:
+                # Start the worker process
+                self.process = subprocess.Popen(
+                    [sys.executable, self.worker_script],
+                    cwd=os.getcwd(),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+
+                # Start threads to forward output to logger
+                threading.Thread(target=self._monitor_output, args=(self.process.stdout, "WorkerOut"), daemon=True).start()
+                threading.Thread(target=self._monitor_output, args=(self.process.stderr, "WorkerErr"), daemon=True).start()
+
+                return {"success": True, "message": "Worker started."}
+            except Exception as e:
+                return {"success": False, "message": f"Failed to start worker: {e}"}
+
+    def stop_worker(self):
+        with self._lock:
+            if self.process is None or self.process.poll() is not None:
+                return {"success": False, "message": "Worker not running."}
+
+            try:
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+
+                self.process = None
+                return {"success": True, "message": "Worker stopped."}
+            except Exception as e:
+                return {"success": False, "message": f"Error stopping worker: {e}"}
+
+    def _monitor_output(self, stream, source):
+        """Reads output from the subprocess and logs it."""
         try:
-            if not Llama:
-                log("Error", "llama-cpp-python not installed.")
-                with self._lock:
-                    self.status = "error"
-                return
+            for line in iter(stream.readline, ''):
+                if line:
+                    clean_line = line.strip()
+                    if main_loop and clean_line:
+                        asyncio.run_coroutine_threadsafe(logger.emit("Info", clean_line, source), main_loop)
+                    elif clean_line:
+                        print(f"[{source}] {clean_line}")
+        except Exception:
+            pass
+        finally:
+            stream.close()
 
-            log("Info", f"Starting load of model: {path}")
-
-            with self._lock:
-                if self.status in ["loading", "unloading"]:
-                     log("Warn", "Model operation already in progress.")
-                     return
-                self.status = "loading"
-                self.model_path = path
-                self.model_params = config
-
-            # Check file existence
-            if not os.path.exists(path):
-                 raise FileNotFoundError(f"Model file not found: {path}")
-
-            # Actual Loading (Blocking)
-            # Using default params if not specified in config
-            n_ctx = config.get("n_ctx", 2048)
-            n_gpu_layers = config.get("n_gpu_layers", 0)
-
-            self.llm = Llama(
-                model_path=path,
-                n_ctx=n_ctx,
-                n_gpu_layers=n_gpu_layers,
-                verbose=False
-            )
-
-            with self._lock:
-                self.status = "loaded"
-
-            log("Info", "Model loaded successfully.")
-
-        except Exception as e:
-            with self._lock:
-                self.status = "error"
-                self.llm = None
-            log("Error", f"Failed to load model: {str(e)}")
-
-    def unload_model_thread(self):
-        def log(level, msg):
-            if main_loop:
-                 asyncio.run_coroutine_threadsafe(logger.emit(level, msg, "ModelController"), main_loop)
-            else:
-                 print(f"[{level}] ModelController: {msg}")
-
-        try:
-            with self._lock:
-                if self.status == "unloaded":
-                    return
-                self.status = "unloading"
-
-            log("Info", "Unloading model...")
-
-            if self.llm:
-                del self.llm
-                self.llm = None
-                gc.collect()
-
-            with self._lock:
-                self.status = "unloaded"
-                self.model_path = ""
-                self.model_params = {}
-
-            log("Info", "Model unloaded.")
-
-        except Exception as e:
-             with self._lock:
-                self.status = "error"
-             log("Error", f"Error unloading model: {str(e)}")
-
-model_controller = ModelController()
+worker_controller = WorkerController()
 
 # --- Pydantic Models ---
-class LoadModelRequest(BaseModel):
-    model_path: str
-    config: Optional[Dict[str, Any]] = {}
+class PresetModel(BaseModel):
+    preset_id: str
+    config: Dict[str, Any]
+
+class ActiveConfigModel(BaseModel):
+    config: Dict[str, Any]
 
 # --- App Setup ---
 app = FastAPI(title="LYRN v5 Backend")
@@ -236,6 +219,8 @@ async def health_check():
         except Exception:
             pass
 
+    worker_status = worker_controller.get_status()
+
     return {
         "status": "ok",
         "cpu": cpu,
@@ -249,7 +234,8 @@ async def health_check():
             "used_gb": disk.used / (1024**3),
             "total_gb": disk.total / (1024**3)
         },
-        "gpu": gpu_stats
+        "gpu": gpu_stats,
+        "worker": worker_status
     }
 
 # Logging Endpoint
@@ -257,27 +243,70 @@ async def health_check():
 async def stream_logs(request: Request):
     return StreamingResponse(logger.subscribe(request), media_type="text/event-stream")
 
-# Model Endpoints
-@app.get("/api/model/status")
-async def get_model_status():
-    return model_controller.get_status()
+# --- Model & Config Endpoints ---
 
-@app.post("/api/model/load")
-async def load_model(req: LoadModelRequest, background_tasks: BackgroundTasks):
-    if model_controller.status in ["loading", "loaded"]:
-         return JSONResponse({"accepted": False, "message": "Model already loaded or loading."}, status_code=400)
+@app.get("/api/models/list")
+async def list_models():
+    """Lists available models in the models/ directory."""
+    models_dir = Path("models")
+    if not models_dir.exists():
+        return {"models": []}
 
-    # Run in a separate thread to avoid blocking the event loop
-    threading.Thread(target=model_controller.load_model_thread, args=(req.model_path, req.config)).start()
-    return {"accepted": True, "message": "Model load started."}
+    models = [f.name for f in models_dir.glob("*") if f.suffix in ['.gguf', '.bin']]
+    return {"models": sorted(models)}
 
-@app.post("/api/model/unload")
-async def unload_model():
-    if model_controller.status == "unloaded":
-         return JSONResponse({"accepted": False, "message": "No model to unload."}, status_code=400)
+@app.get("/api/config/presets")
+async def get_presets():
+    """Gets all model presets."""
+    if not settings_manager.settings:
+        settings_manager.load_or_detect_first_boot()
 
-    threading.Thread(target=model_controller.unload_model_thread).start()
-    return {"accepted": True, "message": "Model unload started."}
+    return settings_manager.settings.get("model_presets", {})
+
+@app.post("/api/config/presets")
+async def save_preset(preset: PresetModel):
+    """Saves a model preset."""
+    if not settings_manager.settings:
+        settings_manager.load_or_detect_first_boot()
+
+    if "model_presets" not in settings_manager.settings:
+        settings_manager.settings["model_presets"] = {}
+
+    settings_manager.settings["model_presets"][preset.preset_id] = preset.config
+    settings_manager.save_settings()
+    return {"success": True, "message": f"Preset {preset.preset_id} saved."}
+
+@app.post("/api/config/active")
+async def set_active_config(config: ActiveConfigModel):
+    """Sets the active model configuration."""
+    if not settings_manager.settings:
+        settings_manager.load_or_detect_first_boot()
+
+    settings_manager.settings["active"] = config.config
+    settings_manager.save_settings()
+    return {"success": True, "message": "Active configuration updated."}
+
+@app.get("/api/config/active")
+async def get_active_config():
+    """Gets the active model configuration."""
+    if not settings_manager.settings:
+        settings_manager.load_or_detect_first_boot()
+
+    return settings_manager.settings.get("active", {})
+
+# --- Worker Control Endpoints ---
+
+@app.get("/api/system/worker_status")
+async def get_worker_status():
+    return worker_controller.get_status()
+
+@app.post("/api/system/start_worker")
+async def start_worker():
+    return worker_controller.start_worker()
+
+@app.post("/api/system/stop_worker")
+async def stop_worker():
+    return worker_controller.stop_worker()
 
 
 # Serve dashboard at root
