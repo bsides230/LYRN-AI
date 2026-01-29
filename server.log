@@ -1,0 +1,21 @@
+/app/lyrn_web_v5.py:194: DeprecationWarning:
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+
+  @app.on_event("startup")
+INFO:     Started server process [2191]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Settings loaded successfully
+Next job flag initialized to 'false'
+LLM status flag initialized to 'idle'
+[Info] System: Backend started.
+INFO:     127.0.0.1:35300 - "GET /modules/ModelController.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35300 - "GET /api/models/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35302 - "GET /api/config/presets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35312 - "GET /api/config/active HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35312 - "GET /api/system/worker_status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35312 - "GET /api/system/worker_status HTTP/1.1" 200 OK

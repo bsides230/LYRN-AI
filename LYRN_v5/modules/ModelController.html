@@ -12,13 +12,14 @@
             --text-head: #ffffff;
             --text-body: #b0b0b0;
             --brand-purple: #7c5cff;
-            --border-color: #222222;
+            --border-color: #333333;
             --bg-panel: #111111;
+            --input-bg: #1a1a1a;
 
             --status-loaded: #10B981;
             --status-loading: #F59E0B;
             --status-error: #EF4444;
-            --status-unloaded: #666;
+            --status-stopped: #666;
         }
         body {
             background-color: var(--bg-core);
@@ -26,6 +27,7 @@
             font-family: 'Inter', sans-serif;
             margin: 0; padding: 20px;
             font-size: 13px;
+            overflow-y: auto;
         }
         h2 {
             font-family: 'JetBrains Mono', monospace;
@@ -34,257 +36,507 @@
             margin-top: 0;
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .section { margin-bottom: 20px; }
-        .label { font-weight: 500; display: block; margin-bottom: 5px; color: var(--text-head); }
-        .sub-label { font-size: 11px; color: #666; margin-bottom: 5px; }
+        .section { margin-bottom: 25px; }
+        .label { font-weight: 600; display: block; margin-bottom: 8px; color: var(--text-head); font-size: 12px; }
+        .sub-label { font-size: 11px; color: #777; margin-bottom: 5px; }
 
-        input[type="text"], input[type="number"] {
-            background: #111;
-            border: 1px solid #333;
+        /* Form Elements */
+        select, input[type="text"], input[type="number"] {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
             color: white;
-            padding: 8px;
+            padding: 8px 10px;
             border-radius: 4px;
             font-family: 'JetBrains Mono', monospace;
             width: 100%;
             box-sizing: border-box;
-            margin-bottom: 10px;
+            transition: border-color 0.2s;
         }
-        input:focus { outline: none; border-color: var(--brand-purple); }
+        select:focus, input:focus { outline: none; border-color: var(--brand-purple); }
 
-        .row { display: flex; gap: 10px; }
-        .col { flex: 1; }
+        /* Grid Layout for Params */
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .param-item { display: flex; flex-direction: column; }
+        .param-item label { font-size: 11px; color: #888; margin-bottom: 4px; }
 
+        /* Buttons */
         button {
-            padding: 8px 16px;
+            padding: 10px 20px;
             border-radius: 4px;
             border: none;
             cursor: pointer;
             font-weight: 600;
             font-family: 'Inter', sans-serif;
-            transition: background 0.2s;
-            width: 100%;
+            transition: all 0.2s;
+            font-size: 12px;
+            text-transform: uppercase;
         }
-        button.primary { background: var(--brand-purple); color: white; }
-        button.primary:hover { background: #6b4cdb; }
-        button.danger { background: #333; color: #ff6666; border: 1px solid #553333; }
-        button.danger:hover { background: #442222; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.primary { background: var(--brand-purple); color: white; width: 100%; }
+        button.primary:hover { background: #6b4cdb; box-shadow: 0 0 10px rgba(124, 92, 255, 0.3); }
 
-        /* Status Display */
-        #status-box {
+        button.danger { background: #2a1111; color: #ff6666; border: 1px solid #552222; width: 100%; }
+        button.danger:hover { background: #441111; border-color: #ff4444; }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        /* Presets */
+        .presets-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
             background: var(--bg-panel);
             border: 1px solid var(--border-color);
+            color: var(--text-body);
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .preset-btn:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+        .preset-btn.active { background: var(--brand-purple); color: white; border-color: var(--brand-purple); }
+
+        .save-preset-btn { width: auto; padding: 0 15px; }
+
+        /* Tooltip for Presets */
+        .preset-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            border: 1px solid #444;
+            padding: 8px;
             border-radius: 4px;
-            padding: 15px;
+            font-size: 10px;
+            color: #ccc;
+            white-space: pre;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            min-width: 150px;
+            text-align: left;
+        }
+        .preset-btn:hover .preset-tooltip { opacity: 1; }
+
+        /* Status Bar */
+        .status-bar {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px 15px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            margin-bottom: 25px;
         }
-        #status-text { font-family: 'JetBrains Mono', monospace; font-weight: bold; text-transform: uppercase; }
-
-        .status-loaded { color: var(--status-loaded); }
-        .status-loading { color: var(--status-loading); }
-        .status-unloading { color: var(--status-loading); }
-        .status-error { color: var(--status-error); }
-        .status-unloaded { color: var(--status-unloaded); }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 8px 15px;
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'JetBrains Mono';
+            font-weight: bold;
             font-size: 12px;
-            margin-top: 10px;
         }
-        .info-key { color: #666; }
-        .info-val { color: #ddd; font-family: 'JetBrains Mono', monospace; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
+        .dot.running { background: var(--status-loaded); box-shadow: 0 0 8px var(--status-loaded); }
+        .dot.loading { background: var(--status-loading); animation: pulse 1s infinite; }
+        .dot.stopped { background: var(--status-stopped); }
+        .dot.error { background: var(--status-error); }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        /* Control Group */
+        .control-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
 
         #error-msg {
             color: var(--status-error);
             font-size: 12px;
             margin-top: 10px;
             display: none;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 4px;
         }
+
     </style>
 </head>
 <body>
 
-    <h2>AI Model Controller</h2>
+    <h2>
+        Model Configuration
+        <span style="font-size:10px; color:#555; font-weight:400;">v5.0</span>
+    </h2>
 
+    <!-- Status -->
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div id="status-dot" class="dot stopped"></div>
+            <span id="status-text">STOPPED</span>
+        </div>
+        <div style="font-size:11px; color:#666;" id="pid-text">PID: -</div>
+    </div>
+
+    <div id="error-msg"></div>
+
+    <!-- Presets -->
     <div class="section">
-        <div class="label">Current Status</div>
-        <div id="status-box">
-            <span id="status-text" class="status-unloaded">UNLOADED</span>
-            <div id="loading-spinner" style="display:none;">⏳</div>
+        <div class="label">Presets</div>
+        <div class="presets-container" id="presets-list">
+            <!-- Generated via JS -->
+            <button class="preset-btn">1</button>
+            <button class="preset-btn">2</button>
+            <button class="preset-btn save-preset-btn">SAVE</button>
         </div>
-        <div class="info-grid">
-            <div class="info-key">Active Model:</div>
-            <div class="info-val" id="val-model">None</div>
-            <div class="info-key">Context Size:</div>
-            <div class="info-val" id="val-nctx">-</div>
-            <div class="info-key">GPU Layers:</div>
-            <div class="info-val" id="val-ngpu">-</div>
-        </div>
-        <div id="error-msg"></div>
+    </div>
+
+    <!-- Main Config -->
+    <div class="section">
+        <div class="label">Model File</div>
+        <select id="inp-model">
+            <option value="">Select a model...</option>
+        </select>
     </div>
 
     <div class="section">
-        <div class="label">Load Model</div>
-        <div class="sub-label">Full file path to .gguf model</div>
-        <input type="text" id="inp-path" placeholder="/path/to/model.gguf" />
-
-        <div class="row">
-            <div class="col">
-                <div class="sub-label">Context (n_ctx)</div>
-                <input type="number" id="inp-nctx" value="2048" />
+        <div class="label">Parameters</div>
+        <div class="param-grid">
+            <div class="param-item">
+                <label>Context Size (n_ctx)</label>
+                <input type="number" id="inp-n_ctx" value="2048">
             </div>
-            <div class="col">
-                <div class="sub-label">GPU Layers</div>
-                <input type="number" id="inp-ngpu" value="0" />
+            <div class="param-item">
+                <label>Threads (n_threads)</label>
+                <input type="number" id="inp-n_threads" value="8">
+            </div>
+            <div class="param-item">
+                <label>GPU Layers</label>
+                <input type="number" id="inp-n_gpu_layers" value="0">
+            </div>
+            <div class="param-item">
+                <label>Max Tokens</label>
+                <input type="number" id="inp-max_tokens" value="2048">
+            </div>
+            <div class="param-item">
+                <label>Temperature</label>
+                <input type="number" id="inp-temperature" value="0.7" step="0.1">
+            </div>
+            <div class="param-item">
+                <label>Top P</label>
+                <input type="number" id="inp-top_p" value="0.95" step="0.01">
+            </div>
+            <div class="param-item">
+                <label>Top K</label>
+                <input type="number" id="inp-top_k" value="40">
+            </div>
+            <div class="param-item">
+                <label>Batch Size</label>
+                <input type="number" id="inp-n_batch" value="512">
+            </div>
+             <div class="param-item">
+                <label>Chat Format</label>
+                <input type="text" id="inp-chat_format" placeholder="(Optional)">
             </div>
         </div>
+    </div>
 
-        <div class="row" style="margin-top: 10px;">
-            <div class="col">
-                <button id="btn-load" class="primary">Load Model</button>
-            </div>
-            <div class="col">
-                <button id="btn-unload" class="danger">Unload</button>
-            </div>
-        </div>
+    <!-- Actions -->
+    <div class="control-group">
+        <button id="btn-load" class="primary">Start System</button>
+        <button id="btn-stop" class="danger">Stop System</button>
     </div>
 
     <script>
-        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8000';
         let pollInterval = null;
-        let currentState = "unloaded";
+        let isRunning = false;
+        let presets = {};
 
         const els = {
+            statusDot: document.getElementById('status-dot'),
             statusText: document.getElementById('status-text'),
-            valModel: document.getElementById('val-model'),
-            valCtx: document.getElementById('val-nctx'),
-            valGpu: document.getElementById('val-ngpu'),
-            inpPath: document.getElementById('inp-path'),
-            inpCtx: document.getElementById('inp-nctx'),
-            inpGpu: document.getElementById('inp-ngpu'),
+            pidText: document.getElementById('pid-text'),
+            modelSelect: document.getElementById('inp-model'),
             btnLoad: document.getElementById('btn-load'),
-            btnUnload: document.getElementById('btn-unload'),
-            spinner: document.getElementById('loading-spinner'),
-            errorMsg: document.getElementById('error-msg')
+            btnStop: document.getElementById('btn-stop'),
+            errorMsg: document.getElementById('error-msg'),
+            presetsList: document.getElementById('presets-list')
         };
 
-        // Listen for URL updates
+        const inputs = {
+            n_ctx: document.getElementById('inp-n_ctx'),
+            n_threads: document.getElementById('inp-n_threads'),
+            n_gpu_layers: document.getElementById('inp-n_gpu_layers'),
+            max_tokens: document.getElementById('inp-max_tokens'),
+            temperature: document.getElementById('inp-temperature'),
+            top_p: document.getElementById('inp-top_p'),
+            top_k: document.getElementById('inp-top_k'),
+            n_batch: document.getElementById('inp-n_batch'),
+            chat_format: document.getElementById('inp-chat_format'),
+            model_path: document.getElementById('inp-model') // Special case
+        };
+
+        // Listen for URL updates from dashboard
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
                 coreUrl = e.data.url;
-                startPolling();
+                init();
             }
         });
 
-        els.btnLoad.addEventListener('click', loadModel);
-        els.btnUnload.addEventListener('click', unloadModel);
+        els.btnLoad.addEventListener('click', startWorker);
+        els.btnStop.addEventListener('click', stopWorker);
+
+        async function init() {
+            await Promise.all([
+                fetchModels(),
+                fetchPresets(),
+                fetchActiveConfig()
+            ]);
+            startPolling();
+        }
+
+        async function fetchModels() {
+            try {
+                const res = await fetch(`${coreUrl}/api/models/list`);
+                const data = await res.json();
+                els.modelSelect.innerHTML = '<option value="">Select a model...</option>';
+                data.models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = `models/${m}`; // Assuming models dir is root relative
+                    opt.innerText = m;
+                    els.modelSelect.appendChild(opt);
+                });
+            } catch (e) {
+                showError("Failed to list models: " + e.message);
+            }
+        }
+
+        async function fetchPresets() {
+            try {
+                const res = await fetch(`${coreUrl}/api/config/presets`);
+                presets = await res.json();
+                renderPresets();
+            } catch (e) {
+                showError("Failed to fetch presets");
+            }
+        }
+
+        function renderPresets() {
+            els.presetsList.innerHTML = '';
+
+            // Render 1-5 slots
+            for(let i=1; i<=5; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'preset-btn';
+                btn.innerText = i;
+
+                const presetId = i.toString();
+                const pData = presets[presetId];
+
+                if(pData) {
+                    // Tooltip
+                    const tip = document.createElement('div');
+                    tip.className = 'preset-tooltip';
+                    const name = pData.model_path ? pData.model_path.split('/').pop() : 'Unknown';
+                    tip.innerText = `Model: ${name}\nCtx: ${pData.n_ctx}\nGPU: ${pData.n_gpu_layers}`;
+                    btn.appendChild(tip);
+
+                    btn.onclick = () => loadPreset(presetId);
+                } else {
+                    btn.style.opacity = '0.5';
+                    btn.onclick = () => alert("Preset empty. Set params and click Save.");
+                }
+
+                els.presetsList.appendChild(btn);
+            }
+
+            // Save Button
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'preset-btn save-preset-btn';
+            saveBtn.innerText = 'SAVE';
+            saveBtn.onclick = savePreset;
+            els.presetsList.appendChild(saveBtn);
+        }
+
+        function loadPreset(id) {
+            const data = presets[id];
+            if(!data) return;
+
+            // Populate fields
+            for(const [key, val] of Object.entries(data)) {
+                if(inputs[key]) {
+                    inputs[key].value = val;
+                }
+            }
+        }
+
+        async function savePreset() {
+            const id = prompt("Enter preset number (1-5) to save current config:");
+            if(!id || isNaN(id) || id < 1 || id > 5) return;
+
+            const config = getConfigFromInputs();
+
+            try {
+                await fetch(`${coreUrl}/api/config/presets`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ preset_id: id, config: config })
+                });
+                await fetchPresets(); // Refresh
+            } catch(e) {
+                showError("Error saving preset");
+            }
+        }
+
+        async function fetchActiveConfig() {
+            try {
+                const res = await fetch(`${coreUrl}/api/config/active`);
+                const config = await res.json();
+                if(config && Object.keys(config).length > 0) {
+                     for(const [key, val] of Object.entries(config)) {
+                        if(inputs[key]) inputs[key].value = val;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        function getConfigFromInputs() {
+            return {
+                model_path: inputs.model_path.value,
+                n_ctx: parseInt(inputs.n_ctx.value),
+                n_threads: parseInt(inputs.n_threads.value),
+                n_gpu_layers: parseInt(inputs.n_gpu_layers.value),
+                max_tokens: parseInt(inputs.max_tokens.value),
+                temperature: parseFloat(inputs.temperature.value),
+                top_p: parseFloat(inputs.top_p.value),
+                top_k: parseInt(inputs.top_k.value),
+                n_batch: parseInt(inputs.n_batch.value),
+                chat_format: inputs.chat_format.value || null
+            };
+        }
 
         function startPolling() {
             if(pollInterval) clearInterval(pollInterval);
-            if(!coreUrl) return;
-            fetchStatus();
-            pollInterval = setInterval(fetchStatus, 1000);
+            pollStatus();
+            pollInterval = setInterval(pollStatus, 2000);
         }
 
-        async function fetchStatus() {
+        async function pollStatus() {
             try {
-                const res = await fetch(coreUrl + '/api/model/status');
-                if(!res.ok) throw new Error("API Error");
+                const res = await fetch(`${coreUrl}/api/system/worker_status`);
                 const data = await res.json();
                 updateUI(data);
             } catch(e) {
-                console.error(e);
-                els.statusText.innerText = "CONNECTION ERROR";
-                els.statusText.className = "status-error";
+                els.statusText.innerText = "DISCONNECTED";
+                els.statusDot.className = "dot error";
             }
         }
 
         function updateUI(data) {
-            // data = { state, model_name, n_ctx, n_gpu_layers }
-            currentState = data.state;
+            isRunning = data.running;
 
-            els.statusText.innerText = data.state.toUpperCase();
-            els.statusText.className = `status-${data.state}`;
+            // Status Text mapping
+            let label = "STOPPED";
+            let dotClass = "stopped";
 
-            els.valModel.innerText = data.model_name || "None";
-            els.valCtx.innerText = data.n_ctx || "-";
-            els.valGpu.innerText = data.n_gpu_layers !== null ? data.n_gpu_layers : "-";
-
-            // Show/Hide spinner
-            if(data.state === 'loading' || data.state === 'unloading') {
-                els.spinner.style.display = 'block';
-                els.btnLoad.disabled = true;
-                els.btnUnload.disabled = true;
-            } else {
-                els.spinner.style.display = 'none';
-                els.btnLoad.disabled = (data.state === 'loaded');
-                els.btnUnload.disabled = (data.state === 'unloaded' || data.state === 'error'); // Can try unload on error? Usually yes to reset.
-                if(data.state === 'error') els.btnUnload.disabled = false;
+            if(data.running) {
+                if(data.llm_status === 'loading') {
+                    label = "LOADING MODEL...";
+                    dotClass = "loading";
+                } else if(data.llm_status === 'busy') {
+                    label = "GENERATING";
+                    dotClass = "running"; // Green or maybe Blue? Green implies healthy.
+                } else if(data.llm_status === 'error') {
+                    label = "MODEL ERROR";
+                    dotClass = "error";
+                } else {
+                    label = "RUNNING (IDLE)";
+                    dotClass = "running";
+                }
             }
+
+            els.statusText.innerText = label;
+            els.statusDot.className = "dot " + dotClass;
+            els.pidText.innerText = data.pid ? `PID: ${data.pid}` : "PID: -";
+
+            els.btnLoad.disabled = data.running;
+            els.btnStop.disabled = !data.running;
         }
 
-        async function loadModel() {
-            const path = els.inpPath.value.trim();
-            if(!path) return alert("Please enter a model path");
+        async function startWorker() {
+            const config = getConfigFromInputs();
+            if(!config.model_path) {
+                alert("Please select a model first.");
+                return;
+            }
 
             els.errorMsg.style.display = 'none';
             els.btnLoad.disabled = true;
 
-            const payload = {
-                model_path: path,
-                config: {
-                    n_ctx: parseInt(els.inpCtx.value),
-                    n_gpu_layers: parseInt(els.inpGpu.value)
-                }
-            };
-
             try {
-                const res = await fetch(coreUrl + '/api/model/load', {
+                // 1. Save Active Config
+                await fetch(`${coreUrl}/api/config/active`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ config: config })
                 });
+
+                // 2. Start Worker
+                const res = await fetch(`${coreUrl}/api/system/start_worker`, { method: 'POST' });
                 const json = await res.json();
-                if(!res.ok) throw new Error(json.message || "Load failed");
-                // UI update will happen via polling
+
+                if(!json.success) throw new Error(json.message);
+
+                // UI updates via polling
             } catch(e) {
-                els.errorMsg.innerText = e.message;
-                els.errorMsg.style.display = 'block';
+                showError(e.message);
                 els.btnLoad.disabled = false;
             }
         }
 
-        async function unloadModel() {
-            els.errorMsg.style.display = 'none';
-            els.btnUnload.disabled = true;
-
+        async function stopWorker() {
+            els.btnStop.disabled = true;
             try {
-                const res = await fetch(coreUrl + '/api/model/unload', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const json = await res.json();
-                if(!res.ok) throw new Error(json.message || "Unload failed");
+                await fetch(`${coreUrl}/api/system/stop_worker`, { method: 'POST' });
             } catch(e) {
-                els.errorMsg.innerText = e.message;
-                els.errorMsg.style.display = 'block';
-                els.btnUnload.disabled = false;
+                showError(e.message);
             }
         }
 
-        // Try to pre-fill from localStorage if wanted, or just leave blank.
-        // Also check if we have a default model path in settings to hint?
-        // No easy way to get settings from frontend yet without another endpoint.
+        function showError(msg) {
+            els.errorMsg.innerText = msg;
+            els.errorMsg.style.display = 'block';
+        }
 
         // Init
-        if(coreUrl) startPolling();
+        init();
+
     </script>
 </body>
 </html>
