@@ -16,3 +16,4 @@ automation/chunk_queue.json
 automation/job_run_counts.json
 automation/job_log.json
 logs/
+admin_token.txt

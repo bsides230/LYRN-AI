@@ -71,8 +71,8 @@ class ChatManager:
 
                 content = file_path.read_text(encoding='utf-8').strip()
 
-                # Use regex to find all role blocks
-                role_blocks = re.findall(r"#(\w+)_START#\n(.*?)\n#\w+_END#", content, re.DOTALL)
+                # Use regex to find all role blocks, handling potentially unclosed last block
+                role_blocks = re.findall(r"#(\w+)_START#\n(.*?)(?:\n#\w+_END#|$)", content, re.DOTALL)
 
                 for role, text in role_blocks:
                     role_lower = role.lower()

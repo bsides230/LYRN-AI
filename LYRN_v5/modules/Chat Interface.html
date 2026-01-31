@@ -139,6 +139,51 @@
         color: var(--text-body);
     }
 
+    /* THINKING BLOCKS */
+    .think-block {
+        border-left: 2px solid var(--brand-purple);
+        background: rgba(124, 92, 255, 0.05);
+        margin-bottom: 10px;
+        border-radius: 0 4px 4px 0;
+        overflow: hidden;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .think-header {
+        font-size: 10px;
+        color: var(--brand-purple);
+        padding: 4px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
+        background: rgba(124, 92, 255, 0.1);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .think-header::before {
+        content: '▼';
+        font-size: 8px;
+        transition: transform 0.2s;
+    }
+    .think-block.collapsed .think-header::before {
+        transform: rotate(-90deg);
+    }
+    .think-content {
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--text-dim);
+        font-style: italic;
+        white-space: pre-wrap;
+        border-top: 1px solid rgba(124, 92, 255, 0.1);
+    }
+    .think-block.collapsed .think-content {
+        display: none;
+    }
+    body.hide-thinking .think-block {
+        display: none !important;
+    }
+
     .typing-indicator {
         font-style: italic; color: var(--brand-purple); font-size: 11px; margin-top: 5px;
     }
@@ -243,6 +288,15 @@
           </p>
       </div>
 
+      <div style="margin-bottom: 20px;">
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select: none;">
+              <input type="checkbox" id="set-show-thinking"> Show Thinking Process
+          </label>
+          <p style="font-size:11px; color:var(--text-dim); margin-top:5px; margin-left: 24px;">
+              If checked, model reasoning traces (e.g. &lt;think&gt;) will be displayed in a collapsible block.
+          </p>
+      </div>
+
       <div style="display:flex; justify-content:flex-end; gap:10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
            <button onclick="closeSettings()">Cancel</button>
            <button class="btn-primary" onclick="saveSettings()">Save Configuration</button>
@@ -270,6 +324,15 @@
         input.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
                 sendMessage();
+            }
+        });
+
+        // Thinking Accordion Delegation
+        document.addEventListener('click', (e) => {
+            const header = e.target.closest('.think-header');
+            if (header) {
+                const block = header.parentElement;
+                block.classList.toggle('collapsed');
             }
         });
 
@@ -328,6 +391,16 @@
 
     async function loadHistory() {
         try {
+            // Also load settings to apply "hide-thinking" if needed
+            const base = CONFIG.apiUrl.replace('/api/chat', '');
+            try {
+                const confRes = await fetch(base + '/api/config');
+                if(confRes.ok) {
+                    const d = await confRes.json();
+                    if(d.settings) applySettings(d.settings);
+                }
+            } catch(e) {}
+
             // Assume history endpoint is at /history relative to chat endpoint
             const historyUrl = CONFIG.apiUrl + '/history';
             const res = await fetch(historyUrl);
@@ -394,6 +467,9 @@
                 const limit = s.chat_history_length !== undefined ? s.chat_history_length : 10;
                 document.getElementById('set-history-limit').value = limit;
                 document.getElementById('limit-val').innerText = limit;
+                document.getElementById('set-show-thinking').checked = (s.show_thinking !== false);
+
+                applySettings(s); // Sync UI state
 
                 document.getElementById('settings-modal').classList.remove('hidden');
             } else {
@@ -424,6 +500,7 @@
             // Update
             currentSettings.enable_chat_history = document.getElementById('set-history-enable').checked;
             currentSettings.chat_history_length = parseInt(document.getElementById('set-history-limit').value);
+            currentSettings.show_thinking = document.getElementById('set-show-thinking').checked;
 
             const postRes = await fetch(base + '/api/config', {
                 method: 'POST',
@@ -432,6 +509,7 @@
             });
 
             if(postRes.ok) {
+                applySettings(currentSettings);
                 showToast("Settings Saved");
                 closeSettings();
             } else {
@@ -442,6 +520,11 @@
             console.error(e);
             showToast("Error saving settings", true);
         }
+    }
+
+    function applySettings(s) {
+        if (s.show_thinking === false) document.body.classList.add('hide-thinking');
+        else document.body.classList.remove('hide-thinking');
     }
 
     /* =========================================
@@ -498,7 +581,7 @@
                             const j = JSON.parse(line);
                             if (j.response) {
                                 accumulated += j.response;
-                                responseBubble.innerText = accumulated;
+                                renderRichText(responseBubble, accumulated);
                             }
                         } catch (e) {
                             console.warn("JSON Parse Error:", e, line);
@@ -550,7 +633,7 @@
             bubble.style.color = 'var(--brand-purple)';
             bubble.style.fontStyle = 'italic';
         } else {
-            bubble.innerText = text;
+            renderRichText(bubble, text);
         }
 
         row.appendChild(bubble);
@@ -560,6 +643,54 @@
         setTimeout(() => history.scrollTop = history.scrollHeight, 10);
 
         return id;
+    }
+
+    function renderRichText(container, text) {
+        // Check for <think> tag
+        const thinkRegex = /<think>([\s\S]*?)(?:<\/think>|$)/;
+        const match = text.match(thinkRegex);
+
+        if (match) {
+            const thinkContent = match[1];
+            const remainingText = text.replace(match[0], "").trim();
+
+            // Find or create think block
+            let thinkBlock = container.querySelector('.think-block');
+            if (!thinkBlock) {
+                thinkBlock = document.createElement('div');
+                thinkBlock.className = 'think-block';
+                thinkBlock.innerHTML = `
+                    <div class="think-header">Thinking Process</div>
+                    <div class="think-content"></div>
+                `;
+                container.prepend(thinkBlock);
+            }
+
+            // Update content (avoid innerHTML rewrite of block to preserve collapsed state)
+            const contentDiv = thinkBlock.querySelector('.think-content');
+            if (contentDiv.innerText !== thinkContent) {
+                contentDiv.innerText = thinkContent;
+            }
+
+            // Handle remaining text
+            let responseSpan = container.querySelector('.response-text');
+            if (!responseSpan) {
+                responseSpan = document.createElement('div');
+                responseSpan.className = 'response-text';
+                container.appendChild(responseSpan);
+            }
+
+            if (responseSpan.innerText !== remainingText) {
+                responseSpan.innerText = remainingText;
+            }
+
+        } else {
+            // Normal text
+            if (container.querySelector('.think-block')) {
+                 container.innerHTML = '';
+            }
+            container.innerText = text;
+        }
     }
 
     async function clearChat() {

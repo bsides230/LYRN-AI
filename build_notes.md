@@ -1,5 +1,25 @@
 # Build Notes
 
+## v5.0.1 - Chat UX & Stability Improvements
+
+This update focuses on improving the Chat Interface user experience, adding support for reasoning models, and fixing backend stability issues on Windows.
+
+- **Backend (Worker):**
+    -   **Encoding Fix:** Modified `headless_lyrn_worker.py` to force UTF-8 encoding for `sys.stdout` and `sys.stderr`. This prevents the worker from crashing with `UnicodeEncodeError: 'charmap' codec...` when models generate special characters (e.g., non-breaking hyphens) on Windows consoles.
+    -   **Robust Parsing:** Updated `chat_manager.py` regex to handle unclosed role blocks (e.g., `#MODEL_START#` without a closing tag). This ensures that if a generation is interrupted or the user reopens the chat mid-stream, the partial content is correctly displayed instead of being ignored.
+
+- **Dashboard:**
+    -   **Minimize Window:** Added a minimize button (`_`) to the window controls. This hides the window (keeping the DOM and stream active in the background) rather than closing it (which destroys the connection).
+
+- **Chat Interface:**
+    -   **Thinking Mode Support:** Added native support for reasoning models (e.g., DeepSeek-R1) that output `<think>...</think>` tags.
+        -   **Collapsible UI:** Thinking process is rendered in a distinct, collapsible accordion block (`.think-block`).
+        -   **Setting:** Added a "Show Thinking Process" checkbox in the module settings to toggle visibility globally.
+        -   **Streaming:** The thinking block updates in real-time during generation.
+
+- **Model Controller:**
+    -   **Auto-Refresh:** Added a listener to the Model Selector dropdown. Clicking it now automatically refreshes the model list from the backend, eliminating the need to restart the module after downloading a new model.
+
 ## v5.0.0 - Dashboard v5 & Cleanup (Current)
 
 This update marks the official transition to the Dashboard v5 architecture and a major cleanup of the codebase.

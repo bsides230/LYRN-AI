@@ -1013,6 +1013,7 @@
                 <div class="window-header">
                     <span class="window-title">${mod.name}</span>
                     <div class="win-controls">
+                         <button class="win-btn" onclick="minimizeWindow('${mod.id}')">_</button>
                          <button class="win-btn" onclick="toggleMaximize(this)">☐</button>
                          <button class="win-btn close-btn" onclick="closeWindow('${mod.id}')">✕</button>
                     </div>
@@ -1046,6 +1047,12 @@
             const win = document.getElementById('win_' + modId);
             if(win) win.remove();
             activeWindows.delete(modId);
+            updateDockIndicators();
+        }
+
+        function minimizeWindow(modId) {
+            const win = document.getElementById('win_' + modId);
+            if(win) win.style.display = 'none';
             updateDockIndicators();
         }
 
