@@ -7,19 +7,48 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <style>
+        /* =========================================
+           CORE VARIABLES (Matches Snapshot Builder)
+           ========================================= */
         :root {
             --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --bg-input: #050505;
+            --brand-purple: #7c5cff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.1);
             --text-head: #ffffff;
             --text-body: #b0b0b0;
-            --brand-purple: #7c5cff;
+            --text-dim: #666666;
             --border-color: #222222;
-            --bg-panel: #111111;
+            --input-focus-bg: #111111;
 
             --log-info: #3B82F6;
             --log-warn: #F59E0B;
             --log-error: #EF4444;
             --log-success: #10B981;
         }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --bg-input: #ffffff;
+            --brand-purple: #6a4ce0;
+            --brand-purple-dim: rgba(106, 76, 224, 0.1);
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --input-focus-bg: #f9fafb;
+        }
+
+        * { box-sizing: border-box; }
+
+        /* --- THEMED SCROLLBARS --- */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
         body {
             background-color: var(--bg-core);
             color: var(--text-body);
@@ -29,8 +58,10 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            box-sizing: border-box;
+            width: 100vw;
+            overflow: hidden;
         }
+
         h2 {
             font-family: 'JetBrains Mono', monospace;
             color: var(--text-head);
@@ -49,18 +80,21 @@
             align-items: center;
             font-family: 'JetBrains Mono', monospace;
             font-size: 11px;
+            flex-wrap: wrap;
         }
-        button {
-            background-color: #222;
+
+        button, select {
+            background-color: var(--bg-panel);
             border: 1px solid var(--border-color);
             color: var(--text-head);
             padding: 5px 10px;
             border-radius: 4px;
             cursor: pointer;
             font-family: inherit;
+            font-size: 11px;
         }
-        button:hover { background-color: #333; }
-        button.active { background-color: var(--brand-purple); border-color: var(--brand-purple); }
+        button:hover, select:hover { border-color: var(--brand-purple); }
+        button.active { background-color: var(--brand-purple); border-color: var(--brand-purple); color: #fff; }
 
         .spacer { flex-grow: 1; }
 
@@ -81,10 +115,13 @@
             margin-bottom: 4px;
             line-height: 1.4;
             display: flex;
+            border-bottom: 1px solid transparent;
         }
-        .log-ts { color: #555; margin-right: 8px; flex-shrink: 0; }
-        .log-level { margin-right: 8px; font-weight: bold; width: 50px; flex-shrink: 0; }
-        .log-source { color: #888; margin-right: 8px; width: 100px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log-entry:hover { background: rgba(124, 92, 255, 0.05); }
+
+        .log-ts { color: var(--text-dim); margin-right: 8px; flex-shrink: 0; font-size: 11px; }
+        .log-level { margin-right: 8px; font-weight: bold; width: 60px; flex-shrink: 0; }
+        .log-source { color: var(--text-dim); margin-right: 8px; width: 100px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;}
         .log-msg { color: var(--text-body); word-break: break-all; }
 
         .level-Info { color: var(--log-info); }
@@ -98,27 +135,53 @@
         #status-indicator.connected { background: var(--log-success); box-shadow: 0 0 5px var(--log-success); }
         #status-indicator.disconnected { background: var(--log-error); }
 
+        /* History Controls */
+        .history-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .control-label { color: var(--text-dim); text-transform: uppercase; font-size: 10px; }
+
     </style>
 </head>
 <body>
 
     <div style="display: flex; align-items: center; justify-content: space-between;">
         <h2>System Logs</h2>
-        <div style="display: flex; align-items: center; font-size: 11px; color: #666;">
+        <div style="display: flex; align-items: center; font-size: 11px; color: var(--text-dim);">
             <div id="status-indicator"></div>
             <span id="connection-status">Disconnected</span>
         </div>
     </div>
 
-    <div class="controls">
-        <button id="btn-clear">Clear</button>
+    <!-- Session / Chunk Navigation -->
+    <div class="history-controls">
+        <span class="control-label">Session:</span>
+        <select id="sel-session" style="max-width: 200px;"></select>
+
+        <span class="control-label">Page:</span>
+        <select id="sel-chunk" style="max-width: 100px;"></select>
+
         <div class="spacer"></div>
-        <label><input type="checkbox" id="chk-autoscroll" checked> Auto-scroll</label>
+        <button id="btn-live" class="active" onclick="enableLiveMode()">LIVE</button>
+        <button onclick="refreshMetadata()">↻</button>
+    </div>
+
+    <div class="controls">
+        <button id="btn-clear">Clear View</button>
+        <div class="spacer"></div>
+        <label style="cursor: pointer; user-select: none;"><input type="checkbox" id="chk-autoscroll" checked> Auto-scroll</label>
         <span style="width: 10px;"></span>
         <span>Filter:</span>
-        <label><input type="checkbox" class="filter-chk" value="Info" checked> Info</label>
-        <label><input type="checkbox" class="filter-chk" value="Warn" checked> Warn</label>
-        <label><input type="checkbox" class="filter-chk" value="Error" checked> Error</label>
+        <label style="cursor: pointer; user-select: none;"><input type="checkbox" class="filter-chk" value="Info" checked> Info</label>
+        <label style="cursor: pointer; user-select: none;"><input type="checkbox" class="filter-chk" value="Warn" checked> Warn</label>
+        <label style="cursor: pointer; user-select: none;"><input type="checkbox" class="filter-chk" value="Error" checked> Error</label>
     </div>
 
     <div id="log-container"></div>
@@ -126,10 +189,18 @@
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
         let eventSource = null;
+        let isLive = true;
+        let currentSessionId = null;
+        let currentChunkId = null;
+
         const logContainer = document.getElementById('log-container');
         const statusDot = document.getElementById('status-indicator');
         const statusText = document.getElementById('connection-status');
         const chkAutoScroll = document.getElementById('chk-autoscroll');
+
+        const selSession = document.getElementById('sel-session');
+        const selChunk = document.getElementById('sel-chunk');
+        const btnLive = document.getElementById('btn-live');
 
         // --- Filters ---
         const activeFilters = new Set(['Info', 'Warn', 'Error']);
@@ -145,13 +216,139 @@
             logContainer.innerHTML = '';
         });
 
+        selSession.addEventListener('change', () => {
+             loadChunks(selSession.value);
+        });
+
+        selChunk.addEventListener('change', () => {
+             loadHistoricalLog(selSession.value, selChunk.value);
+        });
+
         // Listen for URL updates from parent dashboard
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
                 coreUrl = e.data.url;
-                connectSSE();
+                refreshMetadata();
+                if(isLive) connectSSE();
+            }
+            if (e.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+            }
+            if (event.data.type === 'FONT_CHANGE') {
+                document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
         });
+
+        function enableLiveMode() {
+            isLive = true;
+            btnLive.classList.add('active');
+            logContainer.innerHTML = ''; // Clear old logs
+
+            // Reload the latest chunk content to fill history immediately
+            if(selSession.options.length > 0 && selChunk.options.length > 0) {
+                // Ensure we are selecting the latest
+                const latestSess = selSession.options[0].value;
+                const latestChunk = selChunk.options[selChunk.options.length-1].value;
+
+                selSession.value = latestSess;
+                selChunk.value = latestChunk;
+
+                loadHistoricalLog(latestSess, latestChunk, true);
+            }
+
+            connectSSE();
+        }
+
+        async function refreshMetadata() {
+            if(!coreUrl) return;
+            try {
+                const res = await fetch(coreUrl + '/api/logs/sessions');
+                if(!res.ok) return;
+                const sessions = await res.json();
+
+                selSession.innerHTML = '';
+                sessions.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    // Format timestamp
+                    const ts = s.timestamp.replace(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, '$1-$2-$3 $4:$5');
+                    opt.innerText = ts;
+                    selSession.appendChild(opt);
+                });
+
+                if(sessions.length > 0) {
+                    if(!currentSessionId) currentSessionId = sessions[0].id; // Default to latest
+                    // If live, ensure we are selecting the latest
+                    if(isLive) selSession.value = sessions[0].id;
+                    else selSession.value = currentSessionId;
+
+                    await loadChunks(selSession.value);
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadChunks(sessionId) {
+            currentSessionId = sessionId;
+            try {
+                const res = await fetch(`${coreUrl}/api/logs/sessions/${sessionId}/chunks`);
+                const chunks = await res.json();
+
+                selChunk.innerHTML = '';
+                chunks.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.innerText = `Page ${c.index}`;
+                    selChunk.appendChild(opt);
+                });
+
+                if(chunks.length > 0) {
+                    // Default to last chunk (latest)
+                    const lastChunk = chunks[chunks.length-1].id;
+
+                    if(isLive && sessionId === selSession.options[0].value) {
+                         selChunk.value = lastChunk;
+                         // Load initial content even in live mode
+                         loadHistoricalLog(sessionId, lastChunk, true);
+                    } else {
+                         selChunk.value = lastChunk;
+                         loadHistoricalLog(sessionId, lastChunk);
+                    }
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadHistoricalLog(sessionId, chunkId, keepLive = false) {
+            if(isLive && !keepLive) {
+                // If user manually changes controls (implying history browsing), disable live mode
+                isLive = false;
+                btnLive.classList.remove('active');
+                if(eventSource) eventSource.close();
+                updateStatus(false, "Viewing History");
+            }
+
+            currentChunkId = chunkId;
+            if(!keepLive) logContainer.innerHTML = '<div style="padding:20px; color:var(--text-dim);">Loading...</div>';
+
+            try {
+                const res = await fetch(`${coreUrl}/api/logs/sessions/${sessionId}/chunks/${chunkId}`);
+                const logs = await res.json();
+
+                if(!keepLive) logContainer.innerHTML = '';
+                else {
+                    // For live preload, verify we aren't duplicating too much if SSE already connected
+                    // Simple approach: clear and append. SSE events will append after.
+                    logContainer.innerHTML = '';
+                }
+
+                logs.forEach(log => appendLog(log));
+
+                // Scroll to bottom
+                logContainer.scrollTop = logContainer.scrollHeight;
+
+            } catch(e) {
+                if(!keepLive) logContainer.innerText = "Failed to load logs.";
+            }
+        }
 
         function connectSSE() {
             if(eventSource) {
@@ -171,10 +368,11 @@
             eventSource = new EventSource(sseUrl);
 
             eventSource.onopen = () => {
-                updateStatus(true, "Connected");
+                updateStatus(true, "Live");
             };
 
             eventSource.onmessage = (event) => {
+                if(!isLive) return;
                 try {
                     const data = JSON.parse(event.data);
                     appendLog(data);
@@ -185,7 +383,6 @@
 
             eventSource.onerror = (err) => {
                 updateStatus(false, "Connection Lost");
-                // EventSource auto-reconnects, but visually we show lost
             };
         }
 
@@ -201,7 +398,10 @@
             div.dataset.level = log.level;
 
             // Format TS (ISO to HH:MM:SS)
-            const time = new Date(log.ts).toLocaleTimeString('en-US', { hour12: false });
+            let time = log.ts;
+            try {
+                time = new Date(log.ts).toLocaleTimeString('en-US', { hour12: false });
+            } catch(e){}
 
             div.innerHTML = `
                 <div class="log-ts">${time}</div>
@@ -211,16 +411,14 @@
             `;
 
             // Filter check
-            if(!activeFilters.has(log.level) && log.level !== 'Success') { // Default success to show if not filtered explicitly?
-                // Wait, success wasn't in filters. Treat it like Info?
-                // Actually my filter logic is exact match.
+            if(!activeFilters.has(log.level) && log.level !== 'Success') {
                 div.style.display = 'none';
             }
 
             logContainer.appendChild(div);
 
-            // Limit buffer size to avoid DOM lag
-            if(logContainer.childElementCount > 1000) {
+            // Limit buffer size only if live
+            if(isLive && logContainer.childElementCount > 2000) {
                 logContainer.removeChild(logContainer.firstChild);
             }
 
@@ -233,7 +431,7 @@
             const entries = logContainer.children;
             for(let i=0; i<entries.length; i++) {
                 const level = entries[i].dataset.level;
-                if(activeFilters.has(level)) {
+                if(activeFilters.has(level) || level === 'Success') {
                     entries[i].style.display = 'flex';
                 } else {
                     entries[i].style.display = 'none';
@@ -252,7 +450,10 @@
         }
 
         // Init
-        if(coreUrl) connectSSE();
+        if(coreUrl) {
+            refreshMetadata();
+            connectSSE();
+        }
     </script>
 </body>
 </html>
