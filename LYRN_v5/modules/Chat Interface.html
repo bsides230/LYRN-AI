@@ -211,7 +211,7 @@
        GLOBAL STATE
        ========================================= */
     let CONFIG = {
-        apiUrl: "http://localhost:8005/api/chat"
+        apiUrl: "http://localhost:8000/api/chat"
     };
 
     let isProcessing = false;
@@ -235,6 +235,12 @@
             }
             if (event.data.type === 'FONT_CHANGE') {
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
+            }
+            if (event.data.type === 'CORE_URL_CHANGE') {
+                // Remove trailing slash if present then append endpoint
+                const base = event.data.url.replace(/\/$/, "");
+                CONFIG.apiUrl = base + '/api/chat';
+                updateStatusDisplay();
             }
         });
     });
@@ -321,11 +327,44 @@
 
             if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
-            const data = await response.json();
-
-            // Remove loading indicator
+            // Remove loading indicator & start streaming
             responseBubble.classList.remove('typing');
-            responseBubble.innerText = data.response || "[No response content]";
+            responseBubble.innerText = "";
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulated = "";
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                let newlineIdx = buffer.indexOf('\n');
+                while (newlineIdx !== -1) {
+                    const line = buffer.substring(0, newlineIdx);
+                    buffer = buffer.substring(newlineIdx + 1);
+
+                    if (line.trim()) {
+                        try {
+                            const j = JSON.parse(line);
+                            if (j.response) {
+                                accumulated += j.response;
+                                responseBubble.innerText = accumulated;
+                            }
+                        } catch (e) {
+                            console.warn("JSON Parse Error:", e, line);
+                        }
+                    }
+                    newlineIdx = buffer.indexOf('\n');
+                }
+
+                // Scroll
+                const history = document.getElementById('chat-history');
+                history.scrollTop = history.scrollHeight;
+            }
 
         } catch (err) {
             responseBubble.classList.remove('typing');

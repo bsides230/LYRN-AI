@@ -213,9 +213,7 @@
             <h1 class="panel-title">Job Automation</h1>
         </div>
         <div class="btn-group">
-            <input type="file" id="file-input" style="display: none;" accept=".json" onchange="handleFileLoad(this)">
-            <button onclick="document.getElementById('file-input').click()">Import JSON</button>
-            <button onclick="exportCurrentData()">Export JSON</button>
+            <button onclick="refreshAll()" title="Refresh Data">↻</button>
             <button class="btn-icon btn-square" onclick="showHelp()" title="Help">?</button>
         </div>
     </header>
@@ -324,12 +322,14 @@
 
   <script>
     /* =========================================
-       GLOBAL STATE
+       GLOBAL STATE & API
        ========================================= */
+    let CORE_URL = "http://localhost:8000";
+
     let DATA = {
-        jobs: {},      // { "job_name": { instructions: "...", trigger: "..." } }
-        schedules: [], // [ { id: "uuid", job_name: "...", scheduled_datetime_iso: "..." } ]
-        cycles: {}     // { "cycle_name": { triggers: [...] } }
+        jobs: {},
+        schedules: [],
+        cycles: {}
     };
 
     let UI = {
@@ -341,12 +341,9 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Init logic
-        renderJobsList();
-        renderCyclesList();
-        initScheduler();
+        refreshAll();
 
-        // Theme Sync
+        // Listen for Theme & URL changes
         window.addEventListener('message', (event) => {
             if (event.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', event.data.theme);
@@ -354,8 +351,40 @@
             if (event.data.type === 'FONT_CHANGE') {
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
+            if (event.data.type === 'CORE_URL_CHANGE') {
+                 CORE_URL = event.data.url.replace(/\/$/, "");
+                 refreshAll();
+            }
         });
     });
+
+    function refreshAll() {
+        Promise.all([fetchJobs(), fetchCycles(), fetchSchedule()])
+            .then(() => {
+                showToast("Data Synced");
+                // Re-render current view
+                if(UI.currentTab === 'jobs') renderJobsList();
+                if(UI.currentTab === 'cycles') renderCyclesList();
+                if(UI.currentTab === 'scheduler') renderCalendar();
+            })
+            .catch(e => showToast("Sync Failed: " + e.message, true));
+    }
+
+    async function fetchJobs() {
+        const res = await fetch(`${CORE_URL}/api/automation/jobs`);
+        if(!res.ok) throw new Error("Jobs fetch failed");
+        DATA.jobs = await res.json();
+    }
+    async function fetchCycles() {
+        const res = await fetch(`${CORE_URL}/api/automation/cycles`);
+        if(!res.ok) throw new Error("Cycles fetch failed");
+        DATA.cycles = await res.json();
+    }
+    async function fetchSchedule() {
+        const res = await fetch(`${CORE_URL}/api/automation/schedule`);
+        if(!res.ok) throw new Error("Schedule fetch failed");
+        DATA.schedules = await res.json();
+    }
 
     /* =========================================
        TABS & NAVIGATION
@@ -372,7 +401,7 @@
     }
 
     function showHelp() {
-        alert("LYRN JOB MANAGER\n\n- Import/Export JSON files to manage automation.\n- Jobs: Define tasks.\n- Scheduler: Schedule tasks.\n- Cycles: Chains of tasks.");
+        alert("LYRN JOB MANAGER\n\n- Configure automated jobs and cycles.\n- Jobs: Define tasks and triggers.\n- Scheduler: Queue jobs for execution.\n- Cycles: Define chains of triggers.");
     }
 
     function showToast(msg, error=false) {
@@ -381,59 +410,6 @@
         t.style.borderColor = error ? 'var(--error-color)' : 'var(--brand-purple)';
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 3000);
-    }
-
-    /* =========================================
-       FILE I/O
-       ========================================= */
-    function handleFileLoad(input) {
-        const file = input.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const json = JSON.parse(e.target.result);
-                if (UI.currentTab === 'jobs') {
-                    DATA.jobs = json;
-                    renderJobsList();
-                    showToast("Jobs Imported");
-                } else if (UI.currentTab === 'scheduler') {
-                    DATA.schedules = Array.isArray(json) ? json : [];
-                    renderCalendar();
-                    showToast("Schedules Imported");
-                } else if (UI.currentTab === 'cycles') {
-                    DATA.cycles = json;
-                    renderCyclesList();
-                    showToast("Cycles Imported");
-                }
-            } catch (err) { showToast("Invalid JSON", true); }
-        };
-        reader.readAsText(file);
-        input.value = '';
-    }
-
-    function exportCurrentData() {
-        let filename = "data.json";
-        let content = "";
-
-        if (UI.currentTab === 'jobs') {
-            content = JSON.stringify(DATA.jobs, null, 2);
-            filename = "jobs.json";
-        } else if (UI.currentTab === 'scheduler') {
-            content = JSON.stringify(DATA.schedules, null, 2);
-            filename = "schedules.json";
-        } else if (UI.currentTab === 'cycles') {
-            content = JSON.stringify(DATA.cycles, null, 2);
-            filename = "cycles.json";
-        }
-
-        const blob = new Blob([content], {type: "application/json"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast(`Exported ${filename}`);
     }
 
     /* =========================================
@@ -479,20 +455,47 @@
         container.innerHTML = html;
     }
 
-    function saveJob() {
+    async function saveJob() {
         const isNew = UI.selectedJob === '_NEW_';
         const name = isNew ? document.getElementById('edit-job-name').value.trim() : UI.selectedJob;
         if (!name) return showToast("Name required", true);
 
-        DATA.jobs[name] = {
+        const payload = {
+            name: name,
             instructions: document.getElementById('edit-job-inst').value,
             trigger: document.getElementById('edit-job-trig').value
         };
 
-        if (isNew) UI.selectedJob = name;
-        renderJobsList();
-        selectJob(name);
-        showToast("Job Saved");
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/jobs`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if(!res.ok) throw new Error("Save failed");
+
+            await fetchJobs();
+            if (isNew) UI.selectedJob = name;
+            renderJobsList();
+            selectJob(name);
+            showToast("Job Saved");
+        } catch(e) { showToast(e.message, true); }
+    }
+
+    async function deleteJob() {
+         if (!UI.selectedJob || UI.selectedJob === '_NEW_') return;
+         if (!confirm(`Delete ${UI.selectedJob}?`)) return;
+
+         try {
+            const res = await fetch(`${CORE_URL}/api/automation/jobs/${UI.selectedJob}`, { method: 'DELETE' });
+            if(!res.ok) throw new Error("Delete failed");
+
+            await fetchJobs();
+            UI.selectedJob = null;
+            renderJobsList();
+            selectJob(null);
+            showToast("Deleted");
+         } catch(e) { showToast(e.message, true); }
     }
 
     /* =========================================
@@ -536,39 +539,57 @@
         container.innerHTML = html;
     }
 
-    function saveCycle() {
+    async function saveCycle() {
         const isNew = UI.selectedCycle === '_NEW_';
         const name = isNew ? document.getElementById('edit-cycle-name').value.trim() : UI.selectedCycle;
         if (!name) return showToast("Name required", true);
 
         try {
             const trigs = JSON.parse(document.getElementById('edit-cycle-json').value);
-            DATA.cycles[name] = { triggers: trigs };
+            const payload = { name: name, triggers: trigs };
+
+            const res = await fetch(`${CORE_URL}/api/automation/cycles`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if(!res.ok) throw new Error("Save failed");
+
+            await fetchCycles();
             if (isNew) UI.selectedCycle = name;
             renderCyclesList();
             selectCycle(name);
             showToast("Cycle Saved");
-        } catch(e) { showToast("Invalid JSON", true); }
+        } catch(e) { showToast("Error: " + e.message, true); }
+    }
+
+    async function deleteCycle() {
+         if (!UI.selectedCycle || UI.selectedCycle === '_NEW_') return;
+         if (!confirm(`Delete ${UI.selectedCycle}?`)) return;
+
+         try {
+            const res = await fetch(`${CORE_URL}/api/automation/cycles/${UI.selectedCycle}`, { method: 'DELETE' });
+            if(!res.ok) throw new Error("Delete failed");
+
+            await fetchCycles();
+            UI.selectedCycle = null;
+            renderCyclesList();
+            selectCycle(null);
+            showToast("Deleted");
+         } catch(e) { showToast(e.message, true); }
     }
 
     /* =========================================
-       SHARED
+       SHARED WRAPPERS
        ========================================= */
     function addNewItem(type) {
         if (type === 'job') { UI.selectedJob = '_NEW_'; selectJob('_NEW_'); }
         if (type === 'cycle') { UI.selectedCycle = '_NEW_'; selectCycle('_NEW_'); }
     }
-
     function deleteCurrentItem(type) {
-        const name = type === 'job' ? UI.selectedJob : UI.selectedCycle;
-        if (!name || name === '_NEW_') return;
-        if (!confirm(`Delete ${name}?`)) return;
-
-        if (type === 'job') { delete DATA.jobs[name]; UI.selectedJob = null; renderJobsList(); selectJob(null); }
-        if (type === 'cycle') { delete DATA.cycles[name]; UI.selectedCycle = null; renderCyclesList(); selectCycle(null); }
-        showToast("Deleted");
+        if (type === 'job') deleteJob();
+        if (type === 'cycle') deleteCycle();
     }
-
     function escapeHtml(text) {
         if (!text) return "";
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -581,7 +602,6 @@
         UI.currentDate = new Date();
         renderCalendar();
     }
-
     function changeMonth(delta) {
         UI.currentDate.setMonth(UI.currentDate.getMonth() + delta);
         renderCalendar();
@@ -595,7 +615,6 @@
         const month = UI.currentDate.getMonth();
         document.getElementById('calendar-month-label').innerText = UI.currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        // Headers
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         days.forEach(d => {
             const div = document.createElement('div');
@@ -607,7 +626,6 @@
         const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-        // Pad start
         for(let i=0; i<firstDay; i++) {
             const empty = document.createElement('div');
             empty.style.background = 'var(--bg-core)';
@@ -622,9 +640,12 @@
             cell.className = 'calendar-day';
             if (dateObj.toDateString() === todayStr) cell.classList.add('today');
 
-            // Find events
+            // Find events (DATA.schedules comes from backend, expecting { when: "..." } or "scheduled_datetime_iso" based on controller)
+            // Backend returns queue which has 'when'.
             const daySchedules = DATA.schedules.filter(s => {
-                const sDate = new Date(s.scheduled_datetime_iso);
+                const dateStr = s.when || s.scheduled_datetime_iso;
+                if(!dateStr) return false;
+                const sDate = new Date(dateStr);
                 return sDate.toDateString() === dateObj.toDateString();
             });
 
@@ -632,7 +653,7 @@
             if (daySchedules.length > 0) {
                 eventsHtml = `<div class="day-events">`;
                 daySchedules.slice(0, 3).forEach(s => {
-                    eventsHtml += `<div class="event-pill">${s.job_name}</div>`;
+                    eventsHtml += `<div class="event-pill">${s.name || s.job_name}</div>`;
                 });
                 if(daySchedules.length > 3) eventsHtml += `<div class="event-pill">+${daySchedules.length - 3} more</div>`;
                 eventsHtml += `</div>`;
@@ -649,7 +670,6 @@
         const modal = document.getElementById('scheduler-modal');
         document.getElementById('modal-date-title').innerText = date.toDateString();
 
-        // Populate Job Select
         const sel = document.getElementById('modal-job-select');
         sel.innerHTML = '';
         Object.keys(DATA.jobs).sort().forEach(j => {
@@ -671,9 +691,11 @@
         list.innerHTML = '';
 
         const daySchedules = DATA.schedules.filter(s => {
-             const sDate = new Date(s.scheduled_datetime_iso);
+             const dateStr = s.when || s.scheduled_datetime_iso;
+             if(!dateStr) return false;
+             const sDate = new Date(dateStr);
              return sDate.toDateString() === UI.selectedDateForModal.toDateString();
-        }).sort((a,b) => new Date(a.scheduled_datetime_iso) - new Date(b.scheduled_datetime_iso));
+        }).sort((a,b) => new Date(a.when || a.scheduled_datetime_iso) - new Date(b.when || b.scheduled_datetime_iso));
 
         if (daySchedules.length === 0) {
             list.innerHTML = '<p style="color:var(--text-dim)">No schedules for this day.</p>';
@@ -681,18 +703,19 @@
         }
 
         daySchedules.forEach(s => {
-            const time = new Date(s.scheduled_datetime_iso).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const dateStr = s.when || s.scheduled_datetime_iso;
+            const time = new Date(dateStr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             const item = document.createElement('div');
             item.className = 'schedule-item';
             item.innerHTML = `
-                <span><b style="color:var(--brand-purple)">${time}</b> - ${s.job_name}</span>
+                <span><b style="color:var(--brand-purple)">${time}</b> - ${s.name || s.job_name}</span>
                 <button class="btn-square btn-delete" style="width:20px; height:20px; font-size:10px" onclick="deleteSchedule('${s.id}')">✕</button>
             `;
             list.appendChild(item);
         });
     }
 
-    function addScheduleFromModal() {
+    async function addScheduleFromModal() {
         const job = document.getElementById('modal-job-select').value;
         if(!job) return showToast("No job selected", true);
 
@@ -709,23 +732,38 @@
         const offsetMs = dt.getTimezoneOffset() * 60000;
         const iso = (new Date(dt.getTime() - offsetMs)).toISOString().slice(0, -1);
 
-        DATA.schedules.push({
-            id: crypto.randomUUID(),
-            job_name: job,
-            scheduled_datetime_iso: iso
-        });
+        const payload = {
+             job_name: job,
+             scheduled_datetime_iso: iso
+        };
 
-        renderDayScheduleList();
-        renderCalendar();
-        showToast("Scheduled");
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/schedule`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if(!res.ok) throw new Error("Schedule failed");
+
+            await fetchSchedule();
+            renderDayScheduleList();
+            renderCalendar();
+            showToast("Scheduled");
+        } catch(e) { showToast(e.message, true); }
     }
 
-    function deleteSchedule(id) {
+    async function deleteSchedule(id) {
         if(!confirm("Delete schedule?")) return;
-        DATA.schedules = DATA.schedules.filter(s => s.id !== id);
-        renderDayScheduleList();
-        renderCalendar();
-        showToast("Deleted");
+
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/schedule/${id}`, { method: 'DELETE' });
+            if(!res.ok) throw new Error("Delete failed");
+
+            await fetchSchedule();
+            renderDayScheduleList();
+            renderCalendar();
+            showToast("Deleted");
+        } catch(e) { showToast(e.message, true); }
     }
 
   </script>

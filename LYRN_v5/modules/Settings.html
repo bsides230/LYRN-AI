@@ -204,7 +204,18 @@
                 </div>
             </div>
 
-            <!-- Future Settings Cards can go here -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3 class="panel-title">System Configuration (Server)</h3>
+                    <button class="btn-save" onclick="saveSystemConfig()">Save to Server</button>
+                </div>
+                <div class="card-body">
+                    <p style="color: var(--text-dim); margin-bottom: 10px;">
+                        Directly edit the server-side configuration (settings.json). Use with caution.
+                    </p>
+                    <textarea id="sys-config-editor" style="width:100%; height:300px; font-family:'JetBrains Mono'; font-size:12px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; padding:10px; resize:vertical;"></textarea>
+                </div>
+            </div>
 
         </div>
     </div>
@@ -221,9 +232,11 @@
     /* =========================================
        GLOBAL STATE
        ========================================= */
+    let CORE_URL = "http://localhost:8000";
+
     let API_MAP = {
-        "Chat": "http://localhost:8005/api/chat",
-        "Job Manager": "http://localhost:8001/api",
+        "Chat": "http://localhost:8000/api/chat",
+        "Job Manager": "http://localhost:8000/api",
         "RWI Builder": "http://localhost:8000/api"
     };
 
@@ -231,6 +244,7 @@
         // Init logic
         loadFromLocalStorage();
         renderApiList();
+        fetchSystemConfig();
 
         // Theme Sync
         window.addEventListener('message', (event) => {
@@ -239,6 +253,10 @@
             }
             if (event.data.type === 'FONT_CHANGE') {
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
+            }
+            if (event.data.type === 'CORE_URL_CHANGE') {
+                 CORE_URL = event.data.url.replace(/\/$/, "");
+                 fetchSystemConfig();
             }
         });
     });
@@ -341,6 +359,39 @@
     function escapeHtml(text) {
         if (!text) return "";
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    /* =========================================
+       SYSTEM CONFIG (SERVER SIDE)
+       ========================================= */
+    async function fetchSystemConfig() {
+        try {
+            const res = await fetch(CORE_URL + '/api/config');
+            if(!res.ok) throw new Error("Config fetch failed");
+            const json = await res.json();
+            document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
+        } catch(e) {
+            console.error(e);
+            // showToast("Failed to load System Config", true);
+            document.getElementById('sys-config-editor').value = "// Failed to load config from " + CORE_URL;
+        }
+    }
+
+    async function saveSystemConfig() {
+        try {
+            const text = document.getElementById('sys-config-editor').value;
+            const json = JSON.parse(text);
+
+            const res = await fetch(CORE_URL + '/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(json)
+            });
+            if(!res.ok) throw new Error("Save failed");
+            showToast("System Config Saved");
+        } catch(e) {
+            showToast("Error: " + e.message, true);
+        }
     }
 
   </script>
