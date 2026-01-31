@@ -153,13 +153,21 @@ class AutomationController:
         except (IOError, TimeoutError, json.JSONDecodeError) as e:
             print(f"Error deleting job definition for '{job_name}': {e}")
 
-    def add_job(self, name: str, priority: int = 100, when: str = "now", args: Optional[Dict[str, Any]] = None):
+    def add_job(self, name: str, priority: int = 100, when: str = "now", args: Optional[Dict[str, Any]] = None, job_id: Optional[str] = None):
         """Adds a new job to the file-based execution queue in a thread-safe manner."""
         if name not in self.job_definitions:
             print(f"Warning: Job '{name}' not defined. Cannot add to queue.")
             return
 
-        new_job_dict = { "name": name, "priority": priority, "when": when, "args": args or {} }
+        # Use provided ID or generate one if strictly needed (though usually provided by UI)
+        # If not provided, we don't force one unless required by get_queue consumers.
+        new_job_dict = {
+            "id": job_id if job_id else f"job_{int(time.time()*1000)}",
+            "name": name,
+            "priority": priority,
+            "when": when,
+            "args": args or {}
+        }
 
         try:
             with SimpleFileLock(self.queue_lock_path):
@@ -169,6 +177,79 @@ class AutomationController:
             print(f"Job '{name}' added to the queue file. Queue size: {len(queue_data)}")
         except TimeoutError as e:
             print(f"Error adding job: {e}")
+
+    def get_queue(self) -> List[Dict]:
+        """Returns the current job queue."""
+        try:
+            with SimpleFileLock(self.queue_lock_path):
+                return self._read_queue_unsafe()
+        except TimeoutError:
+            print("Error getting queue: Timeout")
+            return []
+
+    def remove_job_from_queue(self, job_id: str):
+        """Removes a job from the queue by ID."""
+        try:
+            with SimpleFileLock(self.queue_lock_path):
+                queue = self._read_queue_unsafe()
+                new_queue = [j for j in queue if j.get("id") != job_id]
+                self._write_queue_unsafe(new_queue)
+        except TimeoutError:
+            print("Error removing job: Timeout")
+
+    def get_cycles(self) -> Dict[str, Any]:
+        """Loads cycles from cycles.json"""
+        path = self.job_definitions_path / "cycles.json"
+        if path.exists():
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error reading cycles.json: {e}")
+        return {}
+
+    def save_cycle(self, name: str, triggers: List[Any]):
+        """Saves a cycle definition."""
+        path = self.job_definitions_path / "cycles.json"
+        lock_path = path.with_suffix('.json.lock')
+
+        try:
+            with SimpleFileLock(lock_path):
+                cycles = {}
+                if path.exists():
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            cycles = json.load(f)
+                    except: pass
+
+                cycles[name] = {"triggers": triggers}
+
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(cycles, f, indent=2)
+        except Exception as e:
+            print(f"Error saving cycle: {e}")
+
+    def delete_cycle(self, name: str):
+        """Deletes a cycle definition."""
+        path = self.job_definitions_path / "cycles.json"
+        lock_path = path.with_suffix('.json.lock')
+
+        try:
+            with SimpleFileLock(lock_path):
+                cycles = {}
+                if path.exists():
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            cycles = json.load(f)
+                    except: pass
+
+                if name in cycles:
+                    del cycles[name]
+
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(cycles, f, indent=2)
+        except Exception as e:
+            print(f"Error deleting cycle: {e}")
 
     def get_next_job(self) -> Optional[Job]:
         """Retrieves and consumes the next job from the queue file in a thread-safe manner."""

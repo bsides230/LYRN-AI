@@ -19,6 +19,7 @@ from pydantic import BaseModel
 import uvicorn
 
 from settings_manager import SettingsManager
+from automation_controller import AutomationController
 
 try:
     import pynvml
@@ -84,6 +85,7 @@ class JournalLogger:
 # Global Logger
 logger = JournalLogger()
 settings_manager = SettingsManager()
+automation_controller = AutomationController()
 
 # --- Worker Controller ---
 class WorkerController:
@@ -180,6 +182,25 @@ class PresetModel(BaseModel):
 class ActiveConfigModel(BaseModel):
     config: Dict[str, Any]
 
+class ChatRequest(BaseModel):
+    message: str
+
+class JobDefinitionModel(BaseModel):
+    name: str
+    instructions: str
+    trigger: str
+
+class JobScheduleModel(BaseModel):
+    id: Optional[str] = None
+    job_name: str
+    scheduled_datetime_iso: str
+    priority: int = 100
+    args: Optional[Dict[str, Any]] = None
+
+class CycleModel(BaseModel):
+    name: str
+    triggers: List[Any]
+
 # --- App Setup ---
 app = FastAPI(title="LYRN v5 Backend")
 
@@ -243,6 +264,85 @@ async def health_check():
 async def stream_logs(request: Request):
     return StreamingResponse(logger.subscribe(request), media_type="text/event-stream")
 
+# Chat Endpoint
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest):
+    message = request.message
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"chat/chat_{timestamp}.txt"
+    filepath = os.path.abspath(filename)
+
+    # Ensure directory
+    os.makedirs("chat", exist_ok=True)
+
+    # Write User Message
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"#USER_START#\n{message}\n#USER_END#")
+
+    # Write Trigger
+    with open("chat_trigger.txt", "w", encoding="utf-8") as f:
+        f.write(filepath)
+
+    async def event_generator():
+        last_pos = 0
+        retries = 0
+        started = False
+
+        while True:
+            await asyncio.sleep(0.1)
+            try:
+                if not os.path.exists(filepath):
+                    continue
+
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                    if not started:
+                        start_idx = content.find("#MODEL_START#")
+                        if start_idx != -1:
+                            started = True
+                            # Start reading from after #MODEL_START# + newline
+                            last_pos = start_idx + len("#MODEL_START#")
+                            if content[last_pos] == '\n':
+                                last_pos += 1
+                        else:
+                            # Check for error
+                            if "[Error:" in content:
+                                yield json.dumps({"response": "Error in worker."}) + "\n"
+                                return
+
+                            retries += 1
+                            if retries > 600: # 60 seconds timeout
+                                yield json.dumps({"response": "Timeout waiting for worker."}) + "\n"
+                                return
+                            continue
+
+                    if started:
+                        # Read from last_pos
+                        current_len = len(content)
+                        if current_len > last_pos:
+                            new_text = content[last_pos:]
+
+                            # Check for END
+                            end_idx = new_text.find("#MODEL_END#")
+                            if end_idx != -1:
+                                # We have the end.
+                                chunk = new_text[:end_idx]
+                                if chunk:
+                                    yield json.dumps({"response": chunk}) + "\n"
+                                return # Done
+                            else:
+                                # Stream what we have
+                                yield json.dumps({"response": new_text}) + "\n"
+                                last_pos = current_len
+
+            except Exception as e:
+                print(f"Error in stream: {e}")
+                yield json.dumps({"response": f"Error: {e}"}) + "\n"
+                return
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
 # --- Model & Config Endpoints ---
 
 @app.get("/api/models/list")
@@ -294,6 +394,27 @@ async def get_active_config():
 
     return settings_manager.settings.get("active", {})
 
+@app.get("/api/config")
+async def get_config():
+    """Gets the full system configuration."""
+    if not settings_manager.settings:
+        settings_manager.load_or_detect_first_boot()
+    return {
+        "settings": settings_manager.settings,
+        "ui_settings": settings_manager.ui_settings
+    }
+
+@app.post("/api/config")
+async def save_config(data: Dict[str, Any]):
+    """Saves the full system configuration."""
+    if "settings" in data:
+        settings_manager.settings = data["settings"]
+    if "ui_settings" in data:
+        settings_manager.ui_settings = data["ui_settings"]
+
+    settings_manager.save_settings()
+    return {"success": True, "message": "Settings saved."}
+
 # --- Worker Control Endpoints ---
 
 @app.get("/api/system/worker_status")
@@ -307,6 +428,56 @@ async def start_worker():
 @app.post("/api/system/stop_worker")
 async def stop_worker():
     return worker_controller.stop_worker()
+
+# --- Automation Endpoints ---
+
+@app.get("/api/automation/jobs")
+async def get_jobs():
+    return automation_controller.job_definitions
+
+@app.post("/api/automation/jobs")
+async def save_job(job: JobDefinitionModel):
+    automation_controller.save_job_definition(job.name, job.instructions, job.trigger)
+    return {"success": True}
+
+@app.delete("/api/automation/jobs/{job_name}")
+async def delete_job(job_name: str):
+    automation_controller.delete_job_definition(job_name)
+    return {"success": True}
+
+@app.get("/api/automation/schedule")
+async def get_schedule():
+    return automation_controller.get_queue()
+
+@app.post("/api/automation/schedule")
+async def add_schedule(item: JobScheduleModel):
+    automation_controller.add_job(
+        name=item.job_name,
+        priority=item.priority,
+        when=item.scheduled_datetime_iso,
+        args=item.args,
+        job_id=item.id
+    )
+    return {"success": True}
+
+@app.delete("/api/automation/schedule/{job_id}")
+async def delete_schedule(job_id: str):
+    automation_controller.remove_job_from_queue(job_id)
+    return {"success": True}
+
+@app.get("/api/automation/cycles")
+async def get_cycles():
+    return automation_controller.get_cycles()
+
+@app.post("/api/automation/cycles")
+async def save_cycle(cycle: CycleModel):
+    automation_controller.save_cycle(cycle.name, cycle.triggers)
+    return {"success": True}
+
+@app.delete("/api/automation/cycles/{cycle_name}")
+async def delete_cycle(cycle_name: str):
+    automation_controller.delete_cycle(cycle_name)
+    return {"success": True}
 
 
 # Serve dashboard at root

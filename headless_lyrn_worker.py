@@ -170,14 +170,21 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         # The trigger file usually has just "user\nMSG" at the end or creates a new file.
         # We assume the file *ends* with "user\nMSG" and we append "\n\nmodel\n"
 
-        # Extract the user message.
-        # Robust strategy: Look for the last "user\n" block.
-        last_user_idx = file_content.rfind("user\n")
-        if last_user_idx == -1:
-            print("Error: No user message found in chat file.")
-            return
+        # Extract the user message using regex for #USER_START#...#USER_END#
+        # We look for the LAST occurrence to get the current prompt.
+        import re
+        user_blocks = re.findall(r"#USER_START#\n(.*?)\n#USER_END#", file_content, re.DOTALL)
 
-        user_message = file_content[last_user_idx + 5:].strip()
+        if not user_blocks:
+            # Fallback to old format for compatibility or error
+            last_user_idx = file_content.rfind("user\n")
+            if last_user_idx != -1:
+                user_message = file_content[last_user_idx + 5:].strip()
+            else:
+                print("Error: No user message found in chat file.")
+                return
+        else:
+            user_message = user_blocks[-1].strip()
 
         # Append to messages
         messages.append({"role": "user", "content": user_message})
@@ -196,7 +203,7 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
 
         # 4. Stream output to file
         with open(chat_file_path, "a", encoding="utf-8") as f:
-            f.write("\n\nmodel\n") # Separator
+            f.write("\n\n#MODEL_START#\n") # Separator
             for token_data in stream:
                 if 'choices' in token_data and len(token_data['choices']) > 0:
                     delta = token_data['choices'][0].get('delta', {})
@@ -204,7 +211,7 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     if content:
                         f.write(content)
                         f.flush()
-            f.write("\n")
+            f.write("\n#MODEL_END#\n")
 
         print("Generation complete.")
         set_llm_status("idle")
