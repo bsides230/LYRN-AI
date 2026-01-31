@@ -39,7 +39,7 @@ class ChatManager:
         except Exception as e:
             print(f"Error managing chat history files: {e}")
 
-    def get_chat_history_messages(self) -> List[Dict[str, str]]:
+    def get_chat_history_messages(self, exclude_paths: List[str] = None) -> List[Dict[str, str]]:
         """
         Reads chat journal files, parses them, and returns a structured list
         of messages suitable for the LLM, ensuring roles alternate correctly.
@@ -50,12 +50,25 @@ class ChatManager:
         self.manage_chat_history_files()
         messages = []
 
+        # Prepare exclusion set with resolved paths
+        exclude_set = set()
+        if exclude_paths:
+            for p in exclude_paths:
+                try:
+                    exclude_set.add(str(Path(p).resolve()))
+                except Exception:
+                    pass
+
         try:
             files = sorted(self.chat_dir.glob("*.txt"), key=os.path.getmtime)
             if not files:
                 return []
 
             for file_path in files:
+                # Check exclusion
+                if str(file_path.resolve()) in exclude_set:
+                    continue
+
                 content = file_path.read_text(encoding='utf-8').strip()
 
                 # Use regex to find all role blocks

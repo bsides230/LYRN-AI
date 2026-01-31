@@ -3,6 +3,7 @@ __pycache__/
 /chat
 /episodic_memory
 active_chat.txt
+chat_trigger.txt
 
 # Runtime flags
 global_flags/automation.txt

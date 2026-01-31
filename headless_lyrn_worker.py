@@ -158,7 +158,7 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         messages = [{"role": "system", "content": full_system_prompt}]
 
         # Add History
-        history = chat_manager.get_chat_history_messages()
+        history = chat_manager.get_chat_history_messages(exclude_paths=[chat_file_path_str])
         # Filter out the current file if it happens to be in history (unlikely if new)
         # or just assume history is past context.
         messages.extend(history)
