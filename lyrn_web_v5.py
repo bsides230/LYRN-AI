@@ -34,6 +34,7 @@ except ImportError:
 
 # Global reference to the main event loop
 main_loop: Optional[asyncio.AbstractEventLoop] = None
+LYRN_TOKEN: Optional[str] = None
 
 # --- DiskJournalLogger ---
 class DiskJournalLogger:
@@ -321,8 +322,26 @@ class ModelFetchRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global main_loop
+    global main_loop, LYRN_TOKEN
     main_loop = asyncio.get_running_loop()
+
+    # Load Admin Token
+    token_file = Path("admin_token.txt")
+    if token_file.exists():
+        try:
+            LYRN_TOKEN = token_file.read_text(encoding="utf-8").strip()
+            print("[System] Loaded admin token from admin_token.txt")
+        except Exception as e:
+            print(f"[System] Failed to read admin_token.txt: {e}")
+
+    # Fallback to env var
+    if not LYRN_TOKEN:
+        LYRN_TOKEN = os.environ.get("LYRN_MODEL_TOKEN")
+        if LYRN_TOKEN:
+            print("[System] Loaded admin token from Environment Variable")
+        else:
+            print("[System] Warning: No admin token found (admin_token.txt or LYRN_MODEL_TOKEN). Model management will be unavailable.")
+
     await logger.emit("Info", "Backend started.", "System")
     yield
 
@@ -501,8 +520,7 @@ async def chat_endpoint(request: ChatRequest):
 # --- Model & Config Endpoints ---
 
 async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token")):
-    expected_token = os.environ.get("LYRN_MODEL_TOKEN")
-    if not expected_token or not x_token or x_token != expected_token:
+    if not LYRN_TOKEN or not x_token or x_token != LYRN_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return x_token
 

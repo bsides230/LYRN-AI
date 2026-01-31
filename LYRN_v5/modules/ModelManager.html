@@ -229,10 +229,31 @@
     <div class="auth-popup" id="auth-modal">
         <div class="popup-box">
             <h3 style="margin-top:0; color:var(--text-head); font-family:'JetBrains Mono'; font-size:14px;">Authentication</h3>
-            <p style="color:var(--text-body);">Enter the Admin Token to manage models.</p>
-            <input type="text" id="inp-token" placeholder="LYRN_MODEL_TOKEN" />
-            <div style="text-align:right;">
-                <button class="primary" onclick="saveToken()">Save</button>
+            <p style="color:var(--text-body); margin-bottom:15px;">Admin Access Required</p>
+
+            <!-- File Upload Option -->
+            <div style="margin-bottom: 20px; text-align: center;">
+                 <input type="file" id="inp-token-file" accept=".txt" style="display:none" onchange="handleTokenFile(this)">
+                 <button class="primary" onclick="document.getElementById('inp-token-file').click()" style="width:100%; padding:10px;">
+                    📂 Upload Token File
+                 </button>
+                 <p style="font-size:10px; color:var(--text-dim); margin-top:5px;">Select admin_token.txt</p>
+            </div>
+
+            <!-- Divider -->
+            <div style="border-top:1px solid var(--border-color); margin: 15px 0; position:relative;">
+                <span style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); background:var(--bg-panel); padding:0 5px; color:var(--text-dim); font-size:10px;">OR</span>
+            </div>
+
+            <!-- Manual Entry -->
+             <div style="margin-bottom:10px;">
+                <button onclick="toggleManual()" id="btn-manual-toggle" style="width:100%; font-size:10px; color:var(--text-dim); border:none; background:none; cursor:pointer; text-decoration:underline;">Enter Manually</button>
+                <div id="manual-entry" style="display:none; margin-top:10px;">
+                    <input type="text" id="inp-token" placeholder="Paste Token String" />
+                    <div style="text-align:right; margin-top:5px;">
+                        <button class="primary" onclick="saveToken()">Save</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -279,6 +300,27 @@
         function openAuth() {
             document.getElementById('inp-token').value = authToken;
             els.authModal.style.display = 'flex';
+            // Reset UI state
+            document.getElementById('manual-entry').style.display = 'none';
+        }
+
+        function toggleManual() {
+            const el = document.getElementById('manual-entry');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function handleTokenFile(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const text = e.target.result.trim();
+                    if(text) {
+                        document.getElementById('inp-token').value = text;
+                        saveToken();
+                    }
+                };
+                reader.readAsText(input.files[0]);
+            }
         }
 
         function saveToken() {
