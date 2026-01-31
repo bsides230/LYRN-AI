@@ -10,6 +10,7 @@ import collections
 import time
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -202,7 +203,15 @@ class CycleModel(BaseModel):
     triggers: List[Any]
 
 # --- App Setup ---
-app = FastAPI(title="LYRN v5 Backend")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global main_loop
+    main_loop = asyncio.get_running_loop()
+    await logger.emit("Info", "Backend started.", "System")
+    yield
+
+app = FastAPI(title="LYRN v5 Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -211,12 +220,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def startup_event():
-    global main_loop
-    main_loop = asyncio.get_running_loop()
-    await logger.emit("Info", "Backend started.", "System")
 
 # --- Routes ---
 
@@ -489,4 +492,15 @@ async def read_root():
 app.mount("/", StaticFiles(directory="LYRN_v5", html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = 8000
+    try:
+        if os.path.exists("port.txt"):
+            with open("port.txt", "r") as f:
+                val = f.read().strip()
+                if val.isdigit():
+                    port = int(val)
+    except Exception as e:
+        print(f"Failed to load port.txt: {e}")
+
+    print(f"Starting server on port {port}...")
+    uvicorn.run(app, host="0.0.0.0", port=port)

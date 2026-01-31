@@ -18,6 +18,12 @@ This update marks the official transition to the Dashboard v5 architecture and a
     -   Created new `README.md` focused on v5.
     -   Archived v4 documentation and build notes to `deprecated/v4_artifacts/`.
 
+- **PWA & Startup:**
+    -   Added `manifest.json` and `sw.js` to enable PWA installation.
+    -   Added `start_lyrn.bat` for easy startup without command line.
+    -   Added `port.txt` to configure the web server port (default: 8080).
+    -   Cleaned up root directory by moving `req.md`, `GUI_ANALYSIS.md`, `MEMORY_SYSTEM_ANALYSIS.md`, and `settings.json.bk` to `deprecated/v4_artifacts/`.
+
 ## Philosophy & Rules (Ported)
 
 -   **Efficiency and Accessibility:** The primary goal is to create a powerful AI cognition framework that is lightweight enough to run on standard consumer hardware.
