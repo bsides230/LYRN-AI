@@ -55,36 +55,14 @@
     }
   },
   {
-    "name": "jobs",
+    "name": "user_preferences",
     "pinned": false,
     "active": false,
     "order": 5,
     "config": {
-      "begin_bracket": "###JOBS_START###",
-      "end_bracket": "###JOBS_END###",
-      "rwi_text": "This block contains a list of job instructions."
-    }
-  },
-  {
-    "name": "user_preferences",
-    "pinned": false,
-    "active": false,
-    "order": 6,
-    "config": {
       "begin_bracket": "###USER_PREFERENCES_START###",
       "end_bracket": "###USER_PREFERENCES_END###",
       "rwi_text": "Reserved for user-specific preferences and knobs."
-    }
-  },
-  {
-    "name": "oss_tools",
-    "pinned": false,
-    "active": false,
-    "order": 7,
-    "config": {
-      "begin_bracket": "###OSS_TOOLS_START###",
-      "end_bracket": "###OSS_TOOLS_END###",
-      "rwi_text": "Tool and OSS integration notes."
     }
   }
 ]
