@@ -489,4 +489,15 @@ async def read_root():
 app.mount("/", StaticFiles(directory="LYRN_v5", html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = 8000
+    try:
+        if os.path.exists("port.txt"):
+            with open("port.txt", "r") as f:
+                val = f.read().strip()
+                if val.isdigit():
+                    port = int(val)
+    except Exception as e:
+        print(f"Failed to load port.txt: {e}")
+
+    print(f"Starting server on port {port}...")
+    uvicorn.run(app, host="0.0.0.0", port=port)
