@@ -219,6 +219,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         // Init logic
         loadConfig();
+        loadHistory();
 
         // Input binding
         const input = document.getElementById('chat-input');
@@ -257,7 +258,16 @@
        CONFIG & API
        ========================================= */
     function loadConfig() {
-        // 1. Try LocalStorage
+        // 1. Try Core URL from Dashboard (Highest Priority)
+        const coreUrl = localStorage.getItem('lyrn_core_url');
+        if (coreUrl) {
+            CONFIG.apiUrl = coreUrl.replace(/\/$/, "") + '/api/chat';
+            console.log("Loaded Core URL from LocalStorage:", CONFIG.apiUrl);
+            updateStatusDisplay();
+            return;
+        }
+
+        // 2. Try LocalStorage (Legacy / Module Specific)
         try {
             const stored = localStorage.getItem('lyrn_api_config');
             if (stored) {
@@ -270,6 +280,32 @@
         } catch (e) { console.warn("LocalStorage access failed", e); }
 
         updateStatusDisplay();
+    }
+
+    async function loadHistory() {
+        try {
+            // Assume history endpoint is at /history relative to chat endpoint
+            const historyUrl = CONFIG.apiUrl + '/history';
+            const res = await fetch(historyUrl);
+            if (!res.ok) return;
+
+            const messages = await res.json();
+            if (Array.isArray(messages) && messages.length > 0) {
+                 const history = document.getElementById('chat-history');
+                 // Clear welcome message if present
+                 if (history.children.length === 1 && history.children[0].style.textAlign === 'center') {
+                    history.innerHTML = '';
+                 }
+
+                 messages.forEach(msg => {
+                     appendMessage(msg.role, msg.content);
+                 });
+
+                 setTimeout(() => history.scrollTop = history.scrollHeight, 100);
+            }
+        } catch (e) {
+            console.warn("Failed to load history:", e);
+        }
     }
 
     function handleFileLoad(input) {
@@ -367,8 +403,15 @@
             }
 
         } catch (err) {
+            console.error("Chat Error:", err);
             responseBubble.classList.remove('typing');
-            responseBubble.innerText = `Error: ${err.message}`;
+
+            let errorMsg = `Error: ${err.message}`;
+            if (err.name === 'TypeError' && err.message.includes('fetch')) {
+                errorMsg = `Connection Failed. Check URL: ${CONFIG.apiUrl}`;
+            }
+
+            responseBubble.innerText = errorMsg;
             responseBubble.style.color = 'var(--error-color)';
         } finally {
             isProcessing = false;
@@ -384,7 +427,7 @@
             history.innerHTML = '';
         }
 
-        const id = 'msg-' + Date.now();
+        const id = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const row = document.createElement('div');
         row.className = `message-row ${role}`;
         row.id = id;
@@ -409,13 +452,26 @@
         return id;
     }
 
-    function clearChat() {
-        const history = document.getElementById('chat-history');
-        history.innerHTML = `
-            <div style="text-align: center; color: var(--text-dim); margin-top: 40px;">
-                <p>Chat Cleared.</p>
-            </div>
-        `;
+    async function clearChat() {
+        if (!confirm("Are you sure you want to clear the chat history? This cannot be undone.")) return;
+
+        try {
+            const res = await fetch(CONFIG.apiUrl, { method: 'DELETE' });
+            if (res.ok) {
+                const history = document.getElementById('chat-history');
+                history.innerHTML = `
+                    <div style="text-align: center; color: var(--text-dim); margin-top: 40px;">
+                        <p>Chat Cleared.</p>
+                    </div>
+                `;
+                showToast("Chat History Deleted");
+            } else {
+                showToast("Failed to delete chat", true);
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("Error connecting to server", true);
+        }
     }
 
   </script>

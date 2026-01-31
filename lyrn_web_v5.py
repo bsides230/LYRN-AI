@@ -21,6 +21,7 @@ import uvicorn
 
 from settings_manager import SettingsManager
 from automation_controller import AutomationController
+from chat_manager import ChatManager
 
 try:
     import pynvml
@@ -88,6 +89,20 @@ logger = JournalLogger()
 settings_manager = SettingsManager()
 automation_controller = AutomationController()
 
+# Initialize ChatManager (Needs settings to be loaded)
+settings_manager.load_or_detect_first_boot()
+role_mappings = {
+    "assistant": "final_output",
+    "model": "final_output",
+    "thinking": "thinking_process",
+    "analysis": "thinking_process"
+}
+chat_manager = ChatManager(
+    settings_manager.settings.get("paths", {}).get("chat", "chat/"),
+    settings_manager,
+    role_mappings
+)
+
 # --- Worker Controller ---
 class WorkerController:
     """Manages the headless worker process."""
@@ -126,7 +141,7 @@ class WorkerController:
             try:
                 # Start the worker process
                 self.process = subprocess.Popen(
-                    [sys.executable, self.worker_script],
+                    [sys.executable, "-u", self.worker_script],
                     cwd=os.getcwd(),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -268,8 +283,29 @@ async def stream_logs(request: Request):
     return StreamingResponse(logger.subscribe(request), media_type="text/event-stream")
 
 # Chat Endpoint
+@app.get("/api/chat/history")
+async def get_chat_history():
+    """Returns the current chat history as a list of messages."""
+    return chat_manager.get_chat_history_messages()
+
+@app.delete("/api/chat")
+async def clear_chat_history():
+    """Clears all chat history files."""
+    try:
+        chat_dir = Path(settings_manager.settings.get("paths", {}).get("chat", "chat/"))
+        if chat_dir.exists():
+            for f in chat_dir.glob("*.txt"):
+                try:
+                    f.unlink()
+                except OSError as e:
+                    print(f"Failed to delete {f}: {e}")
+        return {"success": True, "message": "Chat history cleared."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
+    print(f"[API] Received chat request: {request.message[:50]}...")
     message = request.message
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"chat/chat_{timestamp}.txt"
@@ -281,10 +317,12 @@ async def chat_endpoint(request: ChatRequest):
     # Write User Message
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(f"#USER_START#\n{message}\n#USER_END#")
+    print(f"[API] Created chat file: {filepath}")
 
     # Write Trigger
     with open("chat_trigger.txt", "w", encoding="utf-8") as f:
         f.write(filepath)
+    print(f"[API] Wrote trigger file: chat_trigger.txt")
 
     async def event_generator():
         last_pos = 0
@@ -311,11 +349,13 @@ async def chat_endpoint(request: ChatRequest):
                         else:
                             # Check for error
                             if "[Error:" in content:
+                                print("[API] Detected error in chat file.")
                                 yield json.dumps({"response": "Error in worker."}) + "\n"
                                 return
 
                             retries += 1
                             if retries > 600: # 60 seconds timeout
+                                print("[API] Timeout waiting for worker response.")
                                 yield json.dumps({"response": "Timeout waiting for worker."}) + "\n"
                                 return
                             continue
