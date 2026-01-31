@@ -252,10 +252,16 @@
   </div>
 
   <script>
+    let CORE_URL = "http://localhost:8000";
+
     document.addEventListener('DOMContentLoaded', () => {
+        // Core URL Init
+        const stored = localStorage.getItem('lyrn_core_url');
+        if(stored) CORE_URL = stored.replace(/\/$/, "");
+
         initRWIBuilder();
         
-        // Theme Sync
+        // Theme Sync & URL Update
         window.addEventListener('message', (event) => {
             if (event.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', event.data.theme);
@@ -263,22 +269,35 @@
             if (event.data.type === 'FONT_CHANGE') {
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
+            if (event.data.type === 'CORE_URL_CHANGE') {
+                CORE_URL = event.data.url.replace(/\/$/, "");
+            }
         });
     });
 
     /* =========================================
        RWI BUILDER LOGIC
        ========================================= */
-    function initRWIBuilder() {
+    async function initRWIBuilder() {
         if (!document.getElementById('components-list')) return;
 
         let components = [
             { name: "rwi", pinned: true, active: true, order: 0, config: { begin_bracket: "###RWI_INSTRUCTIONS_START###", end_bracket: "###RWI_INSTRUCTIONS_END###", rwi_text: "Relational Web Index header." }, content: "" },
-            { name: "system_instructions", pinned: true, active: true, order: 1, config: { begin_bracket: "###SYSTEM_INSTRUCTIONS_START###", end_bracket: "###SYSTEM_INSTRUCTIONS_END###", rwi_text: "Core system instructions." }, content: `This model operates as part of the LYRN cognitive architecture...` },
-            { name: "system_rules", pinned: true, active: true, order: 2, config: { begin_bracket: "###SYSTEM_RULES_START###", end_bracket: "###SYSTEM_RULES_END###", rwi_text: "Hard constraints." }, content: `PRIORITY_OVERRIDES:\n- Follow user directives...` },
-            { name: "ai_preferences", pinned: false, active: true, order: 3, config: { begin_bracket: "###AI_PREFERENCES_START###", end_bracket: "###AI_PREFERENCES_END###", rwi_text: "AI-specific preferences." }, content: `Name: Greg\nBirthday: March 11, 1976` },
-            { name: "personality", pinned: false, active: true, order: 4, config: { begin_bracket: "###PERSONALITY_START###", end_bracket: "###PERSONALITY_END###", rwi_text: "AI identity." }, content: `"Creativity = 0700"\n"Consistency = 0800"` }
+            { name: "system_instructions", pinned: true, active: true, order: 1, config: { begin_bracket: "###SYSTEM_INSTRUCTIONS_START###", end_bracket: "###SYSTEM_INSTRUCTIONS_END###", rwi_text: "Core system instructions." }, content: `This model operates as part of the LYRN cognitive architecture...` }
         ];
+
+        // Fetch from API
+        try {
+            const res = await fetch(CORE_URL + '/api/snapshot');
+            if(res.ok) {
+                const data = await res.json();
+                if(Array.isArray(data) && data.length > 0) {
+                    components = data;
+                }
+            }
+        } catch(e) {
+            console.warn("Failed to fetch snapshot from API, using defaults.", e);
+        }
 
         let selectedComponent = null;
 
@@ -391,7 +410,8 @@
 
         window.rwiAddNew = () => selectComponent('_NEW_');
 
-        window.rwiSave = () => {
+        // NEW: SAVE to API
+        window.rwiSave = async () => {
             const isNew = selectedComponent === '_NEW_';
             let name = selectedComponent;
             if (isNew) {
@@ -417,7 +437,18 @@
                 }
             }
             updateRWITableOfContents();
-            showToast("Component Saved");
+
+            // API CALL
+            try {
+                const res = await fetch(CORE_URL + '/api/snapshot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(components)
+                });
+                if(res.ok) showToast("Snapshot Saved to Core");
+                else showToast("Failed to Save", true);
+            } catch(e) { showToast("Connection Error", true); }
+
             renderList();
             if (isNew) selectComponent(name);
         };
@@ -429,17 +460,38 @@
                 selectedComponent = null;
                 document.getElementById('editor-container').innerHTML = '<p style="padding:20px; color:var(--text-dim)">Select a component.</p>';
                 updateRWITableOfContents();
+
+                // Trigger Save to persist deletion
+                window.rwiSave();
+
                 renderList();
                 showToast("Deleted");
             }
         };
 
-        window.rwiBuild = () => {
+        // NEW: REBUILD Trigger
+        window.rwiBuild = async () => {
             const btn = document.getElementById('rebuild-btn');
             if (!btn) return;
             const origText = btn.innerText;
             btn.innerText = "Building...";
-            setTimeout(() => { btn.innerText = origText; showToast("Master Prompt Rebuilt"); }, 800);
+
+            try {
+                // Ensure saved first? Maybe not needed if user clicked save. But safe to assume current state.
+                await fetch(CORE_URL + '/api/snapshot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(components)
+                });
+
+                const res = await fetch(CORE_URL + '/api/snapshot/rebuild', { method: 'POST' });
+                if(res.ok) showToast("Rebuild Trigger Sent");
+                else showToast("Rebuild Failed", true);
+            } catch(e) {
+                showToast("Connection Error", true);
+            }
+
+            setTimeout(() => { btn.innerText = origText; }, 800);
         };
         
         window.rwiSaveSNS = () => { window.rwiPreview(); document.getElementById('modal-title').innerText = "Review Snapshot (.SNS)"; document.getElementById('download-btn').classList.remove('btn-hidden'); };

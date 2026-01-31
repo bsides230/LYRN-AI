@@ -30,6 +30,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TRIGGER_FILE = os.path.join(SCRIPT_DIR, "chat_trigger.txt")
+REBUILD_TRIGGER = os.path.join(SCRIPT_DIR, "rebuild_trigger.txt")
 LLM_STATUS_FILE = os.path.join(SCRIPT_DIR, "global_flags", "llm_status.txt")
 
 def set_llm_status(status: str):
@@ -98,8 +99,35 @@ def main():
     print(f"Watching for trigger: {TRIGGER_FILE}")
 
     while running:
+        # Check for Rebuild Trigger
+        if os.path.exists(REBUILD_TRIGGER):
+            print(f"[Worker] Rebuild trigger detected.")
+            try:
+                os.remove(REBUILD_TRIGGER)
+
+                # Reload settings
+                settings_manager.load_or_detect_first_boot()
+                settings = settings_manager.settings
+
+                set_llm_status("loading")
+                print("[Worker] Rebuilding snapshot...")
+                snapshot_loader.build_master_prompt_from_components()
+                print("[Worker] Snapshot rebuilt successfully.")
+                set_llm_status("idle")
+            except Exception as e:
+                print(f"[Worker] Error rebuilding snapshot: {e}")
+                set_llm_status("error")
+
         if os.path.exists(TRIGGER_FILE):
             print(f"[Worker] Trigger detected: {TRIGGER_FILE}")
+
+            # Reload settings to ensure fresh preferences (e.g. history length)
+            try:
+                settings_manager.load_or_detect_first_boot()
+                settings = settings_manager.settings
+            except Exception as e:
+                print(f"[Worker] Error reloading settings: {e}")
+
             try:
                 with open(TRIGGER_FILE, 'r', encoding='utf-8') as f:
                     content = f.read().strip()
