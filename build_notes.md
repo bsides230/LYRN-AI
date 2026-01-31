@@ -4,6 +4,14 @@
 
 This update marks the official transition to the Dashboard v5 architecture and a major cleanup of the codebase.
 
+- **UI/UX Polish & Fixes:**
+    -   **Chat Settings:** Added UI controls in the Settings module to toggle chat history context and set the number of history pairs sent to the LLM.
+    -   **Chat Management:** "Clear History" now physically deletes the chat log files from the configured chat directory.
+    -   **Jobs Module:** Fixed a startup error where the module failed to fetch data if the `automation/` directory structure didn't exist.
+    -   **Dashboard:** Removed the deprecated "Asset Shop" module. Added an LLM Status light to the top-left header.
+    -   **System Monitor:** Refactored for a more compact layout. The GPU section now automatically hides if no GPU is detected.
+    -   **Theming:** Fixed scrollbar styling in LogViewer, ModelController, ServerStatus, and Dashboard to match the dark theme.
+
 - **Architecture Overhaul:**
     -   Fully transitioned to `lyrn_web_v5.py` (FastAPI) and `headless_lyrn_worker.py`.
     -   Legacy CustomTkinter GUI files (`lyrn_sad_v4.*.py`) have been moved to `deprecated/v4_artifacts/`.

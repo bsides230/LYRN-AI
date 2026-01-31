@@ -1,0 +1,22 @@
+INFO:     Started server process [4097]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+Settings loaded successfully
+Next job flag initialized to 'false'
+LLM status flag initialized to 'idle'
+Loaded 1 job definitions from jobs.json: ['chat_pair_summary']
+Settings loaded successfully
+Next job flag initialized to 'false'
+LLM status flag initialized to 'idle'
+Starting server on port 8080...
+[Info] System: Backend started.
+INFO:     127.0.0.1:49720 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49720 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49720 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49726 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51474 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51474 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51478 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51474 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55246 - "GET /modules/ServerStatus.html HTTP/1.1" 200 OK

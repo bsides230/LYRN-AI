@@ -1,0 +1,14 @@
+{
+  "summary_job": {
+    "instructions": "Create a concise, factual summary of the provided text. Focus on key decisions, outcomes, and open items.",
+    "trigger": "Summarize the previous text."
+  },
+  "keyword_job": {
+    "instructions": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\"]",
+    "trigger": "Extract keywords from the previous text."
+  },
+  "reflection_job": {
+    "instructions": "Reflect on the conversation so far. Identify key insights, contradictions, or areas for future exploration. Propose next steps if applicable.",
+    "trigger": "Reflect on the conversation."
+  }
+}

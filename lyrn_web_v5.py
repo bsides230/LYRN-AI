@@ -308,11 +308,14 @@ async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
     message = request.message
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"chat/chat_{timestamp}.txt"
-    filepath = os.path.abspath(filename)
 
-    # Ensure directory
-    os.makedirs("chat", exist_ok=True)
+    # Use configured chat directory
+    chat_path_str = settings_manager.settings.get("paths", {}).get("chat", "chat")
+    chat_dir = Path(chat_path_str)
+    chat_dir.mkdir(parents=True, exist_ok=True)
+
+    filename = f"chat_{timestamp}.txt"
+    filepath = chat_dir / filename
 
     # Write User Message
     with open(filepath, "w", encoding="utf-8") as f:
@@ -321,7 +324,7 @@ async def chat_endpoint(request: ChatRequest):
 
     # Write Trigger
     with open("chat_trigger.txt", "w", encoding="utf-8") as f:
-        f.write(filepath)
+        f.write(str(filepath.resolve()))
     print(f"[API] Wrote trigger file: chat_trigger.txt")
 
     async def event_generator():

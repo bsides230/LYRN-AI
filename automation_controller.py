@@ -24,6 +24,11 @@ class AutomationController:
     def __init__(self, job_definitions_path: str = "automation/jobs", queue_path: str = "automation/job_queue.json"):
         self.job_definitions_path = Path(job_definitions_path)
         self.queue_path = Path(queue_path)
+
+        # Ensure directories exist
+        self.job_definitions_path.mkdir(parents=True, exist_ok=True)
+        self.queue_path.parent.mkdir(parents=True, exist_ok=True)
+
         self.queue_lock_path = self.queue_path.with_suffix(f"{self.queue_path.suffix}.lock")
         self.job_definitions = {}
         self._load_job_definitions()

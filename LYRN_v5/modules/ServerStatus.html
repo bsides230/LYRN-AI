@@ -18,61 +18,68 @@
             background-color: var(--bg-core);
             color: var(--text-body);
             font-family: 'Inter', sans-serif;
-            margin: 0; padding: 20px;
-            font-size: 13px;
+            margin: 0; padding: 10px;
+            font-size: 11px;
+            overflow-y: auto;
         }
+
+        /* --- THEMED SCROLLBARS --- */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
         h2 {
             font-family: 'JetBrains Mono', monospace;
             color: var(--text-head);
-            font-size: 16px;
-            margin-top: 0;
+            font-size: 12px;
+            margin-top: 5px;
+            margin-bottom: 8px;
             border-bottom: 1px solid var(--border-color);
-            padding-bottom: 10px;
+            padding-bottom: 4px;
+            text-transform: uppercase;
         }
         .stat-row {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
+            padding: 4px 0;
             border-bottom: 1px solid var(--border-color);
         }
+        .stat-row:last-child { border-bottom: none; }
         .stat-label { font-weight: 500; }
         .stat-value { font-family: 'JetBrains Mono', monospace; color: var(--brand-purple); }
         .status-indicator {
-            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
             background-color: #444; margin-right: 8px;
         }
-        .status-indicator.connected { background-color: #00ff88; box-shadow: 0 0 8px #00ff88; }
+        .status-indicator.connected { background-color: #00ff88; box-shadow: 0 0 6px #00ff88; }
         .status-indicator.error { background-color: #ff4444; }
 
-        #connection-info { margin-bottom: 20px; font-size: 11px; color: #666; font-family: 'JetBrains Mono'; }
+        #connection-info { margin-bottom: 10px; font-size: 10px; color: #666; font-family: 'JetBrains Mono'; display: flex; align-items: center; }
     </style>
 </head>
 <body>
     <div id="connection-info">
         <span id="status-dot" class="status-indicator"></span>
-        <span id="url-display">Waiting for connection...</span>
+        <span id="url-display">Waiting...</span>
     </div>
 
-    <h2>System Resources</h2>
+    <h2>System</h2>
     <div class="stat-row">
-        <span class="stat-label">CPU Usage</span>
+        <span class="stat-label">CPU</span>
         <span class="stat-value" id="val-cpu">--%</span>
     </div>
     <div class="stat-row">
-        <span class="stat-label">RAM Usage</span>
+        <span class="stat-label">RAM</span>
         <span class="stat-value" id="val-ram">--%</span>
     </div>
     <div class="stat-row">
-        <span class="stat-label">Disk Usage</span>
+        <span class="stat-label">Disk</span>
         <span class="stat-value" id="val-disk">--%</span>
     </div>
 
-    <h2 style="margin-top: 20px;">GPU Status</h2>
-    <div id="gpu-container">
-        <div class="stat-row">
-            <span class="stat-label">No GPU Detected</span>
-        </div>
-    </div>
+    <h2 id="gpu-header" style="margin-top: 15px; display:none;">GPU</h2>
+    <div id="gpu-container" style="display:none;"></div>
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
@@ -118,15 +125,20 @@
                 document.getElementById('val-disk').innerText = data.disk.percent + '%';
 
                 const gpuContainer = document.getElementById('gpu-container');
+                const gpuHeader = document.getElementById('gpu-header');
+
                 if(data.gpu && data.gpu.vram_percent !== undefined) {
+                    gpuHeader.style.display = 'block';
+                    gpuContainer.style.display = 'block';
                     gpuContainer.innerHTML = `
                         <div class="stat-row">
-                            <span class="stat-label">GPU (0)</span>
-                            <span class="stat-value">${data.gpu.vram_percent.toFixed(1)}% / ${data.gpu.vram_used_gb.toFixed(1)}GB</span>
+                            <span class="stat-label">VRAM</span>
+                            <span class="stat-value">${data.gpu.vram_percent.toFixed(0)}% (${data.gpu.vram_used_gb.toFixed(1)}G)</span>
                         </div>
                     `;
                 } else {
-                    gpuContainer.innerHTML = '<div class="stat-row"><span class="stat-label">No GPU Active</span></div>';
+                    gpuHeader.style.display = 'none';
+                    gpuContainer.style.display = 'none';
                 }
 
             } catch(e) {
