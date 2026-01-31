@@ -1,50 +1,90 @@
 [
   {
-    "name": "RWI",
-    "order": 0,
+    "name": "rwi",
+    "pinned": true,
     "active": true,
-    "pinned": true
+    "order": 0,
+    "config": {
+      "begin_bracket": "###RWI_INSTRUCTIONS_START###",
+      "end_bracket": "###RWI_INSTRUCTIONS_END###",
+      "rwi_text": "Relational Web Index header. Lists all active components and how to interpret them."
+    }
   },
   {
     "name": "system_instructions",
-    "order": 1,
+    "pinned": true,
     "active": true,
-    "pinned": false
+    "order": 1,
+    "config": {
+      "begin_bracket": "###SYSTEM_INSTRUCTIONS_START###",
+      "end_bracket": "###SYSTEM_INSTRUCTIONS_END###",
+      "rwi_text": "Core system instructions."
+    }
   },
   {
     "name": "system_rules",
-    "order": 2,
+    "pinned": true,
     "active": true,
-    "pinned": false
+    "order": 2,
+    "config": {
+      "begin_bracket": "###SYSTEM_RULES_START###",
+      "end_bracket": "###SYSTEM_RULES_END###",
+      "rwi_text": "Hard constraints on behavior."
+    }
   },
   {
     "name": "ai_preferences",
-    "order": 3,
+    "pinned": false,
     "active": true,
-    "pinned": false
+    "order": 3,
+    "config": {
+      "begin_bracket": "###AI_PREFERENCES_START###",
+      "end_bracket": "###AI_PREFERENCES_END###",
+      "rwi_text": "AI-specific preferences."
+    }
   },
   {
     "name": "personality",
-    "order": 4,
+    "pinned": false,
     "active": true,
-    "pinned": false
+    "order": 4,
+    "config": {
+      "begin_bracket": "###PERSONALITY_START###",
+      "end_bracket": "###PERSONALITY_END###",
+      "rwi_text": "AI identity traits and behavioral biases."
+    }
   },
   {
     "name": "jobs",
+    "pinned": false,
+    "active": false,
     "order": 5,
-    "active": true,
-    "pinned": false
+    "config": {
+      "begin_bracket": "###JOBS_START###",
+      "end_bracket": "###JOBS_END###",
+      "rwi_text": "This block contains a list of job instructions."
+    }
   },
   {
     "name": "user_preferences",
-    "order": 6,
+    "pinned": false,
     "active": false,
-    "pinned": false
+    "order": 6,
+    "config": {
+      "begin_bracket": "###USER_PREFERENCES_START###",
+      "end_bracket": "###USER_PREFERENCES_END###",
+      "rwi_text": "Reserved for user-specific preferences and knobs."
+    }
   },
   {
     "name": "oss_tools",
-    "order": 7,
+    "pinned": false,
     "active": false,
-    "pinned": false
+    "order": 7,
+    "config": {
+      "begin_bracket": "###OSS_TOOLS_START###",
+      "end_bracket": "###OSS_TOOLS_END###",
+      "rwi_text": "Tool and OSS integration notes."
+    }
   }
 ]
