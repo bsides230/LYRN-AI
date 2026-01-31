@@ -345,6 +345,9 @@
         els.btnLoad.addEventListener('click', startWorker);
         els.btnStop.addEventListener('click', stopWorker);
 
+        // Auto-refresh model list on click
+        els.modelSelect.addEventListener('mousedown', fetchModels);
+
         async function init() {
             await Promise.all([
                 fetchModels(),
