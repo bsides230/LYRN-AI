@@ -367,8 +367,15 @@
             }
 
         } catch (err) {
+            console.error("Chat Error:", err);
             responseBubble.classList.remove('typing');
-            responseBubble.innerText = `Error: ${err.message}`;
+
+            let errorMsg = `Error: ${err.message}`;
+            if (err.name === 'TypeError' && err.message.includes('fetch')) {
+                errorMsg = `Connection Failed. Check URL: ${CONFIG.apiUrl}`;
+            }
+
+            responseBubble.innerText = errorMsg;
             responseBubble.style.color = 'var(--error-color)';
         } finally {
             isProcessing = false;

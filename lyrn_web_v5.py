@@ -270,6 +270,7 @@ async def stream_logs(request: Request):
 # Chat Endpoint
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
+    print(f"[API] Received chat request: {request.message[:50]}...")
     message = request.message
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"chat/chat_{timestamp}.txt"
@@ -281,10 +282,12 @@ async def chat_endpoint(request: ChatRequest):
     # Write User Message
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(f"#USER_START#\n{message}\n#USER_END#")
+    print(f"[API] Created chat file: {filepath}")
 
     # Write Trigger
     with open("chat_trigger.txt", "w", encoding="utf-8") as f:
         f.write(filepath)
+    print(f"[API] Wrote trigger file: chat_trigger.txt")
 
     async def event_generator():
         last_pos = 0
@@ -311,11 +314,13 @@ async def chat_endpoint(request: ChatRequest):
                         else:
                             # Check for error
                             if "[Error:" in content:
+                                print("[API] Detected error in chat file.")
                                 yield json.dumps({"response": "Error in worker."}) + "\n"
                                 return
 
                             retries += 1
                             if retries > 600: # 60 seconds timeout
+                                print("[API] Timeout waiting for worker response.")
                                 yield json.dumps({"response": "Timeout waiting for worker."}) + "\n"
                                 return
                             continue

@@ -99,6 +99,7 @@ def main():
 
     while running:
         if os.path.exists(TRIGGER_FILE):
+            print(f"[Worker] Trigger detected: {TRIGGER_FILE}")
             try:
                 with open(TRIGGER_FILE, 'r', encoding='utf-8') as f:
                     content = f.read().strip()
@@ -145,9 +146,16 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
 
         # However, following the model_loader logic, we construct the prompt from history + current file content.
 
-        messages = [{"role": "system", "content": system_prompt}]
+        print(f"[Worker] Building prompt components...")
+        print(f"[Worker] System Prompt Length: {len(system_prompt)}")
+        print(f"[Worker] Delta Content Length: {len(delta_content) if delta_content else 0}")
+
+        # Merge Deltas into System Prompt to preserve v4 injection order and KV cache
+        full_system_prompt = system_prompt
         if delta_content:
-            messages.append({"role": "system", "content": delta_content})
+            full_system_prompt += "\n\n" + delta_content
+
+        messages = [{"role": "system", "content": full_system_prompt}]
 
         # Add History
         history = chat_manager.get_chat_history_messages()
@@ -190,6 +198,9 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         messages.append({"role": "user", "content": user_message})
 
         print(f"User: {user_message}", flush=True)
+        print(f"[Worker] Total messages in prompt: {len(messages)}")
+        for i, msg in enumerate(messages):
+            print(f"  [{i}] Role: {msg['role']}, Content Length: {len(msg['content'])}")
 
         # 3. Generate
         active_config = settings.get("active", {})
