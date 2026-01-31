@@ -38,6 +38,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TRIGGER_FILE = os.path.join(SCRIPT_DIR, "chat_trigger.txt")
 REBUILD_TRIGGER = os.path.join(SCRIPT_DIR, "rebuild_trigger.txt")
 LLM_STATUS_FILE = os.path.join(SCRIPT_DIR, "global_flags", "llm_status.txt")
+STATS_FILE = os.path.join(SCRIPT_DIR, "global_flags", "llm_stats.json")
 
 def set_llm_status(status: str):
     try:
@@ -46,6 +47,19 @@ def set_llm_status(status: str):
             f.write(status)
     except Exception as e:
         print(f"Error setting LLM status: {e}")
+
+def write_stats(tps, tokens_generated, model_name):
+    try:
+        data = {
+            "tps": round(tps, 2),
+            "last_tokens": tokens_generated,
+            "model_name": os.path.basename(model_name),
+            "timestamp": time.time()
+        }
+        with open(STATS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+    except Exception as e:
+        print(f"Error writing stats: {e}")
 
 def main():
     print("--- Headless LYRN Worker Starting ---")
@@ -238,6 +252,8 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
 
         # 3. Generate
         active_config = settings.get("active", {})
+        start_time = time.time()
+        token_count = 0
 
         stream = llm.create_chat_completion(
             messages=messages,
@@ -257,13 +273,20 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     delta = token_data['choices'][0].get('delta', {})
                     content = delta.get('content', '')
                     if content:
+                        token_count += 1
                         f.write(content)
                         f.flush()
                         full_response += content
             f.write("\n#MODEL_END#\n")
 
+        end_time = time.time()
+        duration = end_time - start_time
+        tps = token_count / duration if duration > 0 else 0
+
+        write_stats(tps, token_count, active_config.get("model_path", "Unknown"))
+
         print(f"Model: {full_response}", flush=True)
-        print("Generation complete.")
+        print(f"Generation complete. {token_count} tokens in {duration:.2f}s ({tps:.2f} T/s)")
         set_llm_status("idle")
 
     except Exception as e:
