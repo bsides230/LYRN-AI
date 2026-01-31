@@ -115,6 +115,12 @@
         }
         .status-light.green { background-color: #00cc66; box-shadow: 0 0 8px rgba(0, 204, 102, 0.6); }
         .status-light.yellow { background-color: #ffbb33; box-shadow: 0 0 8px rgba(255, 187, 51, 0.6); }
+        .status-light.blue { background-color: #7c5cff; box-shadow: 0 0 10px #7c5cff; }
+        .status-light.orange { background-color: #ff8800; box-shadow: 0 0 8px #ff8800; }
+
+        .status-light.pulse { animation: lightPulse 1.5s infinite ease-in-out; }
+        @keyframes lightPulse { 0% { opacity: 1; transform:scale(1); } 50% { opacity: 0.6; transform:scale(0.9); } 100% { opacity: 1; transform:scale(1); } }
+
         .status-light:hover { transform: scale(1.2); }
 
         /* =========================================
@@ -1302,7 +1308,22 @@
                 const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
 
                 document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
-                updateStatusLight('green', 'Connected: System Normal');
+
+                // LLM Status Logic
+                if (data.worker) {
+                    if (!data.worker.running) {
+                        updateStatusLight('orange', 'Backend OK / Worker Stopped');
+                    } else {
+                        const s = data.worker.llm_status;
+                        if (s === 'busy') updateStatusLight('blue pulse', 'LLM Generating...');
+                        else if (s === 'loading') updateStatusLight('yellow pulse', 'Loading Model...');
+                        else if (s === 'error') updateStatusLight('red pulse', 'Model Error');
+                        else updateStatusLight('green', 'System Ready');
+                    }
+                } else {
+                    updateStatusLight('green', 'Connected');
+                }
+
             } catch (e) {
                 document.getElementById('sys-cpu').innerText = "";
                 updateStatusLight('red', 'Disconnected / Offline');

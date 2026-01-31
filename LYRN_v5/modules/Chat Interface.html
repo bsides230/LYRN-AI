@@ -168,6 +168,19 @@
     /* FOOTER */
     .footer-bar { padding: 8px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); font-size: calc(var(--font-size-base) - 2px); font-family: 'JetBrains Mono'; color: var(--text-dim); flex-shrink: 0; }
 
+    /* MODAL */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(2px);
+        z-index: 10000; display: flex; justify-content: center; align-items: center;
+    }
+    .modal-box {
+        background: var(--bg-panel); border: 1px solid var(--border-color);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 400px;
+        display: flex; flex-direction: column; border-radius: 8px; animation: slideUp 0.3s ease-out; padding: 20px;
+    }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
   </style>
 </head>
 <body>
@@ -180,8 +193,7 @@
         </div>
         <div class="btn-group">
             <span id="api-status" style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text-dim); margin-right:10px;">Checking API...</span>
-            <input type="file" id="file-input" style="display: none;" accept=".json" onchange="handleFileLoad(this)">
-            <button onclick="document.getElementById('file-input').click()">Import Config</button>
+            <button class="btn-icon btn-square" onclick="openSettings()" title="Settings">⚙️</button>
             <button class="btn-icon btn-square" onclick="clearChat()" title="Clear Chat">🗑️</button>
         </div>
     </header>
@@ -205,6 +217,38 @@
   </div>
 
   <div id="toast">Operation Successful</div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h3 class="panel-title" style="margin-bottom:20px;">Chat Settings</h3>
+
+      <div style="margin-bottom: 20px;">
+          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select: none;">
+              <input type="checkbox" id="set-history-enable"> Enable Chat History
+          </label>
+          <p style="font-size:11px; color:var(--text-dim); margin-top:5px; margin-left: 24px;">
+              If disabled, the model will only see the system prompt and your current message.
+          </p>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+          <label style="font-family:'JetBrains Mono'; font-size:11px; text-transform:uppercase; color:var(--text-dim);">History Limit (Pairs)</label>
+          <div style="display:flex; gap:10px; align-items:center; margin-top: 8px;">
+              <input type="range" id="set-history-limit" min="0" max="50" step="1" style="flex:1;" oninput="document.getElementById('limit-val').innerText = this.value">
+              <span id="limit-val" style="font-family:'JetBrains Mono'; width:30px; text-align:right;">10</span>
+          </div>
+          <p style="font-size:11px; color:var(--text-dim); margin-top:5px;">
+              Number of previous exchanges to include in context.
+          </p>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+           <button onclick="closeSettings()">Cancel</button>
+           <button class="btn-primary" onclick="saveSettings()">Save Configuration</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     /* =========================================
@@ -332,6 +376,72 @@
         document.getElementById('endpoint-display').innerText = `API: ${CONFIG.apiUrl}`;
         // Simple connectivity check (optional)
         document.getElementById('api-status').innerText = "Ready";
+    }
+
+    /* =========================================
+       SETTINGS LOGIC
+       ========================================= */
+    async function openSettings() {
+        // Fetch current settings
+        try {
+            const base = CONFIG.apiUrl.replace('/api/chat', ''); // Get base URL
+            const res = await fetch(base + '/api/config');
+            if(res.ok) {
+                const data = await res.json();
+                const s = data.settings || {};
+
+                document.getElementById('set-history-enable').checked = (s.enable_chat_history !== false); // Default true
+                const limit = s.chat_history_length !== undefined ? s.chat_history_length : 10;
+                document.getElementById('set-history-limit').value = limit;
+                document.getElementById('limit-val').innerText = limit;
+
+                document.getElementById('settings-modal').classList.remove('hidden');
+            } else {
+                showToast("Failed to load settings", true);
+            }
+        } catch(e) {
+            console.error(e);
+            showToast("Connection Error", true);
+        }
+    }
+
+    function closeSettings() {
+        document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    async function saveSettings() {
+        try {
+            const base = CONFIG.apiUrl.replace('/api/chat', '');
+
+            // First get existing settings so we don't overwrite other things
+            const getRes = await fetch(base + '/api/config');
+            let currentSettings = {};
+            if(getRes.ok) {
+                const data = await getRes.json();
+                currentSettings = data.settings || {};
+            }
+
+            // Update
+            currentSettings.enable_chat_history = document.getElementById('set-history-enable').checked;
+            currentSettings.chat_history_length = parseInt(document.getElementById('set-history-limit').value);
+
+            const postRes = await fetch(base + '/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ settings: currentSettings })
+            });
+
+            if(postRes.ok) {
+                showToast("Settings Saved");
+                closeSettings();
+            } else {
+                showToast("Failed to save", true);
+            }
+
+        } catch(e) {
+            console.error(e);
+            showToast("Error saving settings", true);
+        }
     }
 
     /* =========================================

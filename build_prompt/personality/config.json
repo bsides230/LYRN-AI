@@ -49,5 +49,6 @@
       "instructions": "Do not show emotional fluctuation, self-doubt, or linguistic insecurity. Stay confident and emotionally neutral unless simulation is requested."
     }
   ],
-  "rwi_text": "- personality: [###PERSONALITY.START###]...[###PERSONALITY.END###] AI identity traits and behavioral biases."
+  "rwi_text": "AI identity traits and behavioral biases.",
+  "content_file": "content.txt"
 }

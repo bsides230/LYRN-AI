@@ -522,6 +522,123 @@ async def delete_cycle(cycle_name: str):
     automation_controller.delete_cycle(cycle_name)
     return {"success": True}
 
+# --- Snapshot Builder Endpoints ---
+
+@app.get("/api/snapshot")
+async def get_snapshot():
+    """Reads components and their content."""
+    try:
+        base_dir = Path("build_prompt")
+        comp_path = base_dir / "components.json"
+
+        if not comp_path.exists():
+            return [] # Return empty list if no file
+
+        with open(comp_path, 'r', encoding='utf-8') as f:
+            components = json.load(f)
+
+        # Enhance components with content
+        for comp in components:
+            name = comp.get("name")
+            if name == "RWI":
+                continue
+
+            # Look for content in subdir
+            comp_dir = base_dir / name
+            config_path = comp_dir / "config.json"
+
+            content_file = "content.txt"
+
+            if config_path.exists():
+                try:
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        c = json.load(f)
+                        content_file = c.get("content_file", "content.txt")
+                except: pass
+
+            content_path = comp_dir / content_file
+            if content_path.exists():
+                try:
+                    comp["content"] = content_path.read_text(encoding='utf-8')
+                except:
+                    comp["content"] = ""
+            else:
+                 comp["content"] = ""
+
+        return components
+    except Exception as e:
+        print(f"Error getting snapshot: {e}")
+        return []
+
+@app.post("/api/snapshot")
+async def save_snapshot(components: List[Dict[str, Any]]):
+    """Saves components list and updates content files."""
+    try:
+        base_dir = Path("build_prompt")
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. Save components.json (without content field to keep it clean)
+        clean_components = []
+        for c in components:
+            copy = c.copy()
+            if "content" in copy:
+                del copy["content"]
+            clean_components.append(copy)
+
+        with open(base_dir / "components.json", "w", encoding='utf-8') as f:
+            json.dump(clean_components, f, indent=2)
+
+        # 2. Save content files
+        for c in components:
+            name = c.get("name")
+            if not name or name == "RWI": continue
+
+            content = c.get("content", "")
+            comp_dir = base_dir / name
+            comp_dir.mkdir(exist_ok=True)
+
+            config_path = comp_dir / "config.json"
+            # Read existing config to preserve other fields or create new
+            config = {}
+            if config_path.exists():
+                try:
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                except: pass
+
+            # Update config with necessary fields from frontend
+            if "config" in c:
+                frontend_config = c["config"]
+                if "begin_bracket" in frontend_config: config["begin_bracket"] = frontend_config["begin_bracket"]
+                if "end_bracket" in frontend_config: config["end_bracket"] = frontend_config["end_bracket"]
+                if "rwi_text" in frontend_config: config["rwi_text"] = frontend_config["rwi_text"]
+
+            # Ensure content_file is set
+            if "content_file" not in config:
+                config["content_file"] = "content.txt"
+
+            with open(config_path, "w", encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+
+            # Write content
+            with open(comp_dir / config["content_file"], "w", encoding='utf-8') as f:
+                f.write(content)
+
+        return {"success": True}
+    except Exception as e:
+        print(f"Error saving snapshot: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/snapshot/rebuild")
+async def rebuild_snapshot():
+    """Triggers a snapshot rebuild in the worker."""
+    try:
+        with open("rebuild_trigger.txt", "w", encoding='utf-8') as f:
+            f.write("rebuild")
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Serve dashboard at root
 @app.get("/")
