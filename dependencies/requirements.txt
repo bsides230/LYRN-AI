@@ -2,7 +2,7 @@ customtkinter
 llama-cpp-python
 Pillow
 psutil
-pynvml
+nvidia-ml-py
 
 pyautogui
 pygetwindow
