@@ -7,20 +7,46 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <style>
+        /* =========================================
+           CORE VARIABLES (Matches Snapshot Builder)
+           ========================================= */
         :root {
             --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --bg-input: #1a1a1a;
+            --brand-purple: #7c5cff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.1);
             --text-head: #ffffff;
             --text-body: #b0b0b0;
-            --brand-purple: #7c5cff;
+            --text-dim: #666666;
             --border-color: #333333;
-            --bg-panel: #111111;
-            --input-bg: #1a1a1a;
+            --input-focus-bg: #111111;
 
             --status-loaded: #10B981;
             --status-loading: #F59E0B;
             --status-error: #EF4444;
             --status-stopped: #666;
         }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --bg-input: #ffffff;
+            --brand-purple: #6a4ce0;
+            --brand-purple-dim: rgba(106, 76, 224, 0.1);
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --input-focus-bg: #f9fafb;
+        }
+
+        /* --- THEMED SCROLLBARS --- */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
         body {
             background-color: var(--bg-core);
             color: var(--text-body);
@@ -44,13 +70,13 @@
 
         .section { margin-bottom: 25px; }
         .label { font-weight: 600; display: block; margin-bottom: 8px; color: var(--text-head); font-size: 12px; }
-        .sub-label { font-size: 11px; color: #777; margin-bottom: 5px; }
+        .sub-label { font-size: 11px; color: var(--text-dim); margin-bottom: 5px; }
 
         /* Form Elements */
         select, input[type="text"], input[type="number"] {
-            background: var(--input-bg);
+            background: var(--bg-input);
             border: 1px solid var(--border-color);
-            color: white;
+            color: var(--text-head);
             padding: 8px 10px;
             border-radius: 4px;
             font-family: 'JetBrains Mono', monospace;
@@ -58,7 +84,7 @@
             box-sizing: border-box;
             transition: border-color 0.2s;
         }
-        select:focus, input:focus { outline: none; border-color: var(--brand-purple); }
+        select:focus, input:focus { outline: none; border-color: var(--brand-purple); background: var(--input-focus-bg); }
 
         /* Grid Layout for Params */
         .param-grid {
@@ -68,7 +94,7 @@
             margin-bottom: 20px;
         }
         .param-item { display: flex; flex-direction: column; }
-        .param-item label { font-size: 11px; color: #888; margin-bottom: 4px; }
+        .param-item label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
 
         /* Buttons */
         button {
@@ -191,7 +217,7 @@
 
     <h2>
         Model Configuration
-        <span style="font-size:10px; color:#555; font-weight:400;">v5.0</span>
+        <span style="font-size:10px; color:var(--text-dim); font-weight:400;">v5.0</span>
     </h2>
 
     <!-- Status -->
@@ -200,7 +226,7 @@
             <div id="status-dot" class="dot stopped"></div>
             <span id="status-text">STOPPED</span>
         </div>
-        <div style="font-size:11px; color:#666;" id="pid-text">PID: -</div>
+        <div style="font-size:11px; color:var(--text-dim);" id="pid-text">PID: -</div>
     </div>
 
     <div id="error-msg"></div>
@@ -307,6 +333,12 @@
             if (e.data.type === 'CORE_URL_CHANGE') {
                 coreUrl = e.data.url;
                 init();
+            }
+            if (e.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+            }
+            if (event.data.type === 'FONT_CHANGE') {
+                document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
         });
 
@@ -509,7 +541,7 @@
                     dotClass = "loading";
                 } else if(data.llm_status === 'busy') {
                     label = "GENERATING";
-                    dotClass = "running"; // Green or maybe Blue? Green implies healthy.
+                    dotClass = "running";
                 } else if(data.llm_status === 'error') {
                     label = "MODEL ERROR";
                     dotClass = "error";
@@ -525,6 +557,13 @@
 
             els.btnLoad.disabled = data.running;
             els.btnStop.disabled = !data.running;
+
+            // Error Message
+            if(data.llm_status === 'error' && data.error_message) {
+                showError("Error: " + data.error_message);
+            } else {
+                els.errorMsg.style.display = 'none';
+            }
         }
 
         async function startWorker() {

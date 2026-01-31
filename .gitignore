@@ -15,3 +15,4 @@ automation/job_queue.json
 automation/chunk_queue.json
 automation/job_run_counts.json
 automation/job_log.json
+logs/

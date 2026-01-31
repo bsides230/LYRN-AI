@@ -523,7 +523,8 @@
 
     <div id="top-system-bar">
         <div class="bar-section">
-            <div id="sys-status-light" class="status-light" title="Status: Disconnected (Red)" onclick="openConnectionPopup()"></div>
+            <div id="sys-status-server" class="status-light" title="Server Status: Disconnected" onclick="openConnectionPopup()"></div>
+            <div id="sys-status-llm" class="status-light" title="LLM Status: Unknown" style="display:none"></div>
             <span class="system-text" id="sys-cpu"></span>
             <span class="system-text" id="sys-date">...</span>
             <span class="system-text" id="sys-clock">...</span>
@@ -639,7 +640,7 @@
         ];
 
         let appSettings = {
-            activeModules: ['mod_chat', 'mod_builder', 'mod_models', 'mod_job_manager', 'mod_asset_shop', 'mod_server_status'],
+            activeModules: ['mod_chat', 'mod_builder', 'mod_models', 'mod_job_manager', 'mod_logs', 'mod_settings', 'mod_asset_shop', 'mod_server_status'],
             dockPinned: true, 
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
@@ -1262,7 +1263,7 @@
             statusEl.innerText = "Testing...";
             statusEl.style.color = "var(--text-dim)";
             
-            updateStatusLight('yellow', 'Testing Connection...');
+            setLight('sys-status-server', 'yellow', 'Testing Connection...');
 
             try {
                 const res = await fetch(url + '/health');
@@ -1278,14 +1279,14 @@
                         f.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: url }, '*');
                     });
 
-                    updateStatusLight('green', 'Connected to Core');
+                    setLight('sys-status-server', 'green', 'Connected to Core');
                 } else {
                     throw new Error("Invalid response");
                 }
             } catch (e) {
                 statusEl.innerText = "Connection Failed: " + e.message;
                 statusEl.style.color = "var(--error-color)";
-                updateStatusLight('red', 'Connection Failed');
+                setLight('sys-status-server', 'red', 'Connection Failed');
             }
         }
 
@@ -1297,43 +1298,55 @@
         }
 
         async function fetchStats() {
+            const srvLight = 'sys-status-server';
+            const llmLight = 'sys-status-llm';
+
             if(!coreUrl) {
-                updateStatusLight('red', 'No Connection Configured');
+                setLight(srvLight, 'red', 'No Connection Configured');
                 return;
             }
             try {
                 const res = await fetch(coreUrl + '/health');
                 const data = await res.json();
+
+                // Server OK
+                setLight(srvLight, 'green', 'Connected to Backend');
+
                 const cpuText = `CPU: ${data.cpu}%`;
                 const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
-
                 document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
 
                 // LLM Status Logic
+                const llmEl = document.getElementById(llmLight);
+                llmEl.style.display = 'block';
+
                 if (data.worker) {
                     if (!data.worker.running) {
-                        updateStatusLight('orange', 'Backend OK / Worker Stopped');
+                        setLight(llmLight, 'orange', 'Worker Stopped');
                     } else {
                         const s = data.worker.llm_status;
-                        if (s === 'busy') updateStatusLight('blue pulse', 'LLM Generating...');
-                        else if (s === 'loading') updateStatusLight('yellow pulse', 'Loading Model...');
-                        else if (s === 'error') updateStatusLight('red pulse', 'Model Error');
-                        else updateStatusLight('green', 'System Ready');
+                        if (s === 'busy') setLight(llmLight, 'blue pulse', 'LLM Generating...');
+                        else if (s === 'loading') setLight(llmLight, 'yellow pulse', 'Loading Model...');
+                        else if (s === 'error') setLight(llmLight, 'red pulse', 'Model Error');
+                        else setLight(llmLight, 'green', 'Worker Idle / Ready');
                     }
                 } else {
-                    updateStatusLight('green', 'Connected');
+                    setLight(llmLight, 'red', 'Worker Status Unknown');
                 }
 
             } catch (e) {
                 document.getElementById('sys-cpu').innerText = "";
-                updateStatusLight('red', 'Disconnected / Offline');
+                setLight(srvLight, 'red', 'Disconnected / Offline');
+                document.getElementById(llmLight).style.display = 'none';
             }
         }
 
-        function updateStatusLight(status, title) {
-            const el = document.getElementById('sys-status-light');
-            el.className = 'status-light ' + status;
-            el.title = title || status;
+        function setLight(id, status, title) {
+            const el = document.getElementById(id);
+            if(el) {
+                el.className = 'status-light ' + status;
+                el.title = title || status;
+            }
         }
 
         function initSystemMonitor() { 
