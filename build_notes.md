@@ -24,6 +24,11 @@ This update marks the official transition to the Dashboard v5 architecture and a
     -   Added `port.txt` to configure the web server port (default: 8080).
     -   Cleaned up root directory by moving `req.md`, `GUI_ANALYSIS.md`, `MEMORY_SYSTEM_ANALYSIS.md`, and `settings.json.bk` to `deprecated/v4_artifacts/`.
 
+- **Bug Fixes & Hardening:**
+    -   **Chat Logic:** Fixed an issue where the user's latest message was duplicated in the prompt (once from history, once from the active trigger), causing "Conversation roles must alternate" errors. The Worker now explicitly excludes the active chat file when retrieving history.
+    -   **Path Handling:** Updated `settings.json` to use relative paths instead of absolute Windows paths. This prevents the creation of invalid directories (e.g., folders named `D:\LYRN-SAD\global_flags`) when the backend is run in a Linux environment.
+    -   **Git:** Added `chat_trigger.txt` to `.gitignore`.
+
 ## Philosophy & Rules (Ported)
 
 -   **Efficiency and Accessibility:** The primary goal is to create a powerful AI cognition framework that is lightweight enough to run on standard consumer hardware.
