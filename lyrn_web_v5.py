@@ -379,6 +379,15 @@ async def health_check():
 
     worker_status = worker_controller.get_status()
 
+    llm_stats = {}
+    try:
+        stats_path = Path("global_flags/llm_stats.json")
+        if stats_path.exists():
+            with open(stats_path, 'r', encoding='utf-8') as f:
+                llm_stats = json.load(f)
+    except Exception:
+        pass
+
     return {
         "status": "ok",
         "cpu": cpu,
@@ -393,7 +402,8 @@ async def health_check():
             "total_gb": disk.total / (1024**3)
         },
         "gpu": gpu_stats,
-        "worker": worker_status
+        "worker": worker_status,
+        "llm_stats": llm_stats
     }
 
 # Logging Endpoints
@@ -523,6 +533,10 @@ async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token")):
     if not LYRN_TOKEN or not x_token or x_token != LYRN_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return x_token
+
+@app.post("/api/verify_token", dependencies=[Depends(verify_token)])
+async def verify_token_endpoint():
+    return {"status": "valid"}
 
 @app.post("/api/models/fetch", dependencies=[Depends(verify_token)])
 async def fetch_model(request: ModelFetchRequest):

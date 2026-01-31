@@ -23,6 +23,29 @@ if %errorlevel% neq 0 (
 )
 
 :START
+if exist "admin_token.txt" goto RUN_SERVER
+
+echo.
+echo [WARNING] No admin_token.txt found!
+echo.
+echo You must have an Admin Token to access the system.
+echo.
+set /p "create_token=Create Admin Token now? (Y/N): "
+if /i "%create_token%"=="Y" goto CREATE_TOKEN
+if /i "%create_token%"=="N" goto NO_TOKEN
+goto START
+
+:CREATE_TOKEN
+python token_generator.py
+goto RUN_SERVER
+
+:NO_TOKEN
+echo.
+echo WARNING: Starting without an Admin Token. You will NOT be able to access the system.
+timeout /t 5
+goto RUN_SERVER
+
+:RUN_SERVER
 echo.
 echo Starting LYRN Dashboard...
 python lyrn_web_v5.py

@@ -348,6 +348,7 @@
             box-shadow: 0 0 6px var(--brand-purple); display: none;
         }
         .dock-btn.is-running .active-dot { display: block; }
+        .active-dot.minimized-dot { background-color: #ff8800; box-shadow: 0 0 6px #ff8800; }
 
         /* =========================================
            POPUPS & SETTINGS
@@ -538,6 +539,22 @@
         </div>
     </div>
 
+    <div id="auth-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); backdrop-filter:blur(15px); z-index:30000; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="background:var(--bg-panel); border:1px solid var(--brand-purple); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
+            <h2 style="margin:0 0 20px 0; color:var(--text-head); font-family:'JetBrains Mono'; text-transform:uppercase; font-size:16px;">Authentication Required</h2>
+            <p style="font-size:12px; color:var(--text-body); margin-bottom:20px; line-height:1.4;">Please enter your Admin Token to access the system.</p>
+            <input type="password" id="inp-auth-token" placeholder="Paste Token Here..." style="width:100%; padding:10px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; margin-bottom:15px; border-radius:4px;">
+
+            <label style="display:flex; align-items:start; gap:10px; font-size:11px; color:var(--text-dim); text-align:left; margin-bottom:20px; cursor:pointer;">
+                <input type="checkbox" id="chk-save-token">
+                <span>Save token to this device?<br><span style="color:#ffaa00;">Warning: Only do this on private devices.</span></span>
+            </label>
+
+            <button class="cta-btn" style="width:100%; padding:10px;" onclick="submitAuthToken()">AUTHENTICATE</button>
+            <div id="auth-error" style="color:var(--error-color); font-size:11px; margin-top:10px; min-height:15px;"></div>
+        </div>
+    </div>
+
     <div id="edit-mode-banner">
         <span>EDIT MODE ACTIVE</span>
         <button onclick="disableEditMode()">DONE</button>
@@ -654,6 +671,10 @@
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
         let coreUrl = "http://localhost:8000";
+        if(window.location.protocol.startsWith('http')) {
+             coreUrl = window.location.origin;
+        }
+        let authToken = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
@@ -1013,6 +1034,7 @@
                 <div class="window-header">
                     <span class="window-title">${mod.name}</span>
                     <div class="win-controls">
+                         <button class="win-btn pin-btn" title="Pin Always on Top" onclick="togglePin('${mod.id}', this)">📌</button>
                          <button class="win-btn" onclick="minimizeWindow('${mod.id}')">_</button>
                          <button class="win-btn" onclick="toggleMaximize(this)">☐</button>
                          <button class="win-btn close-btn" onclick="closeWindow('${mod.id}')">✕</button>
@@ -1031,6 +1053,8 @@
             iframe.onload = () => {
                 iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
                 iframe.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
+                iframe.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: coreUrl }, '*');
+                if(authToken) iframe.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
             };
 
             setupWindowDrag(win);
@@ -1144,11 +1168,22 @@
         }
 
         function updateDockIndicators() {
-            document.querySelectorAll('.dock-btn').forEach(btn => btn.classList.remove('is-running'));
+            document.querySelectorAll('.dock-btn').forEach(btn => {
+                btn.classList.remove('is-running');
+                const dot = btn.querySelector('.active-dot');
+                if(dot) dot.classList.remove('minimized-dot');
+            });
+
             activeWindows.forEach(id => {
                 const btn = document.getElementById('btn_' + id);
-                if(btn && document.getElementById('win_' + id) && document.getElementById('win_' + id).style.display !== 'none') {
+                const win = document.getElementById('win_' + id);
+
+                if(btn && win) {
                     btn.classList.add('is-running');
+                    const dot = btn.querySelector('.active-dot');
+                    if(dot && win.style.display === 'none') {
+                        dot.classList.add('minimized-dot');
+                    }
                 }
             });
         }
@@ -1200,6 +1235,18 @@
             const dock = document.getElementById('floating-dock'); 
             pinned ? dock.classList.remove('dock-collapsed') : dock.classList.add('dock-collapsed'); 
             saveSettings(); 
+        }
+
+        function togglePin(modId, btn) {
+            const win = document.getElementById('win_' + modId);
+            if(win) {
+                win.classList.toggle('always-on-top');
+                if(win.classList.contains('always-on-top')) {
+                    btn.classList.add('pinned');
+                } else {
+                    btn.classList.remove('pinned');
+                }
+            }
         }
         
         function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
@@ -1279,7 +1326,10 @@
                     localStorage.setItem('lyrn_core_url', url);
                     coreUrl = url;
                     document.getElementById('connection-popup').style.display = 'none';
+
+                    // Connected successfully, now check Auth
                     initBackendMonitor();
+                    checkAuth();
 
                     // Broadcast to modules
                     document.querySelectorAll('iframe').forEach(f => {
@@ -1295,6 +1345,77 @@
                 statusEl.style.color = "var(--error-color)";
                 setLight('sys-status-server', 'red', 'Connection Failed');
             }
+        }
+
+        let hasCheckedAuth = false;
+        async function checkAuth() {
+            if(hasCheckedAuth) return;
+
+            // Check LocalStorage
+            const storedToken = localStorage.getItem('lyrn_admin_token');
+            if(storedToken) {
+                // Verify it
+                const valid = await verifyToken(storedToken);
+                if(valid) {
+                    authToken = storedToken;
+                    broadcastToken();
+                    hasCheckedAuth = true;
+                    return;
+                }
+            }
+
+            // Show Overlay
+            document.getElementById('auth-overlay').style.display = 'flex';
+        }
+
+        async function submitAuthToken() {
+            const inp = document.getElementById('inp-auth-token');
+            const err = document.getElementById('auth-error');
+            const save = document.getElementById('chk-save-token');
+            const token = inp.value.trim();
+
+            if(!token) {
+                err.innerText = "Token cannot be empty.";
+                return;
+            }
+
+            err.innerText = "Verifying...";
+
+            const valid = await verifyToken(token);
+            if(valid) {
+                authToken = token;
+                if(save.checked) {
+                    if(confirm("Are you sure you want to save this token? Only do this on a trusted device.")) {
+                        localStorage.setItem('lyrn_admin_token', token);
+                    }
+                }
+
+                document.getElementById('auth-overlay').style.display = 'none';
+                broadcastToken();
+                hasCheckedAuth = true;
+            } else {
+                err.innerText = "Invalid Token. Please check admin_token.txt";
+            }
+        }
+
+        async function verifyToken(token) {
+            try {
+                const res = await fetch(coreUrl + '/api/verify_token', {
+                    method: 'POST',
+                    headers: { 'X-Token': token }
+                });
+                if(res.ok) return true;
+                return false;
+            } catch(e) {
+                console.error("Auth check failed", e);
+                return false;
+            }
+        }
+
+        function broadcastToken() {
+            document.querySelectorAll('iframe').forEach(f => {
+                f.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
+            });
         }
 
         let monitorInterval = null;
@@ -1318,6 +1439,12 @@
 
                 // Server OK
                 setLight(srvLight, 'green', 'Connected to Backend');
+
+                // Hide connection popup if visible
+                document.getElementById('connection-popup').style.display = 'none';
+
+                // Trigger Auth Check if connected and not done yet
+                if(!hasCheckedAuth) checkAuth();
 
                 const cpuText = `CPU: ${data.cpu}%`;
                 const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
@@ -1372,6 +1499,37 @@
         function toggleDashboardFullscreen() { !document.fullscreenElement ? document.documentElement.requestFullscreen() : document.exitFullscreen(); }
         function checkIfIframe() { if(window.self !== window.top) document.getElementById('btn-close-iframe').style.display = 'flex'; }
         function closeDashboard() { window.parent.postMessage({ type: 'CLOSE_DASHBOARD' }, '*'); }
+
+        window.addEventListener('message', (e) => {
+            if(e.data.type === 'OPEN_WIDGET') {
+                // Check if widget already exists
+                const existing = document.getElementById('win_' + e.data.id);
+                if(existing) {
+                    // Bring to front
+                    existing.style.display = 'flex';
+                    existing.style.zIndex = ++zIndexCounter;
+                    return;
+                }
+
+                // Create synthetic module
+                const mod = {
+                    id: e.data.id,
+                    name: e.data.name,
+                    file: e.data.file
+                };
+                createWindow(mod);
+
+                // Customize for widget (smaller size default)
+                const win = document.getElementById('win_' + mod.id);
+                if(win) {
+                    win.style.width = '300px';
+                    win.style.height = '200px';
+                    // Center it
+                    win.style.left = (window.innerWidth/2 - 150) + 'px';
+                    win.style.top = (window.innerHeight/2 - 100) + 'px';
+                }
+            }
+        });
 
         /* Welcome Popup Logic */
         function checkWelcome() {
