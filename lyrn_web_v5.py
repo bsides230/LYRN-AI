@@ -126,7 +126,7 @@ class WorkerController:
             try:
                 # Start the worker process
                 self.process = subprocess.Popen(
-                    [sys.executable, self.worker_script],
+                    [sys.executable, "-u", self.worker_script],
                     cwd=os.getcwd(),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,

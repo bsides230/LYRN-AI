@@ -85,7 +85,7 @@ def main():
             n_threads=active_config.get("n_threads", 4),
             n_gpu_layers=active_config.get("n_gpu_layers", 0),
             n_batch=active_config.get("n_batch", 512),
-            verbose=False # Reduce spam
+            verbose=True
         )
         print("Model loaded successfully.")
         set_llm_status("idle")
@@ -189,6 +189,8 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         # Append to messages
         messages.append({"role": "user", "content": user_message})
 
+        print(f"User: {user_message}", flush=True)
+
         # 3. Generate
         active_config = settings.get("active", {})
 
@@ -202,6 +204,7 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         )
 
         # 4. Stream output to file
+        full_response = ""
         with open(chat_file_path, "a", encoding="utf-8") as f:
             f.write("\n\n#MODEL_START#\n") # Separator
             for token_data in stream:
@@ -211,8 +214,10 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     if content:
                         f.write(content)
                         f.flush()
+                        full_response += content
             f.write("\n#MODEL_END#\n")
 
+        print(f"Model: {full_response}", flush=True)
         print("Generation complete.")
         set_llm_status("idle")
 
