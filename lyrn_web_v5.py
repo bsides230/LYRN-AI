@@ -8,11 +8,15 @@ import threading
 import subprocess
 import collections
 import time
+import hashlib
+import shutil
+import aiohttp
+import aiofiles
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
@@ -308,6 +312,11 @@ class CycleModel(BaseModel):
     name: str
     triggers: List[Any]
 
+class ModelFetchRequest(BaseModel):
+    url: str
+    filename: Optional[str] = None
+    expected_sha256: Optional[str] = None
+
 # --- App Setup ---
 
 @asynccontextmanager
@@ -491,15 +500,168 @@ async def chat_endpoint(request: ChatRequest):
 
 # --- Model & Config Endpoints ---
 
+async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token")):
+    expected_token = os.environ.get("LYRN_MODEL_TOKEN")
+    if not expected_token or not x_token or x_token != expected_token:
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    return x_token
+
+@app.post("/api/models/fetch", dependencies=[Depends(verify_token)])
+async def fetch_model(request: ModelFetchRequest):
+    url = request.url
+
+    # 1. Determine Filename
+    filename = request.filename
+    if not filename:
+        path = url.split("?")[0]
+        filename = path.split("/")[-1]
+
+    # Sanitize
+    filename = os.path.basename(filename)
+    if not filename or filename in ['.', '..']:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    models_dir = Path("models")
+    staging_dir = models_dir / "_staging"
+    models_dir.mkdir(exist_ok=True)
+    staging_dir.mkdir(exist_ok=True)
+
+    part_file = staging_dir / f"{filename}.part"
+    final_staging = staging_dir / filename
+    dest_file = models_dir / filename
+
+    # 2. Size Limit
+    max_bytes = int(os.environ.get("LYRN_MAX_MODEL_BYTES", 0))
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    raise HTTPException(status_code=400, detail=f"Download failed: HTTP {resp.status}")
+
+                content_len = resp.headers.get("Content-Length")
+                if max_bytes > 0 and content_len and int(content_len) > max_bytes:
+                     raise HTTPException(status_code=400, detail="File too large")
+
+                downloaded = 0
+                sha256 = hashlib.sha256()
+                total_size = int(content_len) if content_len else 0
+                last_log_time = time.time()
+
+                async with aiofiles.open(part_file, "wb") as f:
+                    async for chunk in resp.content.iter_chunked(1024 * 1024): # 1MB chunks
+                        downloaded += len(chunk)
+                        if max_bytes > 0 and downloaded > max_bytes:
+                             raise HTTPException(status_code=400, detail="File limit exceeded")
+
+                        sha256.update(chunk)
+                        await f.write(chunk)
+
+                        if time.time() - last_log_time > 2:
+                            pct = ""
+                            if total_size > 0:
+                                pct = f" ({int(downloaded/total_size*100)}%)"
+                            await logger.emit("Info", f"Downloading {filename}: {downloaded // (1024*1024)}MB{pct}", "ModelManager")
+                            last_log_time = time.time()
+
+        # 3. Hash Verification
+        computed_hash = sha256.hexdigest()
+        if request.expected_sha256 and computed_hash.lower() != request.expected_sha256.lower():
+            # Cleanup
+            if part_file.exists(): part_file.unlink()
+            raise HTTPException(status_code=400, detail=f"Hash mismatch. Computed: {computed_hash}")
+
+        # 4. Atomic Move
+        shutil.move(str(part_file), str(final_staging))
+        shutil.move(str(final_staging), str(dest_file))
+
+        await logger.emit("Success", f"Downloaded model: {filename} ({downloaded} bytes)", "ModelManager")
+
+        return {
+            "ok": True,
+            "saved_as": f"models/{filename}",
+            "sha256": computed_hash,
+            "bytes": downloaded
+        }
+
+    except Exception as e:
+        if part_file.exists():
+            try:
+                part_file.unlink()
+            except: pass
+        print(f"Download error: {e}")
+        await logger.emit("Error", f"Download failed: {str(e)}", "ModelManager")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/models/list")
 async def list_models():
     """Lists available models in the models/ directory."""
     models_dir = Path("models")
     if not models_dir.exists():
-        return {"models": []}
+        return []
 
-    models = [f.name for f in models_dir.glob("*") if f.suffix in ['.gguf', '.bin']]
-    return {"models": sorted(models)}
+    models = []
+    for f in models_dir.iterdir():
+        if f.is_file() and f.name != "_staging" and not f.name.endswith(".part"):
+             stat = f.stat()
+             models.append({
+                 "name": f.name,
+                 "bytes": stat.st_size,
+                 "modified": datetime.datetime.fromtimestamp(stat.st_mtime).isoformat()
+             })
+
+    return sorted(models, key=lambda x: x['name'])
+
+@app.get("/api/models/inspect")
+async def inspect_model(name: str):
+    models_dir = Path("models")
+    f = models_dir / os.path.basename(name)
+
+    if not f.exists() or not f.is_file():
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    # Compute Hash
+    # Synchronous for now as permitted, but let's try to be nice
+    # Streaming hash
+    loop = asyncio.get_running_loop()
+    def compute_hash():
+        sha256 = hashlib.sha256()
+        with open(f, "rb") as stream:
+             while chunk := stream.read(1024*1024):
+                  sha256.update(chunk)
+        return sha256.hexdigest()
+
+    computed_hash = await loop.run_in_executor(None, compute_hash)
+
+    stat = f.stat()
+    return {
+        "name": f.name,
+        "bytes": stat.st_size,
+        "modified": datetime.datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        "sha256": computed_hash
+    }
+
+@app.delete("/api/models/delete", dependencies=[Depends(verify_token)])
+async def delete_model(name: str):
+    models_dir = Path("models")
+    filename = os.path.basename(name)
+
+    if filename == "_staging":
+         raise HTTPException(status_code=400, detail="Cannot delete staging dir")
+
+    f = models_dir / filename
+    if not f.exists():
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    try:
+        if f.is_dir():
+             # Should not happen given list filter but safety first
+             raise HTTPException(status_code=400, detail="Cannot delete directories")
+        f.unlink()
+        await logger.emit("Info", f"Deleted model: {filename}", "ModelManager")
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/config/presets")
 async def get_presets():

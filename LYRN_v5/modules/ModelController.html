@@ -359,10 +359,15 @@
                 const res = await fetch(`${coreUrl}/api/models/list`);
                 const data = await res.json();
                 els.modelSelect.innerHTML = '<option value="">Select a model...</option>';
-                data.models.forEach(m => {
+
+                // Compatibility check if data is array or object
+                const list = Array.isArray(data) ? data : (data.models || []);
+
+                list.forEach(item => {
+                    const name = typeof item === 'string' ? item : item.name;
                     const opt = document.createElement('option');
-                    opt.value = `models/${m}`; // Assuming models dir is root relative
-                    opt.innerText = m;
+                    opt.value = `models/${name}`; // Assuming models dir is root relative
+                    opt.innerText = name;
                     els.modelSelect.appendChild(opt);
                 });
             } catch (e) {
