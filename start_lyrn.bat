@@ -1,4 +1,6 @@
 @echo off
+echo Installing/Updating Dependencies...
+pip install -r dependencies\requirements.txt
 echo Starting LYRN Dashboard...
 python lyrn_web_v5.py
 pause
