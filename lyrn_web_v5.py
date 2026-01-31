@@ -21,6 +21,7 @@ import uvicorn
 
 from settings_manager import SettingsManager
 from automation_controller import AutomationController
+from chat_manager import ChatManager
 
 try:
     import pynvml
@@ -87,6 +88,20 @@ class JournalLogger:
 logger = JournalLogger()
 settings_manager = SettingsManager()
 automation_controller = AutomationController()
+
+# Initialize ChatManager (Needs settings to be loaded)
+settings_manager.load_or_detect_first_boot()
+role_mappings = {
+    "assistant": "final_output",
+    "model": "final_output",
+    "thinking": "thinking_process",
+    "analysis": "thinking_process"
+}
+chat_manager = ChatManager(
+    settings_manager.settings.get("paths", {}).get("chat", "chat/"),
+    settings_manager,
+    role_mappings
+)
 
 # --- Worker Controller ---
 class WorkerController:
@@ -268,6 +283,26 @@ async def stream_logs(request: Request):
     return StreamingResponse(logger.subscribe(request), media_type="text/event-stream")
 
 # Chat Endpoint
+@app.get("/api/chat/history")
+async def get_chat_history():
+    """Returns the current chat history as a list of messages."""
+    return chat_manager.get_chat_history_messages()
+
+@app.delete("/api/chat")
+async def clear_chat_history():
+    """Clears all chat history files."""
+    try:
+        chat_dir = Path(settings_manager.settings.get("paths", {}).get("chat", "chat/"))
+        if chat_dir.exists():
+            for f in chat_dir.glob("*.txt"):
+                try:
+                    f.unlink()
+                except OSError as e:
+                    print(f"Failed to delete {f}: {e}")
+        return {"success": True, "message": "Chat history cleared."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
