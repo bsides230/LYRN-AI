@@ -9,3 +9,5 @@ pygetwindow
 fastapi
 uvicorn
 python-multipart
+aiohttp
+aiofiles

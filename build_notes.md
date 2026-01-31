@@ -29,6 +29,13 @@ This update marks the official transition to the Dashboard v5 architecture and a
     -   **Path Handling:** Updated `settings.json` to use relative paths instead of absolute Windows paths. This prevents the creation of invalid directories (e.g., folders named `D:\LYRN-SAD\global_flags`) when the backend is run in a Linux environment.
     -   **Git:** Added `chat_trigger.txt` to `.gitignore`.
 
+- **Startup & Authentication:**
+    -   **Token Tools:** Added `token_generator.py` (and `generate_token.bat`) to generate secure admin tokens into `admin_token.txt`.
+    -   **Startup Wizard:** Updated `start_lyrn.bat` to prompt users (Y/N) for dependency installation.
+    -   **Quick Start:** Added `quick_start.bat` for immediate server launch skipping checks.
+    -   **File-Based Auth:** Backend now reads `admin_token.txt` for the admin token, falling back to environment variables.
+    -   **Model Manager UI:** Updated Authentication Modal to support direct file upload of `admin_token.txt` for easier login.
+
 ## Philosophy & Rules (Ported)
 
 -   **Efficiency and Accessibility:** The primary goal is to create a powerful AI cognition framework that is lightweight enough to run on standard consumer hardware.
