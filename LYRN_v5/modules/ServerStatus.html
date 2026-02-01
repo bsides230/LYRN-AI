@@ -157,17 +157,39 @@
             <div class="big-stat" id="llm-status" style="font-size:16px;">Unknown</div>
         </div>
 
+        <!-- Timings -->
+        <div class="stat-row">
+            <span class="stat-label">Load Time</span>
+            <span class="stat-value" id="llm-load-time">0 ms</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Total Time</span>
+            <span class="stat-value" id="llm-total-time">0.00 s</span>
+        </div>
+
+        <div style="height:1px; background:var(--border-color); margin:10px 0;"></div>
+
+        <!-- Token Counts -->
         <div class="chart-grid">
             <div class="chart-card">
-                <div class="sub-stat">SPEED (TPS)</div>
-                <div class="big-stat" id="llm-tps">0.0</div>
-                <div class="sub-stat">Tokens/Sec</div>
+                <div class="sub-stat">PROMPT (SPEED)</div>
+                <div class="big-stat" id="llm-prompt-tokens">0</div>
+                <div class="sub-stat" id="llm-prompt-speed">0 T/s</div>
             </div>
             <div class="chart-card">
-                <div class="sub-stat">LAST GEN</div>
-                <div class="big-stat" id="llm-tokens">0</div>
-                <div class="sub-stat">Tokens</div>
+                <div class="sub-stat">RESPONSE (SPEED)</div>
+                <div class="big-stat" id="llm-eval-tokens">0</div>
+                <div class="sub-stat" id="llm-eval-speed">0 T/s</div>
             </div>
+        </div>
+
+        <div class="stat-row" style="margin-top:10px;">
+            <span class="stat-label">KV Cache Reused</span>
+            <span class="stat-value" id="llm-kv-reused">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Total Tokens</span>
+            <span class="stat-value" id="llm-total-tokens">0</span>
         </div>
 
         <div class="stat-row" style="margin-top:15px;">
@@ -289,9 +311,24 @@
 
             // LLM Stats
             if(data.llm_stats) {
-                document.getElementById('llm-tps').innerText = data.llm_stats.tps || "0.0";
-                document.getElementById('llm-tokens').innerText = data.llm_stats.last_tokens || "0";
-                document.getElementById('llm-model').innerText = data.llm_stats.model_name || "--";
+                const s = data.llm_stats;
+                // Basic
+                document.getElementById('llm-model').innerText = s.model_name || "--";
+
+                // Extended
+                document.getElementById('llm-load-time').innerText = (s.load_time || 0).toFixed(0) + " ms";
+                document.getElementById('llm-total-time').innerText = (s.total_time || 0).toFixed(2) + " s";
+
+                document.getElementById('llm-prompt-tokens').innerText = s.prompt_tokens || 0;
+                document.getElementById('llm-prompt-speed').innerText = (s.prompt_speed || 0).toFixed(1) + " T/s";
+
+                document.getElementById('llm-eval-tokens').innerText = s.eval_tokens || (s.last_tokens || 0);
+                // Use eval_speed if available, otherwise tps from legacy
+                const evalSpeed = s.eval_speed || s.tps || 0;
+                document.getElementById('llm-eval-speed').innerText = evalSpeed.toFixed(1) + " T/s";
+
+                document.getElementById('llm-kv-reused').innerText = s.kv_cache_reused || 0;
+                document.getElementById('llm-total-tokens').innerText = s.total_tokens || 0;
             }
 
             if(data.worker) {

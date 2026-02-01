@@ -543,7 +543,21 @@
         <div style="background:var(--bg-panel); border:1px solid var(--brand-purple); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
             <h2 style="margin:0 0 20px 0; color:var(--text-head); font-family:'JetBrains Mono'; text-transform:uppercase; font-size:16px;">Authentication Required</h2>
             <p style="font-size:12px; color:var(--text-body); margin-bottom:20px; line-height:1.4;">Please enter your Admin Token to access the system.</p>
-            <input type="password" id="inp-auth-token" placeholder="Paste Token Here..." style="width:100%; padding:10px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; margin-bottom:15px; border-radius:4px;">
+            <div style="margin-bottom: 15px; text-align: center;">
+                 <input type="file" id="inp-token-file" accept=".txt" style="display:none" onchange="handleTokenFile(this)">
+                 <button class="cta-btn" onclick="document.getElementById('inp-token-file').click()" style="width:100%; padding:10px; background:transparent; border:1px solid var(--brand-purple);">
+                    📂 Upload Token File
+                 </button>
+                 <p style="font-size:10px; color:var(--text-dim); margin-top:5px; margin-bottom:0;">Select admin_token.txt</p>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                <div style="flex:1; height:1px; background:var(--border-color);"></div>
+                <span style="font-size:10px; color:var(--text-dim);">OR</span>
+                <div style="flex:1; height:1px; background:var(--border-color);"></div>
+            </div>
+
+            <input type="password" id="inp-auth-token" placeholder="Paste Token String Here..." style="width:100%; padding:10px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; margin-bottom:15px; border-radius:4px;">
 
             <label style="display:flex; align-items:start; gap:10px; font-size:11px; color:var(--text-dim); text-align:left; margin-bottom:20px; cursor:pointer;">
                 <input type="checkbox" id="chk-save-token">
@@ -1366,6 +1380,20 @@
 
             // Show Overlay
             document.getElementById('auth-overlay').style.display = 'flex';
+        }
+
+        function handleTokenFile(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const text = e.target.result.trim();
+                    if(text) {
+                        document.getElementById('inp-auth-token').value = text;
+                        submitAuthToken();
+                    }
+                };
+                reader.readAsText(input.files[0]);
+            }
         }
 
         async function submitAuthToken() {
