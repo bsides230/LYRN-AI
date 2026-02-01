@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import psutil
 import asyncio
 import json
@@ -35,6 +36,20 @@ except ImportError:
 # Global reference to the main event loop
 main_loop: Optional[asyncio.AbstractEventLoop] = None
 LYRN_TOKEN: Optional[str] = None
+
+# Global LLM Stats (populated from log parsing)
+extended_llm_stats = {
+    "kv_cache_reused": 0,
+    "prompt_tokens": 0,
+    "prompt_speed": 0.0,
+    "eval_tokens": 0,
+    "eval_speed": 0.0,
+    "total_tokens": 0,
+    "load_time": 0.0,
+    "total_time": 0.0,
+    "tokenization_time_ms": 0.0,
+    "generation_time_ms": 0.0
+}
 
 # --- DiskJournalLogger ---
 class DiskJournalLogger:
@@ -275,6 +290,50 @@ class WorkerController:
             for line in iter(stream.readline, ''):
                 if line:
                     clean_line = line.strip()
+
+                    # Parse extended stats from llama.cpp logs
+                    try:
+                        # KV Cache
+                        kv_match = re.search(r'(\d+)\s+prefix-match hit', clean_line)
+                        if kv_match:
+                            extended_llm_stats["kv_cache_reused"] = int(kv_match.group(1))
+
+                        # Prompt Eval
+                        prompt_match = re.search(r'prompt eval time\s*=\s*([\d.]+)\s*ms\s*/\s*(\d+)\s*tokens.*?([\d.]+)\s*ms per token', clean_line)
+                        if prompt_match:
+                            ms = float(prompt_match.group(1))
+                            tokens = int(prompt_match.group(2))
+                            ms_per_tok = float(prompt_match.group(3))
+                            extended_llm_stats["tokenization_time_ms"] = ms
+                            extended_llm_stats["prompt_tokens"] = tokens
+                            extended_llm_stats["prompt_speed"] = 1000.0 / ms_per_tok if ms_per_tok > 0 else 0.0
+
+                        # Eval (Generation)
+                        eval_match = re.search(r'eval time\s*=\s*([\d.]+)\s*ms\s*/\s*(\d+)\s*runs.*?([\d.]+)\s*ms per token', clean_line)
+                        if eval_match:
+                            ms = float(eval_match.group(1))
+                            tokens = int(eval_match.group(2))
+                            ms_per_tok = float(eval_match.group(3))
+                            extended_llm_stats["generation_time_ms"] = ms
+                            extended_llm_stats["eval_tokens"] = tokens
+                            extended_llm_stats["eval_speed"] = 1000.0 / ms_per_tok if ms_per_tok > 0 else 0.0
+
+                        # Load Time
+                        load_match = re.search(r'load time\s*=\s*([\d.]+)\s*ms', clean_line)
+                        if load_match:
+                            extended_llm_stats["load_time"] = float(load_match.group(1))
+
+                        # Total Time
+                        total_match = re.search(r'total time\s*=\s*([\d.]+)\s*ms', clean_line)
+                        if total_match:
+                            extended_llm_stats["total_time"] = float(total_match.group(1)) / 1000.0 # Convert to seconds
+
+                        # Update totals
+                        extended_llm_stats["total_tokens"] = extended_llm_stats["prompt_tokens"] + extended_llm_stats["eval_tokens"]
+
+                    except Exception:
+                        pass
+
                     if main_loop and clean_line:
                         asyncio.run_coroutine_threadsafe(logger.emit("Info", clean_line, source), main_loop)
                     elif clean_line:
@@ -387,6 +446,9 @@ async def health_check():
                 llm_stats = json.load(f)
     except Exception:
         pass
+
+    # Merge with extended stats from memory
+    llm_stats.update(extended_llm_stats)
 
     return {
         "status": "ok",
