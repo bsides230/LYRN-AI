@@ -160,6 +160,13 @@
             transition: all 0.2s;
         }
         .win-btn:hover { background: var(--brand-purple-dim); color: var(--text-head); }
+
+        .win-btn.pinned {
+            background: var(--brand-purple-dim);
+            color: var(--brand-purple);
+            /* Visual indication of "pinned" state */
+            box-shadow: inset 0 0 0 1px var(--brand-purple);
+        }
         
         .window-content { flex: 1; position: relative; background: var(--bg-core); overflow: hidden; }
         iframe { width: 100%; height: 100%; border: none; }
@@ -1257,8 +1264,10 @@
                 win.classList.toggle('always-on-top');
                 if(win.classList.contains('always-on-top')) {
                     btn.classList.add('pinned');
+                    btn.innerHTML = '📍';
                 } else {
                     btn.classList.remove('pinned');
+                    btn.innerHTML = '📌';
                 }
             }
         }

@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional, List, Dict
 from settings_manager import SettingsManager
 from automation_controller import AutomationController
-from oss_tool_manager import OSSToolManager
 
 # Script directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -12,10 +11,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 class SnapshotLoader:
     """Loads the static base prompt from the 'build_prompt' directory."""
 
-    def __init__(self, settings_manager: SettingsManager, automation_controller: AutomationController, oss_tool_manager: Optional[OSSToolManager] = None):
+    def __init__(self, settings_manager: SettingsManager, automation_controller: AutomationController):
         self.settings_manager = settings_manager
         self.automation_controller = automation_controller
-        self.oss_tool_manager = oss_tool_manager
         self.build_prompt_dir = os.path.join(SCRIPT_DIR, "build_prompt")
         self.master_prompt_path = os.path.join(self.build_prompt_dir, "master_prompt.txt")
         self.config_path = os.path.join(self.build_prompt_dir, "builder_config.json")
@@ -89,73 +87,6 @@ class SnapshotLoader:
         for component in active_components:
             component_name = component['name']
             if component_name == "RWI":
-                continue
-
-            # Handle the special "jobs" component
-            if component_name == "jobs":
-                jobs_config_path = os.path.join(self.build_prompt_dir, "jobs", "config.json")
-                jobs_config = self._load_json_file(jobs_config_path) or {}
-
-                all_jobs = self.automation_controller.job_definitions
-                if all_jobs:
-                    job_instructions_parts = []
-                    job_begin_bracket = jobs_config.get("job_begin_bracket", "")
-                    job_end_bracket = jobs_config.get("job_end_bracket", "")
-
-                    for job_name, job_data in all_jobs.items():
-                        instruction = job_data.get("instructions", "")
-
-                        start_bracket = job_begin_bracket.replace("*job_name*", job_name)
-                        end_bracket = job_end_bracket.replace("*job_name*", job_name)
-
-                        job_instructions_parts.append(f"{start_bracket}\n{instruction}\n{end_bracket}")
-
-                    full_jobs_content = "\n\n".join(job_instructions_parts)
-
-                    main_instructions = jobs_config.get("instructions", "")
-                    if main_instructions:
-                        full_jobs_content = f"{main_instructions}\n\n{full_jobs_content}"
-
-                    section_begin_bracket = jobs_config.get("begin_bracket", "")
-                    section_end_bracket = jobs_config.get("end_bracket", "")
-
-                    jobs_block = f"{section_begin_bracket}\n{full_jobs_content}\n{section_end_bracket}"
-                    prompt_parts.append(jobs_block)
-                continue
-
-            # Handle the new "oss_tools" component
-            if component_name == "oss_tools":
-                oss_tools_config_path = os.path.join(self.build_prompt_dir, "oss_tools", "config.json")
-                oss_tools_config = self._load_json_file(oss_tools_config_path) or {}
-
-                # Use the passed oss_tool_manager if available
-                all_tools = self.oss_tool_manager.get_all_tools() if self.oss_tool_manager else []
-
-                if all_tools:
-                    tool_parts = []
-                    tool_begin_bracket = oss_tools_config.get("tool_begin_bracket", "")
-                    tool_end_bracket = oss_tools_config.get("tool_end_bracket", "")
-
-                    for tool in all_tools:
-                        definition = tool.params.get("definition", "")
-                        if not definition:
-                            continue
-
-                        start_bracket = tool_begin_bracket.replace("*tool_name*", tool.name)
-                        end_bracket = tool_end_bracket.replace("*tool_name*", tool.name)
-                        tool_parts.append(f"{start_bracket}\n{definition}\n{end_bracket}")
-
-                    full_tools_content = "\n\n".join(tool_parts)
-
-                    main_instructions = oss_tools_config.get("instructions", "")
-                    if main_instructions:
-                        full_tools_content = f"{main_instructions}\n\n{full_tools_content}"
-
-                    section_begin_bracket = oss_tools_config.get("begin_bracket", "")
-                    section_end_bracket = oss_tools_config.get("end_bracket", "")
-
-                    oss_tools_block = f"{section_begin_bracket}\n{full_tools_content}\n{section_end_bracket}"
-                    prompt_parts.append(oss_tools_block)
                 continue
 
             component_dir = os.path.join(self.build_prompt_dir, component_name)

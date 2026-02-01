@@ -441,7 +441,7 @@
              return;
         }
 
-        const data = name === '_NEW_' ? { instructions: '', trigger: '' } : DATA.jobs[name];
+        const data = name === '_NEW_' ? { instructions: '' } : DATA.jobs[name];
         deleteBtn.classList.toggle('hidden', name === '_NEW_');
 
         let html = '';
@@ -449,10 +449,27 @@
             html += `<div class="form-group"><label>Job Name</label><input type="text" id="edit-job-name" placeholder="my_job"></div>`;
         }
         html += `
-            <div class="form-group"><label>Instructions</label><textarea id="edit-job-inst" style="height:150px">${escapeHtml(data.instructions || '')}</textarea></div>
-            <div class="form-group"><label>Trigger</label><textarea id="edit-job-trig" style="height:80px">${escapeHtml(data.trigger || '')}</textarea></div>
+            <div class="form-group"><label>Instructions</label><textarea id="edit-job-inst" style="height:250px">${escapeHtml(data.instructions || '')}</textarea></div>
+            <div class="form-group">
+                <button class="btn-primary" onclick="runJob()" style="width:100%; justify-content:center;">RUN JOB</button>
+            </div>
         `;
         container.innerHTML = html;
+    }
+
+    async function runJob() {
+        const inst = document.getElementById('edit-job-inst').value.trim();
+        if(!inst) return showToast("No instructions", true);
+
+        try {
+            const res = await fetch(`${CORE_URL}/api/chat`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ message: inst })
+            });
+            if(!res.ok) throw new Error("Failed to run job");
+            showToast("Job Sent to Chat");
+        } catch(e) { showToast(e.message, true); }
     }
 
     async function saveJob() {
@@ -463,7 +480,7 @@
         const payload = {
             name: name,
             instructions: document.getElementById('edit-job-inst').value,
-            trigger: document.getElementById('edit-job-trig').value
+            trigger: "" // Legacy support if backend requires it
         };
 
         try {
