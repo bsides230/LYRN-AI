@@ -1,5 +1,17 @@
 # Build Notes
 
+## v5.0.2 - Legacy Cleanup & Framework Analysis
+
+This update involves a comprehensive cleanup of the repository to remove legacy artifacts from previous versions and a deep dive into comparing LYRN v5 with other local agent frameworks.
+
+- **Repository Cleanup:**
+    -   Moved legacy documentation and asset directories to `deprecated/v4_artifacts/` (`docs/`, `images/`, `languages/`, `lyrn_docs/`, `screenshots/`, `themes/`).
+    -   Moved legacy configuration and utility files to `deprecated/v4_artifacts/` (`chat_review.txt`, `LYRN Style Guide.html`, `QUICK_START.md`, `personality.json`, `quotes.txt`, `settings.json.bk`, `verification_error.png`).
+    -   The root directory is now streamlined to contain only files essential for the LYRN v5 Dashboard and Headless Worker operation.
+
+- **Framework Analysis:**
+    -   (Pending) A detailed report `framework_report.md` will be generated comparing LYRN v5's structured memory and headless architecture against other local agent frameworks.
+
 ## v5.0.1 - Chat UX & Stability Improvements
 
 This update focuses on improving the Chat Interface user experience, adding support for reasoning models, and fixing backend stability issues on Windows.
