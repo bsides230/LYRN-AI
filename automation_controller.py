@@ -53,16 +53,13 @@ class AutomationController:
         """Creates a default jobs.json file if none is found."""
         default_jobs = {
             "summary_job": {
-                "instructions": "Create a concise, factual summary of the provided text. Focus on key decisions, outcomes, and open items.",
-                "trigger": "Summarize the previous text."
+                "instructions": "Create a concise, factual summary of the provided text. Focus on key decisions, outcomes, and open items."
             },
             "keyword_job": {
-                "instructions": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\"]",
-                "trigger": "Extract keywords from the previous text."
+                "instructions": "Extract the main keywords from the provided text as a JSON-formatted list. Example: [\"keyword1\", \"keyword2\"]"
             },
             "reflection_job": {
-                "instructions": "Reflect on the conversation so far. Identify key insights, contradictions, or areas for future exploration. Propose next steps if applicable.",
-                "trigger": "Reflect on the conversation."
+                "instructions": "Reflect on the conversation so far. Identify key insights, contradictions, or areas for future exploration. Propose next steps if applicable."
             }
         }
         self.job_definitions = default_jobs
@@ -94,10 +91,11 @@ class AutomationController:
         except (IOError, OSError) as e:
             print(f"Error writing job queue file: {e}")
 
-    def save_job_definition(self, job_name: str, instructions: str, trigger: str):
-        """Saves a job's instructions and trigger to the jobs.json file."""
+    def save_job_definition(self, job_name: str, instructions: str, trigger: str = ""):
+        """Saves a job's instructions to the jobs.json file."""
         job_data = {
             "instructions": instructions,
+            # 'trigger' is kept for legacy compatibility but not used
             "trigger": trigger
         }
 
@@ -251,32 +249,69 @@ class AutomationController:
         except Exception as e:
             print(f"Error deleting cycle: {e}")
 
-    def get_next_job(self) -> Optional[Job]:
-        """Retrieves and consumes the next job from the queue file in a thread-safe manner."""
+    def get_next_due_job(self) -> Optional[Job]:
+        """Retrieves and consumes the next DUE job from the queue."""
+        import datetime
         try:
             with SimpleFileLock(self.queue_lock_path):
                 queue_data = self._read_queue_unsafe()
                 if not queue_data:
                     return None
 
-                next_job_dict = queue_data.pop(0)
-                self._write_queue_unsafe(queue_data)
+                now = datetime.datetime.now()
+                due_idx = -1
+
+                # Check for jobs that are due
+                for i, job in enumerate(queue_data):
+                    when_str = job.get("when", "now")
+                    if when_str == "now":
+                        due_idx = i
+                        break
+
+                    try:
+                        # Handle potential Z suffix or generic ISO
+                        clean_iso = when_str.replace("Z", "+00:00")
+                        when_dt = datetime.datetime.fromisoformat(clean_iso)
+                        # Naive vs Aware check - assume system local time if naive, or just compare
+                        if when_dt.tzinfo is None:
+                             # Make aware if needed or keep naive. 'now' is naive.
+                             pass
+
+                        # Compare
+                        if when_dt <= now:
+                             due_idx = i
+                             break
+                    except:
+                        # If parsing fails, treat as due to clear it out/run it.
+                        print(f"Warning: Invalid date '{when_str}' for job {job.get('name')}")
+                        due_idx = i
+                        break
+
+                if due_idx != -1:
+                    next_job_dict = queue_data.pop(due_idx)
+                    self._write_queue_unsafe(queue_data)
+
+                    instruction_prompt = self.get_job_instructions_prompt(next_job_dict["name"], next_job_dict.get("args", {}))
+                    if not instruction_prompt:
+                        return None
+
+                    return Job(
+                        name=next_job_dict["name"],
+                        priority=next_job_dict.get("priority", 100),
+                        when=next_job_dict.get("when", "now"),
+                        args=next_job_dict.get("args", {}),
+                        prompt=instruction_prompt
+                    )
+
+                return None
+
         except TimeoutError as e:
             print(f"Error getting next job: {e}")
             return None
 
-        instruction_prompt = self.get_job_instructions_prompt(next_job_dict["name"], next_job_dict.get("args", {}))
-        if not instruction_prompt:
-            print(f"Warning: Could not get instruction prompt for job '{next_job_dict['name']}'. Skipping.")
-            return None
-
-        return Job(
-            name=next_job_dict["name"],
-            priority=next_job_dict.get("priority", 100),
-            when=next_job_dict.get("when", "now"),
-            args=next_job_dict.get("args", {}),
-            prompt=instruction_prompt
-        )
+    def get_next_job(self) -> Optional[Job]:
+        """Deprecated: Use get_next_due_job"""
+        return self.get_next_due_job()
 
     def has_pending_jobs(self) -> bool:
         """
@@ -298,7 +333,7 @@ class AutomationController:
 
     def get_job_instructions_prompt(self, job_name: str, args: Dict[str, Any]) -> Optional[str]:
         """
-        Constructs the full instruction prompt for a given job, including the standardized header.
+        Constructs the instruction prompt for a given job.
         """
         if job_name not in self.job_definitions:
             print(f"Error: Cannot get instructions for undefined job '{job_name}'.")
@@ -310,8 +345,5 @@ class AutomationController:
             placeholder = f"{{{key}}}"
             job_instructions = job_instructions.replace(placeholder, str(value))
 
-        prompt = f"###JOB_START: {job_name.upper()}###\n"
-        prompt += f"{job_instructions}\n"
-        prompt += f"###_END###"
-
-        return prompt
+        # Return raw instructions for chat injection
+        return job_instructions

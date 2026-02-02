@@ -203,6 +203,47 @@ chat_manager = ChatManager(
     role_mappings
 )
 
+# --- Helper Functions ---
+def trigger_chat_generation(message: str):
+    """Creates a chat file and triggers the worker."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"chat/chat_{timestamp}.txt"
+    filepath = os.path.abspath(filename)
+
+    # Ensure directory
+    os.makedirs("chat", exist_ok=True)
+
+    # Write User Message
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"#USER_START#\n{message}\n#USER_END#")
+    print(f"[System] Created chat file: {filepath}")
+
+    # Write Trigger
+    with open("chat_trigger.txt", "w", encoding="utf-8") as f:
+        f.write(filepath)
+    print(f"[System] Wrote trigger file: chat_trigger.txt")
+
+    return filepath
+
+# --- Scheduler Loop ---
+async def scheduler_loop():
+    print("[Scheduler] Starting scheduler loop...")
+    while True:
+        try:
+            # Check for due jobs
+            job = automation_controller.get_next_due_job()
+            if job:
+                print(f"[Scheduler] Executing job: {job.name}")
+                if job.prompt:
+                    trigger_chat_generation(job.prompt)
+                else:
+                    print(f"[Scheduler] Job {job.name} has no prompt/instructions.")
+
+            await asyncio.sleep(5) # Check every 5 seconds
+        except Exception as e:
+            print(f"[Scheduler] Error in loop: {e}")
+            await asyncio.sleep(5)
+
 # --- Worker Controller ---
 class WorkerController:
     """Manages the headless worker process."""
@@ -402,6 +443,10 @@ async def lifespan(app: FastAPI):
             print("[System] Warning: No admin token found (admin_token.txt or LYRN_MODEL_TOKEN). Model management will be unavailable.")
 
     await logger.emit("Info", "Backend started.", "System")
+
+    # Start Scheduler
+    asyncio.create_task(scheduler_loop())
+
     yield
 
 app = FastAPI(title="LYRN v5 Backend", lifespan=lifespan)
@@ -509,23 +554,11 @@ async def clear_chat_history():
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
-    message = request.message
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"chat/chat_{timestamp}.txt"
-    filepath = os.path.abspath(filename)
 
-    # Ensure directory
-    os.makedirs("chat", exist_ok=True)
-
-    # Write User Message
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(f"#USER_START#\n{message}\n#USER_END#")
-    print(f"[API] Created chat file: {filepath}")
-
-    # Write Trigger
-    with open("chat_trigger.txt", "w", encoding="utf-8") as f:
-        f.write(filepath)
-    print(f"[API] Wrote trigger file: chat_trigger.txt")
+    try:
+        filepath = trigger_chat_generation(request.message)
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=f"Failed to trigger chat: {e}")
 
     async def event_generator():
         last_pos = 0

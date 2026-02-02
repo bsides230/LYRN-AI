@@ -21,7 +21,6 @@ from snapshot_loader import SnapshotLoader
 from delta_manager import DeltaManager
 from chat_manager import ChatManager
 from automation_controller import AutomationController
-from oss_tool_manager import OSSToolManager
 
 # Global flag for clean shutdown
 running = True
@@ -73,9 +72,8 @@ def main():
     settings = settings_manager.settings
 
     automation_controller = AutomationController()
-    oss_tool_manager = OSSToolManager()
 
-    snapshot_loader = SnapshotLoader(settings_manager, automation_controller, oss_tool_manager)
+    snapshot_loader = SnapshotLoader(settings_manager, automation_controller)
     delta_manager = DeltaManager()
 
     # ChatManager requires role mappings
