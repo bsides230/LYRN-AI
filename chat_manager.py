@@ -79,10 +79,10 @@ class ChatManager:
 
                     # For the purpose of history, any role that isn't 'user' is treated as 'assistant'
                     if role_lower == "user":
-                        messages.append({"role": "user", "content": text.strip()})
+                        messages.append({"role": "user", "content": text})
                     else:
                         # Treat all other roles (assistant, model, thinking, etc.) as the assistant's turn
-                        messages.append({"role": "assistant", "content": text.strip()})
+                        messages.append({"role": "assistant", "content": text})
 
             # Ensure the conversation ends with a user message if possible,
             # but llama-cpp can handle assistant as the last message.
