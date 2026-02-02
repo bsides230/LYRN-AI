@@ -507,3 +507,11 @@ class AutomationController:
                 return json.load(f)
         except Exception:
             return []
+
+    def clear_job_history(self):
+        """Clears the job history file."""
+        try:
+            with open(self.history_path, 'w', encoding='utf-8') as f:
+                json.dump([], f)
+        except Exception as e:
+            print(f"Error clearing job history: {e}")

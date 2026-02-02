@@ -249,6 +249,9 @@ async def scheduler_loop():
                 if scripts_ok:
                     if job.prompt:
                         trigger_chat_generation(job.prompt)
+                        # Log if this was a prompt-only job (scripts handle their own logging)
+                        if not job.scripts:
+                            automation_controller.log_job_history(job.name, [{"message": "Prompt triggered successfully."}], "success")
                     elif not job.scripts:
                         # Only log this if there were no scripts either
                         print(f"[Scheduler] Job {job.name} has no prompt/instructions and no scripts.")
@@ -902,6 +905,11 @@ async def get_scripts():
 @app.get("/api/automation/history")
 async def get_job_history():
     return automation_controller.get_job_history()
+
+@app.delete("/api/automation/history")
+async def clear_job_history():
+    automation_controller.clear_job_history()
+    return {"success": True}
 
 @app.get("/api/automation/schedule")
 async def get_schedule():
