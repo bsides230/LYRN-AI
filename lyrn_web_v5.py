@@ -204,14 +204,14 @@ chat_manager = ChatManager(
 )
 
 # --- Helper Functions ---
-def trigger_chat_generation(message: str):
+def trigger_chat_generation(message: str, folder: str = "chat"):
     """Creates a chat file and triggers the worker."""
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"chat/chat_{timestamp}.txt"
+    filename = f"{folder}/{folder}_{timestamp}.txt"
     filepath = os.path.abspath(filename)
 
     # Ensure directory
-    os.makedirs("chat", exist_ok=True)
+    os.makedirs(folder, exist_ok=True)
 
     # Write User Message
     with open(filepath, "w", encoding="utf-8") as f:
@@ -248,10 +248,16 @@ async def scheduler_loop():
                 # 2. Trigger Chat if scripts ok (or no scripts) AND prompt exists
                 if scripts_ok:
                     if job.prompt:
-                        trigger_chat_generation(job.prompt)
-                        # Log if this was a prompt-only job (scripts handle their own logging)
-                        if not job.scripts:
-                            automation_controller.log_job_history(job.name, [{"message": "Prompt triggered successfully."}], "success")
+                        # Use "jobs" folder for automated tasks
+                        filepath = trigger_chat_generation(job.prompt, folder="jobs")
+
+                        # Log the prompt generation step
+                        automation_controller.log_job_history(
+                            job.name,
+                            [{"message": "Prompt triggered successfully."}],
+                            "success",
+                            filepath=filepath
+                        )
                     elif not job.scripts:
                         # Only log this if there were no scripts either
                         print(f"[Scheduler] Job {job.name} has no prompt/instructions and no scripts.")
@@ -905,6 +911,24 @@ async def get_scripts():
 @app.get("/api/automation/history")
 async def get_job_history():
     return automation_controller.get_job_history()
+
+@app.get("/api/automation/job_content")
+async def get_job_content(path: str):
+    """Reads the content of a job file."""
+    try:
+        # Security check: Ensure path is within jobs/ folder
+        requested_path = Path(path).resolve()
+        jobs_dir = Path("jobs").resolve()
+
+        if not str(requested_path).startswith(str(jobs_dir)):
+            raise HTTPException(status_code=403, detail="Access denied: Invalid file path.")
+
+        if not requested_path.exists():
+            raise HTTPException(status_code=404, detail="File not found.")
+
+        return {"content": requested_path.read_text(encoding="utf-8")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/automation/history")
 async def clear_job_history():

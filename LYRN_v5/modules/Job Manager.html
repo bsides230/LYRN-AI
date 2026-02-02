@@ -292,7 +292,10 @@
             <div style="display: flex; flex-direction: column; height: 100%;">
                 <div class="panel-header">
                     <h3 class="panel-title">Execution History</h3>
-                    <button onclick="refreshAll()">Refresh</button>
+                    <div class="btn-group">
+                        <button class="btn-square btn-delete" onclick="clearHistory()" title="Clear History">🗑️</button>
+                        <button onclick="refreshAll()">Refresh</button>
+                    </div>
                 </div>
                 <div id="history-list" class="list-scroll" style="padding: 10px;"></div>
             </div>
@@ -327,6 +330,18 @@
                 </div>
                 <button class="btn-primary" style="width: 100%;" onclick="addScheduleFromModal()">Add Schedule</button>
             </div>
+        </div>
+    </div>
+  </div>
+
+  <div id="output-modal" class="modal-overlay hidden">
+    <div class="modal-box" style="width: 600px; height: 80%;">
+        <div class="modal-header">
+            <h3 class="panel-title" id="output-modal-title">Job Output</h3>
+            <button onclick="closeOutputModal()" style="border:none; background:transparent; font-size:16px; color:var(--text-dim);">✕</button>
+        </div>
+        <div class="modal-body">
+            <pre id="output-modal-content" style="white-space: pre-wrap; font-family: 'JetBrains Mono'; font-size: 11px; color: var(--text-body);"></pre>
         </div>
     </div>
   </div>
@@ -902,6 +917,14 @@
                  scriptsDetails += '</div>';
             }
 
+            // Check for output file
+            let actions = '';
+            if (entry.filepath) {
+                // Escape filepath for JS string (backslashes and single quotes)
+                const safePath = entry.filepath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                actions = `<button class="btn-square" style="width: auto; height: 24px; font-size: 10px; padding: 0 8px; margin-top: 5px;" onclick="viewJobOutput('${safePath}')">VIEW OUTPUT</button>`;
+            }
+
             const el = document.createElement('div');
             el.style.borderBottom = '1px solid var(--border-color)';
             el.style.padding = '10px';
@@ -915,9 +938,38 @@
                 </div>
                 <div style="color:var(--text-dim); font-size:10px; margin-top:2px;">${date}</div>
                 ${scriptsDetails}
+                ${actions}
             `;
             list.appendChild(el);
         });
+    }
+
+    async function viewJobOutput(path) {
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/job_content?path=${encodeURIComponent(path)}`);
+            if(!res.ok) throw new Error("Failed to load output");
+            const data = await res.json();
+
+            document.getElementById('output-modal-content').innerText = data.content;
+            document.getElementById('output-modal').classList.remove('hidden');
+        } catch(e) {
+            showToast(e.message, true);
+        }
+    }
+
+    function closeOutputModal() {
+        document.getElementById('output-modal').classList.add('hidden');
+    }
+
+    async function clearHistory() {
+        if(!confirm("Are you sure you want to clear ALL execution history and job logs?")) return;
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/history`, { method: 'DELETE' });
+            if(!res.ok) throw new Error("Delete failed");
+            await fetchHistory();
+            renderHistory();
+            showToast("History Cleared");
+        } catch(e) { showToast(e.message, true); }
     }
 
   </script>

@@ -468,7 +468,7 @@ class AutomationController:
             "results": script_results
         }
 
-    def log_job_history(self, job_name: str, results: List[Dict], status: str):
+    def log_job_history(self, job_name: str, results: List[Dict], status: str, filepath: str = None):
         """Logs job execution to history file."""
         entry = {
             "id": f"hist_{int(time.time()*1000)}",
@@ -478,6 +478,9 @@ class AutomationController:
             "scripts_run": len(results),
             "details": results
         }
+
+        if filepath:
+            entry["filepath"] = filepath
 
         try:
             history = []
@@ -509,9 +512,20 @@ class AutomationController:
             return []
 
     def clear_job_history(self):
-        """Clears the job history file."""
+        """Clears the job history file and deletes job output files."""
         try:
+            # Clear JSON
             with open(self.history_path, 'w', encoding='utf-8') as f:
                 json.dump([], f)
+
+            # Clear jobs directory
+            jobs_dir = Path("jobs")
+            if jobs_dir.exists():
+                for f in jobs_dir.glob("*.txt"):
+                    try:
+                        f.unlink()
+                    except Exception as e:
+                        print(f"Error deleting job file {f}: {e}")
+
         except Exception as e:
             print(f"Error clearing job history: {e}")
