@@ -1,0 +1,40 @@
+INFO:     Started server process [5768]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+[System] Logging to session: logs/session_20260202_025006
+Settings loaded successfully
+Next job flag initialized to 'false'
+LLM status flag initialized to 'idle'
+Loaded 2 job definitions from jobs.json: ['chat_pair_summary', 'test_job_scripts']
+Settings loaded successfully
+Next job flag initialized to 'false'
+LLM status flag initialized to 'idle'
+Starting server on port 8080...
+[System] Warning: No admin token found (admin_token.txt or LYRN_MODEL_TOKEN). Model management will be unavailable.
+[Info] System: Backend started.
+[Scheduler] Starting scheduler loop...
+INFO:     127.0.0.1:34542 - "GET /modules/Job%20Manager.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34542 - "GET /api/automation/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34554 - "GET /api/automation/cycles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34566 - "GET /api/automation/schedule HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34574 - "GET /api/automation/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34580 - "GET /api/automation/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60104 - "GET /modules/Job%20Manager.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60104 - "GET /api/automation/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60116 - "GET /api/automation/cycles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60128 - "GET /api/automation/schedule HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60144 - "GET /api/automation/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60152 - "GET /api/automation/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55724 - "GET /modules/Job%20Manager.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55724 - "GET /api/automation/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55734 - "GET /api/automation/cycles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55740 - "GET /api/automation/schedule HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55748 - "GET /api/automation/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55750 - "GET /api/automation/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54986 - "GET /modules/Job%20Manager.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54986 - "GET /api/automation/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54992 - "GET /api/automation/cycles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54996 - "GET /api/automation/schedule HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55004 - "GET /api/automation/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55020 - "GET /api/automation/history HTTP/1.1" 200 OK

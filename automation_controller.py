@@ -1,7 +1,10 @@
 import os
+import sys
 import json
 import shutil
 import time
+import subprocess
+import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Dict, Any, List
@@ -15,6 +18,7 @@ class Job:
     when: str = "now"
     args: Dict[str, Any] = field(default_factory=dict)
     prompt: str = ""
+    scripts: List[str] = field(default_factory=list)
 
 class AutomationController:
     """
@@ -25,6 +29,8 @@ class AutomationController:
         self.job_definitions_path = Path(job_definitions_path)
         self.queue_path = Path(queue_path)
         self.queue_lock_path = self.queue_path.with_suffix(f"{self.queue_path.suffix}.lock")
+        self.history_path = Path("automation/job_history.json")
+        self.scripts_path = Path("automation/job_scripts")
         self.job_definitions = {}
         self._load_job_definitions()
         # Ensure the queue file exists
@@ -91,12 +97,13 @@ class AutomationController:
         except (IOError, OSError) as e:
             print(f"Error writing job queue file: {e}")
 
-    def save_job_definition(self, job_name: str, instructions: str, trigger: str = ""):
+    def save_job_definition(self, job_name: str, instructions: str, trigger: str = "", scripts: List[str] = None):
         """Saves a job's instructions to the jobs.json file."""
         job_data = {
             "instructions": instructions,
             # 'trigger' is kept for legacy compatibility but not used
-            "trigger": trigger
+            "trigger": trigger,
+            "scripts": scripts or []
         }
 
         jobs_json_path = self.job_definitions_path / "jobs.json"
@@ -292,15 +299,20 @@ class AutomationController:
                     self._write_queue_unsafe(queue_data)
 
                     instruction_prompt = self.get_job_instructions_prompt(next_job_dict["name"], next_job_dict.get("args", {}))
-                    if not instruction_prompt:
-                        return None
+                    if instruction_prompt is None:
+                        instruction_prompt = ""
+
+                    # Fetch script list from definition
+                    job_def = self.job_definitions.get(next_job_dict["name"], {})
+                    scripts = job_def.get("scripts", [])
 
                     return Job(
                         name=next_job_dict["name"],
                         priority=next_job_dict.get("priority", 100),
                         when=next_job_dict.get("when", "now"),
                         args=next_job_dict.get("args", {}),
-                        prompt=instruction_prompt
+                        prompt=instruction_prompt,
+                        scripts=scripts
                     )
 
                 return None
@@ -347,3 +359,151 @@ class AutomationController:
 
         # Return raw instructions for chat injection
         return job_instructions
+
+    def get_available_scripts(self) -> List[str]:
+        """Lists available python scripts in automation/job_scripts"""
+        if not self.scripts_path.exists():
+            return []
+
+        scripts = []
+        for f in self.scripts_path.glob("*.py"):
+            scripts.append(f.name)
+        return sorted(scripts)
+
+    def execute_job_scripts(self, job: Job) -> Dict[str, Any]:
+        """
+        Executes the scripts associated with the job sequentially.
+        Passes job.prompt (instructions) as the first argument.
+        """
+        script_results = []
+        all_success = True
+
+        for script_name in job.scripts:
+            script_path = self.scripts_path / script_name
+            if not script_path.exists():
+                print(f"[Job {job.name}] Script not found: {script_name}")
+                script_results.append({
+                    "script": script_name,
+                    "status": "error",
+                    "message": "Script file not found",
+                    "timestamp": time.time()
+                })
+                all_success = False
+                break
+
+            print(f"[Job {job.name}] Running script: {script_name}")
+            try:
+                # Run subprocess
+                # Pass instructions as argument 1
+                cmd = [sys.executable, str(script_path), job.prompt]
+
+                # Run with timeout (e.g. 60s per script)
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    encoding='utf-8' # Ensure UTF-8
+                )
+
+                # Check exit code
+                if result.returncode == 0:
+                    try:
+                        # Try parsing last line as JSON if possible, or just store stdout
+                        output_data = result.stdout.strip()
+                        # Often script prints JSON lines. We might want the last one.
+                        # For now, just store the full stdout.
+                        script_results.append({
+                            "script": script_name,
+                            "status": "success",
+                            "stdout": result.stdout,
+                            "stderr": result.stderr,
+                            "timestamp": time.time()
+                        })
+                    except Exception:
+                         script_results.append({
+                            "script": script_name,
+                            "status": "success",
+                            "stdout": result.stdout,
+                            "timestamp": time.time()
+                        })
+                else:
+                    print(f"[Job {job.name}] Script {script_name} failed with code {result.returncode}")
+                    script_results.append({
+                        "script": script_name,
+                        "status": "failed",
+                        "code": result.returncode,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                        "timestamp": time.time()
+                    })
+                    all_success = False
+                    break # Stop execution chain on failure
+
+            except subprocess.TimeoutExpired:
+                print(f"[Job {job.name}] Script {script_name} timed out.")
+                script_results.append({
+                    "script": script_name,
+                    "status": "timeout",
+                    "timestamp": time.time()
+                })
+                all_success = False
+                break
+            except Exception as e:
+                print(f"[Job {job.name}] Script {script_name} execution error: {e}")
+                script_results.append({
+                    "script": script_name,
+                    "status": "error",
+                    "message": str(e),
+                    "timestamp": time.time()
+                })
+                all_success = False
+                break
+
+        final_status = "success" if all_success else "failed"
+        self.log_job_history(job.name, script_results, final_status)
+
+        return {
+            "status": final_status,
+            "results": script_results
+        }
+
+    def log_job_history(self, job_name: str, results: List[Dict], status: str):
+        """Logs job execution to history file."""
+        entry = {
+            "id": f"hist_{int(time.time()*1000)}",
+            "job_name": job_name,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "status": status,
+            "scripts_run": len(results),
+            "details": results
+        }
+
+        try:
+            history = []
+            if self.history_path.exists():
+                with open(self.history_path, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+
+            # Prepend new entry
+            history.insert(0, entry)
+
+            # Limit history size (e.g. 100 entries)
+            if len(history) > 100:
+                history = history[:100]
+
+            with open(self.history_path, 'w', encoding='utf-8') as f:
+                json.dump(history, f, indent=2)
+
+        except Exception as e:
+            print(f"Error logging job history: {e}")
+
+    def get_job_history(self) -> List[Dict]:
+        """Returns the job history."""
+        if not self.history_path.exists():
+            return []
+        try:
+            with open(self.history_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return []

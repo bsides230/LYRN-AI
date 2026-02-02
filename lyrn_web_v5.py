@@ -234,10 +234,24 @@ async def scheduler_loop():
             job = automation_controller.get_next_due_job()
             if job:
                 print(f"[Scheduler] Executing job: {job.name}")
-                if job.prompt:
-                    trigger_chat_generation(job.prompt)
-                else:
-                    print(f"[Scheduler] Job {job.name} has no prompt/instructions.")
+
+                # 1. Execute Scripts if any
+                scripts_ok = True
+                if job.scripts:
+                    print(f"[Scheduler] Running scripts for job: {job.name}")
+                    # Run in executor to avoid blocking the event loop
+                    result = await main_loop.run_in_executor(None, automation_controller.execute_job_scripts, job)
+                    if result["status"] != "success":
+                        print(f"[Scheduler] Scripts failed for job {job.name}. Aborting chat generation.")
+                        scripts_ok = False
+
+                # 2. Trigger Chat if scripts ok (or no scripts) AND prompt exists
+                if scripts_ok:
+                    if job.prompt:
+                        trigger_chat_generation(job.prompt)
+                    elif not job.scripts:
+                        # Only log this if there were no scripts either
+                        print(f"[Scheduler] Job {job.name} has no prompt/instructions and no scripts.")
 
             await asyncio.sleep(5) # Check every 5 seconds
         except Exception as e:
@@ -401,6 +415,7 @@ class JobDefinitionModel(BaseModel):
     name: str
     instructions: str
     trigger: str
+    scripts: List[str] = []
 
 class JobScheduleModel(BaseModel):
     id: Optional[str] = None
@@ -872,13 +887,21 @@ async def get_jobs():
 
 @app.post("/api/automation/jobs")
 async def save_job(job: JobDefinitionModel):
-    automation_controller.save_job_definition(job.name, job.instructions, job.trigger)
+    automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts)
     return {"success": True}
 
 @app.delete("/api/automation/jobs/{job_name}")
 async def delete_job(job_name: str):
     automation_controller.delete_job_definition(job_name)
     return {"success": True}
+
+@app.get("/api/automation/scripts")
+async def get_scripts():
+    return automation_controller.get_available_scripts()
+
+@app.get("/api/automation/history")
+async def get_job_history():
+    return automation_controller.get_job_history()
 
 @app.get("/api/automation/schedule")
 async def get_schedule():

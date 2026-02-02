@@ -1,0 +1,25 @@
+[
+  {
+    "id": "hist_1770000472688",
+    "job_name": "test_job_scripts",
+    "timestamp": "2026-02-02T02:47:52.688268",
+    "status": "success",
+    "scripts_run": 2,
+    "details": [
+      {
+        "script": "test_script_basic.py",
+        "status": "success",
+        "stdout": "{\"status\": \"starting\", \"script\": \"test_script_basic.py\", \"timestamp\": 1770000469.6337225}\n{\"status\": \"success\", \"message\": \"Basic test script completed successfully.\", \"received_instructions\": \"Testing scripts execution sequence.\", \"timestamp\": 1770000471.633956}\n",
+        "stderr": "",
+        "timestamp": 1770000471.6407325
+      },
+      {
+        "script": "test_script_handoff.py",
+        "status": "success",
+        "stdout": "{\"status\": \"starting\", \"script\": \"test_script_handoff.py\", \"timestamp\": 1770000471.6810873}\n{\"status\": \"success\", \"message\": \"Handoff script executed. Chain verified.\", \"received_instructions\": \"Testing scripts execution sequence.\", \"timestamp\": 1770000472.681409}\n",
+        "stderr": "",
+        "timestamp": 1770000472.6882474
+      }
+    ]
+  }
+]

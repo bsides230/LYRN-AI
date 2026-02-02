@@ -222,6 +222,7 @@
         <button class="tab-btn active" onclick="switchTab('jobs')">JOBS</button>
         <button class="tab-btn" onclick="switchTab('scheduler')">SCHEDULER</button>
         <button class="tab-btn" onclick="switchTab('cycles')">CYCLES</button>
+        <button class="tab-btn" onclick="switchTab('history')">HISTORY</button>
     </div>
 
     <div class="content-area">
@@ -286,6 +287,16 @@
                 </div>
             </div>
         </div>
+
+        <div id="tab-history" class="tab-content">
+            <div style="display: flex; flex-direction: column; height: 100%;">
+                <div class="panel-header">
+                    <h3 class="panel-title">Execution History</h3>
+                    <button onclick="refreshAll()">Refresh</button>
+                </div>
+                <div id="history-list" class="list-scroll" style="padding: 10px;"></div>
+            </div>
+        </div>
     </div>
 
     <div class="footer-bar">
@@ -329,7 +340,9 @@
     let DATA = {
         jobs: {},
         schedules: [],
-        cycles: {}
+        cycles: {},
+        availableScripts: [],
+        history: []
     };
 
     let UI = {
@@ -359,13 +372,14 @@
     });
 
     function refreshAll() {
-        Promise.all([fetchJobs(), fetchCycles(), fetchSchedule()])
+        Promise.all([fetchJobs(), fetchCycles(), fetchSchedule(), fetchScripts(), fetchHistory()])
             .then(() => {
                 showToast("Data Synced");
                 // Re-render current view
                 if(UI.currentTab === 'jobs') renderJobsList();
                 if(UI.currentTab === 'cycles') renderCyclesList();
                 if(UI.currentTab === 'scheduler') renderCalendar();
+                if(UI.currentTab === 'history') renderHistory();
             })
             .catch(e => showToast("Sync Failed: " + e.message, true));
     }
@@ -385,6 +399,16 @@
         if(!res.ok) throw new Error("Schedule fetch failed");
         DATA.schedules = await res.json();
     }
+    async function fetchScripts() {
+        const res = await fetch(`${CORE_URL}/api/automation/scripts`);
+        if(!res.ok) throw new Error("Scripts fetch failed");
+        DATA.availableScripts = await res.json();
+    }
+    async function fetchHistory() {
+        const res = await fetch(`${CORE_URL}/api/automation/history`);
+        if(!res.ok) throw new Error("History fetch failed");
+        DATA.history = await res.json();
+    }
 
     /* =========================================
        TABS & NAVIGATION
@@ -398,6 +422,7 @@
         document.getElementById(`tab-${tab}`).classList.add('active');
 
         if (tab === 'scheduler') renderCalendar();
+        if (tab === 'history') renderHistory();
     }
 
     function showHelp() {
@@ -441,7 +466,10 @@
              return;
         }
 
-        const data = name === '_NEW_' ? { instructions: '' } : DATA.jobs[name];
+        const data = name === '_NEW_' ? { instructions: '', scripts: [] } : DATA.jobs[name];
+        // Ensure scripts array exists
+        if(!data.scripts) data.scripts = [];
+
         deleteBtn.classList.toggle('hidden', name === '_NEW_');
 
         let html = '';
@@ -450,10 +478,71 @@
         }
         html += `
             <div class="form-group"><label>Instructions</label><textarea id="edit-job-inst" style="height:250px">${escapeHtml(data.instructions || '')}</textarea></div>
+        `;
+
+        // Scripts Section
+        html += '<div class="form-group"><label>Scripts (Run Sequence)</label><div style="border:1px solid var(--border-color); padding:10px; margin-bottom:10px; background:rgba(0,0,0,0.1);">';
+        html += '<div id="script-list-container">';
+
+        data.scripts.forEach((s, idx) => {
+            html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px; background:var(--bg-core); padding:5px; align-items:center;">
+                <span style="font-family:'JetBrains Mono'">${idx+1}. ${s}</span>
+                <button class="btn-square btn-delete" style="width:20px; height:20px; font-size:10px;" onclick="removeScript(${idx})">✕</button>
+            </div>`;
+        });
+        if(data.scripts.length === 0) html += '<p style="color:var(--text-dim); font-size:10px;">No scripts added.</p>';
+
+        html += '</div>';
+
+        html += `<div style="display:flex; gap:5px; margin-top:10px;">
+            <select id="add-script-select" style="flex:1;"><option value="">Select Script...</option>
+            ${DATA.availableScripts.map(s => `<option value="${s}">${s}</option>`).join('')}
+            </select>
+            <button onclick="addScript()">Add Script</button>
+        </div></div>`;
+
+        html += `
             <div class="form-group">
                 <button class="btn-primary" onclick="runJob()" style="width:100%; justify-content:center;">RUN JOB</button>
             </div>
         `;
+        container.innerHTML = html;
+
+        // Store current editing scripts in UI for manipulation
+        UI.editingScripts = [...data.scripts];
+    }
+
+    function addScript() {
+        const sel = document.getElementById('add-script-select');
+        const scriptName = sel.value;
+        if(!scriptName) return;
+
+        UI.editingScripts.push(scriptName);
+        saveJob(true); // Temporary save state to UI (or full save)
+        // For simplicity, let's just re-render. Ideally we update the DOM directly or save state.
+        // We will just re-render selectJob with updated temp data.
+
+        // Mock the DATA update in memory for the UI to render, but don't persist yet until "Save" is clicked?
+        // Actually, existing saveJob uses the DOM values.
+        // Let's update the DOM list.
+        renderScriptListDOM();
+    }
+
+    function removeScript(idx) {
+        UI.editingScripts.splice(idx, 1);
+        renderScriptListDOM();
+    }
+
+    function renderScriptListDOM() {
+         const container = document.getElementById('script-list-container');
+         let html = '';
+         UI.editingScripts.forEach((s, idx) => {
+            html += `<div style="display:flex; justify-content:space-between; margin-bottom:5px; background:var(--bg-core); padding:5px; align-items:center;">
+                <span style="font-family:'JetBrains Mono'">${idx+1}. ${s}</span>
+                <button class="btn-square btn-delete" style="width:20px; height:20px; font-size:10px;" onclick="removeScript(${idx})">✕</button>
+            </div>`;
+        });
+        if(UI.editingScripts.length === 0) html += '<p style="color:var(--text-dim); font-size:10px;">No scripts added.</p>';
         container.innerHTML = html;
     }
 
@@ -472,15 +561,16 @@
         } catch(e) { showToast(e.message, true); }
     }
 
-    async function saveJob() {
+    async function saveJob(skipFetch = false) {
         const isNew = UI.selectedJob === '_NEW_';
-        const name = isNew ? document.getElementById('edit-job-name').value.trim() : UI.selectedJob;
+        const name = isNew ? (document.getElementById('edit-job-name') ? document.getElementById('edit-job-name').value.trim() : UI.selectedJob) : UI.selectedJob;
         if (!name) return showToast("Name required", true);
 
         const payload = {
             name: name,
             instructions: document.getElementById('edit-job-inst').value,
-            trigger: "" // Legacy support if backend requires it
+            trigger: "",
+            scripts: UI.editingScripts || []
         };
 
         try {
@@ -491,11 +581,13 @@
             });
             if(!res.ok) throw new Error("Save failed");
 
-            await fetchJobs();
-            if (isNew) UI.selectedJob = name;
-            renderJobsList();
-            selectJob(name);
-            showToast("Job Saved");
+            if(!skipFetch) {
+                await fetchJobs();
+                if (isNew) UI.selectedJob = name;
+                renderJobsList();
+                selectJob(name);
+                showToast("Job Saved");
+            }
         } catch(e) { showToast(e.message, true); }
     }
 
@@ -781,6 +873,51 @@
             renderCalendar();
             showToast("Deleted");
         } catch(e) { showToast(e.message, true); }
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('history-list');
+        list.innerHTML = '';
+        if (!DATA.history || DATA.history.length === 0) {
+            list.innerHTML = '<p style="color:var(--text-dim); text-align:center; padding:20px;">No execution history.</p>';
+            return;
+        }
+
+        DATA.history.forEach(entry => {
+            const date = new Date(entry.timestamp).toLocaleString();
+            const statusColor = entry.status === 'success' ? 'var(--success-color)' : 'var(--error-color)';
+
+            let scriptsDetails = '';
+            if (entry.details && entry.details.length > 0) {
+                 scriptsDetails = '<div style="margin-top:5px; font-size:11px; padding-left:10px; border-left:2px solid var(--border-color);">';
+                 entry.details.forEach(d => {
+                     const sColor = d.status === 'success' ? 'var(--success-color)' : 'var(--error-color)';
+                     scriptsDetails += `<div style="display:flex; justify-content:space-between;">
+                        <span>${d.script}</span>
+                        <span style="color:${sColor}">${d.status}</span>
+                     </div>
+                     ${d.status === 'failed' && d.stderr ? `<pre style="color:var(--text-dim); font-size:10px; background:rgba(0,0,0,0.2); padding:2px;">${d.stderr}</pre>` : ''}
+                     `;
+                 });
+                 scriptsDetails += '</div>';
+            }
+
+            const el = document.createElement('div');
+            el.style.borderBottom = '1px solid var(--border-color)';
+            el.style.padding = '10px';
+            el.style.marginBottom = '5px';
+            el.style.background = 'var(--bg-panel)';
+
+            el.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600; font-family:'JetBrains Mono';">${entry.job_name}</span>
+                    <span style="color:${statusColor}; font-weight:bold; font-size:10px; text-transform:uppercase;">${entry.status}</span>
+                </div>
+                <div style="color:var(--text-dim); font-size:10px; margin-top:2px;">${date}</div>
+                ${scriptsDetails}
+            `;
+            list.appendChild(el);
+        });
     }
 
   </script>
