@@ -1,7 +1,7 @@
 {
   "settings": {
     "active": {
-      "model_path": "models/LiquidAI 1.2B Thinking",
+      "model_path": "models/Qwen.Qwen3-4B-Thinking-2507.Q4_K_M.gguf",
       "n_ctx": 40000,
       "n_threads": 22,
       "n_gpu_layers": 36,
@@ -34,7 +34,7 @@
     },
     "model_presets": {
       "1": {
-        "model_path": "models/LiquidAI 1.2B Thinking",
+        "model_path": "models/Qwen.Qwen3-4B-Thinking-2507.Q4_K_M.gguf",
         "n_ctx": 40000,
         "n_threads": 22,
         "n_gpu_layers": 36,
