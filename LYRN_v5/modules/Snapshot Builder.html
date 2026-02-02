@@ -253,6 +253,7 @@
 
   <script>
     let CORE_URL = "http://localhost:8000";
+    let authToken = null;
 
     document.addEventListener('DOMContentLoaded', () => {
         // Core URL Init
@@ -268,6 +269,9 @@
             }
             if (event.data.type === 'FONT_CHANGE') {
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
+            }
+            if (event.data.type === 'TOKEN_UPDATE') {
+                authToken = event.data.token;
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                 CORE_URL = event.data.url.replace(/\/$/, "");
@@ -288,7 +292,9 @@
 
         // Fetch from API
         try {
-            const res = await fetch(CORE_URL + '/api/snapshot');
+            const res = await fetch(CORE_URL + '/api/snapshot', {
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
             if(res.ok) {
                 const data = await res.json();
                 if(Array.isArray(data) && data.length > 0) {
@@ -442,7 +448,10 @@
             try {
                 const res = await fetch(CORE_URL + '/api/snapshot', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
                     body: JSON.stringify(components)
                 });
                 if(res.ok) showToast("Snapshot Saved to Core");
@@ -480,11 +489,17 @@
                 // Ensure saved first? Maybe not needed if user clicked save. But safe to assume current state.
                 await fetch(CORE_URL + '/api/snapshot', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
                     body: JSON.stringify(components)
                 });
 
-                const res = await fetch(CORE_URL + '/api/snapshot/rebuild', { method: 'POST' });
+                const res = await fetch(CORE_URL + '/api/snapshot/rebuild', {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 if(res.ok) showToast("Rebuild Trigger Sent");
                 else showToast("Rebuild Failed", true);
             } catch(e) {

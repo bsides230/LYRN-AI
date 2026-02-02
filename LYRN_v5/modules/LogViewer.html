@@ -188,6 +188,7 @@
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = null;
         let eventSource = null;
         let isLive = true;
         let currentSessionId = null;
@@ -231,6 +232,11 @@
                 refreshMetadata();
                 if(isLive) connectSSE();
             }
+            if (e.data.type === 'TOKEN_UPDATE') {
+                authToken = e.data.token;
+                // Reconnect SSE if live with new token
+                if(isLive) connectSSE();
+            }
             if (e.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', e.data.theme);
             }
@@ -262,7 +268,9 @@
         async function refreshMetadata() {
             if(!coreUrl) return;
             try {
-                const res = await fetch(coreUrl + '/api/logs/sessions');
+                const res = await fetch(coreUrl + '/api/logs/sessions', {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 if(!res.ok) return;
                 const sessions = await res.json();
 
@@ -290,7 +298,9 @@
         async function loadChunks(sessionId) {
             currentSessionId = sessionId;
             try {
-                const res = await fetch(`${coreUrl}/api/logs/sessions/${sessionId}/chunks`);
+                const res = await fetch(`${coreUrl}/api/logs/sessions/${sessionId}/chunks`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 const chunks = await res.json();
 
                 selChunk.innerHTML = '';
@@ -330,7 +340,9 @@
             if(!keepLive) logContainer.innerHTML = '<div style="padding:20px; color:var(--text-dim);">Loading...</div>';
 
             try {
-                const res = await fetch(`${coreUrl}/api/logs/sessions/${sessionId}/chunks/${chunkId}`);
+                const res = await fetch(`${coreUrl}/api/logs/sessions/${sessionId}/chunks/${chunkId}`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 const logs = await res.json();
 
                 if(!keepLive) logContainer.innerHTML = '';
@@ -364,7 +376,10 @@
             updateStatus(false, "Connecting...");
 
             // Append /api/logs
-            const sseUrl = coreUrl.replace(/\/$/, '') + '/api/logs';
+            let sseUrl = coreUrl.replace(/\/$/, '') + '/api/logs';
+            if (authToken) {
+                sseUrl += `?token=${encodeURIComponent(authToken)}`;
+            }
             eventSource = new EventSource(sseUrl);
 
             eventSource.onopen = () => {

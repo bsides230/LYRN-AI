@@ -1,7 +1,7 @@
 {
   "settings": {
     "active": {
-      "model_path": "models/LiquidAI 1.2B Thinking",
+      "model_path": "models/LiquidAI 1.2B Instruct",
       "n_ctx": 80000,
       "n_threads": 22,
       "n_gpu_layers": 36,

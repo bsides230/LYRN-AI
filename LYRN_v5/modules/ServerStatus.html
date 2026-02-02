@@ -262,7 +262,9 @@
             try {
                 // Assuming /health is public or we pass token if needed.
                 // Currently /health is public in lyrn_web_v5.py.
-                const res = await fetch(coreUrl + '/health');
+                const res = await fetch(coreUrl + '/health', {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 if(!res.ok) return;
 
                 const data = await res.json();

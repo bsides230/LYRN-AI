@@ -475,15 +475,48 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="LYRN v5 Backend", lifespan=lifespan)
 
+# Determine allowed origins
+allowed_origins = settings_manager.settings.get("allowed_origins", [])
+current_port = 8000
+try:
+    if os.path.exists("port.txt"):
+        with open("port.txt", "r") as f:
+            val = f.read().strip()
+            if val.isdigit():
+                current_port = int(val)
+except: pass
+
+defaults = [
+    f"http://localhost:{current_port}",
+    f"http://127.0.0.1:{current_port}"
+]
+# Ensure defaults are present
+for d in defaults:
+    if d not in allowed_origins:
+        allowed_origins.append(d)
+
+print(f"[System] Allowed Origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["X-Token", "Content-Type", "Authorization"],
 )
 
 # --- Routes ---
+
+async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token"), token: Optional[str] = None):
+    # Support both Header (preferred) and Query Param (SSE/EventSource)
+    auth_token = x_token or token
+    if not LYRN_TOKEN or not auth_token or auth_token != LYRN_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    return auth_token
+
+@app.post("/api/verify_token", dependencies=[Depends(verify_token)])
+async def verify_token_endpoint():
+    return {"status": "valid"}
 
 @app.get("/health")
 async def health_check():
@@ -538,29 +571,29 @@ async def health_check():
     }
 
 # Logging Endpoints
-@app.get("/api/logs")
+@app.get("/api/logs", dependencies=[Depends(verify_token)])
 async def stream_logs(request: Request):
     return StreamingResponse(logger.subscribe(request), media_type="text/event-stream")
 
-@app.get("/api/logs/sessions")
+@app.get("/api/logs/sessions", dependencies=[Depends(verify_token)])
 async def list_log_sessions():
     return logger.list_sessions()
 
-@app.get("/api/logs/sessions/{session_id}/chunks")
+@app.get("/api/logs/sessions/{session_id}/chunks", dependencies=[Depends(verify_token)])
 async def list_log_chunks(session_id: str):
     return logger.list_chunks(session_id)
 
-@app.get("/api/logs/sessions/{session_id}/chunks/{chunk_id}")
+@app.get("/api/logs/sessions/{session_id}/chunks/{chunk_id}", dependencies=[Depends(verify_token)])
 async def get_log_chunk(session_id: str, chunk_id: str):
     return logger.get_chunk_content(session_id, chunk_id)
 
 # Chat Endpoint
-@app.get("/api/chat/history")
+@app.get("/api/chat/history", dependencies=[Depends(verify_token)])
 async def get_chat_history():
     """Returns the current chat history as a list of messages."""
     return chat_manager.get_chat_history_messages()
 
-@app.delete("/api/chat")
+@app.delete("/api/chat", dependencies=[Depends(verify_token)])
 async def clear_chat_history():
     """Clears all chat history files."""
     try:
@@ -575,7 +608,7 @@ async def clear_chat_history():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/chat")
+@app.post("/api/chat", dependencies=[Depends(verify_token)])
 async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
 
@@ -647,15 +680,6 @@ async def chat_endpoint(request: ChatRequest):
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 # --- Model & Config Endpoints ---
-
-async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token")):
-    if not LYRN_TOKEN or not x_token or x_token != LYRN_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid or missing token")
-    return x_token
-
-@app.post("/api/verify_token", dependencies=[Depends(verify_token)])
-async def verify_token_endpoint():
-    return {"status": "valid"}
 
 @app.post("/api/models/fetch", dependencies=[Depends(verify_token)])
 async def fetch_model(request: ModelFetchRequest):
@@ -744,7 +768,7 @@ async def fetch_model(request: ModelFetchRequest):
         await logger.emit("Error", f"Download failed: {str(e)}", "ModelManager")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/models/list")
+@app.get("/api/models/list", dependencies=[Depends(verify_token)])
 async def list_models():
     """Lists available models in the models/ directory."""
     models_dir = Path("models")
@@ -763,7 +787,7 @@ async def list_models():
 
     return sorted(models, key=lambda x: x['name'])
 
-@app.get("/api/models/inspect")
+@app.get("/api/models/inspect", dependencies=[Depends(verify_token)])
 async def inspect_model(name: str):
     models_dir = Path("models")
     f = models_dir / os.path.basename(name)
@@ -814,7 +838,7 @@ async def delete_model(name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/config/presets")
+@app.get("/api/config/presets", dependencies=[Depends(verify_token)])
 async def get_presets():
     """Gets all model presets."""
     if not settings_manager.settings:
@@ -822,7 +846,7 @@ async def get_presets():
 
     return settings_manager.settings.get("model_presets", {})
 
-@app.post("/api/config/presets")
+@app.post("/api/config/presets", dependencies=[Depends(verify_token)])
 async def save_preset(preset: PresetModel):
     """Saves a model preset."""
     if not settings_manager.settings:
@@ -835,7 +859,7 @@ async def save_preset(preset: PresetModel):
     settings_manager.save_settings()
     return {"success": True, "message": f"Preset {preset.preset_id} saved."}
 
-@app.post("/api/config/active")
+@app.post("/api/config/active", dependencies=[Depends(verify_token)])
 async def set_active_config(config: ActiveConfigModel):
     """Sets the active model configuration."""
     if not settings_manager.settings:
@@ -845,7 +869,7 @@ async def set_active_config(config: ActiveConfigModel):
     settings_manager.save_settings()
     return {"success": True, "message": "Active configuration updated."}
 
-@app.get("/api/config/active")
+@app.get("/api/config/active", dependencies=[Depends(verify_token)])
 async def get_active_config():
     """Gets the active model configuration."""
     if not settings_manager.settings:
@@ -853,7 +877,7 @@ async def get_active_config():
 
     return settings_manager.settings.get("active", {})
 
-@app.get("/api/config")
+@app.get("/api/config", dependencies=[Depends(verify_token)])
 async def get_config():
     """Gets the full system configuration."""
     if not settings_manager.settings:
@@ -863,7 +887,7 @@ async def get_config():
         "ui_settings": settings_manager.ui_settings
     }
 
-@app.post("/api/config")
+@app.post("/api/config", dependencies=[Depends(verify_token)])
 async def save_config(data: Dict[str, Any]):
     """Saves the full system configuration."""
     if "settings" in data:
@@ -876,43 +900,43 @@ async def save_config(data: Dict[str, Any]):
 
 # --- Worker Control Endpoints ---
 
-@app.get("/api/system/worker_status")
+@app.get("/api/system/worker_status", dependencies=[Depends(verify_token)])
 async def get_worker_status():
     return worker_controller.get_status()
 
-@app.post("/api/system/start_worker")
+@app.post("/api/system/start_worker", dependencies=[Depends(verify_token)])
 async def start_worker():
     return worker_controller.start_worker()
 
-@app.post("/api/system/stop_worker")
+@app.post("/api/system/stop_worker", dependencies=[Depends(verify_token)])
 async def stop_worker():
     return worker_controller.stop_worker()
 
 # --- Automation Endpoints ---
 
-@app.get("/api/automation/jobs")
+@app.get("/api/automation/jobs", dependencies=[Depends(verify_token)])
 async def get_jobs():
     return automation_controller.job_definitions
 
-@app.post("/api/automation/jobs")
+@app.post("/api/automation/jobs", dependencies=[Depends(verify_token)])
 async def save_job(job: JobDefinitionModel):
     automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts)
     return {"success": True}
 
-@app.delete("/api/automation/jobs/{job_name}")
+@app.delete("/api/automation/jobs/{job_name}", dependencies=[Depends(verify_token)])
 async def delete_job(job_name: str):
     automation_controller.delete_job_definition(job_name)
     return {"success": True}
 
-@app.get("/api/automation/scripts")
+@app.get("/api/automation/scripts", dependencies=[Depends(verify_token)])
 async def get_scripts():
     return automation_controller.get_available_scripts()
 
-@app.get("/api/automation/history")
+@app.get("/api/automation/history", dependencies=[Depends(verify_token)])
 async def get_job_history():
     return automation_controller.get_job_history()
 
-@app.get("/api/automation/job_content")
+@app.get("/api/automation/job_content", dependencies=[Depends(verify_token)])
 async def get_job_content(path: str):
     """Reads the content of a job file."""
     try:
@@ -930,16 +954,16 @@ async def get_job_content(path: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/automation/history")
+@app.delete("/api/automation/history", dependencies=[Depends(verify_token)])
 async def clear_job_history():
     automation_controller.clear_job_history()
     return {"success": True}
 
-@app.get("/api/automation/schedule")
+@app.get("/api/automation/schedule", dependencies=[Depends(verify_token)])
 async def get_schedule():
     return automation_controller.get_queue()
 
-@app.post("/api/automation/schedule")
+@app.post("/api/automation/schedule", dependencies=[Depends(verify_token)])
 async def add_schedule(item: JobScheduleModel):
     automation_controller.add_job(
         name=item.job_name,
@@ -950,28 +974,28 @@ async def add_schedule(item: JobScheduleModel):
     )
     return {"success": True}
 
-@app.delete("/api/automation/schedule/{job_id}")
+@app.delete("/api/automation/schedule/{job_id}", dependencies=[Depends(verify_token)])
 async def delete_schedule(job_id: str):
     automation_controller.remove_job_from_queue(job_id)
     return {"success": True}
 
-@app.get("/api/automation/cycles")
+@app.get("/api/automation/cycles", dependencies=[Depends(verify_token)])
 async def get_cycles():
     return automation_controller.get_cycles()
 
-@app.post("/api/automation/cycles")
+@app.post("/api/automation/cycles", dependencies=[Depends(verify_token)])
 async def save_cycle(cycle: CycleModel):
     automation_controller.save_cycle(cycle.name, cycle.triggers)
     return {"success": True}
 
-@app.delete("/api/automation/cycles/{cycle_name}")
+@app.delete("/api/automation/cycles/{cycle_name}", dependencies=[Depends(verify_token)])
 async def delete_cycle(cycle_name: str):
     automation_controller.delete_cycle(cycle_name)
     return {"success": True}
 
 # --- Snapshot Builder Endpoints ---
 
-@app.get("/api/snapshot")
+@app.get("/api/snapshot", dependencies=[Depends(verify_token)])
 async def get_snapshot():
     """Reads components and their content."""
     try:
@@ -1017,7 +1041,7 @@ async def get_snapshot():
         print(f"Error getting snapshot: {e}")
         return []
 
-@app.post("/api/snapshot")
+@app.post("/api/snapshot", dependencies=[Depends(verify_token)])
 async def save_snapshot(components: List[Dict[str, Any]]):
     """Saves components list and updates content files."""
     try:
@@ -1076,7 +1100,7 @@ async def save_snapshot(components: List[Dict[str, Any]]):
         print(f"Error saving snapshot: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/snapshot/rebuild")
+@app.post("/api/snapshot/rebuild", dependencies=[Depends(verify_token)])
 async def rebuild_snapshot():
     """Triggers a snapshot rebuild in the worker."""
     try:

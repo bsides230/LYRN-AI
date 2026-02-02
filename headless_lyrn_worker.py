@@ -204,46 +204,26 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         messages = [{"role": "system", "content": full_system_prompt}]
 
         # Add History
-        history = chat_manager.get_chat_history_messages(exclude_paths=[chat_file_path_str])
-        # Filter out the current file if it happens to be in history (unlikely if new)
-        # or just assume history is past context.
+        # We do NOT exclude the current path, allowing ChatManager to parse the full history
+        # including previous turns in the current file.
+        history = chat_manager.get_chat_history_messages(exclude_paths=[])
         messages.extend(history)
 
-        # 2. Read User Input from the Chat File
+        # 2. Identify Current User Input (for logging)
         chat_file_path = Path(chat_file_path_str)
         if not chat_file_path.exists():
             print(f"Error: Chat file not found: {chat_file_path}")
             return
 
-        with open(chat_file_path, 'r', encoding='utf-8') as f:
-            file_content = f.read()
-
-        # Parse user content from "user\nCONTENT"
-        # Only take the last user part if the file has history?
-        # Standard format: user\nMSG\n\nmodel\nRESP
-        # The trigger file usually has just "user\nMSG" at the end or creates a new file.
-        # We assume the file *ends* with "user\nMSG" and we append "\n\nmodel\n"
-
-        # Extract the user message using regex for #USER_START#...#USER_END#
-        # We look for the LAST occurrence to get the current prompt.
-        import re
-        user_blocks = re.findall(r"#USER_START#\n(.*?)\n#USER_END#", file_content, re.DOTALL)
-
-        if not user_blocks:
-            # Fallback to old format for compatibility or error
-            last_user_idx = file_content.rfind("user\n")
-            if last_user_idx != -1:
-                user_message = file_content[last_user_idx + 5:].strip()
+        # We inspect the last message in the constructed prompt to log the user input
+        if len(messages) > 1:
+            last_msg = messages[-1]
+            if last_msg['role'] == 'user':
+                print(f"User: {last_msg['content']}", flush=True)
             else:
-                print("Error: No user message found in chat file.")
-                return
+                print(f"Last message role: {last_msg['role']}", flush=True)
         else:
-            user_message = user_blocks[-1].strip()
-
-        # Append to messages
-        messages.append({"role": "user", "content": user_message})
-
-        print(f"User: {user_message}", flush=True)
+            print("Warning: No history found for current request.")
         print(f"[Worker] Total messages in prompt: {len(messages)}")
         for i, msg in enumerate(messages):
             print(f"  [{i}] Role: {msg['role']}, Content Length: {len(msg['content'])}")
