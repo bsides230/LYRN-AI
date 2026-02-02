@@ -253,14 +253,14 @@
 
   <script>
     let CORE_URL = "http://localhost:8000";
-    let authToken = null;
+    let authToken = localStorage.getItem('lyrn_admin_token') || null;
 
     document.addEventListener('DOMContentLoaded', () => {
         // Core URL Init
         const stored = localStorage.getItem('lyrn_core_url');
         if(stored) CORE_URL = stored.replace(/\/$/, "");
 
-        initRWIBuilder();
+        if(authToken) initRWIBuilder();
         
         // Theme Sync & URL Update
         window.addEventListener('message', (event) => {
@@ -271,10 +271,13 @@
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
             if (event.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = event.data.token;
+                if(wasNull) initRWIBuilder();
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                 CORE_URL = event.data.url.replace(/\/$/, "");
+                if(authToken) initRWIBuilder();
             }
         });
     });
@@ -284,6 +287,7 @@
        ========================================= */
     async function initRWIBuilder() {
         if (!document.getElementById('components-list')) return;
+        if (!authToken) return;
 
         let components = [
             { name: "rwi", pinned: true, active: true, order: 0, config: { begin_bracket: "###RWI_INSTRUCTIONS_START###", end_bracket: "###RWI_INSTRUCTIONS_END###", rwi_text: "Relational Web Index header." }, content: "" },

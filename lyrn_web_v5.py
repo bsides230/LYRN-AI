@@ -508,11 +508,21 @@ app.add_middleware(
 # --- Routes ---
 
 async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token"), token: Optional[str] = None):
+    # Check for No Auth Flag
+    if Path("global_flags/no_auth").exists():
+        return "NO_AUTH"
+
     # Support both Header (preferred) and Query Param (SSE/EventSource)
     auth_token = x_token or token
     if not LYRN_TOKEN or not auth_token or auth_token != LYRN_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return auth_token
+
+@app.get("/api/auth/status")
+async def get_auth_status():
+    if Path("global_flags/no_auth").exists():
+        return {"required": False}
+    return {"required": True}
 
 @app.post("/api/verify_token", dependencies=[Depends(verify_token)])
 async def verify_token_endpoint():

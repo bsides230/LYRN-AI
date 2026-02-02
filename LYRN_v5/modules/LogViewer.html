@@ -188,7 +188,7 @@
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
-        let authToken = null;
+        let authToken = localStorage.getItem('lyrn_admin_token') || null;
         let eventSource = null;
         let isLive = true;
         let currentSessionId = null;
@@ -233,7 +233,13 @@
                 if(isLive) connectSSE();
             }
             if (e.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = e.data.token;
+
+                if (wasNull) {
+                    refreshMetadata();
+                }
+
                 // Reconnect SSE if live with new token
                 if(isLive) connectSSE();
             }
@@ -266,7 +272,7 @@
         }
 
         async function refreshMetadata() {
-            if(!coreUrl) return;
+            if(!coreUrl || !authToken) return;
             try {
                 const res = await fetch(coreUrl + '/api/logs/sessions', {
                     headers: authToken ? { 'X-Token': authToken } : {}
@@ -373,6 +379,11 @@
                 return;
             }
 
+            if(!authToken) {
+                updateStatus(false, "Waiting for Auth...");
+                return;
+            }
+
             updateStatus(false, "Connecting...");
 
             // Append /api/logs
@@ -465,9 +476,11 @@
         }
 
         // Init
-        if(coreUrl) {
+        if(coreUrl && authToken) {
             refreshMetadata();
             connectSSE();
+        } else if (!authToken) {
+            updateStatus(false, "Waiting for Auth...");
         }
     </script>
 </body>

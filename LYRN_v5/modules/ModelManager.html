@@ -218,7 +218,7 @@
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8000';
-        let authToken = '';
+        let authToken = localStorage.getItem('lyrn_admin_token') || '';
         let selectedModel = null;
         let models = [];
 
@@ -239,10 +239,12 @@
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
                 coreUrl = e.data.url;
-                fetchList();
+                if(authToken) fetchList();
             }
             if (e.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = e.data.token;
+                if(wasNull) fetchList();
             }
             if (e.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', e.data.theme);
@@ -253,7 +255,7 @@
         });
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetchList();
+            if(authToken) fetchList();
         });
 
         function setStatus(msg, type='normal') {
@@ -271,6 +273,7 @@
         }
 
         async function fetchList() {
+            if(!authToken) return;
             setStatus("Refreshing list...");
             try {
                 const res = await fetch(`${coreUrl}/api/models/list`, {
