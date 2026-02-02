@@ -1,7 +1,7 @@
 {
   "settings": {
     "active": {
-      "model_path": "models/LiquidAI 1.2B Instruct",
+      "model_path": "models/LiquidAI 1.2B Thinking",
       "n_ctx": 80000,
       "n_threads": 22,
       "n_gpu_layers": 36,
@@ -34,8 +34,8 @@
     },
     "model_presets": {
       "1": {
-        "model_path": "models/LiquidAI 1.2B Instruct",
-        "n_ctx": 80000,
+        "model_path": "models/LiquidAI 1.2B Thinking",
+        "n_ctx": 40000,
         "n_threads": 22,
         "n_gpu_layers": 36,
         "max_tokens": 5000,
