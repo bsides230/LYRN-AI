@@ -1374,7 +1374,23 @@
         async function checkAuth() {
             if(hasCheckedAuth) return;
 
-            // Check LocalStorage
+            // 1. Check Global Auth Status (Bypass if disabled)
+            try {
+                const res = await fetch(coreUrl + '/api/auth/status');
+                if(res.ok) {
+                    const status = await res.json();
+                    if(status.required === false) {
+                        authToken = "NO_AUTH";
+                        localStorage.setItem('lyrn_admin_token', authToken);
+                        broadcastToken();
+                        hasCheckedAuth = true;
+                        document.getElementById('auth-overlay').style.display = 'none';
+                        return;
+                    }
+                }
+            } catch(e) { console.error("Failed to check auth status", e); }
+
+            // 2. Check LocalStorage
             const storedToken = localStorage.getItem('lyrn_admin_token');
             if(storedToken) {
                 // Verify it
@@ -1387,7 +1403,7 @@
                 }
             }
 
-            // Show Overlay
+            // 3. Show Overlay
             document.getElementById('auth-overlay').style.display = 'flex';
         }
 

@@ -371,11 +371,11 @@
         selectedDateForModal: null
     };
 
-    let authToken = null;
+    let authToken = localStorage.getItem('lyrn_admin_token') || null;
 
     document.addEventListener('DOMContentLoaded', () => {
         loadConfig();
-        refreshAll();
+        if (authToken) refreshAll();
 
         // Listen for Theme & URL changes
         window.addEventListener('message', (event) => {
@@ -386,12 +386,14 @@
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
             if (event.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = event.data.token;
+                if(wasNull) refreshAll();
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                  CORE_URL = event.data.url.replace(/\/$/, "");
                  updateFooterDisplay();
-                 refreshAll();
+                 if(authToken) refreshAll();
             }
         });
     });
@@ -413,6 +415,7 @@
     }
 
     function refreshAll() {
+        if (!authToken) return;
         console.log(`[JobManager] Syncing data with ${CORE_URL}...`);
         Promise.all([fetchJobs(), fetchCycles(), fetchSchedule(), fetchScripts(), fetchHistory()])
             .then(() => {

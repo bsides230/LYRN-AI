@@ -300,7 +300,7 @@
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8000';
-        let authToken = null;
+        let authToken = localStorage.getItem('lyrn_admin_token') || null;
         let pollInterval = null;
         let isRunning = false;
         let presets = {};
@@ -336,7 +336,9 @@
                 init();
             }
             if (e.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = e.data.token;
+                if(wasNull) init();
             }
             if (e.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', e.data.theme);
@@ -353,6 +355,7 @@
         els.modelSelect.addEventListener('mousedown', fetchModels);
 
         async function init() {
+            if(!authToken) return;
             await Promise.all([
                 fetchModels(),
                 fetchPresets(),
@@ -362,6 +365,7 @@
         }
 
         async function fetchModels() {
+            if(!authToken) return;
             try {
                 const res = await fetch(`${coreUrl}/api/models/list`, {
                     headers: authToken ? { 'X-Token': authToken } : {}
@@ -385,6 +389,7 @@
         }
 
         async function fetchPresets() {
+            if(!authToken) return;
             try {
                 const res = await fetch(`${coreUrl}/api/config/presets`, {
                     headers: authToken ? { 'X-Token': authToken } : {}
@@ -504,6 +509,7 @@
         }
 
         async function fetchActiveConfig() {
+            if(!authToken) return;
             try {
                 const res = await fetch(`${coreUrl}/api/config/active`, {
                     headers: authToken ? { 'X-Token': authToken } : {}
@@ -539,6 +545,7 @@
         }
 
         async function pollStatus() {
+            if(!authToken) return;
             try {
                 const res = await fetch(`${coreUrl}/api/system/worker_status`, {
                     headers: authToken ? { 'X-Token': authToken } : {}

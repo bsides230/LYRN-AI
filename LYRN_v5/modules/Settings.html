@@ -233,7 +233,7 @@
        GLOBAL STATE
        ========================================= */
     let CORE_URL = "http://localhost:8000";
-    let authToken = null;
+    let authToken = localStorage.getItem('lyrn_admin_token') || null;
 
     let API_MAP = {
         "Chat": "http://localhost:8000/api/chat",
@@ -245,7 +245,7 @@
         // Init logic
         loadFromLocalStorage();
         renderApiList();
-        fetchSystemConfig();
+        if(authToken) fetchSystemConfig();
 
         // Theme Sync
         window.addEventListener('message', (event) => {
@@ -256,11 +256,13 @@
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
             if (event.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = event.data.token;
+                if(wasNull) fetchSystemConfig();
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                  CORE_URL = event.data.url.replace(/\/$/, "");
-                 fetchSystemConfig();
+                 if(authToken) fetchSystemConfig();
             }
         });
     });
@@ -369,6 +371,7 @@
        SYSTEM CONFIG (SERVER SIDE)
        ========================================= */
     async function fetchSystemConfig() {
+        if(!authToken) return;
         try {
             const res = await fetch(CORE_URL + '/api/config', {
                 headers: authToken ? { 'X-Token': authToken } : {}

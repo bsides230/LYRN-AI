@@ -313,12 +313,12 @@
     };
 
     let isProcessing = false;
-    let authToken = null;
+    let authToken = localStorage.getItem('lyrn_admin_token') || null;
 
     document.addEventListener('DOMContentLoaded', () => {
         // Init logic
         loadConfig();
-        loadHistory();
+        if(authToken) loadHistory();
 
         // Input binding
         const input = document.getElementById('chat-input');
@@ -346,7 +346,9 @@
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
             }
             if (event.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = event.data.token;
+                if(wasNull) loadHistory();
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                 // Remove trailing slash if present then append endpoint
@@ -394,6 +396,7 @@
     }
 
     async function loadHistory() {
+        if(!authToken) return;
         try {
             // Also load settings to apply "hide-thinking" if needed
             const base = CONFIG.apiUrl.replace('/api/chat', '');

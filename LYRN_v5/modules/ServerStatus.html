@@ -200,7 +200,7 @@
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
-        let authToken = null; // Received via postMessage
+        let authToken = localStorage.getItem('lyrn_admin_token') || null;
         let intervalId = null;
 
         // Parse Query Params
@@ -247,18 +247,21 @@
                 document.documentElement.style.setProperty('--font-size-base', e.data.fontSize + 'px');
             }
             if (e.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
                 authToken = e.data.token;
+                if(wasNull) startMonitoring();
             }
         });
 
         function startMonitoring() {
             if(intervalId) clearInterval(intervalId);
-            if(!coreUrl) return;
+            if(!coreUrl || !authToken) return;
             fetchStats();
             intervalId = setInterval(fetchStats, 2000);
         }
 
         async function fetchStats() {
+            if(!authToken) return;
             try {
                 // Assuming /health is public or we pass token if needed.
                 // Currently /health is public in lyrn_web_v5.py.
@@ -346,7 +349,7 @@
         }
 
         // Init
-        if(coreUrl) startMonitoring();
+        if(coreUrl && authToken) startMonitoring();
 
     </script>
 </body>
