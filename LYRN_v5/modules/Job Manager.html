@@ -304,7 +304,10 @@
 
     <div class="footer-bar">
          <span>JOB AUTOMATION MANAGER // V1.0</span>
-         <span id="status-bar">READY</span>
+         <div>
+            <span id="endpoint-display" style="margin-right: 15px;">...</span>
+            <span id="status-bar">READY</span>
+         </div>
     </div>
   </div>
 
@@ -369,6 +372,7 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+        loadConfig();
         refreshAll();
 
         // Listen for Theme & URL changes
@@ -381,12 +385,30 @@
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                  CORE_URL = event.data.url.replace(/\/$/, "");
+                 updateFooterDisplay();
                  refreshAll();
             }
         });
     });
 
+    function loadConfig() {
+        // 1. Try Core URL from Dashboard
+        const coreUrl = localStorage.getItem('lyrn_core_url');
+        if (coreUrl) {
+            CORE_URL = coreUrl.replace(/\/$/, "");
+            console.log("Loaded Core URL from LocalStorage:", CORE_URL);
+        } else {
+            console.log("Using Default Core URL:", CORE_URL);
+        }
+        updateFooterDisplay();
+    }
+
+    function updateFooterDisplay() {
+        document.getElementById('endpoint-display').innerText = `API: ${CORE_URL}`;
+    }
+
     function refreshAll() {
+        console.log(`[JobManager] Syncing data with ${CORE_URL}...`);
         Promise.all([fetchJobs(), fetchCycles(), fetchSchedule(), fetchScripts(), fetchHistory()])
             .then(() => {
                 showToast("Data Synced");
@@ -396,33 +418,46 @@
                 if(UI.currentTab === 'scheduler') renderCalendar();
                 if(UI.currentTab === 'history') renderHistory();
             })
-            .catch(e => showToast("Sync Failed: " + e.message, true));
+            .catch(e => {
+                console.error("[JobManager] Sync Failed:", e);
+                showToast("Sync Failed: " + e.message, true);
+            });
     }
 
     async function fetchJobs() {
-        const res = await fetch(`${CORE_URL}/api/automation/jobs`);
-        if(!res.ok) throw new Error("Jobs fetch failed");
-        DATA.jobs = await res.json();
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/jobs`);
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            DATA.jobs = await res.json();
+        } catch(e) { throw new Error(`Jobs: ${e.message}`); }
     }
     async function fetchCycles() {
-        const res = await fetch(`${CORE_URL}/api/automation/cycles`);
-        if(!res.ok) throw new Error("Cycles fetch failed");
-        DATA.cycles = await res.json();
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/cycles`);
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            DATA.cycles = await res.json();
+        } catch(e) { throw new Error(`Cycles: ${e.message}`); }
     }
     async function fetchSchedule() {
-        const res = await fetch(`${CORE_URL}/api/automation/schedule`);
-        if(!res.ok) throw new Error("Schedule fetch failed");
-        DATA.schedules = await res.json();
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/schedule`);
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            DATA.schedules = await res.json();
+        } catch(e) { throw new Error(`Schedule: ${e.message}`); }
     }
     async function fetchScripts() {
-        const res = await fetch(`${CORE_URL}/api/automation/scripts`);
-        if(!res.ok) throw new Error("Scripts fetch failed");
-        DATA.availableScripts = await res.json();
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/scripts`);
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            DATA.availableScripts = await res.json();
+        } catch(e) { throw new Error(`Scripts: ${e.message}`); }
     }
     async function fetchHistory() {
-        const res = await fetch(`${CORE_URL}/api/automation/history`);
-        if(!res.ok) throw new Error("History fetch failed");
-        DATA.history = await res.json();
+        try {
+            const res = await fetch(`${CORE_URL}/api/automation/history`);
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            DATA.history = await res.json();
+        } catch(e) { throw new Error(`History: ${e.message}`); }
     }
 
     /* =========================================
