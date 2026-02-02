@@ -113,6 +113,7 @@ class SettingsManager:
                 "top_k": 40,
                 "stream": True
             },
+            "allowed_origins": [],
             "paths": {
                 "static_snapshots": "",
                 "dynamic_snapshots": "",

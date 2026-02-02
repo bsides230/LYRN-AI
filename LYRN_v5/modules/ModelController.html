@@ -300,6 +300,7 @@
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8000';
+        let authToken = null;
         let pollInterval = null;
         let isRunning = false;
         let presets = {};
@@ -334,6 +335,9 @@
                 coreUrl = e.data.url;
                 init();
             }
+            if (e.data.type === 'TOKEN_UPDATE') {
+                authToken = e.data.token;
+            }
             if (e.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', e.data.theme);
             }
@@ -359,7 +363,9 @@
 
         async function fetchModels() {
             try {
-                const res = await fetch(`${coreUrl}/api/models/list`);
+                const res = await fetch(`${coreUrl}/api/models/list`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 const data = await res.json();
                 els.modelSelect.innerHTML = '<option value="">Select a model...</option>';
 
@@ -380,7 +386,9 @@
 
         async function fetchPresets() {
             try {
-                const res = await fetch(`${coreUrl}/api/config/presets`);
+                const res = await fetch(`${coreUrl}/api/config/presets`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 presets = await res.json();
                 renderPresets();
             } catch (e) {
@@ -483,7 +491,10 @@
             try {
                 await fetch(`${coreUrl}/api/config/presets`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
                     body: JSON.stringify({ preset_id: id, config: config })
                 });
                 await fetchPresets(); // Refresh
@@ -494,7 +505,9 @@
 
         async function fetchActiveConfig() {
             try {
-                const res = await fetch(`${coreUrl}/api/config/active`);
+                const res = await fetch(`${coreUrl}/api/config/active`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 const config = await res.json();
                 if(config && Object.keys(config).length > 0) {
                      for(const [key, val] of Object.entries(config)) {
@@ -527,7 +540,9 @@
 
         async function pollStatus() {
             try {
-                const res = await fetch(`${coreUrl}/api/system/worker_status`);
+                const res = await fetch(`${coreUrl}/api/system/worker_status`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 const data = await res.json();
                 updateUI(data);
             } catch(e) {
@@ -588,12 +603,18 @@
                 // 1. Save Active Config
                 await fetch(`${coreUrl}/api/config/active`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
                     body: JSON.stringify({ config: config })
                 });
 
                 // 2. Start Worker
-                const res = await fetch(`${coreUrl}/api/system/start_worker`, { method: 'POST' });
+                const res = await fetch(`${coreUrl}/api/system/start_worker`, {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 const json = await res.json();
 
                 if(!json.success) throw new Error(json.message);
@@ -608,7 +629,10 @@
         async function stopWorker() {
             els.btnStop.disabled = true;
             try {
-                await fetch(`${coreUrl}/api/system/stop_worker`, { method: 'POST' });
+                await fetch(`${coreUrl}/api/system/stop_worker`, {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
             } catch(e) {
                 showError(e.message);
             }

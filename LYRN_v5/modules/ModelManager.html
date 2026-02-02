@@ -273,7 +273,9 @@
         async function fetchList() {
             setStatus("Refreshing list...");
             try {
-                const res = await fetch(`${coreUrl}/api/models/list`);
+                const res = await fetch(`${coreUrl}/api/models/list`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 if(!res.ok) throw new Error("Failed to fetch models");
                 models = await res.json();
                 renderList();
@@ -320,7 +322,9 @@
             els.btnHash.disabled = true;
 
             try {
-                const res = await fetch(`${coreUrl}/api/models/inspect?name=${encodeURIComponent(selectedModel.name)}`);
+                const res = await fetch(`${coreUrl}/api/models/inspect?name=${encodeURIComponent(selectedModel.name)}`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 if(!res.ok) throw new Error("Inspect failed");
                 const data = await res.json();
                 els.detHash.innerText = data.sha256;

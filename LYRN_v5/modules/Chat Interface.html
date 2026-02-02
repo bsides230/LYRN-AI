@@ -313,6 +313,7 @@
     };
 
     let isProcessing = false;
+    let authToken = null;
 
     document.addEventListener('DOMContentLoaded', () => {
         // Init logic
@@ -343,6 +344,9 @@
             }
             if (event.data.type === 'FONT_CHANGE') {
                 document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
+            }
+            if (event.data.type === 'TOKEN_UPDATE') {
+                authToken = event.data.token;
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                 // Remove trailing slash if present then append endpoint
@@ -394,7 +398,9 @@
             // Also load settings to apply "hide-thinking" if needed
             const base = CONFIG.apiUrl.replace('/api/chat', '');
             try {
-                const confRes = await fetch(base + '/api/config');
+                const confRes = await fetch(base + '/api/config', {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
                 if(confRes.ok) {
                     const d = await confRes.json();
                     if(d.settings) applySettings(d.settings);
@@ -403,7 +409,9 @@
 
             // Assume history endpoint is at /history relative to chat endpoint
             const historyUrl = CONFIG.apiUrl + '/history';
-            const res = await fetch(historyUrl);
+            const res = await fetch(historyUrl, {
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
             if (!res.ok) return;
 
             const messages = await res.json();
@@ -458,7 +466,9 @@
         // Fetch current settings
         try {
             const base = CONFIG.apiUrl.replace('/api/chat', ''); // Get base URL
-            const res = await fetch(base + '/api/config');
+            const res = await fetch(base + '/api/config', {
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
             if(res.ok) {
                 const data = await res.json();
                 const s = data.settings || {};
@@ -490,7 +500,9 @@
             const base = CONFIG.apiUrl.replace('/api/chat', '');
 
             // First get existing settings so we don't overwrite other things
-            const getRes = await fetch(base + '/api/config');
+            const getRes = await fetch(base + '/api/config', {
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
             let currentSettings = {};
             if(getRes.ok) {
                 const data = await getRes.json();
@@ -504,7 +516,10 @@
 
             const postRes = await fetch(base + '/api/config', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Token': authToken || ''
+                },
                 body: JSON.stringify({ settings: currentSettings })
             });
 
@@ -550,7 +565,10 @@
         try {
             const response = await fetch(CONFIG.apiUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Token': authToken || ''
+                },
                 body: JSON.stringify({ message: text })
             });
 
@@ -697,7 +715,10 @@
         if (!confirm("Are you sure you want to clear the chat history? This cannot be undone.")) return;
 
         try {
-            const res = await fetch(CONFIG.apiUrl, { method: 'DELETE' });
+            const res = await fetch(CONFIG.apiUrl, {
+                method: 'DELETE',
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
             if (res.ok) {
                 const history = document.getElementById('chat-history');
                 history.innerHTML = `

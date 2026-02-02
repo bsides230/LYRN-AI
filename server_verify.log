@@ -1,0 +1,23 @@
+INFO:     Started server process [4152]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+[System] Logging to session: logs/session_20260202_063257
+Settings loaded successfully
+Next job flag initialized to 'false'
+LLM status flag initialized to 'idle'
+Loaded 2 job definitions from jobs.json: ['chat_pair_summary', 'test_job_scripts']
+Settings loaded successfully
+Next job flag initialized to 'false'
+LLM status flag initialized to 'idle'
+[System] Allowed Origins: ['http://localhost:8080', 'http://127.0.0.1:8080']
+Starting server on port 8080...
+[System] Loaded admin token from admin_token.txt
+[Info] System: Backend started.
+[Scheduler] Starting scheduler loop...
+INFO:     127.0.0.1:49712 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49716 - "GET /api/chat/history HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49726 - "GET /api/chat/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49742 - "GET /api/models/list?token=mRXumMtE2HhHDWURgpRo97c2wCIlkMOa HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49758 - "HEAD /api/chat/history HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49762 - "HEAD /api/chat/history HTTP/1.1" 404 Not Found
