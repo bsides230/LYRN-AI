@@ -180,17 +180,6 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         # Master Prompt
         system_prompt = snapshot_loader.load_base_prompt()
 
-        if not system_prompt or len(system_prompt) < 10:
-             msg = "[Worker] ERROR: System Prompt is empty or too short! Snapshot loading failed."
-             print(msg)
-             # Write error to chat file so user sees it in UI
-             try:
-                 with open(chat_file_path_str, "a", encoding="utf-8") as f:
-                     f.write(f"\n[Error: {msg}]\n")
-             except: pass
-             set_llm_status("error")
-             return
-
         # Deltas
         delta_content = delta_manager.get_delta_content()
 
@@ -213,15 +202,6 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             full_system_prompt += "\n\n" + delta_content
 
         messages = [{"role": "system", "content": full_system_prompt}]
-
-        # Token Count Check
-        try:
-             # Check if LLM has tokenize method (llama-cpp-python usually does)
-             if hasattr(llm, 'tokenize'):
-                 prompt_tokens = llm.tokenize(full_system_prompt.encode("utf-8", errors='ignore'))
-                 print(f"[Worker] System Prompt Tokens: {len(prompt_tokens)}")
-        except Exception as e:
-             print(f"[Worker] Warning: Could not count tokens: {e}")
 
         # Add History
         # We do NOT exclude the current path, allowing ChatManager to parse the full history

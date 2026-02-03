@@ -19,20 +19,15 @@ class SnapshotLoader:
         self.config_path = os.path.join(self.build_prompt_dir, "builder_config.json")
         self.prompt_order_path = os.path.join(self.build_prompt_dir, "prompt_order.json")
 
-    def _load_json_file(self, path: str, critical: bool = False) -> Optional[list or dict]:
+    def _load_json_file(self, path: str) -> Optional[list or dict]:
         """Safely loads a JSON file and returns its content."""
         if not os.path.exists(path):
-            msg = f"Warning: JSON file not found: {path}"
-            print(msg)
-            if critical: raise FileNotFoundError(msg)
             return None
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError) as e:
-            msg = f"Error reading JSON file {path}: {e}"
-            print(msg)
-            if critical: raise e
+            print(f"Error reading JSON file {path}: {e}")
             return None
 
     def _load_text_file(self, path: str) -> str:
@@ -59,12 +54,10 @@ class SnapshotLoader:
         prompt_parts = []
 
         components_path = os.path.join(self.build_prompt_dir, "components.json")
-        # Critical: If components.json is missing, we cannot build a snapshot.
-        components = self._load_json_file(components_path, critical=True) or []
+        components = self._load_json_file(components_path) or []
 
         # Filter for active components and sort by order
         active_components = sorted([c for c in components if c.get('active', True)], key=lambda x: x.get('order', 0))
-        print(f"Found {len(active_components)} active components.")
 
         # --- Build the Static RWI block first ---
         rwi_config_path = os.path.join(self.build_prompt_dir, "rwi_config.json")
@@ -117,21 +110,17 @@ class SnapshotLoader:
             content = self._load_text_file(content_path)
 
             if content:
-                print(f"Loaded component '{component_name}' ({len(content)} chars)")
                 # Assemble the block using the specified brackets and content
                 formatted_block = f"{begin_bracket}\n{content}\n{end_bracket}"
                 prompt_parts.append(formatted_block)
-            else:
-                print(f"Warning: Content is empty for component: {component_name}")
 
         full_prompt_text = "\n\n".join(prompt_parts)
         try:
             with open(self.master_prompt_path, 'w', encoding='utf-8') as f:
                 f.write(full_prompt_text)
-            print(f"Master prompt file built successfully from components. Total length: {len(full_prompt_text)} chars.")
+            print("Master prompt file built successfully from components.")
         except IOError as e:
             print(f"Error writing master prompt file: {e}")
-            raise e
 
         return full_prompt_text
 
