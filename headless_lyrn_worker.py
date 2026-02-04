@@ -196,15 +196,14 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         print(f"[Worker] System Prompt Length: {len(system_prompt)}")
         print(f"[Worker] Delta Content Length: {len(delta_content) if delta_content else 0}")
 
-        # Merge Deltas into System Prompt to preserve v4 injection order and KV cache
-        full_system_prompt = system_prompt
-        if delta_content:
-            full_system_prompt += "\n\n" + delta_content
-
         # IMPORTANT:
         # This snapshot prompt is treated as a stable prefix for KV cache reuse.
         # Do NOT rebuild, reorder, or mutate unless REBUILD_TRIGGER is active.
-        messages = [{"role": "system", "content": full_system_prompt}]
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # Add Deltas as a separate system message if present
+        if delta_content:
+            messages.append({"role": "system", "content": delta_content})
 
         # Add History
         # We do NOT exclude the current path, allowing ChatManager to parse the full history
