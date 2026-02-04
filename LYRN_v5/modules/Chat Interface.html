@@ -87,6 +87,9 @@
     .btn-group { display: flex; align-items: center; gap: 8px; }
     .btn-square { width: 32px; height: 32px; padding: 0; font-size: calc(var(--font-size-base) + 4px); }
 
+    button.btn-stop { background: var(--error-color); border-color: var(--error-color); color: white; font-weight: 600; }
+    button.btn-stop:hover { background: #DC2626; }
+
     .hidden { display: none !important; }
 
     /* LAYOUT */
@@ -138,6 +141,18 @@
         border-color: var(--border-color);
         color: var(--text-body);
     }
+
+    .action-bar {
+        display: flex; gap: 10px; margin-top: 6px; justify-content: flex-start;
+        opacity: 0; transition: opacity 0.2s; padding-left: 2px;
+    }
+    .message-row:hover .action-bar { opacity: 1; }
+    .action-btn {
+        background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 4px;
+        font-size: 14px; display: flex; align-items: center; justify-content: center;
+        width: 24px; height: 24px; border-radius: 4px;
+    }
+    .action-btn:hover { color: var(--brand-purple); background: rgba(255,255,255,0.05); }
 
     /* THINKING BLOCKS */
     .think-block {
@@ -253,6 +268,7 @@
     <div class="input-area">
         <textarea id="chat-input" placeholder="Type a message... (Ctrl+Enter to send)"></textarea>
         <button class="btn-primary" style="height: 50px; width: 80px;" onclick="sendMessage()" id="send-btn">SEND</button>
+        <button class="btn-stop hidden" style="height: 50px; width: 80px;" onclick="stopGeneration()" id="stop-btn">STOP</button>
     </div>
 
     <div class="footer-bar">
@@ -455,8 +471,9 @@
                     history.innerHTML = '';
                  }
 
-                 messages.forEach(msg => {
-                     appendMessage(msg.role, msg.content);
+                 messages.forEach((msg, index) => {
+                     const isLast = index === messages.length - 1;
+                     appendMessage(msg.role, msg.content, false, msg.filename, isLast);
                  });
 
                  setTimeout(() => history.scrollTop = history.scrollHeight, 100);
@@ -595,14 +612,16 @@
         // Clear input
         input.value = '';
         isProcessing = true;
-        document.getElementById('send-btn').disabled = true;
+        document.getElementById('send-btn').classList.add('hidden');
+        document.getElementById('stop-btn').classList.remove('hidden');
 
         // UI: Add User Message
         appendMessage('user', text);
 
         // UI: Add Placeholder for Assistant
         const responseId = appendMessage('assistant', '', true); // true = loading state
-        const responseBubble = document.getElementById(responseId).querySelector('.message-bubble');
+        const responseRow = document.getElementById(responseId);
+        const responseBubble = responseRow.querySelector('.message-bubble');
 
         try {
             const response = await fetch(CONFIG.apiUrl, {
@@ -624,6 +643,7 @@
             const decoder = new TextDecoder();
             let accumulated = "";
             let buffer = "";
+            let currentFilename = null;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -639,6 +659,10 @@
                     if (line.trim()) {
                         try {
                             const j = JSON.parse(line);
+                            if (j.filename) {
+                                currentFilename = j.filename;
+                                responseRow.dataset.filename = currentFilename;
+                            }
                             if (j.response) {
                                 accumulated += j.response;
                                 renderRichText(responseBubble, accumulated);
@@ -655,6 +679,11 @@
                 history.scrollTop = history.scrollHeight;
             }
 
+            // Append Action Bar after generation
+            if (currentFilename) {
+                 addActionBar(responseRow, currentFilename, true); // true = isLast
+            }
+
         } catch (err) {
             console.error("Chat Error:", err);
             responseBubble.classList.remove('typing');
@@ -668,12 +697,26 @@
             responseBubble.style.color = 'var(--error-color)';
         } finally {
             isProcessing = false;
-            document.getElementById('send-btn').disabled = false;
+            document.getElementById('send-btn').classList.remove('hidden');
+            document.getElementById('stop-btn').classList.add('hidden');
             input.focus();
         }
     }
 
-    function appendMessage(role, text, isLoading=false) {
+    async function stopGeneration() {
+        try {
+            const base = CONFIG.apiUrl.replace('/api/chat', '');
+            await fetch(base + '/api/chat/stop', {
+                method: 'POST',
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
+            showToast("Stopping...");
+        } catch(e) {
+            console.error("Stop Failed:", e);
+        }
+    }
+
+    function appendMessage(role, text, isLoading=false, filename=null, isLast=false) {
         const history = document.getElementById('chat-history');
         // Clear welcome message if it's the first real message
         if (history.children.length === 1 && history.children[0].style.textAlign === 'center') {
@@ -684,9 +727,16 @@
         const row = document.createElement('div');
         row.className = `message-row ${role}`;
         row.id = id;
+        if(filename) row.dataset.filename = filename;
+
+        const contentWrapper = document.createElement('div');
+        contentWrapper.style.display = 'flex';
+        contentWrapper.style.flexDirection = 'column';
+        contentWrapper.style.maxWidth = '80%';
 
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
+        bubble.style.maxWidth = '100%'; // Wrapper handles width
         if (isLoading) {
             bubble.classList.add('typing');
             bubble.innerText = 'Thinking...';
@@ -696,13 +746,127 @@
             renderRichText(bubble, text);
         }
 
-        row.appendChild(bubble);
+        contentWrapper.appendChild(bubble);
+
+        if (!isLoading && role === 'assistant' && filename) {
+             addActionBar(contentWrapper, filename, isLast);
+        }
+
+        row.appendChild(contentWrapper);
         history.appendChild(row);
 
         // Scroll to bottom
         setTimeout(() => history.scrollTop = history.scrollHeight, 10);
 
         return id;
+    }
+
+    function addActionBar(container, filename, isLast) {
+        const bar = document.createElement('div');
+        bar.className = 'action-bar';
+
+        // Copy
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'action-btn';
+        copyBtn.title = 'Copy';
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+        copyBtn.onclick = () => {
+             const text = container.querySelector('.response-text') ? container.querySelector('.response-text').innerText : container.querySelector('.message-bubble').innerText;
+             navigator.clipboard.writeText(text);
+             showToast("Copied");
+        };
+        bar.appendChild(copyBtn);
+
+        // Retry (Only if last)
+        if (isLast) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'action-btn';
+            retryBtn.title = 'Regenerate';
+            retryBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>';
+            retryBtn.onclick = () => retryMessage(filename);
+            bar.appendChild(retryBtn);
+        }
+
+        // Delete
+        const delBtn = document.createElement('button');
+        delBtn.className = 'action-btn';
+        delBtn.title = 'Delete Pair';
+        delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+        delBtn.onclick = () => deleteMessage(filename);
+        bar.appendChild(delBtn);
+
+        container.appendChild(bar);
+    }
+
+    async function deleteMessage(filename) {
+        if(!confirm("Delete this message pair?")) return;
+        try {
+            const base = CONFIG.apiUrl.replace('/api/chat', '');
+            const res = await fetch(base + `/api/chat/${filename}`, {
+                method: 'DELETE',
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
+            if(res.ok) {
+                // Reload history to ensure sync
+                const history = document.getElementById('chat-history');
+                history.innerHTML = '';
+                loadHistory();
+                showToast("Deleted");
+            } else {
+                showToast("Delete Failed", true);
+            }
+        } catch(e) { console.error(e); showToast("Error", true); }
+    }
+
+    async function retryMessage(filename) {
+        // 1. Get User Input (from previous sibling in DOM)
+        // Since we are clicking on Assistant message, user message is previous sibling
+        // We need to find the DOM element with this filename
+        const rows = document.querySelectorAll('.message-row');
+        let targetRow = null;
+        let userRow = null;
+
+        for(let i=0; i<rows.length; i++) {
+             if(rows[i].dataset.filename === filename) {
+                 if (rows[i].classList.contains('assistant')) targetRow = rows[i];
+                 if (rows[i].classList.contains('user')) userRow = rows[i];
+             }
+        }
+
+        if (!userRow) {
+             // Fallback: Try to get text from the row before targetRow
+             // This assumes strict alternating order which might not hold if merged
+             // But valid for "Delete Pair" context
+             if (targetRow && targetRow.previousElementSibling) {
+                 userRow = targetRow.previousElementSibling;
+             }
+        }
+
+        if(!userRow) {
+            showToast("Could not find original prompt", true);
+            return;
+        }
+
+        const userText = userRow.querySelector('.message-bubble').innerText;
+
+        // 2. Delete
+        try {
+            const base = CONFIG.apiUrl.replace('/api/chat', '');
+            const res = await fetch(base + `/api/chat/${filename}`, {
+                method: 'DELETE',
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
+
+            if(res.ok) {
+                 // 3. Set Input & Send
+                 document.getElementById('chat-input').value = userText;
+                 // Clear history UI momentarily
+                 const history = document.getElementById('chat-history');
+                 history.innerHTML = '';
+                 await loadHistory();
+                 sendMessage();
+            }
+        } catch(e) { console.error(e); }
     }
 
     function renderRichText(container, text) {

@@ -226,7 +226,7 @@ def trigger_chat_generation(message: str, folder: str = "chat"):
         f.write(filepath)
     print(f"[System] Wrote trigger file: chat_trigger.txt")
 
-    return filepath
+    return filepath, os.path.basename(filepath)
 
 # --- Scheduler Loop ---
 async def scheduler_loop():
@@ -252,7 +252,7 @@ async def scheduler_loop():
                 if scripts_ok:
                     if job.prompt:
                         # Use "jobs" folder for automated tasks
-                        filepath = trigger_chat_generation(job.prompt, folder="jobs")
+                        filepath, _ = trigger_chat_generation(job.prompt, folder="jobs")
 
                         # Log the prompt generation step
                         automation_controller.log_job_history(
@@ -758,16 +758,46 @@ async def clear_chat_history():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/api/chat/{filename}", dependencies=[Depends(verify_token)])
+async def delete_chat_file(filename: str):
+    """Deletes a specific chat history file."""
+    try:
+        # Sanitize filename to prevent directory traversal
+        filename = os.path.basename(filename)
+        chat_dir = Path(settings_manager.settings.get("paths", {}).get("chat", "chat/"))
+        file_path = chat_dir / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        file_path.unlink()
+        return {"success": True, "message": f"Deleted {filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/chat/stop", dependencies=[Depends(verify_token)])
+async def stop_chat_generation():
+    """Triggers the worker to stop the current generation."""
+    try:
+        with open("stop_trigger.txt", "w", encoding="utf-8") as f:
+            f.write("stop")
+        print("[API] Wrote stop_trigger.txt")
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stop generation: {e}")
+
 @app.post("/api/chat", dependencies=[Depends(verify_token)])
 async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
 
     try:
-        filepath = trigger_chat_generation(request.message)
+        filepath, filename = trigger_chat_generation(request.message)
     except Exception as e:
          raise HTTPException(status_code=500, detail=f"Failed to trigger chat: {e}")
 
     async def event_generator():
+        # Yield the filename first for UI tracking
+        yield json.dumps({"filename": filename}) + "\n"
         last_pos = 0
         retries = 0
         started = False
