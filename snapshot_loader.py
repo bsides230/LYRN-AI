@@ -126,7 +126,15 @@ class SnapshotLoader:
 
     def load_base_prompt(self) -> str:
         """
-        Builds and loads the master prompt file from components.
+        Loads the master prompt file.
+        If the file exists, it is read directly to preserve the stable prefix for KV cache.
+        If it does not exist, it is rebuilt from components.
         """
         print("Loading base prompt...")
-        return self.build_master_prompt_from_components()
+        if os.path.exists(self.master_prompt_path):
+            # Read from cache to avoid rebuilding and potentially changing the prefix
+            return self._load_text_file(self.master_prompt_path)
+        else:
+            # First run or missing file: build it
+            print("Master prompt not found. Building from components...")
+            return self.build_master_prompt_from_components()

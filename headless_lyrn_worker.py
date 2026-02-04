@@ -201,6 +201,9 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         if delta_content:
             full_system_prompt += "\n\n" + delta_content
 
+        # IMPORTANT:
+        # This snapshot prompt is treated as a stable prefix for KV cache reuse.
+        # Do NOT rebuild, reorder, or mutate unless REBUILD_TRIGGER is active.
         messages = [{"role": "system", "content": full_system_prompt}]
 
         # Add History
@@ -277,12 +280,11 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         set_llm_status("error")
 
     finally:
-        # Clear context after every request to prevent KV cache corruption (v4 parity)
-        try:
-             llm.reset()
-             # print("[Worker] Context reset.") # Optional: uncomment for debug
-        except Exception as e:
-             print(f"[Worker] Error resetting context: {e}")
+        # Do NOT call llm.reset() here.
+        # We want to preserve the KV cache for the stable prefix (snapshot).
+        # Context "wiping" is handled logically by constructing a fresh message list
+        # for each request, but physically we keep the model state to reuse the prefix.
+        pass
 
 if __name__ == "__main__":
     main()
