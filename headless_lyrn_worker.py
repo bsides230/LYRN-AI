@@ -235,6 +235,7 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         active_config = settings.get("active", {})
         start_time = time.time()
         token_count = 0
+        first_token_time = None
 
         stream = llm.create_chat_completion(
             messages=messages,
@@ -254,6 +255,8 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     delta = token_data['choices'][0].get('delta', {})
                     content = delta.get('content', '')
                     if content:
+                        if first_token_time is None:
+                            first_token_time = time.time()
                         token_count += 1
                         f.write(content)
                         f.flush()
@@ -261,13 +264,25 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             f.write("\n#MODEL_END#\n")
 
         end_time = time.time()
-        duration = end_time - start_time
-        tps = token_count / duration if duration > 0 else 0
 
-        write_stats(tps, token_count, active_config.get("model_path", "Unknown"))
+        # Stats Calculation
+        total_duration = end_time - start_time
+
+        # Decode Speed (Generation Speed)
+        # Avoid division by zero
+        if first_token_time and end_time > first_token_time:
+            decode_duration = end_time - first_token_time
+            # Using token_count for decode speed (approximating that time taken was for all tokens)
+            # Strictly it should be (token_count - 1) / (last - first), but user wants consistency with "stats"
+            decode_tps = token_count / decode_duration if decode_duration > 0 else 0
+        else:
+            decode_tps = 0
+
+        # Write stats using the decode TPS (user preference)
+        write_stats(decode_tps, token_count, active_config.get("model_path", "Unknown"))
 
         print(f"Model: {full_response}", flush=True)
-        print(f"Generation complete. {token_count} tokens in {duration:.2f}s ({tps:.2f} T/s)")
+        print(f"Generation complete. {token_count} tokens. Total Time: {total_duration:.2f}s. Speed: {decode_tps:.2f} T/s")
         set_llm_status("idle")
 
     except Exception as e:
