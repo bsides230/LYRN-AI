@@ -187,12 +187,20 @@
     <header>
         <div>
             <div class="meta-label">LYRN SYSTEM MODULE</div>
-            <h1 class="panel-title">Snapshot Builder <span class="version-tag">v2.0</span></h1>
+            <h1 class="panel-title">Snapshot Builder <span class="version-tag">v2.1</span></h1>
         </div>
         <div class="btn-group">
+            <select id="snapshot-select" style="font-family:'JetBrains Mono'; font-size:11px; padding:6px; background:var(--bg-input); color:var(--text-body); border:1px solid var(--border-color); border-radius:4px; max-width:150px;">
+                <option value="">Loading...</option>
+            </select>
+            <button onclick="rwiLoadFromDropdown()">Load</button>
+
             <input type="file" id="sns-file-input" style="display: none;" accept=".sns" onchange="rwiLoadSNS(this)">
-            <button onclick="document.getElementById('sns-file-input').click()">Load</button>
-            <button onclick="rwiSaveSNS()">Save</button>
+            <button onclick="document.getElementById('sns-file-input').click()" title="Upload from Disk">Upload</button>
+
+            <button onclick="rwiSaveSnapshotFile()" title="Save to System">Save</button>
+            <button class="btn-square" onclick="rwiDownloadFile()" title="Download .SNS">⬇️</button>
+
             <button onclick="rwiPreview()">View</button>
             <button class="btn-primary" id="rebuild-btn" onclick="rwiBuild()">Rebuild</button>
             <button class="btn-icon btn-square" onclick="rwiShowHelp()" title="Help">?</button>
@@ -254,6 +262,7 @@
   <script>
     let CORE_URL = "http://localhost:8000";
     let authToken = localStorage.getItem('lyrn_admin_token') || null;
+    let currentSnapshotName = "snapshot";
 
     document.addEventListener('DOMContentLoaded', () => {
         // Core URL Init
@@ -294,8 +303,36 @@
             { name: "system_instructions", pinned: true, active: true, order: 1, config: { begin_bracket: "###SYSTEM_INSTRUCTIONS_START###", end_bracket: "###SYSTEM_INSTRUCTIONS_END###", rwi_text: "Core system instructions." }, content: `This model operates as part of the LYRN cognitive architecture...` }
         ];
 
-        // Fetch from API
+        // 1. Fetch Snapshot List & Active Settings
         try {
+            // Get Config for active snapshot
+            const confRes = await fetch(CORE_URL + '/api/config', { headers: { 'X-Token': authToken } });
+            let activeSnap = null;
+            if(confRes.ok) {
+                const d = await confRes.json();
+                activeSnap = d.settings.active_snapshot;
+            }
+
+            // Get List
+            const listRes = await fetch(CORE_URL + '/api/snapshots', { headers: { 'X-Token': authToken } });
+            if(listRes.ok) {
+                const snaps = await listRes.json();
+                const sel = document.getElementById('snapshot-select');
+                sel.innerHTML = '<option value="">Select Snapshot...</option>';
+                snaps.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.innerText = s.name.replace('.sns', '');
+                    sel.appendChild(opt);
+                });
+
+                if(activeSnap && snaps.find(s => s.name === activeSnap)) {
+                    sel.value = activeSnap;
+                    currentSnapshotName = activeSnap.replace('.sns', '');
+                }
+            }
+
+            // Fetch Current Components (from build_prompt via legacy endpoint)
             const res = await fetch(CORE_URL + '/api/snapshot', {
                 headers: authToken ? { 'X-Token': authToken } : {}
             });
@@ -420,7 +457,7 @@
 
         window.rwiAddNew = () => selectComponent('_NEW_');
 
-        // NEW: SAVE to API
+        // NEW: SAVE to API (Quick Save / Internal Update)
         window.rwiSave = async () => {
             const isNew = selectedComponent === '_NEW_';
             let name = selectedComponent;
@@ -458,8 +495,8 @@
                     },
                     body: JSON.stringify(components)
                 });
-                if(res.ok) showToast("Snapshot Saved to Core");
-                else showToast("Failed to Save", true);
+                if(res.ok) showToast("Component Updated");
+                else showToast("Failed to Update", true);
             } catch(e) { showToast("Connection Error", true); }
 
             renderList();
@@ -512,21 +549,69 @@
 
             setTimeout(() => { btn.innerText = origText; }, 800);
         };
+
+        /* --- NEW SNAPSHOT MANAGEMENT --- */
+
+        window.rwiLoadFromDropdown = async () => {
+            const sel = document.getElementById('snapshot-select');
+            const filename = sel.value;
+            if(!filename) return;
+
+            if(!confirm(`Load snapshot '${filename}'? This will overwrite current workspace.`)) return;
+
+            try {
+                 const res = await fetch(CORE_URL + '/api/snapshots/load', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ filename: filename })
+                });
+                if(res.ok) {
+                    components = await res.json();
+                    currentSnapshotName = filename.replace('.sns', '');
+                    updateRWITableOfContents();
+                    renderList();
+                    selectComponent('rwi');
+                    showToast("Snapshot Loaded");
+                } else {
+                    showToast("Load Failed", true);
+                }
+            } catch(e) {
+                showToast("Error Loading", true);
+            }
+        }
         
-        window.rwiSaveSNS = () => { window.rwiPreview(); document.getElementById('modal-title').innerText = "Review Snapshot (.SNS)"; document.getElementById('download-btn').classList.remove('btn-hidden'); };
+        window.rwiSaveSnapshotFile = async () => {
+            const name = prompt("Enter Name for Snapshot:", currentSnapshotName);
+            if(!name) return;
+
+            try {
+                const res = await fetch(CORE_URL + '/api/snapshots/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ filename: name, components: components })
+                });
+                if(res.ok) {
+                    currentSnapshotName = name;
+                    showToast("Snapshot Saved & Active");
+                    // Refresh dropdown
+                    initRWIBuilder();
+                } else {
+                    showToast("Save Failed", true);
+                }
+            } catch(e) {
+                showToast("Error Saving", true);
+            }
+        };
         
-        window.rwiDownloadSNS = () => {
-             let filename = prompt("Enter filename:", "lyrn_snapshot");
-            if (!filename) return;
-            if (!filename.endsWith('.sns')) filename += '.sns';
+        window.rwiDownloadFile = () => {
+            const filename = currentSnapshotName.endsWith('.sns') ? currentSnapshotName : currentSnapshotName + '.sns';
             const blob = new Blob([JSON.stringify(components, null, 2)], {type: "application/json"});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url; a.download = filename;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast("Snapshot Downloaded");
-            closeModal();
+            showToast("Downloaded");
         }
 
         window.rwiLoadSNS = (input) => {
@@ -536,9 +621,10 @@
             reader.onload = (e) => {
                 try {
                     components = JSON.parse(e.target.result);
+                    currentSnapshotName = file.name.replace('.sns','');
                     selectedComponent = 'rwi'; 
                     updateRWITableOfContents(); renderList(); selectComponent('rwi');
-                    showToast("Snapshot Loaded");
+                    showToast("Snapshot Loaded from Disk");
                 } catch (err) { showToast("Error Parsing File", true); }
             };
             reader.readAsText(file); input.value = '';
@@ -558,7 +644,7 @@
         
         window.rwiShowHelp = () => {
             document.getElementById('modal-title').innerText = "RWI Builder Guide";
-            document.getElementById('modal-html-content').innerHTML = `<p><strong>RWI Builder v2.0 Guide</strong></p><ul><li>Edit, reorder, and toggle components.</li><li>Export .sns files for the dashboard.</li><li>Files are JSON compatible for LYRN v5.</li></ul>`;
+            document.getElementById('modal-html-content').innerHTML = `<p><strong>RWI Builder v2.1 Guide</strong></p><ul><li>Use the Dropdown to load saved snapshots.</li><li>"Save" saves the current state to a .sns file and sets it as active.</li><li>"Rebuild" compiles the active snapshot for the AI Worker.</li></ul>`;
             document.getElementById('modal-content').classList.add('hidden');
             document.getElementById('modal-html-content').classList.remove('hidden');
             document.getElementById('copy-btn').classList.add('btn-hidden'); 

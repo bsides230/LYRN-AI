@@ -210,6 +210,12 @@
                     <button class="btn-save" onclick="saveSystemConfig()">Save to Server</button>
                 </div>
                 <div class="card-body">
+                    <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <label style="color: var(--text-dim); font-family: 'JetBrains Mono'; font-size: 11px; width: 150px; text-transform:uppercase;">Worker Timeout (sec):</label>
+                        <input type="number" id="worker-timeout-input" style="width: 100px; padding: 8px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-head); border-radius: 4px; font-family: 'JetBrains Mono';" placeholder="1800">
+                        <span style="font-size: 11px; color: var(--text-dim);">(Default: 1800s / 30 mins)</span>
+                    </div>
+
                     <p style="color: var(--text-dim); margin-bottom: 10px;">
                         Directly edit the server-side configuration (settings.json). Use with caution.
                     </p>
@@ -233,6 +239,10 @@
        GLOBAL STATE
        ========================================= */
     let CORE_URL = "http://localhost:8000";
+    // Check local storage for Core URL override
+    const storedCore = localStorage.getItem('lyrn_core_url');
+    if(storedCore) CORE_URL = storedCore.replace(/\/$/, "");
+
     let authToken = localStorage.getItem('lyrn_admin_token') || null;
 
     let API_MAP = {
@@ -378,6 +388,14 @@
             });
             if(!res.ok) throw new Error("Config fetch failed");
             const json = await res.json();
+
+            // Sync Input
+            if (json.settings && json.settings.worker_timeout_seconds !== undefined) {
+                document.getElementById('worker-timeout-input').value = json.settings.worker_timeout_seconds;
+            } else {
+                document.getElementById('worker-timeout-input').value = 1800;
+            }
+
             document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
         } catch(e) {
             console.error(e);
@@ -390,6 +408,15 @@
         try {
             const text = document.getElementById('sys-config-editor').value;
             const json = JSON.parse(text);
+
+            // Sync Input to JSON
+            const timeoutVal = parseInt(document.getElementById('worker-timeout-input').value);
+            if (!isNaN(timeoutVal)) {
+                if (!json.settings) json.settings = {};
+                json.settings.worker_timeout_seconds = timeoutVal;
+                // Update editor visually
+                document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
+            }
 
             const res = await fetch(CORE_URL + '/api/config', {
                 method: 'POST',

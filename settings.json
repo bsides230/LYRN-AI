@@ -95,7 +95,9 @@
       }
     },
     "enable_chat_history": true,
-    "chat_history_length": 10
+    "chat_history_length": 10,
+    "worker_timeout_seconds": 1800,
+    "active_snapshot": null
   },
   "ui_settings": {
     "font_size": 12,

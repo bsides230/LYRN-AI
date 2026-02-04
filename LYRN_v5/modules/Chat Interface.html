@@ -315,16 +315,46 @@
     let isProcessing = false;
     let authToken = localStorage.getItem('lyrn_admin_token') || null;
 
+    // Command History State
+    let inputHistory = [];
+    let historyPointer = -1;
+
     document.addEventListener('DOMContentLoaded', () => {
         // Init logic
         loadConfig();
         if(authToken) loadHistory();
+
+        // Load Input History
+        try {
+            const saved = localStorage.getItem('lyrn_chat_input_history');
+            if(saved) inputHistory = JSON.parse(saved);
+        } catch(e) {}
 
         // Input binding
         const input = document.getElementById('chat-input');
         input.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
                 sendMessage();
+            }
+
+            // History Navigation
+            if (e.key === 'ArrowUp') {
+                if (historyPointer < inputHistory.length - 1) {
+                    e.preventDefault();
+                    historyPointer++;
+                    input.value = inputHistory[historyPointer];
+                }
+            }
+            if (e.key === 'ArrowDown') {
+                if (historyPointer > -1) {
+                    e.preventDefault();
+                    historyPointer--;
+                    if (historyPointer === -1) {
+                        input.value = "";
+                    } else {
+                        input.value = inputHistory[historyPointer];
+                    }
+                }
             }
         });
 
@@ -553,6 +583,15 @@
         const text = input.value.trim();
         if (!text || isProcessing) return;
 
+        // Update History (Rolling 20)
+        // Add to front, remove duplicates if identical to last
+        if (inputHistory.length === 0 || inputHistory[0] !== text) {
+            inputHistory.unshift(text);
+            if (inputHistory.length > 20) inputHistory.pop();
+            localStorage.setItem('lyrn_chat_input_history', JSON.stringify(inputHistory));
+        }
+        historyPointer = -1;
+
         // Clear input
         input.value = '';
         isProcessing = true;
@@ -723,13 +762,8 @@
                 headers: authToken ? { 'X-Token': authToken } : {}
             });
             if (res.ok) {
-                const history = document.getElementById('chat-history');
-                history.innerHTML = `
-                    <div style="text-align: center; color: var(--text-dim); margin-top: 40px;">
-                        <p>Chat Cleared.</p>
-                    </div>
-                `;
                 showToast("Chat History Deleted");
+                setTimeout(() => window.location.reload(), 500);
             } else {
                 showToast("Failed to delete chat", true);
             }
