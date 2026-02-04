@@ -35,6 +35,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TRIGGER_FILE = os.path.join(SCRIPT_DIR, "chat_trigger.txt")
+STOP_TRIGGER = os.path.join(SCRIPT_DIR, "stop_trigger.txt")
 REBUILD_TRIGGER = os.path.join(SCRIPT_DIR, "rebuild_trigger.txt")
 LLM_STATUS_FILE = os.path.join(SCRIPT_DIR, "global_flags", "llm_status.txt")
 STATS_FILE = os.path.join(SCRIPT_DIR, "global_flags", "llm_stats.json")
@@ -173,6 +174,13 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
     Processes a chat request triggered by a file path in chat_trigger.txt.
     """
     set_llm_status("busy")
+
+    # Clean up stale stop triggers
+    try:
+        if os.path.exists(STOP_TRIGGER):
+             os.remove(STOP_TRIGGER)
+    except: pass
+
     print(f"Processing request for: {chat_file_path_str}")
 
     try:
@@ -236,8 +244,14 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         token_count = 0
         first_token_time = None
 
+        # Clean messages for LLM (remove metadata like filename)
+        clean_messages = []
+        for msg in messages:
+            clean_msg = {"role": msg["role"], "content": msg["content"]}
+            clean_messages.append(clean_msg)
+
         stream = llm.create_chat_completion(
-            messages=messages,
+            messages=clean_messages,
             max_tokens=active_config.get("max_tokens", 2048),
             temperature=active_config.get("temperature", 0.7),
             top_p=active_config.get("top_p", 0.95),
@@ -250,6 +264,16 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
         with open(chat_file_path, "a", encoding="utf-8") as f:
             f.write("\n\n#MODEL_START#\n") # Separator
             for token_data in stream:
+                # Check for stop trigger
+                if os.path.exists(STOP_TRIGGER):
+                    print("[Worker] Stop trigger detected. Aborting generation.")
+                    try:
+                        os.remove(STOP_TRIGGER)
+                    except: pass
+                    f.write("\n\n[Stopped]")
+                    full_response += "\n[Stopped]"
+                    break
+
                 if 'choices' in token_data and len(token_data['choices']) > 0:
                     delta = token_data['choices'][0].get('delta', {})
                     content = delta.get('content', '')
