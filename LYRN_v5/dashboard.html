@@ -362,19 +362,43 @@
            ========================================= */
         #settings-popup {
             position: fixed; 
-            width: 260px; background: var(--bg-panel); 
+            width: 350px;
+            max-height: 80vh;
+            background: var(--bg-panel);
             border: 1px solid var(--dock-border); border-radius: 12px;
-            padding: 15px; color: var(--text-body);
+            padding: 0; color: var(--text-body);
             box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            display: none; flex-direction: column; gap: 12px;
+            display: none; flex-direction: column;
             z-index: 20001;
+            overflow: hidden;
         }
         #settings-popup.show { display: flex; animation: fadeUp 0.2s; }
         @keyframes fadeUp { from{opacity:0; transform:scale(0.95);} to{opacity:1; transform:scale(1);} }
         
+        /* TABS */
+        .settings-tabs {
+            display: flex; border-bottom: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.1);
+        }
+        .tab-btn {
+            flex: 1; padding: 10px; background: transparent; border: none;
+            color: var(--text-dim); font-family: 'JetBrains Mono'; font-size: 11px;
+            cursor: pointer; border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: var(--text-head); }
+        .tab-btn.active { color: var(--brand-purple); border-bottom-color: var(--brand-purple); font-weight: bold; }
+
+        .settings-content {
+            padding: 15px; overflow-y: auto; flex: 1;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .tab-pane { display: none; flex-direction: column; gap: 12px; }
+        .tab-pane.active { display: flex; }
+
         .settings-header { 
             font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim); 
-            text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; 
+            text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-top: 5px;
         }
         .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
         
@@ -385,6 +409,17 @@
             transition: all 0.2s;
         }
         .btn-full-width:hover { background: var(--brand-purple); border-color: var(--brand-purple); }
+
+        .btn-icon { background: transparent; border: 1px solid var(--border-color); color: var(--text-dim); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+        .btn-icon:hover { color: var(--brand-purple); border-color: var(--brand-purple); }
+
+        /* LAYOUT LIST */
+        .layout-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);
+        }
+        .layout-name { font-size: 12px; color: var(--text-head); }
+        .layout-actions { display: flex; gap: 6px; }
 
         /* SLIDER STYLES */
         input[type="range"] {
@@ -626,32 +661,71 @@
     </div>
 
     <div id="settings-popup">
-        <div class="settings-header">General</div>
-        <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
-        <div class="settings-row">
-            <span>Dark Mode</span>
-            <label class="toggle-switch">
-                <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
-                <span class="toggle-slider"></span>
-            </label>
-        </div>
-        <div class="settings-row">
-            <span>Pin Open</span>
-            <label class="toggle-switch">
-                <input type="checkbox" id="setting-dock-pin" checked onchange="toggleDockPin(this.checked)">
-                <span class="toggle-slider"></span>
-            </label>
-        </div>
-        <div class="settings-row">
-            <span>Font Size: <b id="font-size-display">12</b>px</span>
-            <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
+        <div class="settings-tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-general')">General</button>
+            <button class="tab-btn" onclick="switchTab('tab-layouts')">Layouts</button>
+            <button class="tab-btn" onclick="switchTab('tab-advanced')">Advanced</button>
         </div>
         
-        <div class="settings-header" style="margin-top:5px;">Layout</div>
-        <button class="btn-full-width" onclick="enableEditMode()">Edit Dock Order</button>
-        
-        <div class="settings-header" style="margin-top:5px;">Modules</div>
-        <div id="module-list-container"></div>
+        <div class="settings-content">
+            <!-- GENERAL TAB -->
+            <div id="tab-general" class="tab-pane active">
+                <div class="settings-header">Appearance</div>
+                <div class="settings-row">
+                    <span>Dark Mode</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <span>Pin Dock Open</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-dock-pin" checked onchange="toggleDockPin(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <span>Font Size: <b id="font-size-display">12</b>px</span>
+                    <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
+                </div>
+
+                <div class="settings-header">Connection</div>
+                <button class="btn-full-width" onclick="openConnectionPopup()">Configure Connection</button>
+
+                <div class="settings-header">Modules</div>
+                <button class="btn-full-width" onclick="enableEditMode()" style="margin-bottom:8px;">Edit Dock Order</button>
+                <div id="module-list-container"></div>
+            </div>
+
+            <!-- LAYOUTS TAB -->
+            <div id="tab-layouts" class="tab-pane">
+                <div class="settings-header">Current Layout</div>
+                <div style="display:flex; gap:6px;">
+                    <input type="text" id="inp-layout-name" placeholder="Layout Name" style="flex:1; padding:6px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); border-radius:4px;">
+                    <button class="btn-icon" onclick="saveCurrentLayout()">Save</button>
+                </div>
+
+                <div class="settings-header">Saved Layouts</div>
+                <div id="layout-list" style="display:flex; flex-direction:column; gap:6px;">
+                    <!-- JS Injected -->
+                </div>
+            </div>
+
+            <!-- ADVANCED TAB -->
+            <div id="tab-advanced" class="tab-pane">
+                <div class="settings-header">System Config (Server)</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <button class="btn-full-width" onclick="fetchSystemConfig()">Load Config</button>
+                    <button class="btn-full-width" onclick="saveSystemConfig()">Save Config</button>
+                </div>
+                <textarea id="sys-config-editor" style="width:100%; height:150px; font-family:'JetBrains Mono'; font-size:10px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); padding:8px; resize:vertical;"></textarea>
+
+                <div class="settings-header">API Endpoints (Local)</div>
+                <textarea id="api-config-editor" placeholder="{ 'Chat': 'http://...' }" style="width:100%; height:80px; font-family:'JetBrains Mono'; font-size:10px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); padding:8px; resize:vertical;"></textarea>
+                <button class="btn-full-width" onclick="saveApiConfig()">Save API Map</button>
+            </div>
+        </div>
     </div>
 
     <div id="floating-dock">
@@ -673,12 +747,11 @@
             { id: "mod_model_manager", file: "ModelManager.html", name: "Model Manager", icon: "📦" },
             { id: "mod_job_manager", file: "Job Manager.html", name: "Job Automation", icon: "🤖" },
             { id: "mod_logs", file: "LogViewer.html", name: "System Logs", icon: "📜" },
-            { id: "mod_settings", file: "Settings.html", name: "System Settings", icon: "🔧" },
             { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
         ];
 
         let appSettings = {
-            activeModules: ['mod_chat', 'mod_builder', 'mod_models', 'mod_model_manager', 'mod_job_manager', 'mod_logs', 'mod_settings', 'mod_server_status'],
+            activeModules: ['mod_chat', 'mod_builder', 'mod_models', 'mod_model_manager', 'mod_job_manager', 'mod_logs', 'mod_server_status'],
             dockPinned: true, 
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
@@ -728,7 +801,301 @@
                     disableEditMode();
                 }
             });
+
+            // Handle Window Resize (Keep windows on screen)
+            window.addEventListener('resize', constrainWindows);
+
+            // Init Layouts
+            loadLayoutsAndCheckDefault();
         });
+
+        /* =========================================
+           TABS & LAYOUTS & ADVANCED
+           ========================================= */
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+
+            // Find button that triggered this
+            const btns = document.querySelectorAll('.tab-btn');
+            if(tabId === 'tab-general') btns[0].classList.add('active');
+            if(tabId === 'tab-layouts') btns[1].classList.add('active');
+            if(tabId === 'tab-advanced') btns[2].classList.add('active');
+        }
+
+        /* --- LAYOUTS --- */
+        let savedLayouts = {};
+
+        function loadLayoutsAndCheckDefault() {
+            try {
+                const s = localStorage.getItem('lyrn_layouts');
+                if(s) savedLayouts = JSON.parse(s);
+            } catch(e) { console.error(e); }
+
+            // Check Default
+            const defName = localStorage.getItem('lyrn_default_layout');
+            if(defName && savedLayouts[defName]) {
+                console.log("Loading default layout:", defName);
+                applyLayout(savedLayouts[defName]);
+            }
+        }
+
+        function renderLayoutList() {
+            const list = document.getElementById('layout-list');
+            list.innerHTML = '';
+
+            const defName = localStorage.getItem('lyrn_default_layout');
+
+            Object.keys(savedLayouts).forEach(name => {
+                const isDef = (name === defName);
+                const item = document.createElement('div');
+                item.className = 'layout-item';
+
+                // Name Span
+                const span = document.createElement('span');
+                span.className = 'layout-name';
+                span.textContent = name + (isDef ? ' (Default)' : '');
+
+                // Actions Container
+                const actions = document.createElement('div');
+                actions.className = 'layout-actions';
+
+                // Load Button
+                const btnLoad = document.createElement('button');
+                btnLoad.className = 'btn-icon';
+                btnLoad.title = 'Load';
+                btnLoad.textContent = '📂';
+                btnLoad.onclick = () => loadLayout(name);
+
+                // Default Button
+                const btnDef = document.createElement('button');
+                btnDef.className = 'btn-icon';
+                btnDef.title = 'Set Default';
+                btnDef.textContent = '★';
+                if(isDef) btnDef.style.color = 'var(--brand-purple)';
+                btnDef.onclick = () => setDefaultLayout(name);
+
+                // Delete Button
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-icon';
+                btnDel.title = 'Delete';
+                btnDel.textContent = '✕';
+                btnDel.style.color = 'var(--error-color)';
+                btnDel.onclick = () => deleteLayout(name);
+
+                actions.appendChild(btnLoad);
+                actions.appendChild(btnDef);
+                actions.appendChild(btnDel);
+
+                item.appendChild(span);
+                item.appendChild(actions);
+                list.appendChild(item);
+            });
+        }
+
+        function saveCurrentLayout() {
+            const name = document.getElementById('inp-layout-name').value.trim();
+            if(!name) return alert("Please enter a layout name.");
+
+            const wins = [];
+            document.querySelectorAll('.lyrn-window').forEach(win => {
+                const id = win.id.replace('win_', '');
+                const rect = win.getBoundingClientRect();
+                wins.push({
+                    id: id,
+                    left: rect.left,
+                    top: rect.top,
+                    width: win.style.width,
+                    height: win.style.height,
+                    pinned: win.classList.contains('always-on-top'),
+                    maximized: win.classList.contains('maximized'),
+                    zIndex: win.style.zIndex
+                });
+            });
+
+            // Also save Active Modules list
+            const layout = {
+                windows: wins,
+                activeModules: [...appSettings.activeModules],
+                timestamp: Date.now()
+            };
+
+            savedLayouts[name] = layout;
+            localStorage.setItem('lyrn_layouts', JSON.stringify(savedLayouts));
+            renderLayoutList();
+            document.getElementById('inp-layout-name').value = '';
+        }
+
+        function loadLayout(name) {
+            const layout = savedLayouts[name];
+            if(!layout) return;
+
+            if(confirm('Load layout "' + name + '"? This will close current windows.')) {
+                applyLayout(layout);
+            }
+        }
+
+        function applyLayout(layout) {
+            // 1. Close all windows
+            activeWindows.forEach(id => closeWindow(id));
+
+            // 2. Update active modules if saved
+            if(layout.activeModules) {
+                appSettings.activeModules = layout.activeModules;
+                saveSettings();
+                renderDock();
+            }
+
+            // 3. Restore windows
+            layout.windows.forEach(w => {
+                // Check if module exists in registry (might have been removed)
+                const mod = MODULE_REGISTRY.find(m => m.id === w.id);
+                if(!mod) return;
+
+                createWindow(mod);
+                const win = document.getElementById('win_' + w.id);
+                if(win) {
+                    win.style.left = w.left + 'px';
+                    win.style.top = w.top + 'px';
+                    win.style.width = w.width;
+                    win.style.height = w.height;
+                    win.style.zIndex = w.zIndex;
+
+                    if(w.pinned) {
+                         win.classList.add('always-on-top');
+                         const btn = win.querySelector('.pin-btn');
+                         if(btn) { btn.classList.add('pinned'); btn.innerHTML = '📍'; }
+                    }
+                    if(w.maximized) {
+                        win.classList.add('maximized');
+                        win.style.left = '0'; win.style.top = '32px';
+                        win.style.width = '100%'; win.style.height = 'calc(100% - 32px)';
+                    }
+                }
+            });
+        }
+
+        function deleteLayout(name) {
+            if(confirm('Delete layout "' + name + '"?')) {
+                delete savedLayouts[name];
+                localStorage.setItem('lyrn_layouts', JSON.stringify(savedLayouts));
+
+                if(localStorage.getItem('lyrn_default_layout') === name) {
+                    localStorage.removeItem('lyrn_default_layout');
+                }
+                renderLayoutList();
+            }
+        }
+
+        function setDefaultLayout(name) {
+            localStorage.setItem('lyrn_default_layout', name);
+            renderLayoutList();
+        }
+
+        /* --- ADVANCED SETTINGS --- */
+        async function fetchSystemConfig() {
+            if(!authToken || !coreUrl) return alert("Not connected or authenticated.");
+            try {
+                const res = await fetch(coreUrl + '/api/config', {
+                    headers: { 'X-Token': authToken }
+                });
+                if(!res.ok) throw new Error("Fetch failed");
+                const json = await res.json();
+                document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        async function saveSystemConfig() {
+            if(!authToken || !coreUrl) return alert("Not connected or authenticated.");
+            try {
+                const text = document.getElementById('sys-config-editor').value;
+                const json = JSON.parse(text);
+                const res = await fetch(coreUrl + '/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify(json)
+                });
+                if(!res.ok) throw new Error("Save failed");
+                alert("System Config Saved.");
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        function loadApiConfig() {
+            const s = localStorage.getItem('lyrn_api_config');
+            if(s) {
+                 try {
+                     document.getElementById('api-config-editor').value = JSON.stringify(JSON.parse(s), null, 2);
+                 } catch(e) {
+                     console.error("Failed to parse API config", e);
+                     document.getElementById('api-config-editor').value = "{\n  \"Chat\": \"http://localhost:8000/api/chat\"\n}";
+                 }
+            } else {
+                 document.getElementById('api-config-editor').value = "{\n  \"Chat\": \"http://localhost:8000/api/chat\"\n}";
+            }
+        }
+
+        function saveApiConfig() {
+            try {
+                const text = document.getElementById('api-config-editor').value;
+                const json = JSON.parse(text);
+                localStorage.setItem('lyrn_api_config', JSON.stringify(json));
+                alert("API Map Saved.");
+            } catch(e) {
+                alert("Invalid JSON: " + e.message);
+            }
+        }
+
+        function constrainWindows() {
+            const wins = document.querySelectorAll('.lyrn-window');
+            const maxW = window.innerWidth;
+            const maxH = window.innerHeight;
+            const topBarH = 32;
+
+            wins.forEach(win => {
+                if(win.classList.contains('maximized')) return;
+
+                const rect = win.getBoundingClientRect();
+                let newLeft = rect.left;
+                let newTop = rect.top;
+                let moved = false;
+
+                // Right edge
+                if(rect.right > maxW) {
+                    newLeft = maxW - rect.width;
+                    if(newLeft < 0) newLeft = 0;
+                    moved = true;
+                }
+
+                // Bottom edge
+                if(rect.bottom > maxH) {
+                    newTop = maxH - rect.height;
+                    if(newTop < topBarH) newTop = topBarH;
+                    moved = true;
+                }
+
+                // Top edge
+                if(rect.top < topBarH) {
+                    newTop = topBarH;
+                    moved = true;
+                }
+
+                // Left edge
+                if(rect.left < 0) {
+                    newLeft = 0;
+                    moved = true;
+                }
+
+                if(moved) {
+                    win.style.left = newLeft + 'px';
+                    win.style.top = newTop + 'px';
+                }
+            });
+        }
 
         /* =========================================
            DOCK LOGIC
@@ -788,15 +1155,36 @@
                 if(isEditMode) return;
                 const popup = document.getElementById('settings-popup');
                 
-                const dockRect = document.getElementById('floating-dock').getBoundingClientRect();
-                
-                // Position Settings Popup relative to dock
-                const popupW = 260; 
-                let leftPos = dockRect.left - popupW - 15;
-                if(leftPos < 10) leftPos = dockRect.right + 15;
+                if(!popup.classList.contains('show')) {
+                    // Position Logic
+                    const dockRect = document.getElementById('floating-dock').getBoundingClientRect();
+                    const popupW = 350;
+                    const popupH = 500; // Est max height
+                    const margin = 20;
 
-                popup.style.top = (dockRect.top - 100) + 'px';
-                popup.style.left = leftPos + 'px';
+                    let left = dockRect.left - popupW - margin;
+                    let top = dockRect.top - popupH + margin; // Try to align bottom-ish
+
+                    // If dock is on left side
+                    if (dockRect.left < window.innerWidth / 2) {
+                        left = dockRect.right + margin;
+                    }
+
+                    // Check boundaries
+                    if (left < margin) left = margin;
+                    if (left + popupW > window.innerWidth - margin) left = window.innerWidth - popupW - margin;
+
+                    // Vertical alignment
+                    if (top < margin + 32) top = margin + 32;
+                    if (top + popupH > window.innerHeight - margin) top = window.innerHeight - popupH - margin;
+
+                    popup.style.left = left + 'px';
+                    popup.style.top = top + 'px';
+
+                    // Init logic when opening
+                    renderLayoutList();
+                    loadApiConfig();
+                }
                 
                 popup.classList.toggle('show');
             };
