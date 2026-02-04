@@ -51,6 +51,9 @@ extended_llm_stats = {
     "generation_time_ms": 0.0
 }
 
+# Global Active Downloads
+active_downloads = {} # filename -> { status, bytes, total, pct, error, timestamp }
+
 # --- DiskJournalLogger ---
 class DiskJournalLogger:
     def __init__(self, log_dir="logs", lines_per_chunk=1000):
@@ -833,8 +836,86 @@ async def chat_endpoint(request: ChatRequest):
 
 # --- Model & Config Endpoints ---
 
+async def _download_model_task(url: str, filename: str, expected_sha256: Optional[str], max_bytes: int):
+    models_dir = Path("models")
+    staging_dir = models_dir / "_staging"
+    models_dir.mkdir(exist_ok=True)
+    staging_dir.mkdir(exist_ok=True)
+
+    part_file = staging_dir / f"{filename}.part"
+    final_staging = staging_dir / filename
+    dest_file = models_dir / filename
+
+    try:
+        active_downloads[filename]["status"] = "downloading"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    raise Exception(f"HTTP {resp.status}")
+
+                content_len = resp.headers.get("Content-Length")
+                if max_bytes > 0 and content_len and int(content_len) > max_bytes:
+                     raise Exception("File too large")
+
+                downloaded = 0
+                sha256 = hashlib.sha256()
+                total_size = int(content_len) if content_len else 0
+                last_log_time = time.time()
+
+                # Update total
+                active_downloads[filename]["total"] = total_size
+
+                async with aiofiles.open(part_file, "wb") as f:
+                    async for chunk in resp.content.iter_chunked(1024 * 1024): # 1MB chunks
+                        downloaded += len(chunk)
+                        if max_bytes > 0 and downloaded > max_bytes:
+                             raise Exception("File limit exceeded")
+
+                        sha256.update(chunk)
+                        await f.write(chunk)
+
+                        # Update status
+                        active_downloads[filename]["bytes"] = downloaded
+                        if total_size > 0:
+                            active_downloads[filename]["pct"] = int(downloaded / total_size * 100)
+
+                        if time.time() - last_log_time > 2:
+                            pct = ""
+                            if total_size > 0:
+                                pct = f" ({int(downloaded/total_size*100)}%)"
+                            await logger.emit("Info", f"Downloading {filename}: {downloaded // (1024*1024)}MB{pct}", "ModelManager")
+                            last_log_time = time.time()
+
+        # Hash Verification
+        active_downloads[filename]["status"] = "verifying"
+        computed_hash = sha256.hexdigest()
+        if expected_sha256 and computed_hash.lower() != expected_sha256.lower():
+            if part_file.exists(): part_file.unlink()
+            raise Exception(f"Hash mismatch. Computed: {computed_hash}")
+
+        # Atomic Move
+        shutil.move(str(part_file), str(final_staging))
+        shutil.move(str(final_staging), str(dest_file))
+
+        await logger.emit("Success", f"Downloaded model: {filename} ({downloaded} bytes)", "ModelManager")
+
+        # Mark done
+        active_downloads[filename]["status"] = "completed"
+        active_downloads[filename]["bytes"] = downloaded
+
+    except Exception as e:
+        if part_file.exists():
+            try:
+                part_file.unlink()
+            except: pass
+        print(f"Download error: {e}")
+        await logger.emit("Error", f"Download failed: {str(e)}", "ModelManager")
+        active_downloads[filename]["status"] = "error"
+        active_downloads[filename]["error"] = str(e)
+
 @app.post("/api/models/fetch", dependencies=[Depends(verify_token)])
-async def fetch_model(request: ModelFetchRequest):
+async def fetch_model(request: ModelFetchRequest, background_tasks: BackgroundTasks):
     url = request.url
 
     # 1. Determine Filename
@@ -848,77 +929,42 @@ async def fetch_model(request: ModelFetchRequest):
     if not filename or filename in ['.', '..']:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    models_dir = Path("models")
-    staging_dir = models_dir / "_staging"
-    models_dir.mkdir(exist_ok=True)
-    staging_dir.mkdir(exist_ok=True)
-
-    part_file = staging_dir / f"{filename}.part"
-    final_staging = staging_dir / filename
-    dest_file = models_dir / filename
+    if filename in active_downloads and active_downloads[filename]["status"] in ["pending", "downloading", "verifying"]:
+        raise HTTPException(status_code=400, detail="Download already in progress")
 
     # 2. Size Limit
     max_bytes = int(os.environ.get("LYRN_MAX_MODEL_BYTES", 0))
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    raise HTTPException(status_code=400, detail=f"Download failed: HTTP {resp.status}")
+    # Initialize tracking
+    active_downloads[filename] = {
+        "status": "pending",
+        "bytes": 0,
+        "total": 0,
+        "pct": 0,
+        "error": None,
+        "timestamp": time.time()
+    }
 
-                content_len = resp.headers.get("Content-Length")
-                if max_bytes > 0 and content_len and int(content_len) > max_bytes:
-                     raise HTTPException(status_code=400, detail="File too large")
+    # Start Background Task
+    background_tasks.add_task(_download_model_task, url, filename, request.expected_sha256, max_bytes)
 
-                downloaded = 0
-                sha256 = hashlib.sha256()
-                total_size = int(content_len) if content_len else 0
-                last_log_time = time.time()
+    await logger.emit("Info", f"Started download for {filename}", "ModelManager")
+    return {"ok": True, "message": "Download started", "filename": filename}
 
-                async with aiofiles.open(part_file, "wb") as f:
-                    async for chunk in resp.content.iter_chunked(1024 * 1024): # 1MB chunks
-                        downloaded += len(chunk)
-                        if max_bytes > 0 and downloaded > max_bytes:
-                             raise HTTPException(status_code=400, detail="File limit exceeded")
+@app.get("/api/models/downloads", dependencies=[Depends(verify_token)])
+async def get_active_downloads():
+    current_time = time.time()
+    to_remove = []
+    for fname, data in active_downloads.items():
+        if data["status"] in ["completed", "error"]:
+            # Clean up old statuses after 10 minutes
+            if current_time - data.get("timestamp", 0) > 600:
+                to_remove.append(fname)
 
-                        sha256.update(chunk)
-                        await f.write(chunk)
+    for fname in to_remove:
+        del active_downloads[fname]
 
-                        if time.time() - last_log_time > 2:
-                            pct = ""
-                            if total_size > 0:
-                                pct = f" ({int(downloaded/total_size*100)}%)"
-                            await logger.emit("Info", f"Downloading {filename}: {downloaded // (1024*1024)}MB{pct}", "ModelManager")
-                            last_log_time = time.time()
-
-        # 3. Hash Verification
-        computed_hash = sha256.hexdigest()
-        if request.expected_sha256 and computed_hash.lower() != request.expected_sha256.lower():
-            # Cleanup
-            if part_file.exists(): part_file.unlink()
-            raise HTTPException(status_code=400, detail=f"Hash mismatch. Computed: {computed_hash}")
-
-        # 4. Atomic Move
-        shutil.move(str(part_file), str(final_staging))
-        shutil.move(str(final_staging), str(dest_file))
-
-        await logger.emit("Success", f"Downloaded model: {filename} ({downloaded} bytes)", "ModelManager")
-
-        return {
-            "ok": True,
-            "saved_as": f"models/{filename}",
-            "sha256": computed_hash,
-            "bytes": downloaded
-        }
-
-    except Exception as e:
-        if part_file.exists():
-            try:
-                part_file.unlink()
-            except: pass
-        print(f"Download error: {e}")
-        await logger.emit("Error", f"Download failed: {str(e)}", "ModelManager")
-        raise HTTPException(status_code=500, detail=str(e))
+    return active_downloads
 
 @app.get("/api/models/list", dependencies=[Depends(verify_token)])
 async def list_models():
