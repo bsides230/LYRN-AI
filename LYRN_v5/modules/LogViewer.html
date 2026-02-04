@@ -119,10 +119,10 @@
         }
         .log-entry:hover { background: rgba(124, 92, 255, 0.05); }
 
-        .log-ts { color: var(--text-dim); margin-right: 8px; flex-shrink: 0; font-size: 11px; }
-        .log-level { margin-right: 8px; font-weight: bold; width: 60px; flex-shrink: 0; }
-        .log-source { color: var(--text-dim); margin-right: 8px; width: 100px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;}
-        .log-msg { color: var(--text-body); word-break: break-all; }
+        .log-ts { color: var(--text-dim); margin-right: 6px; flex-shrink: 0; font-size: 10px; width: 50px; overflow: hidden; white-space: nowrap; }
+        .log-level { margin-right: 6px; font-weight: bold; width: 45px; flex-shrink: 0; font-size: 11px; }
+        .log-source { color: var(--text-dim); margin-right: 6px; width: 70px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 10px; }
+        .log-msg { color: var(--text-body); word-break: break-all; flex: 1; }
 
         .level-Info { color: var(--log-info); }
         .level-Warn { color: var(--log-warn); }
@@ -401,7 +401,8 @@
                 if(!isLive) return;
                 try {
                     const data = JSON.parse(event.data);
-                    appendLog(data);
+                    messageQueue.push(data);
+                    startProcessing();
                 } catch(e) {
                     console.error("Parse error", e);
                 }
@@ -412,13 +413,62 @@
             };
         }
 
+        // --- Message Queue for Performance ---
+        const messageQueue = [];
+        let processing = false;
+
+        function startProcessing() {
+            if(processing) return;
+            processing = true;
+            requestAnimationFrame(processQueue);
+        }
+
+        function processQueue() {
+            if(messageQueue.length === 0) {
+                processing = false;
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            // Process chunk (e.g. 50 items) to keep UI responsive
+            const CHUNK_SIZE = 50;
+            const limit = Math.min(messageQueue.length, CHUNK_SIZE);
+
+            for(let i=0; i<limit; i++) {
+                const log = messageQueue.shift();
+                const div = createLogElement(log);
+                fragment.appendChild(div);
+            }
+
+            logContainer.appendChild(fragment);
+
+            // Prune if too large
+            if(isLive && logContainer.childElementCount > 2000) {
+                // Remove roughly as many as we added or more
+                const removeCount = logContainer.childElementCount - 1800;
+                for(let k=0; k<removeCount; k++) {
+                    if(logContainer.firstChild) logContainer.removeChild(logContainer.firstChild);
+                }
+            }
+
+            if(chkAutoScroll.checked) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            // Continue if more items
+            if(messageQueue.length > 0) {
+                requestAnimationFrame(processQueue);
+            } else {
+                processing = false;
+            }
+        }
+
         function updateStatus(connected, text) {
             statusDot.className = connected ? 'connected' : 'disconnected';
             statusText.innerText = text;
         }
 
-        function appendLog(log) {
-            // log = { ts, level, msg, source }
+        function createLogElement(log) {
             const div = document.createElement('div');
             div.className = `log-entry level-${log.level}`;
             div.dataset.level = log.level;
@@ -440,17 +490,14 @@
             if(!activeFilters.has(log.level) && log.level !== 'Success') {
                 div.style.display = 'none';
             }
+            return div;
+        }
 
+        function appendLog(log) {
+            // Legacy/Direct append wrapper
+            const div = createLogElement(log);
             logContainer.appendChild(div);
-
-            // Limit buffer size only if live
-            if(isLive && logContainer.childElementCount > 2000) {
-                logContainer.removeChild(logContainer.firstChild);
-            }
-
-            if(chkAutoScroll.checked) {
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
+            if(chkAutoScroll.checked) logContainer.scrollTop = logContainer.scrollHeight;
         }
 
         function refilterLogs() {
