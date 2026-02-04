@@ -189,6 +189,12 @@
                 </div>
             </div>
 
+            <!-- ACTIVE DOWNLOADS -->
+            <div class="panel-section" id="downloads-panel" style="display:none;">
+                <div class="section-title">Active Downloads</div>
+                <div id="downloads-list"></div>
+            </div>
+
             <!-- DOWNLOAD -->
             <div class="panel-section">
                 <div class="section-title">Download New Model</div>
@@ -254,8 +260,13 @@
             }
         });
 
+        let downloadPollInterval = null;
+
         document.addEventListener('DOMContentLoaded', () => {
-            if(authToken) fetchList();
+            if(authToken) {
+                fetchList();
+                startDownloadPolling();
+            }
         });
 
         function setStatus(msg, type='normal') {
@@ -375,8 +386,8 @@
             }
 
             els.btnDl.disabled = true;
-            els.btnDl.innerText = "Downloading...";
-            setStatus("Starting download... (Check Logs for progress)");
+            els.btnDl.innerText = "Starting...";
+            setStatus("Starting download...");
 
             try {
                 const body = { url: url };
@@ -399,14 +410,15 @@
                 const data = await res.json();
 
                 if(!res.ok) {
-                    throw new Error(data.detail || "Download failed");
+                    throw new Error(data.detail || "Request failed");
                 }
 
-                setStatus("Download Complete!");
+                setStatus(`Download started: ${data.filename}`);
                 document.getElementById('inp-url').value = '';
                 document.getElementById('inp-filename').value = '';
                 document.getElementById('inp-sha256').value = '';
-                fetchList();
+
+                startDownloadPolling();
 
             } catch(e) {
                 setStatus("Error: " + e.message, 'error');
@@ -414,6 +426,87 @@
                 els.btnDl.disabled = false;
                 els.btnDl.innerText = "Download Model";
             }
+        }
+
+        function startDownloadPolling() {
+            if(downloadPollInterval) return;
+            updateDownloads();
+            downloadPollInterval = setInterval(updateDownloads, 1000);
+        }
+
+        async function updateDownloads() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/models/downloads`, {
+                    headers: { 'X-Token': authToken }
+                });
+                if(!res.ok) return;
+                const downloads = await res.json();
+                renderDownloads(downloads);
+            } catch(e) {
+                console.error("Poll error", e);
+            }
+        }
+
+        function renderDownloads(downloads) {
+            const panel = document.getElementById('downloads-panel');
+            const list = document.getElementById('downloads-list');
+
+            const keys = Object.keys(downloads);
+            if(keys.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.style.display = 'block';
+            list.innerHTML = '';
+
+            keys.forEach(fname => {
+                const d = downloads[fname];
+                const div = document.createElement('div');
+                div.style.marginBottom = "10px";
+                div.style.fontSize = "11px";
+                div.style.fontFamily = "JetBrains Mono";
+
+                let statusColor = "var(--brand-purple)";
+                if(d.status === "error") statusColor = "var(--error-color)";
+                if(d.status === "completed") statusColor = "var(--success-color)";
+
+                let progress = "";
+                if(d.status === "downloading") {
+                    progress = ` - ${formatBytes(d.bytes)} / ${formatBytes(d.total)} (${d.pct}%)`;
+                } else if(d.status === "completed") {
+                     progress = ` - ${formatBytes(d.bytes)}`;
+                }
+
+                div.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <span style="color:var(--text-head)">${fname}</span>
+                        <span style="color:${statusColor}">${d.status}</span>
+                    </div>
+                    <div style="color:var(--text-dim)">${progress}</div>
+                    ${d.error ? `<div style="color:var(--error-color)">${d.error}</div>` : ''}
+                `;
+
+                if(d.status === "downloading") {
+                     const barContainer = document.createElement('div');
+                     barContainer.style.height = "4px";
+                     barContainer.style.background = "var(--bg-input)";
+                     barContainer.style.marginTop = "4px";
+                     barContainer.style.borderRadius = "2px";
+
+                     const bar = document.createElement('div');
+                     bar.style.height = "100%";
+                     bar.style.background = "var(--brand-purple)";
+                     bar.style.width = d.pct + "%";
+                     bar.style.borderRadius = "2px";
+
+                     barContainer.appendChild(bar);
+                     div.appendChild(barContainer);
+                }
+
+                list.appendChild(div);
+            });
         }
 
     </script>

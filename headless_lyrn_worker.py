@@ -269,21 +269,20 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
 
     except Exception as e:
         print(f"Error during generation: {e}")
-
-        # Check for KV cache corruption
-        if "llama_decode returned -1" in str(e) or "inconsistent sequence positions" in str(e):
-             print("KV Cache corruption detected. Resetting context...")
-             try:
-                 llm.reset()
-             except Exception as reset_err:
-                 print(f"Error resetting LLM: {reset_err}")
-
         try:
             with open(chat_file_path, "a", encoding="utf-8") as f:
                 f.write(f"\n[Error: {e}]\n")
         except:
             pass
         set_llm_status("error")
+
+    finally:
+        # Clear context after every request to prevent KV cache corruption (v4 parity)
+        try:
+             llm.reset()
+             # print("[Worker] Context reset.") # Optional: uncomment for debug
+        except Exception as e:
+             print(f"[Worker] Error resetting context: {e}")
 
 if __name__ == "__main__":
     main()
