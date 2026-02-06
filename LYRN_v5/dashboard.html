@@ -1887,9 +1887,12 @@
                 // Trigger Auth Check if connected and not done yet
                 if(!hasCheckedAuth) checkAuth();
 
-                const cpuText = `CPU: ${data.cpu}%`;
                 const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
-                document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
+                let finalText = ramText;
+                if(data.cpu !== null && data.cpu !== undefined) {
+                    finalText = `CPU: ${data.cpu}% | ${ramText}`;
+                }
+                document.getElementById('sys-cpu').innerText = finalText;
 
                 // LLM Status Logic
                 const llmEl = document.getElementById(llmLight);

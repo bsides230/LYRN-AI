@@ -540,23 +540,42 @@ async def verify_token_endpoint():
 
 @app.get("/health")
 async def health_check():
-    cpu = psutil.cpu_percent()
+    try:
+        cpu = psutil.cpu_percent()
+    except (PermissionError, AttributeError, Exception):
+        cpu = None
+
     ram = psutil.virtual_memory()
-    disk = psutil.disk_usage('.')
+
+    try:
+        disk = psutil.disk_usage('.')
+    except (PermissionError, Exception):
+        disk = None
 
     gpu_stats = {}
     if pynvml:
         try:
             pynvml.nvmlInit()
-            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-            gpu_stats = {
-                "vram_used_gb": mem_info.used / (1024**3),
-                "vram_total_gb": mem_info.total / (1024**3),
-                "vram_percent": (mem_info.used / mem_info.total) * 100
-            }
-        except Exception:
-            pass
+            device_count = pynvml.nvmlDeviceGetCount()
+            for i in range(device_count):
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                name = pynvml.nvmlDeviceGetName(handle)
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                try:
+                    util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                    gpu_util = util.gpu
+                except Exception:
+                    gpu_util = 0
+
+                gpu_stats[f"gpu_{i}"] = {
+                    "name": name,
+                    "vram_used_gb": mem_info.used / (1024**3),
+                    "vram_total_gb": mem_info.total / (1024**3),
+                    "vram_percent": (mem_info.used / mem_info.total) * 100,
+                    "gpu_util_percent": gpu_util
+                }
+        except Exception as e:
+            gpu_stats["error"] = str(e)
 
     worker_status = worker_controller.get_status()
 
@@ -584,7 +603,7 @@ async def health_check():
             "percent": disk.percent,
             "used_gb": disk.used / (1024**3),
             "total_gb": disk.total / (1024**3)
-        },
+        } if disk else None,
         "gpu": gpu_stats,
         "worker": worker_status,
         "llm_stats": llm_stats
