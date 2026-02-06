@@ -1,5 +1,7 @@
 {
   "settings": {
+    "device_name": "LYRN AI",
+    "modules": ["chat", "automation", "logs", "system", "snapshots", "models"],
     "active": {
       "model_path": "models/LiquidAI 1.2B Instruct",
       "n_ctx": 8000,
