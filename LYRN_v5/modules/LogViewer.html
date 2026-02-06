@@ -120,8 +120,6 @@
         .log-entry:hover { background: rgba(124, 92, 255, 0.05); }
 
         .log-ts { color: var(--text-dim); margin-right: 6px; flex-shrink: 0; font-size: 10px; width: 50px; overflow: hidden; white-space: nowrap; }
-        .log-level { margin-right: 6px; font-weight: bold; width: 45px; flex-shrink: 0; font-size: 11px; }
-        .log-source { color: var(--text-dim); margin-right: 6px; width: 70px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 10px; }
         .log-msg { color: var(--text-body); word-break: break-all; flex: 1; }
 
         .level-Info { color: var(--log-info); }
@@ -177,11 +175,6 @@
         <button id="btn-clear">Clear View</button>
         <div class="spacer"></div>
         <label style="cursor: pointer; user-select: none;"><input type="checkbox" id="chk-autoscroll" checked> Auto-scroll</label>
-        <span style="width: 10px;"></span>
-        <span>Filter:</span>
-        <label style="cursor: pointer; user-select: none;"><input type="checkbox" class="filter-chk" value="Info" checked> Info</label>
-        <label style="cursor: pointer; user-select: none;"><input type="checkbox" class="filter-chk" value="Warn" checked> Warn</label>
-        <label style="cursor: pointer; user-select: none;"><input type="checkbox" class="filter-chk" value="Error" checked> Error</label>
     </div>
 
     <div id="log-container"></div>
@@ -204,14 +197,7 @@
         const btnLive = document.getElementById('btn-live');
 
         // --- Filters ---
-        const activeFilters = new Set(['Info', 'Warn', 'Error']);
-        document.querySelectorAll('.filter-chk').forEach(chk => {
-            chk.addEventListener('change', (e) => {
-                if(e.target.checked) activeFilters.add(e.target.value);
-                else activeFilters.delete(e.target.value);
-                refilterLogs();
-            });
-        });
+        // Removed by user request
 
         document.getElementById('btn-clear').addEventListener('click', () => {
             logContainer.innerHTML = '';
@@ -481,15 +467,9 @@
 
             div.innerHTML = `
                 <div class="log-ts">${time}</div>
-                <div class="log-level level-${log.level}">${log.level}</div>
-                <div class="log-source" title="${log.source}">${log.source}</div>
                 <div class="log-msg">${escapeHtml(log.msg)}</div>
             `;
 
-            // Filter check
-            if(!activeFilters.has(log.level) && log.level !== 'Success') {
-                div.style.display = 'none';
-            }
             return div;
         }
 
@@ -498,18 +478,6 @@
             const div = createLogElement(log);
             logContainer.appendChild(div);
             if(chkAutoScroll.checked) logContainer.scrollTop = logContainer.scrollHeight;
-        }
-
-        function refilterLogs() {
-            const entries = logContainer.children;
-            for(let i=0; i<entries.length; i++) {
-                const level = entries[i].dataset.level;
-                if(activeFilters.has(level) || level === 'Success') {
-                    entries[i].style.display = 'flex';
-                } else {
-                    entries[i].style.display = 'none';
-                }
-            }
         }
 
         function escapeHtml(text) {
