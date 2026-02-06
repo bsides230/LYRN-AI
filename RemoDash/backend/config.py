@@ -3,9 +3,7 @@ import json
 import shutil
 from pathlib import Path
 
-# Script directory and settings path
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Use CWD for settings path to support running from different contexts (e.g. web/ subdir)
+# Use Current Working Directory
 SETTINGS_PATH = "settings.json"
 
 class SettingsManager:
@@ -55,7 +53,7 @@ class SettingsManager:
                         if path and not os.path.isabs(path):
                             self.settings["paths"][key] = os.path.join(cwd, path)
 
-                print("Settings loaded successfully")
+                print(f"Settings loaded successfully from {os.path.abspath(SETTINGS_PATH)}")
                 self.ensure_automation_flag()
                 self.ensure_next_job_flag()
                 self.ensure_llm_status_flag()
@@ -63,12 +61,13 @@ class SettingsManager:
                 print(f"Error loading settings: {e}. Assuming first boot.")
                 self.first_boot = True
         else:
-            print("No settings.json found - First boot detected. Creating default settings.")
+            print(f"No settings.json found in {os.getcwd()} - First boot detected.")
             self.first_boot = True
 
         if self.first_boot:
             # Create and save a default settings file
             self.settings = self.create_empty_settings_structure()
+            # Default paths relative to CWD
             default_paths = {
                 "static_snapshots": "build_prompt/static_snapshots",
                 "dynamic_snapshots": "build_prompt/dynamic_snapshots",
@@ -90,9 +89,9 @@ class SettingsManager:
                 "metrics_logs": "metrics_logs"
             }
             self.settings["paths"] = default_paths
-            self.save_settings() # This saves the file with relative paths
+            self.save_settings()
 
-            # Now resolve paths for the current session
+            # Resolve paths
             cwd = os.getcwd()
             for key, path in self.settings["paths"].items():
                 if path and not os.path.isabs(path):
@@ -117,6 +116,7 @@ class SettingsManager:
                 "stream": True
             },
             "allowed_origins": [],
+            "modules": [], # Unified modules list
             "paths": {
                 "static_snapshots": "",
                 "dynamic_snapshots": "",
@@ -157,61 +157,34 @@ class SettingsManager:
             if settings:
                 self.settings = settings
             self.first_boot = False
-            print("Settings saved successfully")
+            # print("Settings saved successfully")
 
         except Exception as e:
             print(f"Error saving settings: {e}")
 
     def ensure_automation_flag(self):
-        """Ensure automation flag is set to 'off' on startup"""
         if not self.settings or "paths" not in self.settings:
             return
-
         flag_path = self.settings["paths"].get("automation_flag_path", "")
-        if not flag_path:
-            return
-
+        if not flag_path: return
         os.makedirs(os.path.dirname(flag_path), exist_ok=True)
         try:
-            with open(flag_path, 'w', encoding='utf-8') as f:
-                f.write("off")
-        except Exception as e:
-            print(f"Warning: Could not set automation flag: {e}")
+            with open(flag_path, 'w', encoding='utf-8') as f: f.write("off")
+        except Exception: pass
 
     def ensure_next_job_flag(self):
-        """Ensure next job flag is initialized to 'false' on startup"""
-        next_job_path = os.path.join(SCRIPT_DIR, "global_flags", "next_job.txt")
+        next_job_path = os.path.join("global_flags", "next_job.txt")
         os.makedirs(os.path.dirname(next_job_path), exist_ok=True)
-
         try:
-            with open(next_job_path, 'w', encoding='utf-8') as f:
-                f.write("false")
-            print("Next job flag initialized to 'false'")
-        except Exception as e:
-            print(f"Warning: Could not initialize next job flag: {e}")
+            with open(next_job_path, 'w', encoding='utf-8') as f: f.write("false")
+        except Exception: pass
 
     def ensure_llm_status_flag(self):
-        """Ensure LLM status flag is initialized to 'idle' on startup."""
-        llm_status_path = os.path.join(SCRIPT_DIR, "global_flags", "llm_status.txt")
+        llm_status_path = os.path.join("global_flags", "llm_status.txt")
         os.makedirs(os.path.dirname(llm_status_path), exist_ok=True)
         try:
-            with open(llm_status_path, 'w', encoding='utf-8') as f:
-                f.write("idle")
-            print("LLM status flag initialized to 'idle'")
-        except Exception as e:
-            print(f"Warning: Could not initialize LLM status flag: {e}")
+            with open(llm_status_path, 'w', encoding='utf-8') as f: f.write("idle")
+        except Exception: pass
 
-    def set_automation_flag(self, state: str):
-        """Set automation flag to 'on' or 'off'"""
-        if not self.settings or "paths" not in self.settings:
-            return
-
-        flag_path = self.settings["paths"].get("automation_flag_path", "")
-        if not flag_path:
-            return
-
-        try:
-            with open(flag_path, 'w', encoding='utf-8') as f:
-                f.write(state)
-        except Exception as e:
-            print(f"Error setting automation flag: {e}")
+# Global Instance
+settings_manager = SettingsManager()

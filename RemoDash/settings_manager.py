@@ -5,10 +5,11 @@ from pathlib import Path
 
 # Script directory and settings path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.json")
+# Use CWD for settings path to support running from different contexts (e.g. web/ subdir)
+SETTINGS_PATH = "settings.json"
 
 class SettingsManager:
-    """Enhanced settings manager with UI preferences for RemoDash"""
+    """Enhanced settings manager with UI preferences"""
 
     def __init__(self):
         self.settings = None
@@ -16,7 +17,16 @@ class SettingsManager:
         self.ui_settings = {
             "font_size": 12,
             "window_size": "1400x900",
-            "confirmation_preferences": {}
+            "confirmation_preferences": {},
+            "save_chat_history": True,
+            "chat_history_length": 10,
+            "show_thinking_text": True,
+            "chat_colors": {
+                "user_text": "#00C0A0",
+                "assistant_text": "#FFFFFF",
+                "thinking_text": "#FFD700",
+                "system_text": "#B0B0B0"
+            }
         }
         self.load_or_detect_first_boot()
 
@@ -38,7 +48,17 @@ class SettingsManager:
                     self.settings = data.get('settings', {})
                     self.ui_settings.update(data.get('ui_settings', {}))
 
+                # Resolve relative paths for the current session (Using CWD)
+                cwd = os.getcwd()
+                if "paths" in self.settings:
+                    for key, path in self.settings["paths"].items():
+                        if path and not os.path.isabs(path):
+                            self.settings["paths"][key] = os.path.join(cwd, path)
+
                 print("Settings loaded successfully")
+                self.ensure_automation_flag()
+                self.ensure_next_job_flag()
+                self.ensure_llm_status_flag()
             except Exception as e:
                 print(f"Error loading settings: {e}. Assuming first boot.")
                 self.first_boot = True
@@ -46,88 +66,77 @@ class SettingsManager:
             print("No settings.json found - First boot detected. Creating default settings.")
             self.first_boot = True
 
-        if self.settings is not None:
-            # Inject defaults if missing
-            if "git_root_mode" not in self.settings:
-                self.settings["git_root_mode"] = "manual"
-            if "git_root_path" not in self.settings:
-                try:
-                    self.settings["git_root_path"] = str(Path.home() / "documents" / "github" / "repos")
-                except:
-                    self.settings["git_root_path"] = ""
-
-            self.detect_shell()
-
         if self.first_boot:
             # Create and save a default settings file
             self.settings = self.create_empty_settings_structure()
-            self.save_settings()
+            default_paths = {
+                "static_snapshots": "build_prompt/static_snapshots",
+                "dynamic_snapshots": "build_prompt/dynamic_snapshots",
+                "active_jobs": "build_prompt/active_jobs",
+                "deltas": "deltas",
+                "chat": "chat",
+                "output": "output",
+                "keywords": "active_keywords",
+                "topics": "active_topics",
+                "active_chunk": "active_chunk",
+                "chunk_queue": "automation/chunk_queue.json",
+                "job_list": "automation/job_list.txt",
+                "job_log": "automation/job_log.json",
+                "automation_flag_path": "global_flags/automation.txt",
+                "chunk_queue_path": "automation/chunk_queue.json",
+                "chat_dir": "chat",
+                "chat_parsed_dir": "chat_parsed",
+                "audit_dir": "automation/job_audit",
+                "metrics_logs": "metrics_logs"
+            }
+            self.settings["paths"] = default_paths
+            self.save_settings() # This saves the file with relative paths
 
-    def detect_shell(self):
-        """Detects a valid shell executable and updates settings."""
-        # Check if existing setting is valid
-        current = self.settings.get("terminal_shell")
-        if current:
-            # Check if it exists (using shutil.which to verify executable status effectively or os.access)
-            # If it's just a command name like "bash", shutil.which handles it.
-            # If it's a path, shutil.which checks it too.
-            if shutil.which(current) or (os.path.exists(current) and os.access(current, os.X_OK)):
-                return
+            # Now resolve paths for the current session
+            cwd = os.getcwd()
+            for key, path in self.settings["paths"].items():
+                if path and not os.path.isabs(path):
+                    self.settings["paths"][key] = os.path.join(cwd, path)
 
-        # Search for a valid shell
-        candidates = []
-
-        # 1. Environment Variable
-        env_shell = os.environ.get("SHELL")
-        if env_shell: candidates.append(env_shell)
-
-        # 2. Common Termux Paths
-        candidates.extend([
-            "/data/data/com.termux/files/usr/bin/bash",
-            "/data/data/com.termux/files/usr/bin/zsh",
-            "/data/data/com.termux/files/usr/bin/sh"
-        ])
-
-        # 3. Standard Linux Paths
-        candidates.extend([
-            "/bin/bash",
-            "/usr/bin/bash",
-            "/bin/sh",
-            "/usr/bin/sh",
-            "/system/bin/sh" # Android system shell
-        ])
-
-        found_shell = None
-        for path in candidates:
-            if path and os.path.exists(path) and os.access(path, os.X_OK):
-                found_shell = path
-                break
-
-        # 4. Fallback to shutil.which
-        if not found_shell:
-            for name in ["bash", "zsh", "sh"]:
-                path = shutil.which(name)
-                if path:
-                    found_shell = path
-                    break
-
-        if found_shell:
-            print(f"[System] Auto-detected terminal shell: {found_shell}")
-            self.settings["terminal_shell"] = found_shell
-            self.save_settings()
+            self.ensure_automation_flag()
+            self.ensure_next_job_flag()
+            self.ensure_llm_status_flag()
 
     def create_empty_settings_structure(self) -> dict:
         """Create empty settings structure for first boot"""
-        default_git = ""
-        try:
-            default_git = str(Path.home() / "documents" / "github" / "repos")
-        except: pass
-
         return {
+            "active": {
+                "model_path": "",
+                "n_ctx": 8192,
+                "n_threads": 8,
+                "n_gpu_layers": 0,
+                "max_tokens": 2048,
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "top_k": 40,
+                "stream": True
+            },
             "allowed_origins": [],
-            "git_repos": [],
-            "git_root_mode": "manual",
-            "git_root_path": default_git
+            "paths": {
+                "static_snapshots": "",
+                "dynamic_snapshots": "",
+                "active_jobs": "",
+                "deltas": "",
+                "chat": "",
+                "output": "",
+                "keywords": "",
+                "topics": "",
+                "active_chunk": "",
+                "chunk_queue": "",
+                "job_list": "",
+                "job_log": "",
+                "automation_flag_path": "",
+                "chunk_queue_path": "",
+                "chat_dir": "",
+                "chat_parsed_dir": "",
+                "audit_dir": "",
+                "metrics_logs": ""
+            }
         }
 
     def save_settings(self, settings: dict = None):
@@ -152,3 +161,57 @@ class SettingsManager:
 
         except Exception as e:
             print(f"Error saving settings: {e}")
+
+    def ensure_automation_flag(self):
+        """Ensure automation flag is set to 'off' on startup"""
+        if not self.settings or "paths" not in self.settings:
+            return
+
+        flag_path = self.settings["paths"].get("automation_flag_path", "")
+        if not flag_path:
+            return
+
+        os.makedirs(os.path.dirname(flag_path), exist_ok=True)
+        try:
+            with open(flag_path, 'w', encoding='utf-8') as f:
+                f.write("off")
+        except Exception as e:
+            print(f"Warning: Could not set automation flag: {e}")
+
+    def ensure_next_job_flag(self):
+        """Ensure next job flag is initialized to 'false' on startup"""
+        next_job_path = os.path.join(SCRIPT_DIR, "global_flags", "next_job.txt")
+        os.makedirs(os.path.dirname(next_job_path), exist_ok=True)
+
+        try:
+            with open(next_job_path, 'w', encoding='utf-8') as f:
+                f.write("false")
+            print("Next job flag initialized to 'false'")
+        except Exception as e:
+            print(f"Warning: Could not initialize next job flag: {e}")
+
+    def ensure_llm_status_flag(self):
+        """Ensure LLM status flag is initialized to 'idle' on startup."""
+        llm_status_path = os.path.join(SCRIPT_DIR, "global_flags", "llm_status.txt")
+        os.makedirs(os.path.dirname(llm_status_path), exist_ok=True)
+        try:
+            with open(llm_status_path, 'w', encoding='utf-8') as f:
+                f.write("idle")
+            print("LLM status flag initialized to 'idle'")
+        except Exception as e:
+            print(f"Warning: Could not initialize LLM status flag: {e}")
+
+    def set_automation_flag(self, state: str):
+        """Set automation flag to 'on' or 'off'"""
+        if not self.settings or "paths" not in self.settings:
+            return
+
+        flag_path = self.settings["paths"].get("automation_flag_path", "")
+        if not flag_path:
+            return
+
+        try:
+            with open(flag_path, 'w', encoding='utf-8') as f:
+                f.write(state)
+        except Exception as e:
+            print(f"Error setting automation flag: {e}")

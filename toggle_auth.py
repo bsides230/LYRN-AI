@@ -2,7 +2,14 @@ import os
 from pathlib import Path
 
 def main():
-    flags_dir = Path("global_flags")
+    # Detect target directory (match server.py logic)
+    target_dir = Path(".")
+    if Path("web/settings.json").exists():
+        target_dir = Path("web")
+    elif Path("web/automation").exists():
+        target_dir = Path("web")
+
+    flags_dir = target_dir / "global_flags"
     flags_dir.mkdir(exist_ok=True)
 
     flag_file = flags_dir / "no_auth"
