@@ -135,7 +135,7 @@ def main():
         elif choice == '2':
             install_tailscale(os_type)
         elif choice == '3':
-            setup_app("LYRN", "LYRN_v5", "8240")
+            setup_app("LYRN", "web", "8240")
         elif choice == '4':
             setup_app("RemoDash", "RemoDash", "8000")
         elif choice == 'Q':

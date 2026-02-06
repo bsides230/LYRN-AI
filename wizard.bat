@@ -1,3 +1,3 @@
 @echo off
-python wizard.py
+python setup_wizard.py
 pause
