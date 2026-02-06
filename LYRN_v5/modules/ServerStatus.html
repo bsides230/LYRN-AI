@@ -120,7 +120,7 @@
         <h2>System Resources</h2>
 
         <div class="chart-grid">
-            <div class="chart-card">
+            <div class="chart-card" id="card-cpu">
                 <div class="sub-stat">CPU LOAD</div>
                 <div class="big-stat" id="val-cpu">0%</div>
                 <div class="progress-bg"><div class="progress-fill" id="bar-cpu"></div></div>
@@ -133,11 +133,13 @@
             </div>
         </div>
 
-        <div class="stat-row" style="margin-top:15px;">
-            <span class="stat-label">Disk Usage</span>
-            <span class="stat-value" id="val-disk">--%</span>
+        <div id="disk-section">
+            <div class="stat-row" style="margin-top:15px;">
+                <span class="stat-label">Disk Usage</span>
+                <span class="stat-value" id="val-disk">--%</span>
+            </div>
+            <div class="progress-bg"><div class="progress-fill" id="bar-disk"></div></div>
         </div>
-        <div class="progress-bg"><div class="progress-fill" id="bar-disk"></div></div>
     </div>
 
     <!-- GPU Tab -->
@@ -278,33 +280,79 @@
         }
 
         function updateUI(data) {
-            // System
-            document.getElementById('val-cpu').innerText = data.cpu + '%';
-            document.getElementById('bar-cpu').style.width = data.cpu + '%';
+            // System - CPU
+            const cpuCard = document.getElementById('card-cpu');
+            if (data.cpu !== null && data.cpu !== undefined) {
+                cpuCard.style.display = 'block';
+                document.getElementById('val-cpu').innerText = data.cpu + '%';
+                document.getElementById('bar-cpu').style.width = data.cpu + '%';
+            } else {
+                cpuCard.style.display = 'none';
+            }
 
+            // System - RAM
             document.getElementById('val-ram').innerText = Math.round(data.ram.percent) + '%';
             document.getElementById('bar-ram').style.width = data.ram.percent + '%';
             document.getElementById('sub-ram').innerText = `${data.ram.used_gb.toFixed(1)} / ${data.ram.total_gb.toFixed(1)} GB`;
 
-            document.getElementById('val-disk').innerText = data.disk.percent + '%';
-            document.getElementById('bar-disk').style.width = data.disk.percent + '%';
+            // System - Disk
+            const diskSection = document.getElementById('disk-section');
+            if (data.disk) {
+                diskSection.style.display = 'block';
+                document.getElementById('val-disk').innerText = data.disk.percent + '%';
+                document.getElementById('bar-disk').style.width = data.disk.percent + '%';
+            } else {
+                diskSection.style.display = 'none';
+            }
 
             // GPU
             const gpuContainer = document.getElementById('gpu-container');
             const gpuBtn = document.getElementById('btn-tab-gpu');
             const llmBtn = document.getElementById('btn-tab-llm');
 
-            if(data.gpu && data.gpu.vram_percent !== undefined) {
+            // Handle both legacy (single object) and new (dict of GPUs) formats
+            let gpuList = [];
+            if (data.gpu) {
+                // If new format (keys like "gpu_0"), values are objects
+                // If old format (flat object), it has vram_percent directly
+                if (data.gpu.vram_percent !== undefined) {
+                    gpuList.push(data.gpu); // Legacy/Single
+                } else {
+                    // Iterate keys
+                    Object.keys(data.gpu).forEach(k => {
+                        if (k.startsWith('gpu_')) {
+                            gpuList.push(data.gpu[k]);
+                        }
+                    });
+                }
+            }
+
+            if(gpuList.length > 0) {
                 gpuBtn.style.display = 'block';
-                // Render GPU Stats
-                gpuContainer.innerHTML = `
-                    <div class="chart-card">
-                        <div class="sub-stat">VRAM USAGE</div>
-                        <div class="big-stat">${data.gpu.vram_percent.toFixed(1)}%</div>
-                        <div class="progress-bg"><div class="progress-fill" style="width:${data.gpu.vram_percent}%"></div></div>
-                        <div class="sub-stat" style="margin-top:4px;">${data.gpu.vram_used_gb.toFixed(1)} / ${data.gpu.vram_total_gb.toFixed(1)} GB</div>
-                    </div>
-                `;
+                let html = '';
+                gpuList.forEach((gpu, idx) => {
+                    const name = gpu.name || `GPU ${idx}`;
+                    const util = (gpu.gpu_util_percent !== undefined) ? gpu.gpu_util_percent : 0;
+
+                    html += `
+                    <div style="margin-bottom:15px;">
+                        <div class="stat-row"><span class="stat-label">${name}</span></div>
+                        <div class="chart-grid">
+                            <div class="chart-card">
+                                <div class="sub-stat">UTILIZATION</div>
+                                <div class="big-stat">${util}%</div>
+                                <div class="progress-bg"><div class="progress-fill" style="width:${util}%"></div></div>
+                            </div>
+                            <div class="chart-card">
+                                <div class="sub-stat">VRAM</div>
+                                <div class="big-stat">${gpu.vram_percent.toFixed(1)}%</div>
+                                <div class="progress-bg"><div class="progress-fill" style="width:${gpu.vram_percent}%"></div></div>
+                                <div class="sub-stat" style="margin-top:4px;">${gpu.vram_used_gb.toFixed(1)} / ${gpu.vram_total_gb.toFixed(1)} GB</div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                gpuContainer.innerHTML = html;
             } else {
                 // If no GPU, hide tab unless active
                 if(document.getElementById('tab-gpu').classList.contains('active')) {
