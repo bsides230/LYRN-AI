@@ -98,6 +98,19 @@ def setup_app(app_name, app_dir, default_port):
              except Exception as e:
                 print(f"Error: {e}")
 
+    # 3. App Specific Requirements
+    if app_name == "LYRN":
+        print("\nChecking for LYRN specific dependencies (llama-cpp-python)...")
+        try:
+            # Install from requirements_lyrn.txt if exists
+            if Path("requirements_lyrn.txt").exists():
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements_lyrn.txt"])
+                print("LYRN dependencies installed.")
+            else:
+                print("requirements_lyrn.txt not found. Skipping extra install.")
+        except Exception as e:
+            print(f"Error installing LYRN dependencies: {e}")
+
     print(f"\n{app_name} Setup Complete.")
     input("Press Enter to continue...")
 

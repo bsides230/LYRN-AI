@@ -506,6 +506,7 @@
     <div id="settings-popup">
         <div class="settings-tabs">
             <button class="tab-btn active" onclick="switchTab('tab-general')">General</button>
+            <button class="tab-btn" onclick="switchTab('tab-modules')">Modules</button>
             <button class="tab-btn" onclick="switchTab('tab-theme')">Theme</button>
             <button class="tab-btn" onclick="switchTab('tab-layouts')">Layouts</button>
             <button class="tab-btn" onclick="switchTab('tab-advanced')">Advanced</button>
@@ -524,7 +525,10 @@
                     <span>Device Name</span>
                     <input type="text" id="setting-device-name" placeholder="Name" onblur="saveDeviceName(this.value)" style="width:100px; padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); text-align:right;">
                 </div>
+            </div>
 
+            <!-- MODULES -->
+            <div id="tab-modules" class="tab-pane">
                 <div class="settings-header">Modules</div>
                 <button class="btn-full-width" onclick="enableEditMode()" style="margin-bottom:8px;">Edit Dock Order</button>
                 <div id="module-list-container"></div>
@@ -721,9 +725,10 @@
             // Highlight button logic simplified
             const btns = document.querySelectorAll('.tab-btn');
             if(tabId==='tab-general') btns[0].classList.add('active');
-            if(tabId==='tab-theme') btns[1].classList.add('active');
-            if(tabId==='tab-layouts') btns[2].classList.add('active');
-            if(tabId==='tab-advanced') btns[3].classList.add('active');
+            if(tabId==='tab-modules') btns[1].classList.add('active');
+            if(tabId==='tab-theme') btns[2].classList.add('active');
+            if(tabId==='tab-layouts') btns[3].classList.add('active');
+            if(tabId==='tab-advanced') btns[4].classList.add('active');
         }
 
         /* --- LOGIC MERGED FROM BOTH --- */

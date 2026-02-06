@@ -60,3 +60,51 @@ LYRN is not just a framework; it's the foundation for much larger ambitions. The
 
 1.  **A Multi-Agent Dashboard:** A visual interface, imagined as a security camera manager, where each "cam feed" is a containerized LYRN agent. This dashboard will allow for the command and control of multiple agents, both local and remote, leveraging LYRN's simple, text-based nature for communication.
 2.  **A Generative World Engine:** A system for creating vast, detailed, and persistent worlds for gaming, simulation, or even real-world mapping. This is not a pre-written world database; it's a true generative engine. The world is created on the fly as the user explores it. When a user interacts with an object, the LLM is triggered to "lazy load" its details by filling out a template based on the rich, hierarchical context of the player's location. The world itself is an emergent property of the LLM's interaction with the template system.
+
+## Universal Server & Dashboard Architecture (Unified System)
+
+To ensure scalability, maintainability, and rapid application development, the system has been unified into a single modular architecture. This allows any number of applications (LYRN, RemoDash, etc.) to run on the same core infrastructure while maintaining strict data isolation.
+
+### 1. Unified Server Entry Point
+-   **File:** `server.py` (Root Directory)
+-   **Logic:** This script is designed to be executed from *within* an application directory (e.g., `cd LYRN_v5 && python ../server.py`).
+-   **Behavior:**
+    -   It detects the Current Working Directory (CWD) as the application context.
+    -   It loads `settings.json` and `port.txt` from the CWD.
+    -   It dynamically loads API routers from the `backend/` directory based on the `modules` list defined in `settings.json`.
+    -   It serves static files (the dashboard) from the application directory (or `web/` if present).
+
+### 2. Modular Backend
+-   **Directory:** `backend/`
+-   **Structure:** Logic is broken down into discrete, reusable modules:
+    -   `system.py`: Health checks, OS info, Power control.
+    -   `auth.py`: Centralized token verification (`admin_token.txt`).
+    -   `files.py`: File operations, upload, zip.
+    -   `git_mgr.py`: Git repository management.
+    -   `chat.py`: LLM chat orchestration and history.
+    -   `automation.py`: Jobs, Cron, Scripts.
+    -   `vlc.py`, `shortcuts.py`, `models.py`, `snapshots.py`, etc.
+-   **Config:** `settings.json` now includes a `"modules"` list (e.g., `["chat", "system"]`) which tells `server.py` exactly which routers to mount. This keeps lightweight apps (like RemoDash) free of heavy dependencies (like Chat).
+
+### 3. Universal Dashboard
+-   **File:** `dashboard.html` (Identical copy in every app folder)
+-   **Philosophy:** "One Dashboard to Rule Them All."
+-   **Behavior:**
+    -   The dashboard is feature-agnostic. It queries the server configuration on load.
+    -   Features (like the LLM Status Light) are toggled visible only if the corresponding backend module is active.
+    -   It supports app-specific theming (colors, layout) which are persisted in `localStorage`.
+    -   Modules (Chat, Terminal, Builder) are loaded as iframes from the `modules/` folder, which remains specific to the app.
+
+### 4. Setup Wizard
+-   **File:** `setup_wizard.py`
+-   **Purpose:** One script to rule installation.
+-   **Features:**
+    -   Detects OS (Windows/Linux/Android/Mac).
+    -   Installs unified dependencies from `requirements.txt`.
+    -   Installs Tailscale automatically.
+    -   Configures specific apps (LYRN or RemoDash) by generating `port.txt` and `admin_token.txt` in their respective folders.
+
+### Why This Matters
+-   **Development Speed:** Improving the `dashboard.html` or `backend/files.py` instantly benefits *all* applications using the system.
+-   **Stability:** A single, tested server core reduces the surface area for bugs compared to maintaining divergent scripts.
+-   **Isolation:** Despite sharing code, app data (logs, chat history, settings) never leaks because the server process is sandboxed to its startup directory.
