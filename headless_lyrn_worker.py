@@ -292,16 +292,16 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     with open(chat_file_path, 'rb') as f:
                         f.seek(-50, 2) # Check last 50 bytes
                         tail = f.read().decode('utf-8', errors='ignore')
-                        # Check if "#MODEL_START#" is in the last few lines
+                        # Check if "model" is in the last few lines
                         tail_lines = [l.strip() for l in tail.splitlines()]
-                        if "#MODEL_START#" in tail_lines[-3:]:
+                        if "model" in tail_lines[-3:]:
                             needs_separator = False
             except Exception:
                 pass
 
             with open(chat_file_path, "a", encoding="utf-8") as f:
                 if needs_separator:
-                    f.write("\n#MODEL_START#\n")
+                    f.write("\n\nmodel\n")
 
                 for token_data in stream:
                     # Check for stop trigger
@@ -310,7 +310,7 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                         try:
                             os.remove(STOP_TRIGGER)
                         except: pass
-                        f.write("\n\n[Stopped]\n#MODEL_END#")
+                        f.write("\n\n[Stopped]")
                         full_response += "\n[Stopped]"
                         worker_state.last_was_stop = True
                         break
@@ -325,9 +325,6 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                             f.write(content)
                             f.flush()
                             full_response += content
-
-                if not worker_state.last_was_stop:
-                    f.write("\n#MODEL_END#")
 
             end_time = time.time()
 

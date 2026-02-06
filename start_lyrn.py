@@ -831,14 +831,17 @@ async def chat_endpoint(request: ChatRequest):
                     content = f.read()
 
                     if not started:
-                        start_idx = content.find("#MODEL_START#")
-                        if start_idx != -1:
+                        # Check for "model" marker. Worker writes "\n\nmodel\n"
+                        # We look for "model" preceded by newlines or start of file
+                        start_idx = -1
+                        match = re.search(r'(?:^|\n)model\n', content)
+                        if match:
+                            start_idx = match.start()
+                            # Start reading from end of match
+                            last_pos = match.end()
                             started = True
-                            # Start reading from after #MODEL_START# + newline
-                            last_pos = start_idx + len("#MODEL_START#")
-                            if content[last_pos] == '\n':
-                                last_pos += 1
-                        else:
+
+                        if not started:
                             # Check for error
                             if "[Error:" in content:
                                 print("[API] Detected error in chat file.")
@@ -863,18 +866,18 @@ async def chat_endpoint(request: ChatRequest):
                         if current_len > last_pos:
                             new_text = content[last_pos:]
 
-                            # Check for END
-                            end_idx = new_text.find("#MODEL_END#")
-                            if end_idx != -1:
-                                # We have the end.
-                                chunk = new_text[:end_idx]
-                                if chunk:
-                                    yield json.dumps({"response": chunk}) + "\n"
-                                return # Done
-                            else:
-                                # Stream what we have
-                                yield json.dumps({"response": new_text}) + "\n"
-                                last_pos = current_len
+                            # Stream what we have
+                            yield json.dumps({"response": new_text}) + "\n"
+                            last_pos = current_len
+
+                        # Check if worker is done
+                        status_info = worker_controller.get_status()
+                        llm_status = status_info.get("llm_status", "unknown")
+
+                        # If idle or error or stopped, and we have consumed everything (which we just did), we are done.
+                        # Note: We rely on the fact that the worker writes content THEN sets status to idle.
+                        if llm_status in ["idle", "error", "stopped"]:
+                            return
 
             except Exception as e:
                 print(f"Error in stream: {e}")
