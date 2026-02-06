@@ -1,5 +1,18 @@
 # Build Notes
 
+## v5.0.3 - Restore v4 KV-Cache Reuse
+
+This update restores the high-performance KV-cache reuse behavior from v4 while maintaining compatibility with the v5 headless architecture. It resolves the "inconsistent sequence position" errors observed with llama-cpp-python when reusing context.
+
+- **Headless Worker (`headless_lyrn_worker.py`):**
+    -   **Single-Flight Inference:** Implemented a global lock to ensure only one generation request processes at a time.
+    -   **KV Cache Reuse:** Added logic to compare the prefix of the current request's message history against the previous state. If the history is an append-only extension, the KV cache is reused. If the history diverges (e.g., edited logs, deleted files), `llm.reset()` is called to ensure consistency.
+    -   **v4 Log Format:** Restored the v4 chat log format (`user\n...\n\nmodel\n...`) by removing v5 specific markers (`#MODEL_START#`) and ensuring the `model` header is present. This ensures compatibility with v4-style frontends.
+    -   **Stop Handling:** Generation interruptions (`STOP`) now explicitly mark the KV cache as invalid for the next turn to prevent sequence errors.
+
+- **Chat Manager (`chat_manager.py`):**
+    -   **Backward Compatibility:** Updated `get_chat_history_messages` to support parsing both the legacy v4 log format and the v5 marker-based format. This ensures seamless operation regardless of the log style used.
+
 ## v5.0.2 - Legacy Cleanup & Framework Analysis
 
 This update involves a comprehensive cleanup of the repository to remove legacy artifacts from previous versions and a deep dive into comparing LYRN v5 with other local agent frameworks.
