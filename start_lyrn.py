@@ -276,7 +276,7 @@ class WorkerController:
     def __init__(self):
         self.process: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
-        self.worker_script = "headless_lyrn_worker.py"
+        self.worker_script = "model_runner.py"
 
     def get_status(self):
         with self._lock:
