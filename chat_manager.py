@@ -71,14 +71,13 @@ class ChatManager:
 
                 content = file_path.read_text(encoding='utf-8').strip()
 
-                # Use regex to find all role blocks, handling potentially unclosed last block
-                # Try v5 format first (with markers)
-                role_blocks = re.findall(r"#(\w+)_START#\n(.*?)(?:\n#\w+_END#|$)", content, re.DOTALL)
+                # Use regex to find all role blocks, prioritizing v4 format (user\n... model\n...)
+                # Matches role at start of file or after newline, followed by content until next role marker or end of string
+                role_blocks = re.findall(r"(?:^|\n)(user|model|assistant)\n(.*?)(?=\n(?:user|model|assistant)\n|$)", content, re.DOTALL)
 
+                # Fallback to legacy v5 markers if v4 not found (backward compatibility)
                 if not role_blocks:
-                    # Fallback to v4 format (user\n...\n\nmodel\n...)
-                    # Matches role at start of file or after newline, followed by content until next role marker or end of string
-                    role_blocks = re.findall(r"(?:^|\n)(user|model|assistant)\n(.*?)(?=\n(?:user|model|assistant)\n|$)", content, re.DOTALL)
+                    role_blocks = re.findall(r"#(\w+)_START#\n(.*?)(?:\n#\w+_END#|$)", content, re.DOTALL)
 
                 for role, text in role_blocks:
                     role_lower = role.lower()

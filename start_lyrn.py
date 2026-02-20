@@ -218,7 +218,7 @@ def trigger_chat_generation(message: str, folder: str = "chat"):
 
     # Write User Message
     with open(filepath, "w", encoding="utf-8") as f:
-        f.write(f"#USER_START#\n{message}\n#USER_END#")
+        f.write(f"user\n{message}\n")
     print(f"[System] Created chat file: {filepath}")
 
     # Write Trigger

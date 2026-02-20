@@ -226,18 +226,20 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
 
         try:
             # 1. Read User Message from the Triggered File
-            # start_lyrn.py writes: #USER_START#\n{message}\n#USER_END#
+            # start_lyrn.py writes: user\n{message}\n
             content = chat_file_path.read_text(encoding='utf-8')
 
             user_message = ""
-            match = re.search(r"#USER_START#\n(.*?)\n#USER_END#", content, re.DOTALL)
-            if match:
-                user_message = match.group(1).strip()
+            # Check for v4 format first
+            if content.startswith("user\n"):
+                user_message = content[5:].strip() # Remove 'user\n'
             else:
-                # Fallback: maybe just read the whole file content if markers missing?
-                # Or assume it's just the text.
-                print("Warning: Could not find USER markers in chat file. Using raw content.")
-                user_message = content.strip()
+                # Fallback to old regex if needed or raw
+                match = re.search(r"#USER_START#\n(.*?)\n#USER_END#", content, re.DOTALL)
+                if match:
+                    user_message = match.group(1).strip()
+                else:
+                    user_message = content.strip()
 
             print(f"User Message: {user_message[:50]}...")
 
@@ -251,15 +253,17 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                 delta_content = delta_manager.get_delta_content()
 
             # Construct Messages
+            # Order: Snapshot -> History -> Deltas -> New Input
             messages = [{"role": "system", "content": system_prompt}]
-
-            if delta_content:
-                messages.append({"role": "system", "content": delta_content})
 
             # History
             # IMPORTANT: Exclude the current chat file so we don't duplicate it or treat it as history yet
             history = chat_manager.get_chat_history_messages(exclude_paths=[str(chat_file_path.resolve())])
             messages.extend(history)
+
+            # Deltas (Injected after history, before new input)
+            if delta_content:
+                messages.append({"role": "system", "content": delta_content})
 
             # Append current user message
             # Merge if last was user (alternating roles logic)
