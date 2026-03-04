@@ -1,13 +1,6 @@
-customtkinter
-llama-cpp-python
+llama-cpp-lyrn @ git+https://github.com/bsides230/llama-cpp-lyrn.git@main
 Pillow
 psutil
-nvidia-ml-py
-
+pynvml
 pyautogui
 pygetwindow
-fastapi
-uvicorn
-python-multipart
-aiohttp
-aiofiles
