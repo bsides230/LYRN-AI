@@ -1,7 +1,7 @@
 {
   "settings": {
     "active": {
-      "model_path": "models/LiquidAI 1.2B Instruct",
+      "model_path": "models/Qwen3.5-0.8B-Q8_0.gguf",
       "n_ctx": 8000,
       "n_threads": 22,
       "n_gpu_layers": 36,
@@ -13,24 +13,24 @@
       "chat_format": null
     },
     "paths": {
-      "static_snapshots": "build_prompt/static_snapshots",
-      "dynamic_snapshots": "build_prompt/dynamic_snapshots",
-      "active_jobs": "build_prompt/active_jobs",
-      "deltas": "deltas",
-      "chat": "chat",
-      "output": "output",
-      "keywords": "active_keywords",
-      "topics": "active_topics",
-      "active_chunk": "active_chunk",
-      "chunk_queue": "automation/chunk_queue.json",
-      "job_list": "automation/job_list.txt",
-      "job_log": "automation/job_log.json",
-      "automation_flag_path": "global_flags/automation.txt",
-      "chunk_queue_path": "automation/chunk_queue.json",
-      "chat_dir": "chat",
-      "chat_parsed_dir": "chat_parsed",
-      "audit_dir": "automation/job_audit",
-      "metrics_logs": "metrics_logs"
+      "static_snapshots": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\build_prompt/static_snapshots",
+      "dynamic_snapshots": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\build_prompt/dynamic_snapshots",
+      "active_jobs": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\build_prompt/active_jobs",
+      "deltas": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\deltas",
+      "chat": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\chat",
+      "output": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\output",
+      "keywords": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\active_keywords",
+      "topics": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\active_topics",
+      "active_chunk": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\active_chunk",
+      "chunk_queue": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\automation/chunk_queue.json",
+      "job_list": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\automation/job_list.txt",
+      "job_log": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\automation/job_log.json",
+      "automation_flag_path": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\global_flags/automation.txt",
+      "chunk_queue_path": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\automation/chunk_queue.json",
+      "chat_dir": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\chat",
+      "chat_parsed_dir": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\chat_parsed",
+      "audit_dir": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\automation/job_audit",
+      "metrics_logs": "C:\\Users\\matta\\Documents\\GitHub\\LYRN-SAD\\metrics_logs"
     },
     "model_presets": {
       "1": {
