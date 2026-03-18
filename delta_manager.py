@@ -157,6 +157,41 @@ class DeltaManager:
             return True
         return False
 
+    def get_available_scripts(self) -> list:
+        """Returns a list of available python scripts in the deltas directory."""
+        scripts = []
+        if self.base_dir.exists():
+            for f in self.base_dir.glob("*.py"):
+                if f.is_file():
+                    scripts.append(f.name)
+        return scripts
+
+    def update_script_config(self, script_name: str, interval_seconds: int, enabled: bool):
+        """Updates the scheduling configuration for a delta script."""
+        self._load_manifest()
+        if "scripts" not in self.manifest:
+            self.manifest["scripts"] = {}
+
+        if script_name not in self.manifest["scripts"]:
+             self.manifest["scripts"][script_name] = {}
+
+        self.manifest["scripts"][script_name]["interval"] = interval_seconds
+        self.manifest["scripts"][script_name]["enabled"] = enabled
+        self._save_manifest()
+        print(f"Updated script config for '{script_name}'.")
+
+    def get_scripts_config(self) -> dict:
+        """Returns the script configurations."""
+        self._load_manifest()
+        return self.manifest.get("scripts", {})
+
+    def update_script_last_run(self, script_name: str, last_run: float):
+        """Updates the last run time for a script."""
+        self._load_manifest()
+        if "scripts" in self.manifest and script_name in self.manifest["scripts"]:
+             self.manifest["scripts"][script_name]["last_run"] = last_run
+             self._save_manifest()
+
     def get_delta_content(self) -> str:
         """
         Aggregates all enabled stream deltas into a formatted string.

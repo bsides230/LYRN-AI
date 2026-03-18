@@ -265,6 +265,28 @@ async def scheduler_loop():
                         # Only log this if there were no scripts either
                         print(f"[Scheduler] Job {job.name} has no prompt/instructions and no scripts.")
 
+            # Check delta scripts
+            scripts_config = delta_manager_api.get_scripts_config()
+            for script_name, config in scripts_config.items():
+                if config.get("enabled", False):
+                    interval = config.get("interval", 60)
+                    last_run = config.get("last_run", 0)
+                    now = time.time()
+                    if now - last_run >= interval:
+                        script_path = Path("deltas") / script_name
+                        if script_path.exists():
+                            try:
+                                print(f"[Scheduler] Running delta script: {script_name}")
+                                subprocess.Popen(
+                                    [sys.executable, str(script_path)],
+                                    cwd=os.getcwd(),
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                                delta_manager_api.update_script_last_run(script_name, now)
+                            except Exception as e:
+                                print(f"[Scheduler] Error running delta script {script_name}: {e}")
+
             await asyncio.sleep(5) # Check every 5 seconds
         except Exception as e:
             print(f"[Scheduler] Error in loop: {e}")
@@ -457,6 +479,10 @@ class DeltaUpdateModel(BaseModel):
     value: str
 
 class DeltaToggleModel(BaseModel):
+    enabled: bool
+
+class DeltaScriptConfigModel(BaseModel):
+    interval: int
     enabled: bool
 
 # --- App Setup ---
@@ -663,6 +689,26 @@ async def delete_delta(delta_name: str):
     if success:
         return {"success": True}
     raise HTTPException(status_code=404, detail="Delta not found")
+
+@app.get("/api/deltas/scripts", dependencies=[Depends(verify_token)])
+async def get_delta_scripts():
+    scripts = delta_manager_api.get_available_scripts()
+    configs = delta_manager_api.get_scripts_config()
+    result = []
+    for script in scripts:
+        config = configs.get(script, {})
+        result.append({
+            "name": script,
+            "interval": config.get("interval", 60),
+            "enabled": config.get("enabled", False),
+            "last_run": config.get("last_run", 0)
+        })
+    return result
+
+@app.post("/api/deltas/scripts/{script_name}", dependencies=[Depends(verify_token)])
+async def update_delta_script(script_name: str, config: DeltaScriptConfigModel):
+    delta_manager_api.update_script_config(script_name, config.interval, config.enabled)
+    return {"success": True}
 
 
 # Logging Endpoints
