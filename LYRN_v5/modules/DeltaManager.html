@@ -115,6 +115,16 @@
         display: flex; flex-direction: column; gap: 10px;
     }
 
+    .section-title {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: calc(var(--font-size-base) + 2px);
+        color: var(--text-head);
+        margin-top: 20px;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
     .delta-card {
         background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px;
         padding: 15px; display: flex; justify-content: space-between; align-items: center;
@@ -127,6 +137,15 @@
     .delta-value { font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base); color: var(--brand-purple); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--bg-input); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); display: inline-block; max-width: fit-content;}
 
     .delta-actions { display: flex; align-items: center; gap: 15px; }
+
+    .interval-input {
+        background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-head);
+        font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base); border-radius: 4px;
+        padding: 4px 8px; width: 60px; text-align: right;
+    }
+    .interval-input:focus { border-color: var(--brand-purple); outline: none; }
+
+    .interval-label { font-size: calc(var(--font-size-base) - 2px); color: var(--text-dim); text-transform: uppercase; margin-right: 5px;}
 
     /* SWITCH */
     .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
@@ -187,9 +206,16 @@
     </header>
 
     <div class="main-content">
+        <h2 class="section-title">Active Data Streams</h2>
         <div id="delta-list-container" class="delta-list">
             <!-- Deltas populated here -->
-            <div class="empty-state">Loading deltas...</div>
+            <div class="empty-state">Loading streams...</div>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 40px;">Scheduled Scripts</h2>
+        <div id="script-list-container" class="delta-list">
+            <!-- Scripts populated here -->
+            <div class="empty-state">Loading scripts...</div>
         </div>
     </div>
   </div>
@@ -252,9 +278,13 @@
 
     function initModule() {
         fetchDeltas();
+        fetchScripts();
         // Auto-refresh every 2 seconds to show live updates
         if(refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(fetchDeltas, 2000);
+        refreshInterval = setInterval(() => {
+            fetchDeltas();
+            fetchScripts();
+        }, 2000);
     }
 
     async function fetchDeltas() {
@@ -342,6 +372,122 @@
             }
         } catch(e) {
             showToast("Connection Error", true);
+        }
+    }
+
+    async function fetchScripts() {
+        if (!authToken) return;
+        try {
+            const res = await fetch(`${CORE_URL}/api/deltas/scripts`, {
+                headers: { 'X-Token': authToken }
+            });
+            if (res.ok) {
+                const scripts = await res.json();
+                renderScripts(scripts);
+            }
+        } catch(e) {
+            console.warn("Failed to fetch scripts", e);
+        }
+    }
+
+    function renderScripts(scripts) {
+        const container = document.getElementById('script-list-container');
+        if (!scripts || scripts.length === 0) {
+            container.innerHTML = '<div class="empty-state">No delta scripts found in deltas/ directory.</div>';
+            return;
+        }
+
+        // We only want to fully replace the DOM if we don't have existing elements
+        // OR if the number of scripts changed, to avoid losing focus when a user is typing
+        const existingCards = container.querySelectorAll('.delta-card[data-script-name]');
+        const shouldFullRebuild = existingCards.length !== scripts.length;
+
+        if (shouldFullRebuild) {
+            container.innerHTML = '';
+        }
+
+        scripts.forEach(s => {
+            const safeName = escapeHtml(s.name);
+            const isEnabled = s.enabled === true;
+
+            // Format last run
+            let lastRunText = "Never";
+            if (s.last_run > 0) {
+                 const d = new Date(s.last_run * 1000);
+                 lastRunText = d.toLocaleTimeString();
+            }
+
+            const intervalVal = Math.round(s.interval || 60);
+            const safeId = safeName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+            if (shouldFullRebuild) {
+                const card = document.createElement('div');
+                card.className = 'delta-card';
+                card.setAttribute('data-script-name', safeName);
+
+                card.innerHTML = `
+                    <div class="delta-info">
+                        <span class="delta-name">${safeName}</span>
+                        <span class="delta-value" id="last-run-${safeId}" style="background:transparent; border:none; padding:0; color:var(--text-dim); font-size:calc(var(--font-size-base) - 1px);">Last Run: ${lastRunText}</span>
+                    </div>
+                    <div class="delta-actions">
+                        <div style="display:flex; align-items:center;">
+                            <span class="interval-label">Poll every</span>
+                            <input type="number" min="1" class="interval-input" id="interval-${safeId}" value="${intervalVal}" onchange="updateScriptConfig('${safeName}', '${safeId}')">
+                            <span class="interval-label" style="margin-left:5px;">sec</span>
+                        </div>
+                        <label class="switch" title="Enable Polling">
+                            <input type="checkbox" id="toggle-${safeId}" onchange="updateScriptConfig('${safeName}', '${safeId}')" ${isEnabled ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `;
+                container.appendChild(card);
+            } else {
+                // Just update the dynamic values to not interrupt input focus
+                const lastRunEl = document.getElementById(`last-run-${safeId}`);
+                if (lastRunEl) {
+                    lastRunEl.innerText = `Last Run: ${lastRunText}`;
+                }
+
+                const toggleEl = document.getElementById(`toggle-${safeId}`);
+                if (toggleEl && toggleEl !== document.activeElement) {
+                    toggleEl.checked = isEnabled;
+                }
+
+                // Do not update the interval input value if it has focus to prevent typing interruption
+                const intervalEl = document.getElementById(`interval-${safeId}`);
+                if (intervalEl && intervalEl !== document.activeElement) {
+                    intervalEl.value = intervalVal;
+                }
+            }
+        });
+    }
+
+    async function updateScriptConfig(name, id) {
+        const intervalEl = document.getElementById(`interval-${id}`);
+        const toggleEl = document.getElementById(`toggle-${id}`);
+
+        if (!intervalEl || !toggleEl) return;
+
+        const interval = parseInt(intervalEl.value, 10) || 60;
+        const enabled = toggleEl.checked;
+
+        try {
+            const res = await fetch(`${CORE_URL}/api/deltas/scripts/${encodeURIComponent(name)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                body: JSON.stringify({ interval, enabled })
+            });
+            if(res.ok) {
+                showToast(`Updated script ${name}`);
+            } else {
+                showToast("Failed to update script config", true);
+                fetchScripts(); // Revert
+            }
+        } catch(e) {
+            showToast("Connection Error", true);
+            fetchScripts();
         }
     }
 
