@@ -118,12 +118,59 @@ class DeltaManager:
         self._save_manifest()
         print(f"Updated simple delta for '{trait_name}'.")
 
+    def get_streams(self) -> dict:
+        """Returns the current streams from the manifest."""
+        self._load_manifest()
+        return self.manifest.get("streams", {})
+
+    def update_stream(self, name: str, value: str, enabled: bool = True):
+        """Updates or creates a stream delta."""
+        self._load_manifest()
+        if "streams" not in self.manifest:
+            self.manifest["streams"] = {}
+
+        self.manifest["streams"][name] = {
+            "value": value,
+            "enabled": enabled,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        self._save_manifest()
+        print(f"Updated stream delta for '{name}'.")
+
+    def toggle_stream(self, name: str, enabled: bool):
+        """Toggles the enabled state of a stream delta."""
+        self._load_manifest()
+        if "streams" in self.manifest and name in self.manifest["streams"]:
+            self.manifest["streams"][name]["enabled"] = enabled
+            self._save_manifest()
+            print(f"Toggled stream delta '{name}' to {enabled}.")
+            return True
+        return False
+
+    def delete_stream(self, name: str):
+        """Deletes a stream delta."""
+        self._load_manifest()
+        if "streams" in self.manifest and name in self.manifest["streams"]:
+            del self.manifest["streams"][name]
+            self._save_manifest()
+            print(f"Deleted stream delta '{name}'.")
+            return True
+        return False
+
     def get_delta_content(self) -> str:
         """
-        Returns a single timestamp delta as requested.
-        Ignores file-based deltas for now.
+        Aggregates all enabled stream deltas into a formatted string.
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        content = f"Current System Time: {timestamp}"
+        self._load_manifest()
+        streams = self.manifest.get("streams", {})
 
+        content_lines = []
+        for name, data in streams.items():
+            if data.get("enabled", True):
+                content_lines.append(f"{name}: {data.get('value', '')}")
+
+        if not content_lines:
+            return ""
+
+        content = "\n".join(content_lines)
         return f"###DELTAS_START###\n{content}\n###DELTAS_END###"
