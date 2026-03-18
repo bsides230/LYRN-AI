@@ -452,6 +452,13 @@ class SnapshotSaveModel(BaseModel):
 class SnapshotLoadModel(BaseModel):
     filename: str
 
+class DeltaUpdateModel(BaseModel):
+    name: str
+    value: str
+
+class DeltaToggleModel(BaseModel):
+    enabled: bool
+
 # --- App Setup ---
 
 @asynccontextmanager
@@ -608,6 +615,55 @@ async def health_check():
         "worker": worker_status,
         "llm_stats": llm_stats
     }
+
+# --- Delta Manager Endpoints ---
+
+from delta_manager import DeltaManager
+delta_manager_api = DeltaManager()
+
+@app.get("/api/deltas", dependencies=[Depends(verify_token)])
+async def get_deltas():
+    streams = delta_manager_api.get_streams()
+    result = []
+    for name, data in streams.items():
+        result.append({
+            "name": name,
+            "value": data.get("value", ""),
+            "enabled": data.get("enabled", True),
+            "updated_at": data.get("updated_at", "")
+        })
+    return result
+
+@app.post("/api/deltas/update", dependencies=[Depends(verify_token)])
+async def update_delta(data: DeltaUpdateModel):
+    # Retrieve current enabled state if stream exists, else default to True
+    current_streams = delta_manager_api.get_streams()
+    enabled = True
+    if data.name in current_streams:
+        enabled = current_streams[data.name].get("enabled", True)
+
+    delta_manager_api.update_stream(data.name, data.value, enabled)
+    return {"success": True}
+
+@app.post("/api/deltas/{delta_name}/toggle", dependencies=[Depends(verify_token)])
+async def toggle_delta(delta_name: str, data: DeltaToggleModel):
+    # Decode name which could be URL encoded
+    from urllib.parse import unquote
+    name = unquote(delta_name)
+    success = delta_manager_api.toggle_stream(name, data.enabled)
+    if success:
+        return {"success": True}
+    raise HTTPException(status_code=404, detail="Delta not found")
+
+@app.delete("/api/deltas/{delta_name}", dependencies=[Depends(verify_token)])
+async def delete_delta(delta_name: str):
+    from urllib.parse import unquote
+    name = unquote(delta_name)
+    success = delta_manager_api.delete_stream(name)
+    if success:
+        return {"success": True}
+    raise HTTPException(status_code=404, detail="Delta not found")
+
 
 # Logging Endpoints
 @app.get("/api/logs", dependencies=[Depends(verify_token)])
