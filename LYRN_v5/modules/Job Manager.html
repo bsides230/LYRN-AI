@@ -536,6 +536,7 @@
         }
         html += `
             <div class="form-group"><label>Instructions</label><textarea id="edit-job-inst" style="height:250px">${escapeHtml(data.instructions || '')}</textarea></div>
+            <div class="form-group"><label>Dynamic Snapshot (Job Context)</label><textarea id="edit-job-dynamic-snapshot" style="height:150px" placeholder="Optional context injected during job execution">${escapeHtml(data.dynamic_snapshot || '')}</textarea></div>
         `;
 
         // Scripts Section
@@ -627,11 +628,14 @@
         const name = isNew ? (document.getElementById('edit-job-name') ? document.getElementById('edit-job-name').value.trim() : UI.selectedJob) : UI.selectedJob;
         if (!name) return showToast("Name required", true);
 
+        const dynamicSnapshot = document.getElementById('edit-job-dynamic-snapshot') ? document.getElementById('edit-job-dynamic-snapshot').value : "";
+
         const payload = {
             name: name,
             instructions: document.getElementById('edit-job-inst').value,
             trigger: "",
-            scripts: UI.editingScripts || []
+            scripts: UI.editingScripts || [],
+            dynamic_snapshot: dynamicSnapshot
         };
 
         try {

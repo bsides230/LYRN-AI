@@ -27,6 +27,7 @@ import uvicorn
 from settings_manager import SettingsManager
 from automation_controller import AutomationController
 from chat_manager import ChatManager
+from backend.ds_manager import DSManager
 
 try:
     import pynvml
@@ -191,6 +192,7 @@ class DiskJournalLogger:
 logger = DiskJournalLogger()
 settings_manager = SettingsManager()
 automation_controller = AutomationController()
+ds_manager = DSManager()
 
 # Initialize ChatManager (Needs settings to be loaded)
 settings_manager.load_or_detect_first_boot()
@@ -249,10 +251,21 @@ async def scheduler_loop():
                         scripts_ok = False
 
                 # 2. Trigger Chat if scripts ok (or no scripts) AND prompt exists
+                # 2. Activate Dynamic Snapshot if present
+                if job.dynamic_snapshot:
+                    print(f"[Scheduler] Activating dynamic snapshot for job: {job.name}")
+                    ds_manager.save_snapshot("jobs", job.name, job.dynamic_snapshot)
+                    ds_manager.set_snapshot_active("jobs", job.name, True)
+
+                # 3. Trigger Chat if scripts ok (or no scripts) AND prompt exists
                 if scripts_ok:
                     if job.prompt:
                         # Use "jobs" folder for automated tasks
                         filepath, _ = trigger_chat_generation(job.prompt, folder="jobs")
+
+                        # Monitor chat file for completion to deactivate dynamic snapshot
+                        if job.dynamic_snapshot:
+                            asyncio.create_task(_monitor_job_completion(filepath, job.name))
 
                         # Log the prompt generation step
                         automation_controller.log_job_history(
@@ -264,6 +277,11 @@ async def scheduler_loop():
                     elif not job.scripts:
                         # Only log this if there were no scripts either
                         print(f"[Scheduler] Job {job.name} has no prompt/instructions and no scripts.")
+                        if job.dynamic_snapshot:
+                            ds_manager.set_snapshot_active("jobs", job.name, False)
+                else:
+                    if job.dynamic_snapshot:
+                        ds_manager.set_snapshot_active("jobs", job.name, False)
 
             # Check delta scripts
             scripts_config = delta_manager_api.get_scripts_config()
@@ -291,6 +309,44 @@ async def scheduler_loop():
         except Exception as e:
             print(f"[Scheduler] Error in loop: {e}")
             await asyncio.sleep(5)
+
+async def _monitor_job_completion(filepath: str, job_name: str):
+    """Monitors a job chat file for completion and deactivates its dynamic snapshot."""
+    import re
+    max_retries = 3600  # 1 hour timeout
+    retries = 0
+    while retries < max_retries:
+        await asyncio.sleep(1)
+        retries += 1
+        try:
+            if not os.path.exists(filepath):
+                continue
+
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check if generation has finished
+            if "[Stopped]" in content or "[Error:" in content:
+                print(f"[Scheduler] Job {job_name} finished (Stopped/Error). Deactivating dynamic snapshot.")
+                ds_manager.set_snapshot_active("jobs", job_name, False)
+                return
+
+            # If model finished writing and worker is idle
+            status_info = worker_controller.get_status()
+            llm_status = status_info.get("llm_status", "unknown")
+
+            # Use regex to find `model` block to ensure it started
+            match = re.search(r'(?:^|\n)model\n', content)
+            if match and llm_status in ["idle", "error", "stopped"]:
+                print(f"[Scheduler] Job {job_name} finished generation. Deactivating dynamic snapshot.")
+                ds_manager.set_snapshot_active("jobs", job_name, False)
+                return
+        except Exception as e:
+            print(f"[Scheduler] Error monitoring job completion: {e}")
+            break
+
+    # Timeout cleanup
+    ds_manager.set_snapshot_active("jobs", job_name, False)
 
 # --- Worker Controller ---
 class WorkerController:
@@ -450,6 +506,7 @@ class JobDefinitionModel(BaseModel):
     instructions: str
     trigger: str
     scripts: List[str] = []
+    dynamic_snapshot: str = ""
 
 class JobScheduleModel(BaseModel):
     id: Optional[str] = None
@@ -457,6 +514,14 @@ class JobScheduleModel(BaseModel):
     scheduled_datetime_iso: str
     priority: int = 100
     args: Optional[Dict[str, Any]] = None
+
+class DSModel(BaseModel):
+    name: str
+    content: str
+    active: bool = False
+
+class DSActiveModel(BaseModel):
+    active: bool
 
 class CycleModel(BaseModel):
     name: str
@@ -911,6 +976,39 @@ async def stop_chat_generation():
 async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
 
+    # Command interception for Chat-to-Job Loop example
+    if request.message.strip().startswith("/job "):
+        parts = request.message.strip().split(" ", 2)
+        if len(parts) >= 2:
+            job_name = parts[1]
+            job_input = parts[2] if len(parts) == 3 else ""
+
+            # Retrieve job definition to use its template and just replace the {input} or append
+            job_def = automation_controller.job_definitions.get(job_name)
+            if job_def:
+                # Update dynamic snapshot for this job instance with the new input
+                # For this example, we'll append the user input to the job's dynamic snapshot
+                original_snapshot = job_def.get("dynamic_snapshot", "")
+                new_snapshot = f"{original_snapshot}\n\n[Chat Input Data]:\n{job_input}" if original_snapshot else f"[Chat Input Data]:\n{job_input}"
+
+                # Temporarily update the in-memory definition so the scheduler uses the new snapshot
+                automation_controller.job_definitions[job_name]["dynamic_snapshot"] = new_snapshot
+                ds_manager.save_snapshot("jobs", job_name, new_snapshot)
+
+                # Add job to queue
+                automation_controller.add_job(name=job_name)
+
+                async def sys_response():
+                    yield json.dumps({"filename": "system_job_started.txt"}) + "\n"
+                    yield json.dumps({"response": f"System: Scheduled job '{job_name}' successfully with your input. Check the automation logs or DSManager for updates."}) + "\n"
+
+                return StreamingResponse(sys_response(), media_type="application/x-ndjson")
+            else:
+                async def err_response():
+                    yield json.dumps({"filename": "system_error.txt"}) + "\n"
+                    yield json.dumps({"response": f"System: Job '{job_name}' not found."}) + "\n"
+                return StreamingResponse(err_response(), media_type="application/x-ndjson")
+
     try:
         filepath, filename = trigger_chat_generation(request.message)
     except Exception as e:
@@ -1264,6 +1362,42 @@ async def start_worker():
 async def stop_worker():
     return worker_controller.stop_worker()
 
+# --- DSManager Endpoints ---
+
+@app.get("/api/dsmanager/{category}", dependencies=[Depends(verify_token)])
+async def get_dynamic_snapshots(category: str):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    return ds_manager.list_snapshots(category)
+
+@app.post("/api/dsmanager/{category}", dependencies=[Depends(verify_token)])
+async def save_dynamic_snapshot(category: str, data: DSModel):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    success = ds_manager.save_snapshot(category, data.name, data.content)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save snapshot")
+    ds_manager.set_snapshot_active(category, data.name, data.active)
+    return {"success": True}
+
+@app.put("/api/dsmanager/{category}/{name}/active", dependencies=[Depends(verify_token)])
+async def set_dynamic_snapshot_active(category: str, name: str, data: DSActiveModel):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    success = ds_manager.set_snapshot_active(category, name, data.active)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update active state")
+    return {"success": True}
+
+@app.delete("/api/dsmanager/{category}/{name}", dependencies=[Depends(verify_token)])
+async def delete_dynamic_snapshot(category: str, name: str):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    success = ds_manager.delete_snapshot(category, name)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete snapshot")
+    return {"success": True}
+
 # --- Automation Endpoints ---
 
 @app.get("/api/automation/jobs", dependencies=[Depends(verify_token)])
@@ -1272,7 +1406,11 @@ async def get_jobs():
 
 @app.post("/api/automation/jobs", dependencies=[Depends(verify_token)])
 async def save_job(job: JobDefinitionModel):
-    automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts)
+    automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts, job.dynamic_snapshot)
+
+    # Save the snapshot to DSManager as well if it has content
+    if job.dynamic_snapshot:
+        ds_manager.save_snapshot("jobs", job.name, job.dynamic_snapshot)
     return {"success": True}
 
 @app.delete("/api/automation/jobs/{job_name}", dependencies=[Depends(verify_token)])

@@ -1,0 +1,4 @@
+This is a dynamically injected snapshot for the chat_to_job_example job.
+It can contain any user-defined instructions, constraints, or previous chat inputs to guide the LLM's response.
+
+Input query: Summarize the current goals of the LYRN project.

@@ -10,5 +10,13 @@
       "test_script_basic.py",
       "test_script_handoff.py"
     ]
+  },
+  "chat_to_job_example": {
+    "instructions": "You are processing a user's chat input passed through the job loop. Please read the provided context and respond directly to the query inside the dynamic snapshot context block.",
+    "trigger": "",
+    "scripts": [
+      "chat_to_job.py"
+    ],
+    "dynamic_snapshot": "This is a dynamically injected snapshot for the chat_to_job_example job.\nIt can contain any user-defined instructions, constraints, or previous chat inputs to guide the LLM's response.\n\nInput query: Summarize the current goals of the LYRN project."
   }
 }
