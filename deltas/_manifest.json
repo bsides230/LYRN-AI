@@ -1,11 +1,10 @@
 {
   "deltas": [],
-  "simple_deltas": {
-    "creativity": "personality.creativity = 900",
-    "consistency": "personality.consistency = 400",
-    "verbosity": "personality.verbosity = 800",
-    "assertiveness": "personality.assertiveness = 700",
-    "curiosity": "personality.curiosity = 900",
-    "enthusiasm": "personality.enthusiasm = 800"
+  "scripts": {
+    "send_timestamp.py": {
+      "interval": 5,
+      "enabled": true,
+      "last_run": 1773866601.3519564
+    }
   }
 }

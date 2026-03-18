@@ -105,19 +105,6 @@ class DeltaManager:
                 os.remove(temp_filepath)
             return None
 
-    def update_simple_delta(self, trait_name: str, formatted_string: str):
-        """
-        Updates a simple key-value delta in the manifest.
-        This is used for things like personality sliders where only the latest value matters.
-        """
-        self._load_manifest()
-        if "simple_deltas" not in self.manifest:
-            self.manifest["simple_deltas"] = {}
-
-        self.manifest["simple_deltas"][trait_name] = formatted_string
-        self._save_manifest()
-        print(f"Updated simple delta for '{trait_name}'.")
-
     def get_streams(self) -> dict:
         """Returns the current streams from the manifest."""
         self._load_manifest()

@@ -200,6 +200,7 @@
             <h1 class="panel-title">Delta Manager</h1>
         </div>
         <div class="btn-group">
+            <button class="btn-square" onclick="openHelp()" title="Help">?</button>
             <button class="btn-primary" onclick="openAddModal()">Add Delta</button>
             <button class="btn-square" onclick="fetchDeltas()" title="Refresh">🔄</button>
         </div>
@@ -489,6 +490,15 @@
             showToast("Connection Error", true);
             fetchScripts();
         }
+    }
+
+    function openHelp() {
+        window.parent.postMessage({
+            type: 'OPEN_WIDGET',
+            id: 'widget_delta_help',
+            name: 'Delta Manager Instructions',
+            file: 'instructions/DeltaManagerHelp.html'
+        }, '*');
     }
 
     // Modal logic
