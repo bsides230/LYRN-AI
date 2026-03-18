@@ -11,6 +11,8 @@ This file contains critical architectural rules that must be followed during dev
  
  - This system was designed after 90s text based game parser scripts and the simplicity of those triggers. We bring that same energy to this system.
  
+ - NEVER use absolute paths (e.g., `C:\...`) when referencing or creating files, especially files like `automation.txt`. NEVER add absolute path links, symbolic links, or shortcuts to the repository. All file paths must be relative to the repository root.
+
  - Remember in this design we are building cognition for AI. We are building this with simplicty in mind. For example, no crazy coding to complete a function that just requires a file to be watched and the text pulled from formatted blocks. The llm does most of the heavy lifting. This system just moves files and data around dumbly. The affordances are just going to be simple triggers using the similar logic.
 
 ---
