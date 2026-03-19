@@ -644,6 +644,9 @@ async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token"), t
 async def get_auth_status():
     if Path("global_flags/no_auth").exists():
         return {"required": False}
+    # If no token has been configured yet (fresh install), auth cannot be enforced
+    if not LYRN_TOKEN:
+        return {"required": False}
     return {"required": True}
 
 @app.post("/api/verify_token", dependencies=[Depends(verify_token)])
@@ -1032,10 +1035,20 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
     try:
         active_downloads[filename]["status"] = "downloading"
 
-        resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "1.1.1.1"])
-        connector = aiohttp.TCPConnector(resolver=resolver)
+        # Proxy support: honour standard environment variables
+        proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") \
+             or os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") \
+             or os.environ.get("ALL_PROXY") or os.environ.get("all_proxy")
+
+        # Only use custom DNS resolver when not going through a proxy
+        if proxy:
+            connector = aiohttp.TCPConnector()
+        else:
+            resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "1.1.1.1"])
+            connector = aiohttp.TCPConnector(resolver=resolver)
+
         async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.get(url) as resp:
+            async with session.get(url, proxy=proxy) as resp:
                 if resp.status != 200:
                     raise Exception(f"HTTP {resp.status}")
 
