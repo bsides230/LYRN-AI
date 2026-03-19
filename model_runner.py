@@ -210,6 +210,52 @@ def main():
     print("Runner stopped.")
     set_llm_status("stopped")
 
+def _read_input_payload(input_path: Path) -> dict:
+    """
+    Reads the input payload from the trigger path.
+    Supports new JSON format and legacy text format.
+    Returns: {"user_message": str, "job_instructions": str, "source": str}
+    """
+    if input_path.suffix == '.json':
+        # New structured input format
+        data = json.loads(input_path.read_text(encoding='utf-8'))
+        return {
+            "user_message": data.get("user_message", ""),
+            "job_instructions": data.get("job_instructions", ""),
+            "source": data.get("source", "job")
+        }
+    else:
+        # Legacy text format: user\n{message}\n
+        content = input_path.read_text(encoding='utf-8')
+        user_message = ""
+        if content.startswith("user\n"):
+            user_message = content[5:].strip()
+        else:
+            match = re.search(r"#USER_START#\n(.*?)\n#USER_END#", content, re.DOTALL)
+            if match:
+                user_message = match.group(1).strip()
+            else:
+                user_message = content.strip()
+        return {
+            "user_message": user_message,
+            "job_instructions": "",
+            "source": "legacy"
+        }
+
+
+def _resolve_raw_output_path(input_path: Path) -> Path:
+    """
+    Determines the raw output file path based on the input path.
+    For jobs/ folder inputs, writes to jobs/job_raw_output.txt.
+    For other inputs, writes to a sibling _raw_output.txt file.
+    """
+    parent = input_path.parent
+    if parent.name == "jobs":
+        return parent / "job_raw_output.txt"
+    else:
+        return parent / f"{input_path.stem}_raw_output.txt"
+
+
 def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager, chat_manager, settings_manager, ds_manager):
     with model_lock:
         set_llm_status("busy")
@@ -220,32 +266,29 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                 os.remove(STOP_TRIGGER)
         except: pass
 
-        chat_file_path = Path(chat_file_path_str)
-        if not chat_file_path.exists():
-            print(f"Error: Chat file not found: {chat_file_path}")
+        input_path = Path(chat_file_path_str)
+        if not input_path.exists():
+            print(f"Error: Input file not found: {input_path}")
             set_llm_status("idle")
             return
 
         try:
-            # 1. Read User Message from the Triggered File
-            # start_lyrn.py writes: user\n{message}\n
-            content = chat_file_path.read_text(encoding='utf-8')
+            # 1. Read Input Payload
+            payload = _read_input_payload(input_path)
+            user_message = payload["user_message"]
+            job_instructions = payload["job_instructions"]
+            source = payload["source"]
 
-            user_message = ""
-            # Check for v4 format first
-            if content.startswith("user\n"):
-                user_message = content[5:].strip() # Remove 'user\n'
-            else:
-                # Fallback to old regex if needed or raw
-                match = re.search(r"#USER_START#\n(.*?)\n#USER_END#", content, re.DOTALL)
-                if match:
-                    user_message = match.group(1).strip()
-                else:
-                    user_message = content.strip()
+            print(f"[Runner] Source: {source} | User Message: {user_message[:80]}...")
 
-            print(f"User Message: {user_message[:50]}...")
+            # 2. Determine Raw Output Path (separate from input)
+            raw_output_path = _resolve_raw_output_path(input_path)
 
-            # 2. Build Context (v4 Logic)
+            # Clear any stale raw output
+            if raw_output_path.exists():
+                raw_output_path.unlink()
+
+            # 3. Build Context
             # Master Prompt
             system_prompt = snapshot_loader.load_base_prompt()
 
@@ -258,33 +301,36 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                 delta_content = delta_manager.get_delta_content()
 
             # Construct Messages
-            # Order: Snapshot -> Dynamic Snapshots -> History -> Deltas -> New Input
+            # Order: System Prompt -> Dynamic Snapshots -> History -> Deltas -> (Job Instructions if chat) -> User Message
             messages = [{"role": "system", "content": system_prompt}]
 
             if dynamic_snapshot_content:
                 messages.append({"role": "system", "content": f"--- Active Dynamic Snapshots ---\n{dynamic_snapshot_content}"})
 
-            # History
-            # IMPORTANT: Exclude the current chat file so we don't duplicate it or treat it as history yet
-            history = chat_manager.get_chat_history_messages(exclude_paths=[str(chat_file_path.resolve())])
+            # History (no file exclusion needed — input is JSON, not a chat file)
+            history = chat_manager.get_chat_history_messages(exclude_paths=[])
             messages.extend(history)
 
             # Deltas (Injected after history, before new input)
             if delta_content:
                 messages.append({"role": "system", "content": delta_content})
 
-            # Append current user message
-            # Merge if last was user (alternating roles logic)
+            # For chat source: job instructions become system context, user_message is the user turn
+            # For job/legacy source: user_message is the user turn (may be same as instructions)
+            if source == "chat" and job_instructions:
+                messages.append({"role": "system", "content": f"--- Job Instructions ---\n{job_instructions}"})
+
+            # Append current user message (merge if last was also user to maintain alternating roles)
             if messages and messages[-1].get("role") == "user":
                 messages[-1]["content"] += "\n\n" + user_message
             else:
                 messages.append({"role": "user", "content": user_message})
 
-            # 3. Generate with Stderr Capture
+            # 4. Generate with Stderr Capture — write raw output to SEPARATE intermediate file
             active_config = settings_manager.settings.get("active", {})
             log_capture_buffer = io.StringIO()
 
-            print(f"[Runner] Generating response... (Use mlock: True, mmap: False)")
+            print(f"[Runner] Generating response to: {raw_output_path}")
 
             with contextlib.redirect_stderr(log_capture_buffer):
                 stream = llm.create_chat_completion(
@@ -296,11 +342,8 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     stream=True
                 )
 
-                # 4. Stream Response to File
-                # Prepend model separator
-                with open(chat_file_path, "a", encoding="utf-8") as f:
-                    f.write("\n\nmodel\n")
-
+                # Stream raw model output to the intermediate output file
+                with open(raw_output_path, "w", encoding="utf-8") as f:
                     for token_data in stream:
                         # Check stop
                         if os.path.exists(STOP_TRIGGER):
@@ -327,14 +370,16 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if stats:
                 write_stats(stats)
 
-            print("Generation complete.")
+            print(f"[Runner] Generation complete. Raw output: {raw_output_path}")
             set_llm_status("idle")
 
         except Exception as e:
             print(f"Error during generation: {e}")
+            # Write error to raw output so capture layer can detect it
             try:
-                with open(chat_file_path, "a", encoding="utf-8") as f:
-                    f.write(f"\n[Error: {e}]\n")
+                raw_output_path = _resolve_raw_output_path(input_path)
+                with open(raw_output_path, "w", encoding="utf-8") as f:
+                    f.write(f"[Error: {e}]")
             except: pass
             set_llm_status("error")
 

@@ -210,28 +210,51 @@ chat_manager = ChatManager(
 
 # --- Helper Functions ---
 def trigger_chat_generation(message: str, folder: str = "chat"):
-    """Creates a chat file and triggers the worker."""
+    """Creates an input payload and triggers the worker."""
     # Ensure directory
     os.makedirs(folder, exist_ok=True)
 
     if folder == "jobs":
-        filename = f"{folder}/job_model_output.txt"
-        filepath = os.path.abspath(filename)
-        # Clear previous job output to avoid race conditions with watchers
+        input_path = os.path.join(folder, "job_input.json")
+        raw_output_path = os.path.join(folder, "job_raw_output.txt")
+        filepath = os.path.abspath(input_path)
+
+        # Read existing input (may have been created by chat_endpoint with user_message)
+        input_payload = {}
         if os.path.exists(filepath):
             try:
-                os.remove(filepath)
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    input_payload = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                input_payload = {}
+
+        # Merge job instructions into the payload
+        input_payload["job_instructions"] = message
+
+        # If no user_message was set (non-chat job), use instructions as user message
+        if "user_message" not in input_payload or not input_payload["user_message"]:
+            input_payload["user_message"] = message
+            input_payload["source"] = "job"
+
+        # Write updated input payload
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(input_payload, f, indent=2)
+        print(f"[System] Created job input: {filepath} (source={input_payload.get('source', 'unknown')})")
+
+        # Clear previous raw output to avoid stale reads by the capture layer
+        if os.path.exists(raw_output_path):
+            try:
+                os.remove(raw_output_path)
             except Exception as e:
-                print(f"[System] Error clearing old job output: {e}")
+                print(f"[System] Error clearing old raw output: {e}")
     else:
+        # Legacy direct-chat path (non-job)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = f"{folder}/{folder}_{timestamp}.txt"
         filepath = os.path.abspath(filename)
-
-    # Write User Message
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(f"user\n{message}\n")
-    print(f"[System] Created chat file: {filepath}")
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(f"user\n{message}\n")
+        print(f"[System] Created chat file: {filepath}")
 
     # Write Trigger
     with open("chat_trigger.txt", "w", encoding="utf-8") as f:
@@ -321,33 +344,38 @@ async def scheduler_loop():
             await asyncio.sleep(5)
 
 async def _monitor_job_completion(filepath: str, job_name: str):
-    """Monitors a job chat file for completion and deactivates its dynamic snapshot."""
-    import re
+    """Monitors the raw output file for completion and deactivates dynamic snapshot."""
     max_retries = 3600  # 1 hour timeout
     retries = 0
+
+    # Determine the raw output path from the input filepath
+    input_path = Path(filepath)
+    if input_path.parent.name == "jobs":
+        raw_output_path = input_path.parent / "job_raw_output.txt"
+    else:
+        raw_output_path = input_path.parent / f"{input_path.stem}_raw_output.txt"
+
     while retries < max_retries:
         await asyncio.sleep(1)
         retries += 1
         try:
-            if not os.path.exists(filepath):
+            # Check if raw output exists yet
+            if not raw_output_path.exists():
                 continue
 
-            with open(filepath, "r", encoding="utf-8") as f:
-                content = f.read()
+            content = raw_output_path.read_text(encoding="utf-8")
 
-            # Check if generation has finished
+            # Check if generation produced an error or was stopped
             if "[Stopped]" in content or "[Error:" in content:
                 print(f"[Scheduler] Job {job_name} finished (Stopped/Error). Deactivating dynamic snapshot.")
                 ds_manager.set_snapshot_active("jobs", job_name, False)
                 return
 
-            # If model finished writing and worker is idle
+            # If worker is idle/error/stopped and output exists, generation is complete
             status_info = worker_controller.get_status()
             llm_status = status_info.get("llm_status", "unknown")
 
-            # Use regex to find `model` block to ensure it started
-            match = re.search(r'(?:^|\n)model\n', content)
-            if match and llm_status in ["idle", "error", "stopped"]:
+            if content.strip() and llm_status in ["idle", "error", "stopped"]:
                 print(f"[Scheduler] Job {job_name} finished generation. Deactivating dynamic snapshot.")
                 ds_manager.set_snapshot_active("jobs", job_name, False)
                 return
@@ -998,9 +1026,16 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=429, detail="A chat request is already being processed.")
 
     try:
-        # Save user's message to a Dynamic Snapshot
-        ds_manager.save_snapshot("jobs", "chat_input_context", f"[Chat Input]:\n{request.message}")
-        ds_manager.set_snapshot_active("jobs", "chat_input_context", True)
+        # Write structured input payload for the model runner
+        os.makedirs("jobs", exist_ok=True)
+        input_payload = {
+            "user_message": request.message,
+            "source": "chat",
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        with open("jobs/job_input.json", "w", encoding="utf-8") as f:
+            json.dump(input_payload, f, indent=2)
+        print(f"[API] Wrote structured input to jobs/job_input.json")
 
         # Create the lock file
         Path("global_flags").mkdir(exist_ok=True)
