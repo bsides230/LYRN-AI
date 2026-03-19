@@ -87,3 +87,73 @@ This update marks the official transition to the Dashboard v5 architecture and a
 -   **Structured Memory over Prompt Injection:** All core context—personality, memory, goals—lives in structured text files and memory tables. The LLM reasons from this stable foundation rather than having it repeatedly injected into a limited context window.
 -   **Simplicity and Robustness:** The architecture is inspired by the simplicity of 1990s text-based game parsers. The framework's job is to be a robust, simple system for moving data; the LLM's job is to do the heavy lifting of reasoning.
 -   **UI Development:** New modules must be implemented as single-file solutions (combining HTML, CSS, and JS) in `LYRN_v5/modules/` to facilitate loading on smaller systems and minimize floating dependencies. UI must strictly follow `LYRN Style Guide.html`.
+
+
+## v5.0.4 - Full-System Install & Runtime Validation Audit (2026-03-19)
+
+### Environment
+- Host OS: Linux 6.12.47 x86_64 (glibc 2.39)
+- Python: system interpreter `python` / `python3` -> 3.12.12
+- pip: 25.3
+- Execution mode: system-wide install only, no virtual environment
+- Repo path: `/workspace/LYRN-AI`
+
+### Exact install commands run
+- `python3 --version`
+- `python --version`
+- `pip --version`
+- `python -m pip install -r requirements.txt`
+
+### Incremental package installs
+- None. The single primary install completed without requiring any follow-up package installs.
+
+### Exact runtime / validation commands run
+- `python start_lyrn.py`
+- `curl -s http://127.0.0.1:8080/health`
+- `curl -s http://127.0.0.1:8080/api/auth/status`
+- `POST /api/models/fetch` with the required Hugging Face GGUF URL
+- `GET /api/models/downloads`
+- `GET /api/models/list`
+- `POST /api/config/active`
+- `POST /api/system/start_worker`
+- `GET /api/system/worker_status`
+- `POST /api/chat`
+- `GET /api/chat/status`
+- Local inspection of `automation/job_queue.json`, `automation/job_history.json`, `chat_trigger.txt`, and `jobs/job_model_output.txt`
+
+### What changed during validation
+- No source-code files were modified to get the system running.
+- A temporary runtime workaround file `global_flags/no_auth` was created locally so the API could be exercised after the backend reported `{"required": false}` but still returned `401 Unauthorized` on protected endpoints when no admin token was configured.
+- `settings.json` was temporarily updated through the product’s own API (`/api/config/active`) to validate that the active model selection flow writes back to settings.
+- Runtime-generated files were produced/updated during testing, including scheduler state, job history, and dynamic snapshot files.
+
+### Why the workaround was necessary
+- Without `global_flags/no_auth`, the UI/API flow could not proceed through model download, model activation, worker start, or chat submission on a fresh install with no `admin_token.txt`, even though `/api/auth/status` explicitly reported that auth was not required.
+- This should be treated as a product defect, not a permanent operational requirement.
+
+### What would have failed without the workaround
+- Model manager fetch requests failed with `401 Unauthorized`.
+- Model controller worker-start and active-config flows were blocked.
+- Chat submission was blocked before the job system could be exercised.
+
+### Permanent fix vs workaround
+- `global_flags/no_auth` was only a local validation workaround and should not be considered the permanent fix.
+- The permanent fix should be in backend auth handling so `verify_token` matches `GET /api/auth/status` semantics.
+
+### Runtime results summary
+- Backend boot: success.
+- UI static shell reachable from `/`: success.
+- Model download via built-in workflow: failed because outbound access to Hugging Face was blocked in this environment (`403 Forbidden` through the configured proxy).
+- Model activation flow writing `settings.json`: success via the same API path the UI uses.
+- Worker boot: attempted, but failed because the required model file never downloaded.
+- Job-based chat flow: queueing and scheduler/script handoff succeeded; final inference/output completion did not complete because the worker could not load the requested model.
+
+### Logging notes
+- Backend created a new log session under `logs/session_20260319_191145/`.
+- Worker launch failures were visible in backend log streaming (`WorkerOut`), but no `global_flags/last_error.txt` was written, so the structured worker error field remained empty.
+- Scheduler continuously executed the enabled delta script `send_timestamp.py` every 5 seconds during validation, creating persistent background log noise.
+
+### Manual interventions
+- Created `global_flags/no_auth` temporarily to continue validation in the absence of `admin_token.txt`.
+- Attempted the exact required model download through the product workflow, then confirmed the failure state via `/api/models/downloads`.
+- Activated the exact required model path through `/api/config/active` to validate settings persistence even though the file was not present locally.
