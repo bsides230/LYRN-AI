@@ -34,3 +34,7 @@ models/
 
 # Stray Windows-path named directories
 C:*
+
+# Test artifacts
+.test_venv/
+jobs/
