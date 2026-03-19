@@ -1,5 +1,63 @@
 [
   {
+    "id": "hist_1773934197254",
+    "job_name": "chat_response_job",
+    "timestamp": "2026-03-19T15:29:57.254859",
+    "status": "success",
+    "scripts_run": 1,
+    "details": [
+      {
+        "message": "Prompt triggered successfully."
+      }
+    ],
+    "filepath": "/home/user/LYRN-AI/jobs/job_model_output.txt"
+  },
+  {
+    "id": "hist_1773934197254",
+    "job_name": "chat_response_job",
+    "timestamp": "2026-03-19T15:29:57.254059",
+    "status": "success",
+    "scripts_run": 1,
+    "details": [
+      {
+        "script": "spawn_chat_watcher.py",
+        "status": "success",
+        "stdout": "--- spawn_chat_watcher.py executed ---\nSpawned background watcher.\n",
+        "stderr": "",
+        "timestamp": 1773934197.2540483
+      }
+    ]
+  },
+  {
+    "id": "hist_1773934192138",
+    "job_name": "chat_input_job",
+    "timestamp": "2026-03-19T15:29:52.138780",
+    "status": "success",
+    "scripts_run": 1,
+    "details": [
+      {
+        "message": "Prompt triggered successfully."
+      }
+    ],
+    "filepath": "/home/user/LYRN-AI/jobs/job_model_output.txt"
+  },
+  {
+    "id": "hist_1773934192138",
+    "job_name": "chat_input_job",
+    "timestamp": "2026-03-19T15:29:52.138006",
+    "status": "success",
+    "scripts_run": 1,
+    "details": [
+      {
+        "script": "route_chat.py",
+        "status": "success",
+        "stdout": "--- route_chat.py executed ---\nSuccessfully queued chat_response_job.\n",
+        "stderr": "",
+        "timestamp": 1773934192.1379945
+      }
+    ]
+  },
+  {
     "id": "hist_1773878755404",
     "job_name": "chat_response_job",
     "timestamp": "2026-03-19T00:05:55.404198",
