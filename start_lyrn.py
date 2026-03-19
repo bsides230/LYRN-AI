@@ -567,6 +567,10 @@ async def lifespan(app: FastAPI):
     global main_loop, LYRN_TOKEN
     main_loop = asyncio.get_running_loop()
 
+    # Ensure required directories exist on fresh clone
+    for _d in ["models", "global_flags", "chat", "jobs", "logs"]:
+        Path(_d).mkdir(exist_ok=True)
+
     # Load Admin Token
     token_file = Path("admin_token.txt")
     if token_file.exists():
@@ -1028,7 +1032,9 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
     try:
         active_downloads[filename]["status"] = "downloading"
 
-        async with aiohttp.ClientSession() as session:
+        resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "1.1.1.1"])
+        connector = aiohttp.TCPConnector(resolver=resolver)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url) as resp:
                 if resp.status != 200:
                     raise Exception(f"HTTP {resp.status}")

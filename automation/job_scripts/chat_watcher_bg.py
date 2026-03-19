@@ -72,6 +72,19 @@ def main():
                 end_marker = "##Response_END##"
 
                 if start_marker in content and end_marker in content:
+                    # Wait for generation to be fully complete before extracting,
+                    # so we don't capture a partial response block.
+                    llm_status_path = os.path.join(root_dir, "global_flags", "llm_status.txt")
+                    try:
+                        with open(llm_status_path, "r", encoding="utf-8") as sf:
+                            llm_status = sf.read().strip()
+                    except Exception:
+                        llm_status = "idle"  # assume done if file unreadable
+
+                    if llm_status != "idle":
+                        time.sleep(1)
+                        continue
+
                     print("Found response markers!")
 
                     # Extract the response block
