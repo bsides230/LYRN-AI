@@ -25,3 +25,12 @@ settings.json.bk
 settings.json.bk
 settings.json.bk
 /snapshots
+
+# Virtual environments
+venv_cold_start/
+
+# Downloaded model files
+models/
+
+# Stray Windows-path named directories
+C:*
