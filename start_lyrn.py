@@ -27,6 +27,7 @@ import uvicorn
 from settings_manager import SettingsManager
 from automation_controller import AutomationController
 from chat_manager import ChatManager
+from backend.ds_manager import DSManager
 
 try:
     import pynvml
@@ -191,6 +192,7 @@ class DiskJournalLogger:
 logger = DiskJournalLogger()
 settings_manager = SettingsManager()
 automation_controller = AutomationController()
+ds_manager = DSManager()
 
 # Initialize ChatManager (Needs settings to be loaded)
 settings_manager.load_or_detect_first_boot()
@@ -209,12 +211,22 @@ chat_manager = ChatManager(
 # --- Helper Functions ---
 def trigger_chat_generation(message: str, folder: str = "chat"):
     """Creates a chat file and triggers the worker."""
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{folder}/{folder}_{timestamp}.txt"
-    filepath = os.path.abspath(filename)
-
     # Ensure directory
     os.makedirs(folder, exist_ok=True)
+
+    if folder == "jobs":
+        filename = f"{folder}/job_model_output.txt"
+        filepath = os.path.abspath(filename)
+        # Clear previous job output to avoid race conditions with watchers
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                print(f"[System] Error clearing old job output: {e}")
+    else:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{folder}/{folder}_{timestamp}.txt"
+        filepath = os.path.abspath(filename)
 
     # Write User Message
     with open(filepath, "w", encoding="utf-8") as f:
@@ -249,10 +261,21 @@ async def scheduler_loop():
                         scripts_ok = False
 
                 # 2. Trigger Chat if scripts ok (or no scripts) AND prompt exists
+                # 2. Activate Dynamic Snapshot if present
+                if job.dynamic_snapshot:
+                    print(f"[Scheduler] Activating dynamic snapshot for job: {job.name}")
+                    ds_manager.save_snapshot("jobs", job.name, job.dynamic_snapshot)
+                    ds_manager.set_snapshot_active("jobs", job.name, True)
+
+                # 3. Trigger Chat if scripts ok (or no scripts) AND prompt exists
                 if scripts_ok:
                     if job.prompt:
                         # Use "jobs" folder for automated tasks
                         filepath, _ = trigger_chat_generation(job.prompt, folder="jobs")
+
+                        # Monitor chat file for completion to deactivate dynamic snapshot
+                        if job.dynamic_snapshot:
+                            asyncio.create_task(_monitor_job_completion(filepath, job.name))
 
                         # Log the prompt generation step
                         automation_controller.log_job_history(
@@ -264,6 +287,11 @@ async def scheduler_loop():
                     elif not job.scripts:
                         # Only log this if there were no scripts either
                         print(f"[Scheduler] Job {job.name} has no prompt/instructions and no scripts.")
+                        if job.dynamic_snapshot:
+                            ds_manager.set_snapshot_active("jobs", job.name, False)
+                else:
+                    if job.dynamic_snapshot:
+                        ds_manager.set_snapshot_active("jobs", job.name, False)
 
             # Check delta scripts
             scripts_config = delta_manager_api.get_scripts_config()
@@ -291,6 +319,44 @@ async def scheduler_loop():
         except Exception as e:
             print(f"[Scheduler] Error in loop: {e}")
             await asyncio.sleep(5)
+
+async def _monitor_job_completion(filepath: str, job_name: str):
+    """Monitors a job chat file for completion and deactivates its dynamic snapshot."""
+    import re
+    max_retries = 3600  # 1 hour timeout
+    retries = 0
+    while retries < max_retries:
+        await asyncio.sleep(1)
+        retries += 1
+        try:
+            if not os.path.exists(filepath):
+                continue
+
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Check if generation has finished
+            if "[Stopped]" in content or "[Error:" in content:
+                print(f"[Scheduler] Job {job_name} finished (Stopped/Error). Deactivating dynamic snapshot.")
+                ds_manager.set_snapshot_active("jobs", job_name, False)
+                return
+
+            # If model finished writing and worker is idle
+            status_info = worker_controller.get_status()
+            llm_status = status_info.get("llm_status", "unknown")
+
+            # Use regex to find `model` block to ensure it started
+            match = re.search(r'(?:^|\n)model\n', content)
+            if match and llm_status in ["idle", "error", "stopped"]:
+                print(f"[Scheduler] Job {job_name} finished generation. Deactivating dynamic snapshot.")
+                ds_manager.set_snapshot_active("jobs", job_name, False)
+                return
+        except Exception as e:
+            print(f"[Scheduler] Error monitoring job completion: {e}")
+            break
+
+    # Timeout cleanup
+    ds_manager.set_snapshot_active("jobs", job_name, False)
 
 # --- Worker Controller ---
 class WorkerController:
@@ -450,6 +516,7 @@ class JobDefinitionModel(BaseModel):
     instructions: str
     trigger: str
     scripts: List[str] = []
+    dynamic_snapshot: str = ""
 
 class JobScheduleModel(BaseModel):
     id: Optional[str] = None
@@ -457,6 +524,14 @@ class JobScheduleModel(BaseModel):
     scheduled_datetime_iso: str
     priority: int = 100
     args: Optional[Dict[str, Any]] = None
+
+class DSModel(BaseModel):
+    name: str
+    content: str
+    active: bool = False
+
+class DSActiveModel(BaseModel):
+    active: bool
 
 class CycleModel(BaseModel):
     name: str
@@ -491,6 +566,10 @@ class DeltaScriptConfigModel(BaseModel):
 async def lifespan(app: FastAPI):
     global main_loop, LYRN_TOKEN
     main_loop = asyncio.get_running_loop()
+
+    # Ensure required directories exist on fresh clone
+    for _d in ["models", "global_flags", "chat", "jobs", "logs"]:
+        Path(_d).mkdir(exist_ok=True)
 
     # Load Admin Token
     token_file = Path("admin_token.txt")
@@ -911,82 +990,32 @@ async def stop_chat_generation():
 async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
 
+    # Check for existing lock to prevent queue clogging and overwriting
+    if Path("global_flags/chat_processing.txt").exists():
+        raise HTTPException(status_code=429, detail="A chat request is already being processed.")
+
     try:
-        filepath, filename = trigger_chat_generation(request.message)
+        # Save user's message to a Dynamic Snapshot
+        ds_manager.save_snapshot("jobs", "chat_input_context", f"[Chat Input]:\n{request.message}")
+        ds_manager.set_snapshot_active("jobs", "chat_input_context", True)
+
+        # Create the lock file
+        Path("global_flags").mkdir(exist_ok=True)
+        with open("global_flags/chat_processing.txt", "w", encoding="utf-8") as f:
+            f.write("processing")
+
+        # Queue the chat_input_job
+        automation_controller.add_job(name="chat_input_job")
+
+        return {"success": True, "message": "Chat job queued"}
     except Exception as e:
-         raise HTTPException(status_code=500, detail=f"Failed to trigger chat: {e}")
+        print(f"[API] Error queueing chat job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    async def event_generator():
-        # Yield the filename first for UI tracking
-        yield json.dumps({"filename": filename}) + "\n"
-        last_pos = 0
-        retries = 0
-        started = False
-
-        while True:
-            await asyncio.sleep(0.1)
-            try:
-                if not os.path.exists(filepath):
-                    continue
-
-                with open(filepath, "r", encoding="utf-8") as f:
-                    content = f.read()
-
-                    if not started:
-                        # Check for "model" marker. Worker writes "\n\nmodel\n"
-                        # We look for "model" preceded by newlines or start of file
-                        start_idx = -1
-                        match = re.search(r'(?:^|\n)model\n', content)
-                        if match:
-                            start_idx = match.start()
-                            # Start reading from end of match
-                            last_pos = match.end()
-                            started = True
-
-                        if not started:
-                            # Check for error
-                            if "[Error:" in content:
-                                print("[API] Detected error in chat file.")
-                                yield json.dumps({"response": "Error in worker."}) + "\n"
-                                return
-
-                            retries += 1
-                            # Load timeout from settings (default 1800s = 30 mins)
-                            # Loop sleeps 0.1s, so 1800s = 18000 iterations
-                            timeout_seconds = settings_manager.settings.get("worker_timeout_seconds", 1800)
-                            max_retries = timeout_seconds * 10
-
-                            if retries > max_retries:
-                                print(f"[API] Timeout waiting for worker response ({timeout_seconds}s).")
-                                yield json.dumps({"response": "Timeout waiting for worker."}) + "\n"
-                                return
-                            continue
-
-                    if started:
-                        # Read from last_pos
-                        current_len = len(content)
-                        if current_len > last_pos:
-                            new_text = content[last_pos:]
-
-                            # Stream what we have
-                            yield json.dumps({"response": new_text}) + "\n"
-                            last_pos = current_len
-
-                        # Check if worker is done
-                        status_info = worker_controller.get_status()
-                        llm_status = status_info.get("llm_status", "unknown")
-
-                        # If idle or error or stopped, and we have consumed everything (which we just did), we are done.
-                        # Note: We rely on the fact that the worker writes content THEN sets status to idle.
-                        if llm_status in ["idle", "error", "stopped"]:
-                            return
-
-            except Exception as e:
-                print(f"Error in stream: {e}")
-                yield json.dumps({"response": f"Error: {e}"}) + "\n"
-                return
-
-    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+@app.get("/api/chat/status", dependencies=[Depends(verify_token)])
+async def chat_status():
+    processing = Path("global_flags/chat_processing.txt").exists()
+    return {"processing": processing}
 
 # --- Model & Config Endpoints ---
 
@@ -1003,7 +1032,9 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
     try:
         active_downloads[filename]["status"] = "downloading"
 
-        async with aiohttp.ClientSession() as session:
+        resolver = aiohttp.AsyncResolver(nameservers=["8.8.8.8", "1.1.1.1"])
+        connector = aiohttp.TCPConnector(resolver=resolver)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url) as resp:
                 if resp.status != 200:
                     raise Exception(f"HTTP {resp.status}")
@@ -1264,6 +1295,42 @@ async def start_worker():
 async def stop_worker():
     return worker_controller.stop_worker()
 
+# --- DSManager Endpoints ---
+
+@app.get("/api/dsmanager/{category}", dependencies=[Depends(verify_token)])
+async def get_dynamic_snapshots(category: str):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    return ds_manager.list_snapshots(category)
+
+@app.post("/api/dsmanager/{category}", dependencies=[Depends(verify_token)])
+async def save_dynamic_snapshot(category: str, data: DSModel):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    success = ds_manager.save_snapshot(category, data.name, data.content)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save snapshot")
+    ds_manager.set_snapshot_active(category, data.name, data.active)
+    return {"success": True}
+
+@app.put("/api/dsmanager/{category}/{name}/active", dependencies=[Depends(verify_token)])
+async def set_dynamic_snapshot_active(category: str, name: str, data: DSActiveModel):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    success = ds_manager.set_snapshot_active(category, name, data.active)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update active state")
+    return {"success": True}
+
+@app.delete("/api/dsmanager/{category}/{name}", dependencies=[Depends(verify_token)])
+async def delete_dynamic_snapshot(category: str, name: str):
+    if category not in ["jobs", "projects"]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+    success = ds_manager.delete_snapshot(category, name)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete snapshot")
+    return {"success": True}
+
 # --- Automation Endpoints ---
 
 @app.get("/api/automation/jobs", dependencies=[Depends(verify_token)])
@@ -1272,7 +1339,11 @@ async def get_jobs():
 
 @app.post("/api/automation/jobs", dependencies=[Depends(verify_token)])
 async def save_job(job: JobDefinitionModel):
-    automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts)
+    automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts, job.dynamic_snapshot)
+
+    # Save the snapshot to DSManager as well if it has content
+    if job.dynamic_snapshot:
+        ds_manager.save_snapshot("jobs", job.name, job.dynamic_snapshot)
     return {"success": True}
 
 @app.delete("/api/automation/jobs/{job_name}", dependencies=[Depends(verify_token)])

@@ -223,7 +223,7 @@
 
 
     <script>
-        let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8000';
+        let coreUrl = localStorage.getItem('lyrn_core_url') || window.location.origin;
         let authToken = localStorage.getItem('lyrn_admin_token') || '';
         let selectedModel = null;
         let models = [];

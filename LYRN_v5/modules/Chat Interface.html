@@ -325,7 +325,7 @@
        GLOBAL STATE
        ========================================= */
     let CONFIG = {
-        apiUrl: "http://localhost:8000/api/chat"
+        apiUrl: window.location.origin + "/api/chat"
     };
 
     let isProcessing = false;
@@ -334,11 +334,15 @@
     // Command History State
     let inputHistory = [];
     let historyPointer = -1;
+    let pollingInterval = null;
 
     document.addEventListener('DOMContentLoaded', () => {
         // Init logic
         loadConfig();
         if(authToken) loadHistory();
+
+        // Check initial polling state to lock UI across connections
+        startPolling();
 
         // Load Input History
         try {
@@ -595,6 +599,60 @@
     /* =========================================
        CHAT LOGIC
        ========================================= */
+    function startPolling() {
+        if (pollingInterval) return;
+
+        pollingInterval = setInterval(async () => {
+            try {
+                const res = await fetch(CONFIG.apiUrl + '/status', {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.processing && !isProcessing) {
+                        // We loaded a page that was already processing, lock the UI
+                        isProcessing = true;
+                        document.getElementById('send-btn').classList.add('hidden');
+                        document.getElementById('stop-btn').classList.remove('hidden');
+                        document.getElementById('chat-input').disabled = true;
+
+                        // Add a loading placeholder if one doesn't exist
+                        const loadingBubbles = document.querySelectorAll('.message-bubble.typing');
+                        if (loadingBubbles.length === 0) {
+                            appendMessage('assistant', '', true);
+                        }
+                    } else if (!data.processing && isProcessing) {
+                        stopPolling();
+                    }
+                }
+            } catch (e) {
+                console.error("Polling error:", e);
+            }
+        }, 1000);
+    }
+
+    function stopPolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+        isProcessing = false;
+
+        // Remove loading indicator from UI if it exists
+        const loadingBubbles = document.querySelectorAll('.message-bubble.typing');
+        loadingBubbles.forEach(b => {
+            const row = b.closest('.message-row');
+            if (row) row.remove();
+        });
+
+        document.getElementById('send-btn').classList.remove('hidden');
+        document.getElementById('stop-btn').classList.add('hidden');
+        document.getElementById('chat-input').disabled = false;
+
+        // Reload history to show the new message
+        loadHistory();
+    }
+
     async function sendMessage() {
         const input = document.getElementById('chat-input');
         const text = input.value.trim();
@@ -611,6 +669,7 @@
 
         // Clear input
         input.value = '';
+        input.disabled = true;
         isProcessing = true;
         document.getElementById('send-btn').classList.add('hidden');
         document.getElementById('stop-btn').classList.remove('hidden');
@@ -619,9 +678,7 @@
         appendMessage('user', text);
 
         // UI: Add Placeholder for Assistant
-        const responseId = appendMessage('assistant', '', true); // true = loading state
-        const responseRow = document.getElementById(responseId);
-        const responseBubble = responseRow.querySelector('.message-bubble');
+        appendMessage('assistant', '', true); // true = loading state
 
         try {
             const response = await fetch(CONFIG.apiUrl, {
@@ -635,71 +692,32 @@
 
             if (!response.ok) throw new Error(`Server Error: ${response.status}`);
 
-            // Remove loading indicator & start streaming
-            responseBubble.classList.remove('typing');
-            responseBubble.innerText = "";
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulated = "";
-            let buffer = "";
-            let currentFilename = null;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-
-                let newlineIdx = buffer.indexOf('\n');
-                while (newlineIdx !== -1) {
-                    const line = buffer.substring(0, newlineIdx);
-                    buffer = buffer.substring(newlineIdx + 1);
-
-                    if (line.trim()) {
-                        try {
-                            const j = JSON.parse(line);
-                            if (j.filename) {
-                                currentFilename = j.filename;
-                                responseRow.dataset.filename = currentFilename;
-                            }
-                            if (j.response) {
-                                accumulated += j.response;
-                                renderRichText(responseBubble, accumulated);
-                            }
-                        } catch (e) {
-                            console.warn("JSON Parse Error:", e, line);
-                        }
-                    }
-                    newlineIdx = buffer.indexOf('\n');
-                }
-
-                // Scroll
-                const history = document.getElementById('chat-history');
-                history.scrollTop = history.scrollHeight;
+            const data = await response.json();
+            if (data.success) {
+                startPolling();
+            } else {
+                throw new Error(data.message || "Unknown error queueing job");
             }
-
-            // Append Action Bar after generation
-            if (currentFilename) {
-                 addActionBar(responseRow, currentFilename, true); // true = isLast
-            }
-
         } catch (err) {
             console.error("Chat Error:", err);
-            responseBubble.classList.remove('typing');
-
-            let errorMsg = `Error: ${err.message}`;
-            if (err.name === 'TypeError' && err.message.includes('fetch')) {
-                errorMsg = `Connection Failed. Check URL: ${CONFIG.apiUrl}`;
-            }
-
-            responseBubble.innerText = errorMsg;
-            responseBubble.style.color = 'var(--error-color)';
-        } finally {
             isProcessing = false;
             document.getElementById('send-btn').classList.remove('hidden');
             document.getElementById('stop-btn').classList.add('hidden');
+            input.disabled = false;
             input.focus();
+
+            // Show error in the loading bubble
+            const loadingBubbles = document.querySelectorAll('.message-bubble.typing');
+            if (loadingBubbles.length > 0) {
+                const responseBubble = loadingBubbles[loadingBubbles.length - 1];
+                responseBubble.classList.remove('typing');
+                let errorMsg = `Error: ${err.message}`;
+                if (err.name === 'TypeError' && err.message.includes('fetch')) {
+                    errorMsg = `Connection Failed. Check URL: ${CONFIG.apiUrl}`;
+                }
+                responseBubble.innerText = errorMsg;
+                responseBubble.style.color = 'var(--error-color)';
+            }
         }
     }
 
