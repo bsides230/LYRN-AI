@@ -211,12 +211,22 @@ chat_manager = ChatManager(
 # --- Helper Functions ---
 def trigger_chat_generation(message: str, folder: str = "chat"):
     """Creates a chat file and triggers the worker."""
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"{folder}/{folder}_{timestamp}.txt"
-    filepath = os.path.abspath(filename)
-
     # Ensure directory
     os.makedirs(folder, exist_ok=True)
+
+    if folder == "jobs":
+        filename = f"{folder}/job_model_output.txt"
+        filepath = os.path.abspath(filename)
+        # Clear previous job output to avoid race conditions with watchers
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                print(f"[System] Error clearing old job output: {e}")
+    else:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{folder}/{folder}_{timestamp}.txt"
+        filepath = os.path.abspath(filename)
 
     # Write User Message
     with open(filepath, "w", encoding="utf-8") as f:
@@ -976,115 +986,32 @@ async def stop_chat_generation():
 async def chat_endpoint(request: ChatRequest):
     print(f"[API] Received chat request: {request.message[:50]}...")
 
-    # Command interception for Chat-to-Job Loop example
-    if request.message.strip().startswith("/job "):
-        parts = request.message.strip().split(" ", 2)
-        if len(parts) >= 2:
-            job_name = parts[1]
-            job_input = parts[2] if len(parts) == 3 else ""
-
-            # Retrieve job definition to use its template and just replace the {input} or append
-            job_def = automation_controller.job_definitions.get(job_name)
-            if job_def:
-                # Update dynamic snapshot for this job instance with the new input
-                # For this example, we'll append the user input to the job's dynamic snapshot
-                original_snapshot = job_def.get("dynamic_snapshot", "")
-                new_snapshot = f"{original_snapshot}\n\n[Chat Input Data]:\n{job_input}" if original_snapshot else f"[Chat Input Data]:\n{job_input}"
-
-                # Temporarily update the in-memory definition so the scheduler uses the new snapshot
-                automation_controller.job_definitions[job_name]["dynamic_snapshot"] = new_snapshot
-                ds_manager.save_snapshot("jobs", job_name, new_snapshot)
-
-                # Add job to queue
-                automation_controller.add_job(name=job_name)
-
-                async def sys_response():
-                    yield json.dumps({"filename": "system_job_started.txt"}) + "\n"
-                    yield json.dumps({"response": f"System: Scheduled job '{job_name}' successfully with your input. Check the automation logs or DSManager for updates."}) + "\n"
-
-                return StreamingResponse(sys_response(), media_type="application/x-ndjson")
-            else:
-                async def err_response():
-                    yield json.dumps({"filename": "system_error.txt"}) + "\n"
-                    yield json.dumps({"response": f"System: Job '{job_name}' not found."}) + "\n"
-                return StreamingResponse(err_response(), media_type="application/x-ndjson")
+    # Check for existing lock to prevent queue clogging and overwriting
+    if Path("global_flags/chat_processing.txt").exists():
+        raise HTTPException(status_code=429, detail="A chat request is already being processed.")
 
     try:
-        filepath, filename = trigger_chat_generation(request.message)
+        # Save user's message to a Dynamic Snapshot
+        ds_manager.save_snapshot("jobs", "chat_input_context", f"[Chat Input]:\n{request.message}")
+        ds_manager.set_snapshot_active("jobs", "chat_input_context", True)
+
+        # Create the lock file
+        Path("global_flags").mkdir(exist_ok=True)
+        with open("global_flags/chat_processing.txt", "w", encoding="utf-8") as f:
+            f.write("processing")
+
+        # Queue the chat_input_job
+        automation_controller.add_job(name="chat_input_job")
+
+        return {"success": True, "message": "Chat job queued"}
     except Exception as e:
-         raise HTTPException(status_code=500, detail=f"Failed to trigger chat: {e}")
+        print(f"[API] Error queueing chat job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    async def event_generator():
-        # Yield the filename first for UI tracking
-        yield json.dumps({"filename": filename}) + "\n"
-        last_pos = 0
-        retries = 0
-        started = False
-
-        while True:
-            await asyncio.sleep(0.1)
-            try:
-                if not os.path.exists(filepath):
-                    continue
-
-                with open(filepath, "r", encoding="utf-8") as f:
-                    content = f.read()
-
-                    if not started:
-                        # Check for "model" marker. Worker writes "\n\nmodel\n"
-                        # We look for "model" preceded by newlines or start of file
-                        start_idx = -1
-                        match = re.search(r'(?:^|\n)model\n', content)
-                        if match:
-                            start_idx = match.start()
-                            # Start reading from end of match
-                            last_pos = match.end()
-                            started = True
-
-                        if not started:
-                            # Check for error
-                            if "[Error:" in content:
-                                print("[API] Detected error in chat file.")
-                                yield json.dumps({"response": "Error in worker."}) + "\n"
-                                return
-
-                            retries += 1
-                            # Load timeout from settings (default 1800s = 30 mins)
-                            # Loop sleeps 0.1s, so 1800s = 18000 iterations
-                            timeout_seconds = settings_manager.settings.get("worker_timeout_seconds", 1800)
-                            max_retries = timeout_seconds * 10
-
-                            if retries > max_retries:
-                                print(f"[API] Timeout waiting for worker response ({timeout_seconds}s).")
-                                yield json.dumps({"response": "Timeout waiting for worker."}) + "\n"
-                                return
-                            continue
-
-                    if started:
-                        # Read from last_pos
-                        current_len = len(content)
-                        if current_len > last_pos:
-                            new_text = content[last_pos:]
-
-                            # Stream what we have
-                            yield json.dumps({"response": new_text}) + "\n"
-                            last_pos = current_len
-
-                        # Check if worker is done
-                        status_info = worker_controller.get_status()
-                        llm_status = status_info.get("llm_status", "unknown")
-
-                        # If idle or error or stopped, and we have consumed everything (which we just did), we are done.
-                        # Note: We rely on the fact that the worker writes content THEN sets status to idle.
-                        if llm_status in ["idle", "error", "stopped"]:
-                            return
-
-            except Exception as e:
-                print(f"Error in stream: {e}")
-                yield json.dumps({"response": f"Error: {e}"}) + "\n"
-                return
-
-    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+@app.get("/api/chat/status", dependencies=[Depends(verify_token)])
+async def chat_status():
+    processing = Path("global_flags/chat_processing.txt").exists()
+    return {"processing": processing}
 
 # --- Model & Config Endpoints ---
 
