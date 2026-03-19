@@ -71,44 +71,49 @@ def main():
                 start_marker = "##Response_START##"
                 end_marker = "##Response_END##"
 
+                # Wait for generation to be fully complete before extracting,
+                # so we don't capture a partial response block.
+                llm_status_path = os.path.join(root_dir, "global_flags", "llm_status.txt")
+                try:
+                    with open(llm_status_path, "r", encoding="utf-8") as sf:
+                        llm_status = sf.read().strip()
+                except Exception:
+                    llm_status = "idle"  # assume done if file unreadable
+
+                if llm_status != "idle":
+                    time.sleep(1)
+                    continue
+
+                response_text = None
+
                 if start_marker in content and end_marker in content:
-                    # Wait for generation to be fully complete before extracting,
-                    # so we don't capture a partial response block.
-                    llm_status_path = os.path.join(root_dir, "global_flags", "llm_status.txt")
-                    try:
-                        with open(llm_status_path, "r", encoding="utf-8") as sf:
-                            llm_status = sf.read().strip()
-                    except Exception:
-                        llm_status = "idle"  # assume done if file unreadable
-
-                    if llm_status != "idle":
-                        time.sleep(1)
-                        continue
-
                     print("Found response markers!")
-
-                    # Extract the response block
                     pattern = re.compile(f"{start_marker}(.*?){end_marker}", re.DOTALL)
                     match = pattern.search(content)
-
                     if match:
                         response_text = match.group(1).strip()
-                        user_input = get_input_from_snapshot(root_dir)
+                elif content.strip():
+                    # Fallback for tiny models that omit markers:
+                    # use the full model output once generation is complete.
+                    print("No response markers found — using full model output as fallback.")
+                    response_text = content.strip()
 
-                        save_chat_history(root_dir, user_input, response_text)
+                if response_text:
+                    user_input = get_input_from_snapshot(root_dir)
+                    save_chat_history(root_dir, user_input, response_text)
 
-                        # Clear lock file
-                        if os.path.exists(lock_file):
-                            os.remove(lock_file)
-                            print("Cleared chat_processing.txt lock")
+                    # Clear lock file
+                    if os.path.exists(lock_file):
+                        os.remove(lock_file)
+                        print("Cleared chat_processing.txt lock")
 
-                        # Deactivate snapshot
-                        if os.path.exists(snapshot_active_file):
-                            os.remove(snapshot_active_file)
-                            print("Deactivated chat_input_context snapshot")
+                    # Deactivate snapshot
+                    if os.path.exists(snapshot_active_file):
+                        os.remove(snapshot_active_file)
+                        print("Deactivated chat_input_context snapshot")
 
-                        # We are done
-                        sys.exit(0)
+                    # We are done
+                    sys.exit(0)
 
             except Exception as e:
                 print(f"Error reading output file: {e}")
