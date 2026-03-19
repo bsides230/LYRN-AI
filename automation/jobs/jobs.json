@@ -28,7 +28,7 @@
     "dynamic_snapshot": ""
   },
   "chat_response_job": {
-    "instructions": "You are processing a user's chat input passed through the job loop. Please read the provided context from the chat input dynamic snapshot and generate a response. You MUST enclose your final response strictly inside the following markers: ##Response_START## and ##Response_END##",
+    "instructions": "Respond to the user's message directly and helpfully. Focus on the content of their request.",
     "trigger": "",
     "scripts": [
       "spawn_chat_watcher.py"
