@@ -19,7 +19,7 @@ class Job:
     args: Dict[str, Any] = field(default_factory=dict)
     prompt: str = ""
     scripts: List[str] = field(default_factory=list)
-    dynamic_snapshot: str = ""
+    instructions: str = ""
 
 class AutomationController:
     """
@@ -98,14 +98,13 @@ class AutomationController:
         except (IOError, OSError) as e:
             print(f"Error writing job queue file: {e}")
 
-    def save_job_definition(self, job_name: str, instructions: str, trigger: str = "", scripts: List[str] = None, dynamic_snapshot: str = ""):
+    def save_job_definition(self, job_name: str, instructions: str, trigger: str = "", scripts: List[str] = None):
         """Saves a job's instructions to the jobs.json file."""
         job_data = {
             "instructions": instructions,
             # 'trigger' is kept for legacy compatibility but not used
             "trigger": trigger,
-            "scripts": scripts or [],
-            "dynamic_snapshot": dynamic_snapshot
+            "scripts": scripts or []
         }
 
         jobs_json_path = self.job_definitions_path / "jobs.json"
@@ -315,7 +314,7 @@ class AutomationController:
                         args=next_job_dict.get("args", {}),
                         prompt=instruction_prompt,
                         scripts=scripts,
-                        dynamic_snapshot=job_def.get("dynamic_snapshot", "")
+                        instructions=job_def.get("instructions", "")
                     )
 
                 return None
