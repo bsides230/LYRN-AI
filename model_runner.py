@@ -315,10 +315,9 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if delta_content:
                 messages.append({"role": "system", "content": delta_content})
 
-            # For chat source: job instructions become system context, user_message is the user turn
             # For job/legacy source: user_message is the user turn (may be same as instructions)
-            if source == "chat" and job_instructions:
-                messages.append({"role": "system", "content": f"--- Job Instructions ---\n{job_instructions}"})
+            # Job instructions are now handled entirely via DSManager as an active dynamic snapshot
+            # injected early in the context window (right after the master system prompt).
 
             # Append current user message (merge if last was also user to maintain alternating roles)
             if messages and messages[-1].get("role") == "user":

@@ -385,19 +385,17 @@
         <div class="meta-label">LYRN SYSTEMS · CURRENT MODEL FLOW</div>
         <h1 class="hero-title">How the Model Actually Runs Right Now</h1>
         <p class="lede">
-          This page explains the current live LYRN chat execution path: how a user message becomes a queued job, how the active job frame is assembled,
-          exactly which layers are injected into the model context and in what order, and how the final answer is captured back into chat history.
+          This page explains the current live LYRN execution path: how the system maintains continuity via the Relational Web Index (RWI), how it leverages the KV Cache for performance, and how temporary job instructions are loaded and unloaded cleanly using Dynamic Snapshots (via DSManager).
         </p>
         <div class="hero-tags">
-          <div class="tag">Trigger <span>File Driven</span></div>
-          <div class="tag">Context <span>Layered</span></div>
-          <div class="tag">Snapshots <span>Job Scoped</span></div>
+          <div class="tag">Cognition <span>Memory-Based</span></div>
+          <div class="tag">KV Cache <span>Persistent</span></div>
+          <div class="tag">Instructions <span>Dynamic Snapshots</span></div>
           <div class="tag">Output <span>Separated</span></div>
         </div>
         <div class="callout">
           <div class="meta-label">Core Principle</div>
-          The model does not just receive a raw prompt. It receives a structured stack of stable system identity, active world/job framing,
-          live state overlays, bounded job instructions, and then the actual user message as the final user turn.
+          LYRN moves beyond prompt injection. It loads structured memory into RAM (the Master Snapshot) and reuses it across turns via the KV Cache. Dynamic job logic is injected cleanly as temporary snapshots and drops away when the job is done, preventing prompt drift.
         </div>
       </div>
       <div class="hero-side">
@@ -407,49 +405,41 @@
           <p>The runner stays idle until triggered, assembles the active context stack, generates, writes raw output, and then hands the result to the capture layer.</p>
         </div>
         <div class="mini-panel">
-          <div class="meta-label">Why This Matters</div>
-          <p>Job instructions, RWI framing, snapshots, and deltas are not all the same thing. Each layer has a separate purpose and should enter the context stack in a controlled order.</p>
+          <div class="meta-label">KV Cache Advantage</div>
+          <p>By keeping the static Master Snapshot loaded once and reusing its tokens, the model maintains consistent cognitive behavior without token churn or re-evaluating identity at every step.</p>
         </div>
         <div class="mini-panel">
-          <div class="meta-label">Current Chat Rule</div>
-          <p>The real user text is the final <span class="mono">user</span> message. Job instructions are placed as system-side guidance instead of impersonating the user turn.</p>
+          <div class="meta-label">Job Scoping</div>
+          <p>Job instructions are now pure Dynamic Snapshots. DSManager activates them early in the context, and turns them off when the job completes, preventing stale instructions from polluting future reasoning.</p>
         </div>
       </div>
     </header>
 
     <div class="section-divider">01 // End-to-End Runtime Path</div>
     <div class="flow-block">
-<pre>User types message
+<pre>User types message / Trigger is fired
        │
        ▼
-POST /api/chat
+POST /api/chat (or job trigger)
        │
        ├─ Writes jobs/job_input.json
-       │    { user_message, source: "chat", timestamp }
        ├─ Creates global_flags/chat_processing.txt lock
        └─ Queues chat_input_job
        │
        ▼
-Scheduler picks up chat_input_job
+Scheduler picks up job
        │
-       └─ route_chat.py queues chat_response_job
-       │
-       ▼
-Scheduler picks up chat_response_job
-       │
-       ├─ spawn_chat_watcher.py launches chat_watcher_bg.py
-       └─ trigger_chat_generation(job.prompt, folder="jobs")
-            │
-            ├─ reads jobs/job_input.json
-            ├─ merges job_instructions into payload
-            ├─ clears jobs/job_raw_output.txt
-            └─ writes chat_trigger.txt → jobs/job_input.json
+       ├─ ds_manager.save_snapshot()   ← Loads Job Instructions
+       ├─ ds_manager.set_snapshot_active(True)
+       ├─ trigger_chat_generation()
+       └─ writes chat_trigger.txt
        │
        ▼
 Model Runner detects chat_trigger.txt
        │
        ├─ reads structured payload
-       ├─ assembles context layers in order
+       ├─ assembles context layers in exact order (Master -> DS -> History -> Deltas -> User)
+       ├─ reuses KV Cache for unchanged prefix (Master + DS)
        ├─ runs LLM generation
        └─ streams raw model text to jobs/job_raw_output.txt
        │
@@ -457,64 +447,49 @@ Model Runner detects chat_trigger.txt
 chat_watcher_bg.py
        │
        ├─ waits until model is idle
-       ├─ reads raw output
        ├─ extracts final response
-       ├─ reads original user message from jobs/job_input.json
-       └─ writes chat/chat_{timestamp}.txt
+       ├─ writes chat/chat_{timestamp}.txt
+       └─ Scheduler deactivates Dynamic Snapshot: ds_manager.set_snapshot_active(False)
        │
        ▼
-Chat UI polls history and displays captured response only</pre>
+Chat UI polls history and displays captured response</pre>
     </div>
 
     <div class="section-divider">02 // Injection Order Inside the Model Context</div>
     <div class="steps">
       <div class="step-card">
         <div class="step-index">01</div>
-        <h3>Master Prompt / Core System Identity</h3>
-        <p>This is the stable base layer. It defines the model's overall operating identity, baseline behavior, and the non-job-specific rules that should exist before anything dynamic is added.</p>
-        <div class="layer-purpose">Purpose: establish the persistent system frame before any task, memory, or runtime overlays are applied.</div>
+        <h3>Master Prompt / RWI (Relational Web Index)</h3>
+        <p>This is the stable base layer defining the system's identity, values, and memory index. It is pre-tokenized and sits at the very bottom of the stack, meaning it stays locked in the model's KV Cache across turns.</p>
+        <div class="layer-purpose">Purpose: Establish the persistent system frame without re-evaluating core identity on every turn.</div>
       </div>
 
       <div class="step-card">
         <div class="step-index">02</div>
-        <h3>RWI Frame / Active World Interface</h3>
-        <p>This layer is the active task world frame. In practice, it is the job-facing world or interface context that tells the model what space it is operating inside, what kind of loop is active, and what structural affordances matter for this execution.</p>
-        <div class="layer-purpose">Purpose: define the working environment for the active loop so the model is not operating in a blank abstract space.</div>
+        <h3>Active Dynamic Snapshots (via DSManager)</h3>
+        <p>This layer holds the active Job Instructions. When a job runs, its instructions are activated as a dynamic snapshot. By injecting it early (right after the master prompt), it benefits from KV Cache reuse during the job, but cleanly unloads when the job finishes.</p>
+        <div class="layer-purpose">Purpose: Inject bounded, temporary job logic without cluttering the bottom of the prompt or impersonating the user.</div>
       </div>
 
       <div class="step-card">
         <div class="step-index">03</div>
-        <h3>Active Snapshots via DSManager</h3>
-        <p>Snapshots are the bounded contextual inserts that are activated for the current job. These can hold job-specific framing, relevant memory slices, or temporary working context. They exist to enrich the active execution without becoming permanent prompt clutter.</p>
-        <div class="layer-purpose">Purpose: inject only the currently relevant contextual slices for the live job, then let them drop away when the job ends.</div>
+        <h3>Chat History</h3>
+        <p>The runner adds prior user/assistant turns. This preserves the conversational thread, giving the model continuity without confusing history with system-level control layers.</p>
+        <div class="layer-purpose">Purpose: Preserve conversational memory and turn-by-turn context.</div>
       </div>
 
       <div class="step-card">
         <div class="step-index">04</div>
-        <h3>Chat History</h3>
-        <p>The runner then adds prior user/assistant turns from the chat history layer. This preserves the immediate conversational thread and gives the model continuity across turns without confusing history with system-level control layers.</p>
-        <div class="layer-purpose">Purpose: preserve conversational memory and turn-by-turn continuity.</div>
+        <h3>Deltas / Mutable Runtime State</h3>
+        <p>Deltas are live, fast-changing overlays: current time, runtime stats, or field updates. They sit high in the stack so the LLM has the absolute latest snapshot of reality without having to rebuild the massive base cache.</p>
+        <div class="layer-purpose">Purpose: Inject fast-changing state without rewriting the stable KV-cached layers.</div>
       </div>
 
       <div class="step-card">
         <div class="step-index">05</div>
-        <h3>Deltas / Mutable Runtime State</h3>
-        <p>Deltas are the live mutable overlays: current time, running summaries, loose runtime stats, and other state that can change between executions. They come after the larger framing layers because they are lightweight runtime facts, not the foundational identity or world frame.</p>
-        <div class="layer-purpose">Purpose: inject fast-changing state without rewriting the stable system layers.</div>
-      </div>
-
-      <div class="step-card">
-        <div class="step-index">06</div>
-        <h3>Job Instructions</h3>
-        <p>For chat-source jobs, the job instructions are appended as a system-side guidance layer rather than being treated as the user's message. This keeps job logic separate from the human's actual input.</p>
-        <div class="layer-purpose">Purpose: tell the active job how to behave without corrupting the meaning of the user turn.</div>
-      </div>
-
-      <div class="step-card">
-        <div class="step-index">07</div>
         <h3>Actual User Message</h3>
-        <p>The final layer is the real user text as the true <span class="mono">user</span> turn. This is what the model should answer. Everything before it is preparation, framing, or runtime context.</p>
-        <div class="layer-purpose">Purpose: ensure the model responds to the person, not to internal orchestration text.</div>
+        <p>The final layer is the real user text as the true <span class="mono">user</span> turn. Everything before it is preparation, framing, or runtime context.</p>
+        <div class="layer-purpose">Purpose: Ensure the model responds directly to the person/input, not to internal orchestration text.</div>
       </div>
     </div>
 
@@ -522,145 +497,70 @@ Chat UI polls history and displays captured response only</pre>
     <div class="grid-3">
       <div class="layer-card">
         <div class="layer-index">A</div>
-        <h3>System Core</h3>
-        <p>Master prompt and persistent identity rules. This is the durable operating layer that should survive across many different jobs and interfaces.</p>
+        <h3>RWI / Master Snapshot</h3>
+        <p>The durable operating layer that survives across jobs. It contains the relational tables and behavioral constraints that define the system's baseline cognition.</p>
       </div>
       <div class="layer-card">
         <div class="layer-index">B</div>
-        <h3>World / RWI Frame</h3>
-        <p>The current operating space. It explains the active interface or loop frame so the model understands what kind of system it is inside during this execution.</p>
+        <h3>Dynamic Snapshots (Job Logic)</h3>
+        <p>The actual task instructions for the current job. Managed by DSManager, they spin up to guide the job and disappear the moment it completes.</p>
       </div>
       <div class="layer-card">
         <div class="layer-index">C</div>
-        <h3>Snapshot Layer</h3>
-        <p>Selected contextual slices loaded only for the active job. This is where temporary relevance is injected without making the permanent context dirty.</p>
+        <h3>Conversation History</h3>
+        <p>Recent user/assistant turns. Gives the model continuity and the ability to answer in the context of an ongoing exchange.</p>
       </div>
       <div class="layer-card">
         <div class="layer-index">D</div>
-        <h3>Conversation Layer</h3>
-        <p>Recent user/assistant turns from chat history. This gives continuity and lets the model answer in the context of the current exchange.</p>
+        <h3>Delta Layer</h3>
+        <p>Live overlays such as runtime state, time, or mutable facts that change more often than the core snapshot.</p>
       </div>
       <div class="layer-card">
         <div class="layer-index">E</div>
-        <h3>Delta Layer</h3>
-        <p>Live overlays such as runtime state, rolling summaries, time, or other mutable information that changes more often than the snapshot or system layers.</p>
+        <h3>User Turn</h3>
+        <p>The pure, unadulterated user input. Never mixed with system instructions.</p>
       </div>
       <div class="layer-card">
         <div class="layer-index">F</div>
-        <h3>Job Logic Layer</h3>
-        <p>Task guidance for the current execution. This controls job behavior, formatting, or routing intent without pretending to be the person speaking.</p>
+        <h3>KV Cache Reuse</h3>
+        <p>Because the Master Snapshot and Dynamic Snapshots form a stable prefix, the worker process (model_runner) skips re-tokenizing them, vastly speeding up inference.</p>
       </div>
     </div>
 
     <div class="section-divider">04 // Why the Order Matters</div>
     <div class="grid-2">
       <div class="panel">
-        <div class="meta-label">From Stable To Volatile</div>
+        <div class="meta-label">KV Cache Efficiency</div>
         <h3>Identity before state</h3>
-        <p>The stack moves from the most stable layers to the most volatile. First comes enduring system identity, then world/job framing, then temporary contextual slices, then recent conversation, then live runtime overlays, then current job guidance, and finally the user turn.</p>
+        <p>The stack moves from the most stable layers to the most volatile. First comes enduring system identity (RWI), then job framing (Dynamic Snapshots), then history, then live overlays (Deltas), and finally the user turn.</p>
         <div class="accent-line"></div>
-        <p>This keeps changing information from overwriting the deeper system frame and helps the model interpret short-lived state in the right context.</p>
+        <p>This allows the model to cache the early parts of the prompt. If the system identity and job instructions haven't changed since the last turn, the LLM skips parsing them, saving thousands of tokens per run.</p>
       </div>
       <div class="panel">
         <div class="meta-label">Job Boundedness</div>
-        <h3>Snapshots and instructions should not linger</h3>
-        <p>Active snapshots and job instructions are meant to be scoped to the current run. They enrich the live job, but they should not remain as stale residue that bleeds into later jobs.</p>
+        <h3>Instructions via DSManager</h3>
+        <p>In the past, job instructions were appended late, polluting the user's turn. Now, Job Instructions <em>are</em> the Dynamic Snapshot. They are injected cleanly as a system layer.</p>
         <div class="accent-line"></div>
-        <p>That separation is what keeps one bounded agent loop from polluting the next one.</p>
+        <p>When the job finishes, the Scheduler tells DSManager to deactivate the snapshot. The next job runs with a clean slate, preventing stale instructions from bleeding over.</p>
       </div>
     </div>
 
-    <div class="section-divider">05 // Input, Output, and Capture Roles</div>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 150px;">Layer / File</th>
-            <th style="width: 260px;">Role</th>
-            <th>What it is responsible for</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="col-id">/api/chat</td>
-            <td class="col-main">Entry point</td>
-            <td>Accepts the user message, writes the structured input payload, creates the chat-processing lock, and queues the first job.</td>
-          </tr>
-          <tr>
-            <td class="col-id">jobs/job_input.json</td>
-            <td class="col-main">Structured input</td>
-            <td>Stores the real user message plus source metadata and then receives merged job instructions before the runner executes.</td>
-          </tr>
-          <tr>
-            <td class="col-id">trigger_chat_generation()</td>
-            <td class="col-main">Job merge point</td>
-            <td>Combines the current payload with job instructions, clears stale raw output, and triggers the runner.</td>
-          </tr>
-          <tr>
-            <td class="col-id">model_runner.py</td>
-            <td class="col-main">Context assembler</td>
-            <td>Reads the structured payload, assembles the message stack in order, runs generation, and writes raw model text to a separate output file.</td>
-          </tr>
-          <tr>
-            <td class="col-id">jobs/job_raw_output.txt</td>
-            <td class="col-main">Raw model output</td>
-            <td>Holds only the model's raw generated text. It is intentionally separate from the input payload.</td>
-          </tr>
-          <tr>
-            <td class="col-id">chat_watcher_bg.py</td>
-            <td class="col-main">Capture layer</td>
-            <td>Waits for generation to finish, extracts the response, reads the original user message, writes the chat record, and clears the lock.</td>
-          </tr>
-          <tr>
-            <td class="col-id">chat/chat_*.txt</td>
-            <td class="col-main">Conversation record</td>
-            <td>Stores the finalized user/model pair that the UI and the chat history layer both read later.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="section-divider">06 // Simplified Stack View</div>
+    <div class="section-divider">05 // Simplified Stack View</div>
     <div class="flow-block">
-<pre>TOP OF STACK / EARLIEST CONTEXT
+<pre>TOP OF STACK / EARLIEST CONTEXT (CACHED)
 
-[system] Master prompt / core identity
-[system] RWI frame / active world interface
-[system] Active snapshots selected for this job
+[system] Master Snapshot / RWI (Relational Web Index)
+[system] Active Dynamic Snapshots (Job Instructions via DSManager)
 [user/assistant] Chat history
 [system] Deltas / mutable runtime overlays
-[system] Job instructions for current job
 [user] Actual user message
 
 MODEL GENERATES RESPONSE
 
 raw output → jobs/job_raw_output.txt
 capture layer → chat/chat_{timestamp}.txt
+Scheduler → ds_manager.set_snapshot_active(False)
 UI reads captured history only</pre>
-    </div>
-
-    <div class="section-divider">07 // Current Architectural Benefits</div>
-    <div class="grid-4">
-      <div class="panel">
-        <div class="meta-label">Benefit</div>
-        <h3>Clear User Turn</h3>
-        <p>The human's message stays the real user turn instead of being buried under orchestration text.</p>
-      </div>
-      <div class="panel">
-        <div class="meta-label">Benefit</div>
-        <h3>Bounded Context</h3>
-        <p>Snapshots and job instructions can be job-scoped instead of becoming stale baggage.</p>
-      </div>
-      <div class="panel">
-        <div class="meta-label">Benefit</div>
-        <h3>Input / Output Separation</h3>
-        <p>Structured input and raw output live in different files, which makes capture more reliable.</p>
-      </div>
-      <div class="panel">
-        <div class="meta-label">Benefit</div>
-        <h3>Composable Loops</h3>
-        <p>The same runner pattern can support chat, automation, and future job types while keeping the stack ordered.</p>
-      </div>
     </div>
 
     <footer>

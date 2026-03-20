@@ -285,9 +285,9 @@ async def scheduler_loop():
 
                 # 2. Trigger Chat if scripts ok (or no scripts) AND prompt exists
                 # 2. Activate Dynamic Snapshot if present
-                if job.dynamic_snapshot:
+                if job.instructions:
                     print(f"[Scheduler] Activating dynamic snapshot for job: {job.name}")
-                    ds_manager.save_snapshot("jobs", job.name, job.dynamic_snapshot)
+                    ds_manager.save_snapshot("jobs", job.name, job.instructions)
                     ds_manager.set_snapshot_active("jobs", job.name, True)
 
                 # 3. Trigger Chat if scripts ok (or no scripts) AND prompt exists
@@ -297,7 +297,7 @@ async def scheduler_loop():
                         filepath, _ = trigger_chat_generation(job.prompt, folder="jobs")
 
                         # Monitor chat file for completion to deactivate dynamic snapshot
-                        if job.dynamic_snapshot:
+                        if job.instructions:
                             asyncio.create_task(_monitor_job_completion(filepath, job.name))
 
                         # Log the prompt generation step
@@ -310,10 +310,10 @@ async def scheduler_loop():
                     elif not job.scripts:
                         # Only log this if there were no scripts either
                         print(f"[Scheduler] Job {job.name} has no prompt/instructions and no scripts.")
-                        if job.dynamic_snapshot:
+                        if job.instructions:
                             ds_manager.set_snapshot_active("jobs", job.name, False)
                 else:
-                    if job.dynamic_snapshot:
+                    if job.instructions:
                         ds_manager.set_snapshot_active("jobs", job.name, False)
 
             # Check delta scripts
@@ -544,7 +544,6 @@ class JobDefinitionModel(BaseModel):
     instructions: str
     trigger: str
     scripts: List[str] = []
-    dynamic_snapshot: str = ""
 
 class JobScheduleModel(BaseModel):
     id: Optional[str] = None
@@ -1387,11 +1386,11 @@ async def get_jobs():
 
 @app.post("/api/automation/jobs", dependencies=[Depends(verify_token)])
 async def save_job(job: JobDefinitionModel):
-    automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts, job.dynamic_snapshot)
+    automation_controller.save_job_definition(job.name, job.instructions, job.trigger, job.scripts)
 
     # Save the snapshot to DSManager as well if it has content
-    if job.dynamic_snapshot:
-        ds_manager.save_snapshot("jobs", job.name, job.dynamic_snapshot)
+    if job.instructions:
+        ds_manager.save_snapshot("jobs", job.name, job.instructions)
     return {"success": True}
 
 @app.delete("/api/automation/jobs/{job_name}", dependencies=[Depends(verify_token)])

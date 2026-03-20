@@ -87,3 +87,17 @@ This update marks the official transition to the Dashboard v5 architecture and a
 -   **Structured Memory over Prompt Injection:** All core context—personality, memory, goals—lives in structured text files and memory tables. The LLM reasons from this stable foundation rather than having it repeatedly injected into a limited context window.
 -   **Simplicity and Robustness:** The architecture is inspired by the simplicity of 1990s text-based game parsers. The framework's job is to be a robust, simple system for moving data; the LLM's job is to do the heavy lifting of reasoning.
 -   **UI Development:** New modules must be implemented as single-file solutions (combining HTML, CSS, and JS) in `LYRN_v5/modules/` to facilitate loading on smaller systems and minimize floating dependencies. UI must strictly follow `LYRN Style Guide.html`.
+
+### v6.1 - Job Instructions to Dynamic Snapshots and Model Flow Documentation Rebuild
+
+**Architectural Updates**
+- Migrated job instructions to function entirely as temporary Dynamic Snapshots via the `DSManager`.
+- Removed the old `dynamic_snapshot` concept from job definitions, allowing `instructions` themselves to act as the snapshot context.
+- Removed late-bound prompt injection from `model_runner.py` to prevent prompt pollution and duplication. Job instructions now properly scope to the beginning of the context loop for caching and clean up after execution.
+
+**Documentation Updates**
+- Rebuilt `lyrn-current-model-flow.html` to accurately map the updated architecture.
+- Added comprehensive breakdowns of the Relational Web Index (RWI), KV Cache utilization, and DSManager interaction throughout the execution lifecycle.
+
+**Logging Updates**
+- Simplified component saving to only retain active job instructions as a single payload to the active `dynamic_snapshot` block within `build_prompt`.
