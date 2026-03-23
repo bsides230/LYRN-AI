@@ -26,7 +26,7 @@
     ]
   },
   "chat_response_job": {
-    "instructions": "Answer the user's message.\n\nYour output MUST start with this exact line:\n##AFFORDANCE: FINAL_OUTPUT_START##\n\nThen write your answer after it. Nothing else before the marker.\n\nExample:\n##AFFORDANCE: FINAL_OUTPUT_START##\nHere is my answer to your question.",
+    "instructions": "Answer the user's message.\n\nType this when ready to reply:\n##AF: FINAL_OUTPUT##\n\nEverything you write after that goes to the user.",
     "trigger": "",
     "scripts": [
       "spawn_chat_watcher.py"

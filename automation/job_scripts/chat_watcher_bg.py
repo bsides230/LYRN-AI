@@ -27,7 +27,7 @@ import json
 from pathlib import Path
 
 
-AFFORDANCE_START = "##AFFORDANCE: FINAL_OUTPUT_START##"
+AFFORDANCE_START = "##AF: FINAL_OUTPUT##"
 POLL_INTERVAL_STREAM = 0.1   # seconds between read ticks while streaming
 POLL_INTERVAL_WAIT   = 0.5   # seconds between ticks while waiting for file to appear
 TIMEOUT_WAIT_FILE    = 300   # 5 min: max wait for raw output file to appear
@@ -104,6 +104,33 @@ def _save_chat_history(root_dir: str, user_input: str, model_response: str):
         print(f"[Watcher] Saved chat response to {filepath}")
     except Exception as e:
         print(f"[Watcher] Error saving chat history: {e}")
+
+
+def _append_output_log(root_dir: str, user_message: str, raw_output: str,
+                       final_output: str, marker_detected: bool):
+    """Append one generation record to global_flags/output_log.jsonl."""
+    MAX_ENTRIES = 100
+    try:
+        log_path = os.path.join(root_dir, "global_flags", "output_log.jsonl")
+        entry = json.dumps({
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "user_message": user_message,
+            "raw_output": raw_output,
+            "final_output": final_output or "",
+            "marker_detected": marker_detected,
+        })
+        # Read existing lines, append, trim to MAX_ENTRIES
+        lines = []
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8") as f:
+                lines = [l for l in f.read().splitlines() if l.strip()]
+        lines.append(entry)
+        if len(lines) > MAX_ENTRIES:
+            lines = lines[-MAX_ENTRIES:]
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception as e:
+        print(f"[Watcher] Error writing output log: {e}")
 
 
 def _get_user_message_from_json(root_dir: str) -> str | None:
@@ -200,7 +227,7 @@ def main():
                 # have the full text up to char_pos.
                 current_full = full  # still in scope from the read above
                 if AFFORDANCE_START in current_full:
-                    print("[Watcher] ##AFFORDANCE: FINAL_OUTPUT_START## detected — switching to final output mode.")
+                    print("[Watcher] ##AF: FINAL_OUTPUT## detected — switching to final output mode.")
                     in_final_output = True
 
                     # Set the final output mode flag file
@@ -241,13 +268,21 @@ def main():
 
     response_text = _extract_final_response(full_raw)
 
+    user_input = user_message_arg or _get_user_message_from_json(root_dir) or "Unknown Input"
+
     if response_text:
-        # Prefer the user_message captured at spawn time (race-condition safe).
-        # Fall back to job_input.json only if arg was not provided.
-        user_input = user_message_arg or _get_user_message_from_json(root_dir) or "Unknown Input"
         _save_chat_history(root_dir, user_input, response_text)
     else:
         print("[Watcher] No response text extracted — skipping chat history save.")
+
+    # Write to output log so the Output Viewer module can show the full picture
+    _append_output_log(
+        root_dir,
+        user_message=user_input,
+        raw_output=full_raw,
+        final_output=response_text or "",
+        marker_detected=AFFORDANCE_START in full_raw,
+    )
 
     # Clean up all processing flags
     _cleanup_flags(lock_file, final_output_flag)

@@ -1132,6 +1132,87 @@ async def chat_stream():
     )
 
 
+# --- Output Viewer Endpoints ---
+
+@app.get("/api/output/log", dependencies=[Depends(verify_token)])
+async def output_log():
+    """
+    Returns the output log of past LLM generations.
+    Each entry: timestamp, user_message, raw_output, final_output, marker_detected.
+    Newest first, capped at 50 entries.
+    """
+    log_path = Path("global_flags/output_log.jsonl")
+    entries = []
+    if log_path.exists():
+        for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except Exception:
+                    pass
+    return {"entries": list(reversed(entries))[:50]}
+
+
+@app.get("/api/output/raw_stream", dependencies=[Depends(verify_token)])
+async def output_raw_stream():
+    """
+    SSE: streams the FULL raw LLM output in real-time, including pre-affordance
+    internal content.  Used by the Output Viewer to show everything the model
+    generates, not just the final user-visible part.
+
+    Events:  data: {"text": "<chunk>"}   — new raw tokens
+             data: {"done": true}        — generation complete
+    """
+    raw_output = Path("jobs/job_raw_output.txt")
+    llm_status = Path("global_flags/llm_status.txt")
+
+    async def generate():
+        char_pos = 0
+        start    = time.time()
+        timeout  = 300
+
+        # Wait up to 30s for the output file to appear
+        while not raw_output.exists() and time.time() - start < 30:
+            await asyncio.sleep(0.2)
+
+        while time.time() - start < timeout:
+            if raw_output.exists():
+                try:
+                    content = raw_output.read_text(encoding="utf-8", errors="replace")
+                    if len(content) > char_pos:
+                        chunk = content[char_pos:]
+                        char_pos += len(chunk)
+                        yield f"data: {json.dumps({'text': chunk})}\n\n"
+                except Exception:
+                    pass
+
+            try:
+                status = llm_status.read_text().strip()
+            except Exception:
+                status = "idle"
+
+            if status in ("idle", "stopped", "error") and char_pos > 0:
+                # Drain any final bytes, then signal done
+                if raw_output.exists():
+                    try:
+                        content = raw_output.read_text(encoding="utf-8", errors="replace")
+                        if len(content) > char_pos:
+                            yield f"data: {json.dumps({'text': content[char_pos:]})}\n\n"
+                    except Exception:
+                        pass
+                yield f"data: {json.dumps({'done': True})}\n\n"
+                break
+
+            await asyncio.sleep(0.1)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # --- Model & Config Endpoints ---
 
 async def _download_model_task(url: str, filename: str, expected_sha256: Optional[str], max_bytes: int):

@@ -244,7 +244,7 @@ def test_watcher_with_affordance(sandbox):
         "Let me think about this... ",
         "Analyzing the question. ",
         "I have several perspectives. ",
-        "\n##AFFORDANCE: FINAL_OUTPUT_START##\n",
+        "\n##AF: FINAL_OUTPUT##\n",
         "The meaning of life is ",
         "a deeply personal question. ",
         "It varies for each individual, ",
@@ -276,7 +276,7 @@ def test_watcher_with_affordance(sandbox):
 
     # Check that it detected the affordance
     assert_true(
-        "FINAL_OUTPUT_START" in stdout,
+        "AF: FINAL_OUTPUT" in stdout,
         "Watcher logs affordance detection"
     )
 
@@ -381,7 +381,7 @@ def test_watcher_legacy_fallback(sandbox):
 
     # Should NOT have set final_output_mode
     assert_true(
-        "FINAL_OUTPUT_START" not in stdout,
+        "AF: FINAL_OUTPUT" not in stdout,
         "No affordance detection logged (none present)"
     )
 
@@ -427,7 +427,7 @@ def test_race_condition_fix(sandbox):
 
     # Start mock LLM
     tokens = [
-        "##AFFORDANCE: FINAL_OUTPUT_START##\n",
+        "##AF: FINAL_OUTPUT##\n",
         "Response to the original question.",
     ]
     llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.5)
@@ -527,7 +527,7 @@ def test_full_chain(sandbox):
     tokens = [
         "Thinking about recursion... ",
         "A recursive function calls itself. ",
-        "\n##AFFORDANCE: FINAL_OUTPUT_START##\n",
+        "\n##AF: FINAL_OUTPUT##\n",
         "Recursion is when a function calls itself ",
         "to solve smaller subproblems. ",
         "The key is having a base case that stops the recursion.",
