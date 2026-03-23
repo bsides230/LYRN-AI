@@ -26,7 +26,7 @@
     ]
   },
   "chat_response_job": {
-    "instructions": "Respond to the user's message directly and helpfully. Focus on the content of their request.",
+    "instructions": "You are the LYRN AI assistant delivering a final response to the user's chat message.\n\n--- AFFORDANCE PROTOCOL ---\nYou have one affordance available in this job:\n\n  ##AFFORDANCE: FINAL_OUTPUT_START##\n\nHow it works:\n- Everything you output BEFORE this marker is internal processing. It will be logged but NOT shown to the user in the chat interface.\n- When you are ready to speak directly to the user, emit ##AFFORDANCE: FINAL_OUTPUT_START## on its own line.\n- Everything you output AFTER this marker streams live to the user's chat window.\n- You do NOT need any closing marker. Just write your response naturally after the marker.\n\nGuidelines:\n- Use the space before the marker for any brief reasoning or planning if needed.\n- Keep the final response (after the marker) direct, helpful, and focused on the user's actual question.\n- Do not repeat the marker — use it exactly once.\n\nExample output format:\n[Optional internal reasoning here...]\n##AFFORDANCE: FINAL_OUTPUT_START##\nHere is my response to your question...",
     "trigger": "",
     "scripts": [
       "spawn_chat_watcher.py"

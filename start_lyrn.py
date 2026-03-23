@@ -1054,6 +1054,84 @@ async def chat_status():
     processing = Path("global_flags/chat_processing.txt").exists()
     return {"processing": processing}
 
+
+@app.get("/api/chat/stream_status", dependencies=[Depends(verify_token)])
+async def chat_stream_status():
+    """Returns whether the system is currently in final-output streaming mode."""
+    final_output_active = Path("global_flags/final_output_mode.txt").exists()
+    processing = Path("global_flags/chat_processing.txt").exists()
+    return {
+        "final_output_active": final_output_active,
+        "processing": processing,
+    }
+
+
+@app.get("/api/chat/stream", dependencies=[Depends(verify_token)])
+async def chat_stream():
+    """
+    SSE endpoint for live chat output streaming.
+
+    The watcher script writes tokens to global_flags/chat_stream_buffer.txt
+    once the LLM emits ##AFFORDANCE: FINAL_OUTPUT_START##.  This endpoint
+    tails that buffer and forwards new content as SSE events so the chat
+    module can display output in real-time.
+
+    Event format:
+      data: {"text": "<new tokens>"}      — new content chunk
+      data: {"done": true}                — generation complete
+    """
+    stream_buffer = Path("global_flags/chat_stream_buffer.txt")
+    final_output_flag = Path("global_flags/final_output_mode.txt")
+    llm_status_file = Path("global_flags/llm_status.txt")
+
+    async def generate():
+        char_offset = 0
+        stream_timeout = 300  # 5 min max stream
+        start = time.time()
+
+        while time.time() - start < stream_timeout:
+            # Read new content from stream buffer
+            if stream_buffer.exists():
+                try:
+                    content = stream_buffer.read_text(encoding="utf-8", errors="replace")
+                    if len(content) > char_offset:
+                        chunk = content[char_offset:]
+                        char_offset += len(chunk)
+                        yield f"data: {json.dumps({'text': chunk})}\n\n"
+                except Exception:
+                    pass
+
+            # Check if generation is complete (LLM idle and no final_output flag)
+            try:
+                llm_status = llm_status_file.read_text().strip()
+            except Exception:
+                llm_status = "idle"
+
+            if llm_status in ("idle", "stopped", "error") and not final_output_flag.exists():
+                # Drain any remaining buffer content before signalling done
+                if stream_buffer.exists():
+                    try:
+                        content = stream_buffer.read_text(encoding="utf-8", errors="replace")
+                        if len(content) > char_offset:
+                            chunk = content[char_offset:]
+                            yield f"data: {json.dumps({'text': chunk})}\n\n"
+                    except Exception:
+                        pass
+                yield f"data: {json.dumps({'done': True})}\n\n"
+                break
+
+            await asyncio.sleep(0.1)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 # --- Model & Config Endpoints ---
 
 async def _download_model_task(url: str, filename: str, expected_sha256: Optional[str], max_bytes: int):
