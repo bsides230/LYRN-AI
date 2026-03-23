@@ -1,6 +1,6 @@
 {
   "chat_pair_summary": {
-    "instructions": "Create a summary from the most recent chat pair in the following format\n\n- Summary (detailed summary about the intent of the chat pair)\n-- This sumary should append the running main summary if one is available. If one is not available, this summary will become the new running summary and should be more verbose.\n\n**TRIGGER = ##RUN_JOB: chat_pair_summary##**",
+    "instructions": "Summarize the most recent conversation exchange.\n\nWrite one short paragraph describing what the user asked and what was answered.\n\nFormat your output exactly like this:\n- Summary: [your summary here]",
     "trigger": "##RUN_JOB: chat_pair_summary##"
   },
   "test_job_scripts": {
@@ -12,7 +12,7 @@
     ]
   },
   "chat_to_job_example": {
-    "instructions": "You are processing a user's chat input passed through the job loop. Please read the provided context and respond directly to the query inside the dynamic snapshot context block.",
+    "instructions": "Read the user's question in the context block. Answer it directly.",
     "trigger": "",
     "scripts": [
       "chat_to_job.py"
@@ -26,7 +26,7 @@
     ]
   },
   "chat_response_job": {
-    "instructions": "You are the LYRN AI assistant delivering a final response to the user's chat message.\n\n--- AFFORDANCE PROTOCOL ---\nYou have one affordance available in this job:\n\n  ##AFFORDANCE: FINAL_OUTPUT_START##\n\nHow it works:\n- Everything you output BEFORE this marker is internal processing. It will be logged but NOT shown to the user in the chat interface.\n- When you are ready to speak directly to the user, emit ##AFFORDANCE: FINAL_OUTPUT_START## on its own line.\n- Everything you output AFTER this marker streams live to the user's chat window.\n- You do NOT need any closing marker. Just write your response naturally after the marker.\n\nGuidelines:\n- Use the space before the marker for any brief reasoning or planning if needed.\n- Keep the final response (after the marker) direct, helpful, and focused on the user's actual question.\n- Do not repeat the marker — use it exactly once.\n\nExample output format:\n[Optional internal reasoning here...]\n##AFFORDANCE: FINAL_OUTPUT_START##\nHere is my response to your question...",
+    "instructions": "Answer the user's message.\n\nYour output MUST start with this exact line:\n##AFFORDANCE: FINAL_OUTPUT_START##\n\nThen write your answer after it. Nothing else before the marker.\n\nExample:\n##AFFORDANCE: FINAL_OUTPUT_START##\nHere is my answer to your question.",
     "trigger": "",
     "scripts": [
       "spawn_chat_watcher.py"
