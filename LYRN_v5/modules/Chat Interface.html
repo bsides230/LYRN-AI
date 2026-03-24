@@ -154,53 +154,21 @@
     }
     .action-btn:hover { color: var(--brand-purple); background: rgba(255,255,255,0.05); }
 
-    /* THINKING BLOCKS */
-    .think-block {
-        border-left: 2px solid var(--brand-purple);
-        background: rgba(124, 92, 255, 0.05);
-        margin-bottom: 10px;
-        border-radius: 0 4px 4px 0;
-        overflow: hidden;
-        font-family: 'JetBrains Mono', monospace;
+    /* TYPING INDICATOR — dots animation during generation */
+    .message-bubble.typing {
+        min-width: 48px;
+        min-height: 20px;
     }
-    .think-header {
-        font-size: 10px;
+    .message-bubble.typing::after {
+        content: '●●●';
+        animation: typingPulse 1.2s ease-in-out infinite;
         color: var(--brand-purple);
-        padding: 4px 12px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        user-select: none;
-        background: rgba(124, 92, 255, 0.1);
-        text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 4px;
+        font-size: 10px;
     }
-    .think-header::before {
-        content: '▼';
-        font-size: 8px;
-        transition: transform 0.2s;
-    }
-    .think-block.collapsed .think-header::before {
-        transform: rotate(-90deg);
-    }
-    .think-content {
-        padding: 10px 12px;
-        font-size: 12px;
-        color: var(--text-dim);
-        font-style: italic;
-        white-space: pre-wrap;
-        border-top: 1px solid rgba(124, 92, 255, 0.1);
-    }
-    .think-block.collapsed .think-content {
-        display: none;
-    }
-    body.hide-thinking .think-block {
-        display: none !important;
-    }
-
-    .typing-indicator {
-        font-style: italic; color: var(--brand-purple); font-size: 11px; margin-top: 5px;
+    @keyframes typingPulse {
+        0%, 100% { opacity: 0.25; }
+        50%       { opacity: 1; }
     }
 
     /* INPUT AREA */
@@ -304,16 +272,7 @@
           </p>
       </div>
 
-      <div style="margin-bottom: 20px;">
-          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select: none;">
-              <input type="checkbox" id="set-show-thinking"> Show Thinking Process
-          </label>
-          <p style="font-size:11px; color:var(--text-dim); margin-top:5px; margin-left: 24px;">
-              If checked, model reasoning traces (e.g. &lt;think&gt;) will be displayed in a collapsible block.
-          </p>
-      </div>
-
-      <div style="display:flex; justify-content:flex-end; gap:10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+<div style="display:flex; justify-content:flex-end; gap:10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
            <button onclick="closeSettings()">Cancel</button>
            <button class="btn-primary" onclick="saveSettings()">Save Configuration</button>
       </div>
@@ -335,6 +294,7 @@
     let inputHistory = [];
     let historyPointer = -1;
     let pollingInterval = null;
+    let streamingEs = null;   // EventSource for live response streaming
 
     document.addEventListener('DOMContentLoaded', () => {
         // Init logic
@@ -375,15 +335,6 @@
                         input.value = inputHistory[historyPointer];
                     }
                 }
-            }
-        });
-
-        // Thinking Accordion Delegation
-        document.addEventListener('click', (e) => {
-            const header = e.target.closest('.think-header');
-            if (header) {
-                const block = header.parentElement;
-                block.classList.toggle('collapsed');
             }
         });
 
@@ -531,10 +482,6 @@
                 const limit = s.chat_history_length !== undefined ? s.chat_history_length : 10;
                 document.getElementById('set-history-limit').value = limit;
                 document.getElementById('limit-val').innerText = limit;
-                document.getElementById('set-show-thinking').checked = (s.show_thinking !== false);
-
-                applySettings(s); // Sync UI state
-
                 document.getElementById('settings-modal').classList.remove('hidden');
             } else {
                 showToast("Failed to load settings", true);
@@ -566,8 +513,6 @@
             // Update
             currentSettings.enable_chat_history = document.getElementById('set-history-enable').checked;
             currentSettings.chat_history_length = parseInt(document.getElementById('set-history-limit').value);
-            currentSettings.show_thinking = document.getElementById('set-show-thinking').checked;
-
             const postRes = await fetch(base + '/api/config', {
                 method: 'POST',
                 headers: {
@@ -592,8 +537,7 @@
     }
 
     function applySettings(s) {
-        if (s.show_thinking === false) document.body.classList.add('hide-thinking');
-        else document.body.classList.remove('hide-thinking');
+        // Thinking display handled at model level — nothing to apply here
     }
 
     /* =========================================
@@ -636,9 +580,14 @@
             clearInterval(pollingInterval);
             pollingInterval = null;
         }
+        // Close any open stream (shouldn't normally be open here, but clean up)
+        if (streamingEs) {
+            streamingEs.close();
+            streamingEs = null;
+        }
         isProcessing = false;
 
-        // Remove loading indicator from UI if it exists
+        // Remove loading indicator if still present (stream may have already replaced it)
         const loadingBubbles = document.querySelectorAll('.message-bubble.typing');
         loadingBubbles.forEach(b => {
             const row = b.closest('.message-row');
@@ -649,8 +598,65 @@
         document.getElementById('stop-btn').classList.add('hidden');
         document.getElementById('chat-input').disabled = false;
 
-        // Reload history to show the new message
+        // Reload history to get the properly file-linked message (with action bar)
         loadHistory();
+    }
+
+    function startStreaming() {
+        if (streamingEs) { streamingEs.close(); streamingEs = null; }
+
+        const base = CONFIG.apiUrl.replace('/api/chat', '');
+        const url  = base + '/api/chat/stream' +
+                     (authToken ? '?token=' + encodeURIComponent(authToken) : '');
+
+        streamingEs = new EventSource(url);
+
+        let streamBubble = null;   // the assistant bubble being filled
+        let accumulated  = '';     // raw accumulated text from stream
+
+        streamingEs.onmessage = function(e) {
+            try {
+                const msg = JSON.parse(e.data);
+
+                if (msg.done) {
+                    streamingEs.close();
+                    streamingEs = null;
+                    // Let stopPolling handle UI unlock and history reload
+                    stopPolling();
+                    return;
+                }
+
+                if (!msg.text) return;
+                accumulated += msg.text;
+
+                // Strip any stray <think>...</think> from the streamed phase-2 output
+                const display = accumulated.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                if (!display) return;
+
+                // On first token: transition loading bubble to stream bubble
+                if (!streamBubble) {
+                    const typingBubbles = document.querySelectorAll('.message-bubble.typing');
+                    if (typingBubbles.length > 0) {
+                        const lb = typingBubbles[typingBubbles.length - 1];
+                        lb.classList.remove('typing');
+                        streamBubble = lb;
+                    }
+                }
+
+                if (streamBubble) {
+                    streamBubble.innerText = display;
+                    const history = document.getElementById('chat-history');
+                    history.scrollTop = history.scrollHeight;
+                }
+            } catch(err) {
+                console.error('[Stream] parse error:', err);
+            }
+        };
+
+        streamingEs.onerror = function() {
+            if (streamingEs) { streamingEs.close(); streamingEs = null; }
+            // Polling will still detect completion and reload history
+        };
     }
 
     async function sendMessage() {
@@ -695,6 +701,7 @@
             const data = await response.json();
             if (data.success) {
                 startPolling();
+                startStreaming();
             } else {
                 throw new Error(data.message || "Unknown error queueing job");
             }
@@ -757,9 +764,6 @@
         bubble.style.maxWidth = '100%'; // Wrapper handles width
         if (isLoading) {
             bubble.classList.add('typing');
-            bubble.innerText = 'Thinking...';
-            bubble.style.color = 'var(--brand-purple)';
-            bubble.style.fontStyle = 'italic';
         } else {
             renderRichText(bubble, text);
         }
@@ -888,51 +892,10 @@
     }
 
     function renderRichText(container, text) {
-        // Check for <think> tag
-        const thinkRegex = /<think>([\s\S]*?)(?:<\/think>|$)/;
-        const match = text.match(thinkRegex);
-
-        if (match) {
-            const thinkContent = match[1];
-            const remainingText = text.replace(match[0], "").trim();
-
-            // Find or create think block
-            let thinkBlock = container.querySelector('.think-block');
-            if (!thinkBlock) {
-                thinkBlock = document.createElement('div');
-                thinkBlock.className = 'think-block';
-                thinkBlock.innerHTML = `
-                    <div class="think-header">Thinking Process</div>
-                    <div class="think-content"></div>
-                `;
-                container.prepend(thinkBlock);
-            }
-
-            // Update content (avoid innerHTML rewrite of block to preserve collapsed state)
-            const contentDiv = thinkBlock.querySelector('.think-content');
-            if (contentDiv.innerText !== thinkContent) {
-                contentDiv.innerText = thinkContent;
-            }
-
-            // Handle remaining text
-            let responseSpan = container.querySelector('.response-text');
-            if (!responseSpan) {
-                responseSpan = document.createElement('div');
-                responseSpan.className = 'response-text';
-                container.appendChild(responseSpan);
-            }
-
-            if (responseSpan.innerText !== remainingText) {
-                responseSpan.innerText = remainingText;
-            }
-
-        } else {
-            // Normal text
-            if (container.querySelector('.think-block')) {
-                 container.innerHTML = '';
-            }
-            container.innerText = text;
-        }
+        // Strip any <think>...</think> blocks — thinking is handled at the model level
+        // and shown in the Output Viewer history tab, not in the chat module.
+        const clean = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        container.innerText = clean;
     }
 
     async function clearChat() {
