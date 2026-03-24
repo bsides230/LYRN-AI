@@ -400,7 +400,11 @@ def main():
 
     # In two-phase mode full_raw = phase 2 response only (no marker).
     # Strip any <think> tags from phase 2 (in case model thinks again) for chat history.
+    # Safety net: also strip the affordance marker if phase 2 somehow re-emitted it.
     response_text = _strip_thinking(full_raw).strip()
+    if AFFORDANCE_START in response_text:
+        print(f"[Watcher] Phase 3: Safety net — stripping {AFFORDANCE_START!r} from response_text")
+        response_text = response_text.replace(AFFORDANCE_START, "").strip()
     if not response_text:
         # Fallback: try legacy marker extraction
         response_text = _extract_final_response(full_raw)

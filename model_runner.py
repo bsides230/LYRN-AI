@@ -302,9 +302,9 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if settings_manager.get_setting("enable_deltas", True):
                 delta_content = delta_manager.get_delta_content()
 
-            # Construct Messages
-            # Order: System Prompt -> Dynamic Snapshots -> History -> Deltas ->
-            #        FINAL_OUTPUT flag -> job_instructions -> User Message
+            # Construct Phase 1 messages
+            # Order: System Prompt -> Dynamic Snapshots (incl. job instructions snapshot) ->
+            #        History -> Deltas -> job_instructions -> User Message
             messages = [{"role": "system", "content": system_prompt}]
 
             if dynamic_snapshot_content:
@@ -398,13 +398,30 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                 print(f"[Runner] Error setting final output flag: {e}")
 
             # ── Phase 2: Response (streamed to user) ────────────────────────────────
-            # Add phase 1 as assistant turn, ##RECORD## as user turn.
-            # Model generates the actual response, written to raw_output_path for streaming.
+            # Build a CLEAN context: system prompt + history + deltas only.
+            # Deliberately exclude dynamic_snapshot_content and job_instructions —
+            # both contain the "PHASE 1 — SIGNAL ONLY / output only the marker"
+            # instruction which would cause the model to emit ##AF: FINAL_OUTPUT##
+            # again instead of responding naturally.
             print("[Runner] Phase 2: Response generation starting...")
-            phase2_messages = messages + [
-                {"role": "assistant", "content": phase1_output.strip()},
-                {"role": "user", "content": "##RECORD##"}
-            ]
+            phase2_messages = [{"role": "system", "content": system_prompt}]
+            phase2_messages.extend(history)
+            if delta_content:
+                phase2_messages.append({"role": "system", "content": delta_content})
+            phase2_messages.append({
+                "role": "system",
+                "content": (
+                    "RECORD received. Your signal was acknowledged. "
+                    "Now write your natural response to the user's message. "
+                    "Do NOT output ##AF: FINAL_OUTPUT## again."
+                )
+            })
+            if phase2_messages and phase2_messages[-1].get("role") == "user":
+                phase2_messages[-1]["content"] += "\n\n" + user_message
+            else:
+                phase2_messages.append({"role": "user", "content": user_message})
+            phase2_messages.append({"role": "assistant", "content": phase1_output.strip()})
+            phase2_messages.append({"role": "user", "content": "##RECORD##"})
 
             print(f"[Runner] Generating phase 2 response to: {raw_output_path}")
 
