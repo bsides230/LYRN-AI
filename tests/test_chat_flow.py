@@ -379,9 +379,9 @@ def test_watcher_legacy_fallback(sandbox):
 
     assert_true(watcher_proc.returncode == 0, f"Watcher exits 0 (got {watcher_proc.returncode})")
 
-    # Should NOT have set final_output_mode
+    # Should NOT have detected the affordance marker (none present in output)
     assert_true(
-        "AF: FINAL_OUTPUT" not in stdout,
+        "##AF: FINAL_OUTPUT## detected" not in stdout,
         "No affordance detection logged (none present)"
     )
 
@@ -725,6 +725,307 @@ def test_flag_preset_recursion(sandbox):
 
 
 # ---------------------------------------------------------------------------
+# Test 9: Split-token affordance marker detection
+# The marker arrives spread across several small tokens — must still be detected.
+# ---------------------------------------------------------------------------
+def test_split_token_marker(sandbox):
+    log("Test 9: Affordance marker split across multiple tokens is still detected", "SECTION")
+
+    user_msg = "Split token affordance test"
+    write_job_input(sandbox, user_msg)
+
+    for f in ["jobs/job_raw_output.txt", "global_flags/final_output_mode.txt",
+              "global_flags/chat_stream_buffer.txt", "global_flags/chat_processing.txt"]:
+        p = os.path.join(sandbox, f)
+        if os.path.exists(p): os.remove(p)
+    for f in Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"):
+        f.unlink()
+
+    Path(os.path.join(sandbox, "global_flags", "chat_processing.txt")).write_text("processing")
+
+    # Break the marker into tiny pieces across tokens
+    tokens = [
+        "Internal processing...\n",
+        "##AF",          # first fragment
+        ": FINA",        # second fragment
+        "L_OUTPUT",      # third fragment
+        "##\n",          # closing ##
+        "Split-token response delivered successfully.",
+    ]
+    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.15, pre_delay=0.3)
+
+    watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
+    watcher_proc = subprocess.Popen(
+        [sys.executable, watcher_script, sandbox, user_msg],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        stdout, stderr = watcher_proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        watcher_proc.kill()
+        stdout, stderr = watcher_proc.communicate()
+        assert_true(False, "Watcher timed out")
+        return
+
+    llm_thread.join(timeout=5)
+
+    assert_true(watcher_proc.returncode == 0, f"Watcher exits 0 (got {watcher_proc.returncode})")
+    assert_true(
+        "##AF: FINAL_OUTPUT## detected" in stdout,
+        "Split-token affordance marker was detected"
+    )
+
+    chat_files = list(Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"))
+    assert_true(len(chat_files) >= 1, "Chat history saved after split-token detection")
+    if chat_files:
+        content = chat_files[-1].read_text()
+        assert_true("Split-token response delivered" in content,
+                    "Chat history has post-marker content")
+        assert_true("Internal processing" not in content,
+                    "Chat history excludes pre-marker content")
+
+
+# ---------------------------------------------------------------------------
+# Test 10: output_log.jsonl is written with correct structure
+# ---------------------------------------------------------------------------
+def test_output_log_written(sandbox):
+    log("Test 10: output_log.jsonl written with correct fields after generation", "SECTION")
+
+    user_msg = "Output log test question"
+    write_job_input(sandbox, user_msg)
+
+    for f in ["jobs/job_raw_output.txt", "global_flags/final_output_mode.txt",
+              "global_flags/chat_stream_buffer.txt", "global_flags/chat_processing.txt",
+              "global_flags/output_log.jsonl"]:
+        p = os.path.join(sandbox, f)
+        if os.path.exists(p): os.remove(p)
+    for f in Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"):
+        f.unlink()
+
+    Path(os.path.join(sandbox, "global_flags", "chat_processing.txt")).write_text("processing")
+
+    tokens = [
+        "Thinking...\n",
+        "##AF: FINAL_OUTPUT##\n",
+        "The log entry answer.",
+    ]
+    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
+
+    watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
+    watcher_proc = subprocess.Popen(
+        [sys.executable, watcher_script, sandbox, user_msg],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        stdout, stderr = watcher_proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        watcher_proc.kill()
+        stdout, stderr = watcher_proc.communicate()
+        assert_true(False, "Watcher timed out")
+        return
+
+    llm_thread.join(timeout=5)
+
+    log_path = os.path.join(sandbox, "global_flags", "output_log.jsonl")
+    assert_file_exists(log_path, "output_log.jsonl")
+
+    if os.path.exists(log_path):
+        lines = [l for l in Path(log_path).read_text().splitlines() if l.strip()]
+        assert_true(len(lines) >= 1, f"output_log.jsonl has at least 1 entry (got {len(lines)})")
+
+        if lines:
+            try:
+                entry = json.loads(lines[-1])
+                assert_true("timestamp" in entry, "Log entry has 'timestamp'")
+                assert_true("user_message" in entry, "Log entry has 'user_message'")
+                assert_true("raw_output" in entry, "Log entry has 'raw_output'")
+                assert_true("final_output" in entry, "Log entry has 'final_output'")
+                assert_true("marker_detected" in entry, "Log entry has 'marker_detected'")
+                assert_true(entry["user_message"] == user_msg,
+                            "Log entry user_message matches input")
+                assert_true(entry["marker_detected"] is True,
+                            "Log entry marker_detected is True")
+                assert_true("The log entry answer" in entry["final_output"],
+                            "Log entry final_output has response text")
+                assert_true("##AF: FINAL_OUTPUT##" in entry["raw_output"],
+                            "Log entry raw_output includes full raw content with marker")
+            except Exception as e:
+                assert_true(False, f"Log entry parseable: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Test 11: Empty LLM output — watcher handles gracefully
+# ---------------------------------------------------------------------------
+def test_empty_llm_output(sandbox):
+    log("Test 11: Empty LLM output handled gracefully (no crash, no history saved)", "SECTION")
+
+    user_msg = "Empty response test"
+    write_job_input(sandbox, user_msg)
+
+    for f in ["jobs/job_raw_output.txt", "global_flags/final_output_mode.txt",
+              "global_flags/chat_stream_buffer.txt", "global_flags/chat_processing.txt"]:
+        p = os.path.join(sandbox, f)
+        if os.path.exists(p): os.remove(p)
+    for f in Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"):
+        f.unlink()
+
+    Path(os.path.join(sandbox, "global_flags", "chat_processing.txt")).write_text("processing")
+
+    # Write an empty file, then set status to idle
+    tokens = [""]  # empty token
+    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.05, pre_delay=0.3)
+
+    watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
+    watcher_proc = subprocess.Popen(
+        [sys.executable, watcher_script, sandbox, user_msg],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        stdout, stderr = watcher_proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        watcher_proc.kill()
+        stdout, stderr = watcher_proc.communicate()
+        assert_true(False, "Watcher timed out")
+        return
+
+    llm_thread.join(timeout=5)
+
+    # Watcher should exit 0 (not crash)
+    assert_true(watcher_proc.returncode == 0,
+                f"Watcher exits 0 on empty output (got {watcher_proc.returncode})")
+
+    # No chat history should be saved (nothing to save)
+    chat_files = list(Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"))
+    assert_true(len(chat_files) == 0,
+                f"No chat history saved for empty output (found {len(chat_files)})")
+
+    # Processing lock should still be cleared
+    assert_true(
+        not os.path.exists(os.path.join(sandbox, "global_flags", "chat_processing.txt")),
+        "chat_processing.txt cleared even for empty output"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 12: Affordance marker at the very start of output (no internal preamble)
+# ---------------------------------------------------------------------------
+def test_marker_at_start(sandbox):
+    log("Test 12: Affordance marker at the very start of output (no internal preamble)", "SECTION")
+
+    user_msg = "Direct answer please"
+    write_job_input(sandbox, user_msg)
+
+    for f in ["jobs/job_raw_output.txt", "global_flags/final_output_mode.txt",
+              "global_flags/chat_stream_buffer.txt", "global_flags/chat_processing.txt"]:
+        p = os.path.join(sandbox, f)
+        if os.path.exists(p): os.remove(p)
+    for f in Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"):
+        f.unlink()
+
+    Path(os.path.join(sandbox, "global_flags", "chat_processing.txt")).write_text("processing")
+
+    tokens = [
+        "##AF: FINAL_OUTPUT##\n",  # marker is the FIRST thing written
+        "Here is your direct answer.",
+        " No preamble at all.",
+    ]
+    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
+
+    watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
+    watcher_proc = subprocess.Popen(
+        [sys.executable, watcher_script, sandbox, user_msg],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        stdout, stderr = watcher_proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        watcher_proc.kill()
+        stdout, stderr = watcher_proc.communicate()
+        assert_true(False, "Watcher timed out")
+        return
+
+    llm_thread.join(timeout=5)
+
+    assert_true(watcher_proc.returncode == 0, f"Watcher exits 0 (got {watcher_proc.returncode})")
+    assert_true("##AF: FINAL_OUTPUT## detected" in stdout, "Marker detected even at start of output")
+
+    chat_files = list(Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"))
+    assert_true(len(chat_files) >= 1, "Chat history saved")
+    if chat_files:
+        content = chat_files[-1].read_text()
+        assert_true("direct answer" in content, "Chat history has response")
+        assert_true("##AF: FINAL_OUTPUT##" not in content,
+                    "Affordance marker itself not saved to chat history")
+
+
+# ---------------------------------------------------------------------------
+# Test 13: Debug output content validation — watcher logs all phase transitions
+# ---------------------------------------------------------------------------
+def test_debug_output_completeness(sandbox):
+    log("Test 13: Watcher emits all expected Phase 1/2/3 debug messages", "SECTION")
+
+    user_msg = "Debug output test"
+    write_job_input(sandbox, user_msg)
+
+    for f in ["jobs/job_raw_output.txt", "global_flags/final_output_mode.txt",
+              "global_flags/chat_stream_buffer.txt", "global_flags/chat_processing.txt"]:
+        p = os.path.join(sandbox, f)
+        if os.path.exists(p): os.remove(p)
+    for f in Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"):
+        f.unlink()
+
+    Path(os.path.join(sandbox, "global_flags", "chat_processing.txt")).write_text("processing")
+
+    tokens = [
+        "Preamble thinking.\n",
+        "##AF: FINAL_OUTPUT##\n",
+        "Final response here.",
+    ]
+    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
+
+    watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
+    watcher_proc = subprocess.Popen(
+        [sys.executable, watcher_script, sandbox, user_msg],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        stdout, stderr = watcher_proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        watcher_proc.kill()
+        stdout, stderr = watcher_proc.communicate()
+        assert_true(False, "Watcher timed out")
+        return
+
+    llm_thread.join(timeout=5)
+
+    # Check all phase headings are present
+    assert_true("Phase 1:" in stdout, "Phase 1 debug messages present")
+    assert_true("Phase 2:" in stdout, "Phase 2 debug messages present")
+    assert_true("Phase 3:" in stdout, "Phase 3 debug messages present")
+
+    # Check key diagnostic messages
+    assert_true("PID:" in stdout, "PID logged at startup")
+    assert_true("root_dir:" in stdout, "root_dir logged at startup")
+    assert_true("affordance_marker:" in stdout, "affordance_marker logged at startup")
+    assert_true("Output file appeared after" in stdout, "Phase 1 file-detected message logged")
+    assert_true("pre-set: False" in stdout, "Phase 1 flag pre-set status logged")
+    assert_true("LLM status=" in stdout, "Phase 2 LLM status logged on completion")
+    assert_true("Raw output length:" in stdout, "Phase 3 raw output length logged")
+    assert_true("Extracted response length:" in stdout, "Phase 3 extracted length logged")
+    assert_true("Capture complete" in stdout, "Final completion message logged")
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 def main():
@@ -745,6 +1046,11 @@ def main():
         test_full_chain(sandbox)
         test_legacy_markers(sandbox)
         test_flag_preset_recursion(sandbox)
+        test_split_token_marker(sandbox)
+        test_output_log_written(sandbox)
+        test_empty_llm_output(sandbox)
+        test_marker_at_start(sandbox)
+        test_debug_output_completeness(sandbox)
     finally:
         teardown_sandbox(sandbox)
 
