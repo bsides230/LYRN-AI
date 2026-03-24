@@ -405,7 +405,8 @@ class AutomationController:
                     capture_output=True,
                     text=True,
                     timeout=60,
-                    encoding='utf-8' # Ensure UTF-8
+                    encoding='utf-8',
+                    errors='replace'
                 )
 
                 # Check exit code

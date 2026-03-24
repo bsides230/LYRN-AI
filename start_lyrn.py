@@ -446,7 +446,9 @@ class WorkerController:
                     cwd=os.getcwd(),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace'
                 )
 
                 # Start threads to forward output to logger
