@@ -418,21 +418,21 @@
             });
             if (!res.ok) return;
 
+            const history = document.getElementById('chat-history');
+            history.innerHTML = '';
+
             const messages = await res.json();
-            if (Array.isArray(messages) && messages.length > 0) {
-                 const history = document.getElementById('chat-history');
-                 // Clear welcome message if present
-                 if (history.children.length === 1 && history.children[0].style.textAlign === 'center') {
-                    history.innerHTML = '';
-                 }
-
-                 messages.forEach((msg, index) => {
-                     const isLast = index === messages.length - 1;
-                     appendMessage(msg.role, msg.content, false, msg.filename, isLast);
-                 });
-
-                 setTimeout(() => history.scrollTop = history.scrollHeight, 100);
+            if (!Array.isArray(messages) || messages.length === 0) {
+                history.innerHTML = '<div style="text-align: center; color: var(--text-dim); margin-top: 40px;"><p>Welcome to LYRN Chat.</p><p style="font-size: 11px;">Configure API endpoint in Settings or import config here.</p></div>';
+                return;
             }
+
+            messages.forEach((msg, index) => {
+                const isLast = index === messages.length - 1;
+                appendMessage(msg.role, msg.content, false, msg.filename, isLast);
+            });
+
+            setTimeout(() => history.scrollTop = history.scrollHeight, 100);
         } catch (e) {
             console.warn("Failed to load history:", e);
         }
