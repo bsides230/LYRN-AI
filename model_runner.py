@@ -44,6 +44,8 @@ STOP_TRIGGER = os.path.join(SCRIPT_DIR, "stop_trigger.txt")
 REBUILD_TRIGGER = os.path.join(SCRIPT_DIR, "rebuild_trigger.txt")
 LLM_STATUS_FILE = os.path.join(SCRIPT_DIR, "global_flags", "llm_status.txt")
 STATS_FILE = os.path.join(SCRIPT_DIR, "global_flags", "llm_stats.json")
+FINAL_OUTPUT_FLAG = os.path.join(SCRIPT_DIR, "global_flags", "final_output_mode.txt")
+AFFORDANCE_MARKER = "##AF: FINAL_OUTPUT##"
 
 def set_llm_status(status: str):
     try:
@@ -315,6 +317,14 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if delta_content:
                 messages.append({"role": "system", "content": delta_content})
 
+            # Flag delta: if a previous generation set FINAL_OUTPUT mode, tell the model
+            # so it knows its output will be shown to the user in this generation.
+            if os.path.exists(FINAL_OUTPUT_FLAG):
+                messages.append({"role": "system", "content":
+                    "[STATUS: FINAL OUTPUT MODE ACTIVE] "
+                    "Your output is streaming live to the user right now."})
+                print("[Runner] FINAL OUTPUT MODE flag detected — injecting status delta.")
+
             # For job/legacy source: user_message is the user turn (may be same as instructions)
             # Job instructions are now handled entirely via DSManager as an active dynamic snapshot
             # injected early in the context window (right after the master system prompt).
@@ -341,7 +351,12 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     stream=True
                 )
 
-                # Stream raw model output to the intermediate output file
+                # Stream raw model output to the intermediate output file.
+                # Track the affordance marker so we can set the flag the instant
+                # the model emits it — before the watcher's next poll tick.
+                marker_seen = False
+                marker_buf  = ""   # rolling accumulator for split-token marker detection
+
                 with open(raw_output_path, "w", encoding="utf-8") as f:
                     for token_data in stream:
                         # Check stop
@@ -359,6 +374,22 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                             if text:
                                 f.write(text)
                                 f.flush()
+
+                                # Detect the affordance marker across token boundaries
+                                if not marker_seen:
+                                    marker_buf += text
+                                    # Keep only a tail long enough to match the marker
+                                    if len(marker_buf) > len(AFFORDANCE_MARKER) * 2:
+                                        marker_buf = marker_buf[-len(AFFORDANCE_MARKER):]
+                                    if AFFORDANCE_MARKER in marker_buf:
+                                        marker_seen = True
+                                        print("[Runner] ##AF: FINAL_OUTPUT## detected — setting flag.")
+                                        try:
+                                            os.makedirs(os.path.dirname(FINAL_OUTPUT_FLAG), exist_ok=True)
+                                            with open(FINAL_OUTPUT_FLAG, "w") as ff:
+                                                ff.write("active")
+                                        except Exception as e:
+                                            print(f"[Runner] Could not set final_output_mode flag: {e}")
 
             # 5. Parse Metrics from Captured Log
             log_output = log_capture_buffer.getvalue()

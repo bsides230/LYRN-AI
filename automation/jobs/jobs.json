@@ -1,6 +1,6 @@
 {
   "chat_pair_summary": {
-    "instructions": "Create a summary from the most recent chat pair in the following format\n\n- Summary (detailed summary about the intent of the chat pair)\n-- This sumary should append the running main summary if one is available. If one is not available, this summary will become the new running summary and should be more verbose.\n\n**TRIGGER = ##RUN_JOB: chat_pair_summary##**",
+    "instructions": "Summarize the most recent conversation exchange.\n\nWrite one short paragraph describing what the user asked and what was answered.\n\nFormat your output exactly like this:\n- Summary: [your summary here]",
     "trigger": "##RUN_JOB: chat_pair_summary##"
   },
   "test_job_scripts": {
@@ -12,7 +12,7 @@
     ]
   },
   "chat_to_job_example": {
-    "instructions": "You are processing a user's chat input passed through the job loop. Please read the provided context and respond directly to the query inside the dynamic snapshot context block.",
+    "instructions": "Read the user's question in the context block. Answer it directly.",
     "trigger": "",
     "scripts": [
       "chat_to_job.py"
@@ -26,7 +26,7 @@
     ]
   },
   "chat_response_job": {
-    "instructions": "Respond to the user's message directly and helpfully. Focus on the content of their request.",
+    "instructions": "Answer the user's message.\n\nUse this trigger to start your reply:\n##AF: FINAL_OUTPUT##\n\nOnce you write it, your output is LIVE — the user sees it as you type.\nAnything before the trigger is internal only.",
     "trigger": "",
     "scripts": [
       "spawn_chat_watcher.py"
