@@ -325,6 +325,19 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                 messages.append({"role": "system", "content": job_instructions})
                 print("[Runner] Injected job_instructions before user turn.")
 
+            # Check if this is Phase 2 (##RECORD##) and load Phase 1 context if available
+            if user_message == "##RECORD##":
+                last_thinking_file = os.path.join(SCRIPT_DIR, "global_flags", "last_thinking.txt")
+                if os.path.exists(last_thinking_file):
+                    try:
+                        with open(last_thinking_file, "r", encoding="utf-8") as f:
+                            phase1_content = f.read().strip()
+                        if phase1_content:
+                            messages.append({"role": "assistant", "content": phase1_content})
+                            print("[Runner] Injected Phase 1 thinking state into context.")
+                    except Exception as e:
+                        print(f"[Runner] Error reading last_thinking.txt: {e}")
+
             # Append current user message (merge if last was also user to maintain alternating roles)
             if messages and messages[-1].get("role") == "user":
                 messages[-1]["content"] += "\n\n" + user_message
@@ -334,17 +347,12 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             active_config = settings_manager.settings.get("active", {})
             log_capture_buffer = io.StringIO()
 
-            # ── Phase 1: Thinking + Signal ──────────────────────────────────────────
-            # Model thinks through the request and outputs ##AF: FINAL_OUTPUT## only.
-            # This output is NOT written to raw_output_path (not streamed to user).
-            print("[Runner] Phase 1: Thinking/signal generation starting...")
-            phase1_output = ""
-            marker_detected_p1 = False
-            grace_count = 0
-            GRACE_CHARS = 50  # Allow up to 50 chars after marker before breaking early
+            print(f"[Runner] Generation starting...")
+            print(f"[Runner] Generating response to: {raw_output_path}")
 
+            # Write stream output directly to raw_output_path
             with contextlib.redirect_stderr(log_capture_buffer):
-                p1_stream = llm.create_chat_completion(
+                stream = llm.create_chat_completion(
                     messages=messages,
                     max_tokens=active_config.get("max_tokens", 2048),
                     temperature=active_config.get("temperature", 0.7),
@@ -352,92 +360,10 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     top_k=active_config.get("top_k", 40),
                     stream=True
                 )
-                for token_data in p1_stream:
-                    if os.path.exists(STOP_TRIGGER):
-                        try: os.remove(STOP_TRIGGER)
-                        except: pass
-                        break
-                    if 'choices' in token_data and token_data['choices']:
-                        text = token_data['choices'][0].get('delta', {}).get('content', '')
-                        if text:
-                            phase1_output += text
-                            if not marker_detected_p1 and AFFORDANCE_MARKER in phase1_output:
-                                marker_detected_p1 = True
-                                print(f"[Runner] Phase 1: Affordance marker detected — entering grace period.")
-                            elif marker_detected_p1:
-                                grace_count += len(text)
-                                if grace_count >= GRACE_CHARS:
-                                    print(f"[Runner] Phase 1: Grace period elapsed — stopping early.")
-                                    break
-
-            if not marker_detected_p1:
-                print(f"[Runner] WARNING: Affordance marker NOT found in phase 1 ({len(phase1_output)} chars). "
-                      f"Appending marker as fallback.")
-                phase1_output = (phase1_output.rstrip() or "") + "\n" + AFFORDANCE_MARKER
-
-            print(f"[Runner] Phase 1 complete. Output: {len(phase1_output)} chars.")
-
-            # Save phase 1 output for history/logging (watcher reads this)
-            last_thinking_file = os.path.join(SCRIPT_DIR, "global_flags", "last_thinking.txt")
-            try:
-                os.makedirs(os.path.dirname(last_thinking_file), exist_ok=True)
-                with open(last_thinking_file, "w", encoding="utf-8") as f:
-                    f.write(phase1_output)
-                print(f"[Runner] Phase 1 saved to last_thinking.txt")
-            except Exception as e:
-                print(f"[Runner] Error saving last_thinking.txt: {e}")
-
-            # Set final output flag BEFORE phase 2 begins.
-            # The watcher detects this flag and streams all phase 2 content as final output.
-            try:
-                os.makedirs(os.path.dirname(FINAL_OUTPUT_FLAG), exist_ok=True)
-                with open(FINAL_OUTPUT_FLAG, "w") as ff:
-                    ff.write("active")
-                print("[Runner] Final output flag set. Phase 2 will stream to user.")
-            except Exception as e:
-                print(f"[Runner] Error setting final output flag: {e}")
-
-            # ── Phase 2: Response (streamed to user) ────────────────────────────────
-            # Build a CLEAN context: system prompt + history + deltas only.
-            # Deliberately exclude dynamic_snapshot_content and job_instructions —
-            # both contain the "PHASE 1 — SIGNAL ONLY / output only the marker"
-            # instruction which would cause the model to emit ##AF: FINAL_OUTPUT##
-            # again instead of responding naturally.
-            print("[Runner] Phase 2: Response generation starting...")
-            phase2_messages = [{"role": "system", "content": system_prompt}]
-            phase2_messages.extend(history)
-            if delta_content:
-                phase2_messages.append({"role": "system", "content": delta_content})
-            phase2_messages.append({
-                "role": "system",
-                "content": (
-                    "RECORD received. Your signal was acknowledged. "
-                    "Now write your natural response to the user's message. "
-                    "Do NOT output ##AF: FINAL_OUTPUT## again."
-                )
-            })
-            if phase2_messages and phase2_messages[-1].get("role") == "user":
-                phase2_messages[-1]["content"] += "\n\n" + user_message
-            else:
-                phase2_messages.append({"role": "user", "content": user_message})
-            phase2_messages.append({"role": "assistant", "content": phase1_output.strip()})
-            phase2_messages.append({"role": "user", "content": "##RECORD##"})
-
-            print(f"[Runner] Generating phase 2 response to: {raw_output_path}")
-
-            with contextlib.redirect_stderr(log_capture_buffer):
-                p2_stream = llm.create_chat_completion(
-                    messages=phase2_messages,
-                    max_tokens=active_config.get("max_tokens", 2048),
-                    temperature=active_config.get("temperature", 0.7),
-                    top_p=active_config.get("top_p", 0.95),
-                    top_k=active_config.get("top_k", 40),
-                    stream=True
-                )
                 with open(raw_output_path, "w", encoding="utf-8") as f:
-                    for token_data in p2_stream:
+                    for token_data in stream:
                         if os.path.exists(STOP_TRIGGER):
-                            print("[Runner] Stop trigger detected in phase 2.")
+                            print("[Runner] Stop trigger detected.")
                             try: os.remove(STOP_TRIGGER)
                             except: pass
                             f.write("\n\n[Stopped]")
@@ -448,9 +374,9 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                                 f.write(text)
                                 f.flush()
 
-            print(f"[Runner] Phase 2 complete. Raw output: {raw_output_path}")
+            print(f"[Runner] Generation complete. Raw output: {raw_output_path}")
 
-            # 5. Parse Metrics from Captured Log (both phases)
+            # 5. Parse Metrics from Captured Log
             log_output = log_capture_buffer.getvalue()
             print(log_output, file=sys.stderr)
 
@@ -458,7 +384,6 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if stats:
                 write_stats(stats)
 
-            print(f"[Runner] Two-phase generation complete. Raw output: {raw_output_path}")
             set_llm_status("idle")
 
         except Exception as e:

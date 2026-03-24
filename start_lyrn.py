@@ -345,10 +345,10 @@ async def scheduler_loop():
                     if job.instructions:
                         ds_manager.set_snapshot_active("jobs", job.name, False)
 
-            await asyncio.sleep(5) # Check every 5 seconds
+            await asyncio.sleep(0.5) # Check frequently
         except Exception as e:
             print(f"[Scheduler] Error in loop: {e}")
-            await asyncio.sleep(5)
+            await asyncio.sleep(0.5)
 
 async def _monitor_job_completion(filepath: str, job_name: str):
     """Monitors the raw output file for completion and deactivates dynamic snapshot."""
