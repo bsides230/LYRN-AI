@@ -11,20 +11,37 @@ def main():
     watcher_script = os.path.join(script_dir, "chat_watcher_bg.py")
     root_dir = os.path.abspath(os.path.join(script_dir, '../..'))
 
+    print(f"[spawn] script_dir:     {script_dir}")
+    print(f"[spawn] watcher_script: {watcher_script}")
+    print(f"[spawn] root_dir:       {root_dir}")
+    print(f"[spawn] watcher exists: {os.path.exists(watcher_script)}")
+
+    # Check pre-existing flag state before spawning.
+    final_output_flag = os.path.join(root_dir, "global_flags", "final_output_mode.txt")
+    if os.path.exists(final_output_flag):
+        print(f"[spawn] NOTE: final_output_mode.txt already exists — recursion mode will be active in watcher")
+    else:
+        print(f"[spawn] final_output_mode.txt not set — normal affordance detection mode")
+
     # Capture user_message NOW before job_input.json can be overwritten by the next request.
     # This prevents the race condition where the watcher reads a stale/new user_message
     # from job_input.json after LLM generation finishes.
     user_message = ""
+    job_input_path = os.path.join(root_dir, "jobs", "job_input.json")
+    print(f"[spawn] Reading user_message from: {job_input_path}")
     try:
-        job_input_path = os.path.join(root_dir, "jobs", "job_input.json")
         with open(job_input_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             user_message = data.get("user_message", "")
-        print(f"Captured user_message at spawn time: {user_message[:60]}...")
+        print(f"[spawn] Captured user_message at spawn time: {user_message[:60]}...")
+        print(f"[spawn] user_message length: {len(user_message)} chars")
     except Exception as e:
-        print(f"Warning: could not read user_message from job_input.json: {e}")
+        print(f"[spawn] WARNING: could not read user_message from job_input.json: {e}")
+        print(f"[spawn] Watcher will fall back to job_input.json at completion time (race risk)")
 
     cmd = [sys.executable, watcher_script, root_dir, user_message]
+    print(f"[spawn] Spawning command: {sys.executable} chat_watcher_bg.py <root_dir> <user_msg[{len(user_message)}c]>")
+    print(f"[spawn] Platform: {os.name}")
 
     if os.name == 'nt':
         subprocess.Popen(
@@ -41,6 +58,7 @@ def main():
             stderr=subprocess.DEVNULL
         )
 
+    print("[spawn] Background watcher process launched successfully.")
     print("Spawned background watcher.")
     sys.exit(0)
 

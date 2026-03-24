@@ -176,6 +176,16 @@ def main():
     final_output_flag= os.path.join(root_dir, "global_flags", "final_output_mode.txt")
     stream_buffer    = os.path.join(root_dir, "global_flags", "chat_stream_buffer.txt")
 
+    print(f"[Watcher] === chat_watcher_bg.py starting ===")
+    print(f"[Watcher] PID: {os.getpid()}")
+    print(f"[Watcher] root_dir:          {root_dir}")
+    print(f"[Watcher] raw_output_file:   {raw_output_file}")
+    print(f"[Watcher] lock_file:         {lock_file}")
+    print(f"[Watcher] llm_status_path:   {llm_status_path}")
+    print(f"[Watcher] final_output_flag: {final_output_flag}")
+    print(f"[Watcher] stream_buffer:     {stream_buffer}")
+    print(f"[Watcher] user_message_arg:  {repr(user_message_arg[:60]) if user_message_arg else None}")
+    print(f"[Watcher] affordance_marker: {repr(AFFORDANCE_START)}")
     print(f"[Watcher] Watching {raw_output_file} for raw model output...")
 
     global_start = time.time()
@@ -183,17 +193,26 @@ def main():
     # -----------------------------------------------------------------------
     # Phase 1: Wait for the raw output file to appear
     # -----------------------------------------------------------------------
+    print(f"[Watcher] Phase 1: Waiting for output file to appear (timeout={TIMEOUT_WAIT_FILE}s)...")
+    wait_ticks = 0
     while not os.path.exists(raw_output_file):
-        if time.time() - global_start > TIMEOUT_WAIT_FILE:
-            print("[Watcher] Timed out waiting for output file to appear.")
+        elapsed = time.time() - global_start
+        if elapsed > TIMEOUT_WAIT_FILE:
+            print(f"[Watcher] Phase 1: TIMED OUT after {elapsed:.1f}s waiting for output file.")
             _cleanup_flags(lock_file)
             sys.exit(1)
+        wait_ticks += 1
+        if wait_ticks % 10 == 0:  # log every ~5s
+            print(f"[Watcher] Phase 1: Still waiting... {elapsed:.1f}s elapsed")
         time.sleep(POLL_INTERVAL_WAIT)
+
+    print(f"[Watcher] Phase 1: Output file appeared after {time.time()-global_start:.2f}s")
 
     # Check if a previous generation already set the flag (recursion scenario).
     # If so, this generation is the "final output" generation — stream everything
     # from the start without waiting for the marker.
     flag_was_preset = os.path.exists(final_output_flag)
+    print(f"[Watcher] Phase 1: final_output_mode.txt pre-set: {flag_was_preset}")
 
     # Clear stale stream buffer, but do NOT clear the flag if it was already set —
     # that means a previous job set it and we should honour it.
@@ -209,14 +228,20 @@ def main():
     # -----------------------------------------------------------------------
     # Phase 2: Tail the file, detect affordance marker, stream to buffer
     # -----------------------------------------------------------------------
+    print(f"[Watcher] Phase 2: Starting tail loop (poll={POLL_INTERVAL_STREAM}s, timeout={TIMEOUT_GENERATION}s)")
     char_pos       = 0               # character offset read so far
     in_final_output= flag_was_preset  # already live if flag was pre-set
+    total_chars_read = 0
+    total_buffer_chars = 0
+    poll_count = 0
 
     while True:
         elapsed = time.time() - global_start
         if elapsed > TIMEOUT_GENERATION:
-            print("[Watcher] Timed out during generation monitoring.")
+            print(f"[Watcher] Phase 2: TIMED OUT after {elapsed:.1f}s during generation monitoring.")
             break
+
+        poll_count += 1
 
         # --- Read new content from file (by character position) ---
         new_content = ""
@@ -226,10 +251,14 @@ def main():
             if len(full) > char_pos:
                 new_content = full[char_pos:]
                 char_pos = len(full)
-        except Exception:
-            pass
+                total_chars_read += len(new_content)
+        except Exception as e:
+            if poll_count == 1:
+                print(f"[Watcher] Phase 2: Error reading output file: {e}")
 
         if new_content:
+            print(f"[Watcher] Phase 2: +{len(new_content)} chars (total={total_chars_read}, "
+                  f"in_final_output={in_final_output})")
             if not in_final_output:
                 # Combine with already-read content to catch marker split across reads.
                 # We only need the tail of what we've seen to check for the marker.
@@ -238,7 +267,9 @@ def main():
                 # have the full text up to char_pos.
                 current_full = full  # still in scope from the read above
                 if AFFORDANCE_START in current_full:
-                    print("[Watcher] ##AF: FINAL_OUTPUT## detected — switching to final output mode.")
+                    marker_pos = current_full.index(AFFORDANCE_START)
+                    print(f"[Watcher] Phase 2: ##AF: FINAL_OUTPUT## detected at char {marker_pos} "
+                          f"— switching to final output mode.")
                     in_final_output = True
 
                     # Set the final output mode flag file
@@ -246,22 +277,30 @@ def main():
                         os.makedirs(os.path.dirname(final_output_flag), exist_ok=True)
                         with open(final_output_flag, "w", encoding="utf-8") as f:
                             f.write("active")
+                        print(f"[Watcher] Phase 2: final_output_mode.txt written")
                     except Exception as e:
-                        print(f"[Watcher] Error setting final_output_mode flag: {e}")
+                        print(f"[Watcher] Phase 2: ERROR setting final_output_mode flag: {e}")
 
                     # Write everything after the marker to the stream buffer
                     after_marker = current_full.split(AFFORDANCE_START, 1)[1]
                     if after_marker:
                         _append_stream_buffer(stream_buffer, after_marker)
+                        total_buffer_chars += len(after_marker)
+                        print(f"[Watcher] Phase 2: Wrote {len(after_marker)} post-marker chars to stream buffer")
+                    else:
+                        print(f"[Watcher] Phase 2: No post-marker content yet — waiting for more tokens")
 
             else:
                 # Already past the marker — stream new content directly to buffer
                 _append_stream_buffer(stream_buffer, new_content)
+                total_buffer_chars += len(new_content)
 
         # --- Check if LLM has finished ---
         status = _read_llm_status(llm_status_path)
         if status in ("idle", "error", "stopped"):
             # Give a short grace period for any final token flushes
+            print(f"[Watcher] Phase 2: LLM status='{status}' — generation complete. "
+                  f"Total chars read={total_chars_read}, buffer chars={total_buffer_chars}")
             time.sleep(0.3)
             break
 
@@ -270,35 +309,57 @@ def main():
     # -----------------------------------------------------------------------
     # Phase 3: LLM done — extract final response and save chat history
     # -----------------------------------------------------------------------
+    print(f"[Watcher] Phase 3: Reading final raw output from {raw_output_file}")
     try:
         with open(raw_output_file, "r", encoding="utf-8", errors="replace") as f:
             full_raw = f.read()
+        print(f"[Watcher] Phase 3: Raw output length: {len(full_raw)} chars")
     except Exception as e:
-        print(f"[Watcher] Error reading final output: {e}")
+        print(f"[Watcher] Phase 3: ERROR reading final output: {e}")
         full_raw = ""
 
-    response_text = _extract_final_response(full_raw)
+    marker_in_raw = AFFORDANCE_START in full_raw
+    print(f"[Watcher] Phase 3: Affordance marker in raw output: {marker_in_raw}")
+    print(f"[Watcher] Phase 3: Extracting final response...")
 
-    user_input = user_message_arg or _get_user_message_from_json(root_dir) or "Unknown Input"
+    response_text = _extract_final_response(full_raw)
+    print(f"[Watcher] Phase 3: Extracted response length: "
+          f"{len(response_text) if response_text else 0} chars")
+    if response_text:
+        print(f"[Watcher] Phase 3: Response preview: {repr(response_text[:80])}")
+
+    # Determine user_input: argv[2] (pre-captured) > job_input.json fallback > sentinel
+    if user_message_arg:
+        user_input = user_message_arg
+        print(f"[Watcher] Phase 3: Using pre-captured user_message from argv ({len(user_input)} chars)")
+    else:
+        user_input = _get_user_message_from_json(root_dir) or "Unknown Input"
+        print(f"[Watcher] Phase 3: Using user_message from job_input.json (argv not set): "
+              f"{repr(user_input[:60])}")
 
     if response_text:
         _save_chat_history(root_dir, user_input, response_text)
     else:
-        print("[Watcher] No response text extracted — skipping chat history save.")
+        print("[Watcher] Phase 3: No response text extracted — skipping chat history save.")
 
     # Write to output log so the Output Viewer module can show the full picture
+    log_path = os.path.join(root_dir, "global_flags", "output_log.jsonl")
+    print(f"[Watcher] Phase 3: Appending to output log: {log_path}")
     _append_output_log(
         root_dir,
         user_message=user_input,
         raw_output=full_raw,
         final_output=response_text or "",
-        marker_detected=AFFORDANCE_START in full_raw,
+        marker_detected=marker_in_raw,
     )
 
     # Clean up all processing flags
+    print(f"[Watcher] Phase 3: Cleaning up flags: {os.path.basename(lock_file)}, "
+          f"{os.path.basename(final_output_flag)}")
     _cleanup_flags(lock_file, final_output_flag)
 
-    print("[Watcher] Capture complete. Exiting.")
+    elapsed_total = time.time() - global_start
+    print(f"[Watcher] === Capture complete in {elapsed_total:.2f}s. Exiting. ===")
     sys.exit(0)
 
 

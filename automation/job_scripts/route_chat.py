@@ -73,18 +73,32 @@ def _queue_job(queue_path: Path, job_name: str):
 
 def main():
     print("--- route_chat.py executed ---")
+    print(f"[route_chat] CWD: {os.getcwd()}")
+    print(f"[route_chat] Processing chain: {PROCESSING_CHAIN}")
 
     queue_path = Path("automation/job_queue.json")
+    print(f"[route_chat] Queue path: {queue_path.resolve()}")
+    print(f"[route_chat] Queue exists: {queue_path.exists()}")
 
     # Queue every job in the processing chain
-    for job_name in PROCESSING_CHAIN:
+    for i, job_name in enumerate(PROCESSING_CHAIN):
+        print(f"[route_chat] Queuing job {i+1}/{len(PROCESSING_CHAIN)}: '{job_name}'")
         try:
             _queue_job(queue_path, job_name)
         except Exception as e:
-            print(f"[route_chat] Failed to queue '{job_name}': {e}")
+            print(f"[route_chat] ERROR: Failed to queue '{job_name}': {e}")
             sys.exit(1)
 
-    print(f"[route_chat] Queued {len(PROCESSING_CHAIN)} job(s): {PROCESSING_CHAIN}")
+    # Log the final queue state
+    try:
+        queue_data = json.loads(queue_path.read_text())
+        print(f"[route_chat] Queue now has {len(queue_data)} entry/entries:")
+        for entry in queue_data:
+            print(f"[route_chat]   - id={entry.get('id')} name={entry.get('name')}")
+    except Exception as e:
+        print(f"[route_chat] Could not read back queue for verification: {e}")
+
+    print(f"[route_chat] Done — queued {len(PROCESSING_CHAIN)} job(s): {PROCESSING_CHAIN}")
     sys.exit(0)
 
 
