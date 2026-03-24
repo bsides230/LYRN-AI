@@ -318,19 +318,9 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if delta_content:
                 messages.append({"role": "system", "content": delta_content})
 
-            # Flag delta: if a previous generation set FINAL_OUTPUT mode, tell the model
-            # so it knows its output will be shown to the user in this generation.
-            if os.path.exists(FINAL_OUTPUT_FLAG):
-                messages.append({"role": "system", "content":
-                    "[STATUS: FINAL OUTPUT MODE ACTIVE] "
-                    "Your output is streaming live to the user right now."})
-                print("[Runner] FINAL OUTPUT MODE flag detected — injecting status delta.")
-
             # Inject job_instructions as the LAST system message before the user turn.
             # Position matters: placing it here (after history/deltas) keeps it fresh in the
-            # model's context window immediately before it generates, which significantly
-            # improves instruction-following (especially the ##AF: FINAL_OUTPUT## directive).
-            # This fires whether DSManager is active or not — the two don't conflict.
+            # model's context window immediately before it generates.
             if job_instructions and job_instructions.strip():
                 messages.append({"role": "system", "content": job_instructions})
                 print("[Runner] Injected job_instructions before user turn.")
@@ -341,14 +331,20 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             else:
                 messages.append({"role": "user", "content": user_message})
 
-            # 4. Generate with Stderr Capture — write raw output to SEPARATE intermediate file
             active_config = settings_manager.settings.get("active", {})
             log_capture_buffer = io.StringIO()
 
-            print(f"[Runner] Generating response to: {raw_output_path}")
+            # ── Phase 1: Thinking + Signal ──────────────────────────────────────────
+            # Model thinks through the request and outputs ##AF: FINAL_OUTPUT## only.
+            # This output is NOT written to raw_output_path (not streamed to user).
+            print("[Runner] Phase 1: Thinking/signal generation starting...")
+            phase1_output = ""
+            marker_detected_p1 = False
+            grace_count = 0
+            GRACE_CHARS = 50  # Allow up to 50 chars after marker before breaking early
 
             with contextlib.redirect_stderr(log_capture_buffer):
-                stream = llm.create_chat_completion(
+                p1_stream = llm.create_chat_completion(
                     messages=messages,
                     max_tokens=active_config.get("max_tokens", 2048),
                     temperature=active_config.get("temperature", 0.7),
@@ -356,57 +352,96 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     top_k=active_config.get("top_k", 40),
                     stream=True
                 )
+                for token_data in p1_stream:
+                    if os.path.exists(STOP_TRIGGER):
+                        try: os.remove(STOP_TRIGGER)
+                        except: pass
+                        break
+                    if 'choices' in token_data and token_data['choices']:
+                        text = token_data['choices'][0].get('delta', {}).get('content', '')
+                        if text:
+                            phase1_output += text
+                            if not marker_detected_p1 and AFFORDANCE_MARKER in phase1_output:
+                                marker_detected_p1 = True
+                                print(f"[Runner] Phase 1: Affordance marker detected — entering grace period.")
+                            elif marker_detected_p1:
+                                grace_count += len(text)
+                                if grace_count >= GRACE_CHARS:
+                                    print(f"[Runner] Phase 1: Grace period elapsed — stopping early.")
+                                    break
 
-                # Stream raw model output to the intermediate output file.
-                # Track the affordance marker so we can set the flag the instant
-                # the model emits it — before the watcher's next poll tick.
-                marker_seen = False
-                marker_buf  = ""   # rolling accumulator for split-token marker detection
+            if not marker_detected_p1:
+                print(f"[Runner] WARNING: Affordance marker NOT found in phase 1 ({len(phase1_output)} chars). "
+                      f"Appending marker as fallback.")
+                phase1_output = (phase1_output.rstrip() or "") + "\n" + AFFORDANCE_MARKER
 
+            print(f"[Runner] Phase 1 complete. Output: {len(phase1_output)} chars.")
+
+            # Save phase 1 output for history/logging (watcher reads this)
+            last_thinking_file = os.path.join(SCRIPT_DIR, "global_flags", "last_thinking.txt")
+            try:
+                os.makedirs(os.path.dirname(last_thinking_file), exist_ok=True)
+                with open(last_thinking_file, "w", encoding="utf-8") as f:
+                    f.write(phase1_output)
+                print(f"[Runner] Phase 1 saved to last_thinking.txt")
+            except Exception as e:
+                print(f"[Runner] Error saving last_thinking.txt: {e}")
+
+            # Set final output flag BEFORE phase 2 begins.
+            # The watcher detects this flag and streams all phase 2 content as final output.
+            try:
+                os.makedirs(os.path.dirname(FINAL_OUTPUT_FLAG), exist_ok=True)
+                with open(FINAL_OUTPUT_FLAG, "w") as ff:
+                    ff.write("active")
+                print("[Runner] Final output flag set. Phase 2 will stream to user.")
+            except Exception as e:
+                print(f"[Runner] Error setting final output flag: {e}")
+
+            # ── Phase 2: Response (streamed to user) ────────────────────────────────
+            # Add phase 1 as assistant turn, ##RECORD## as user turn.
+            # Model generates the actual response, written to raw_output_path for streaming.
+            print("[Runner] Phase 2: Response generation starting...")
+            phase2_messages = messages + [
+                {"role": "assistant", "content": phase1_output.strip()},
+                {"role": "user", "content": "##RECORD##"}
+            ]
+
+            print(f"[Runner] Generating phase 2 response to: {raw_output_path}")
+
+            with contextlib.redirect_stderr(log_capture_buffer):
+                p2_stream = llm.create_chat_completion(
+                    messages=phase2_messages,
+                    max_tokens=active_config.get("max_tokens", 2048),
+                    temperature=active_config.get("temperature", 0.7),
+                    top_p=active_config.get("top_p", 0.95),
+                    top_k=active_config.get("top_k", 40),
+                    stream=True
+                )
                 with open(raw_output_path, "w", encoding="utf-8") as f:
-                    for token_data in stream:
-                        # Check stop
+                    for token_data in p2_stream:
                         if os.path.exists(STOP_TRIGGER):
-                            print("[Runner] Stop trigger detected.")
-                            try:
-                                os.remove(STOP_TRIGGER)
+                            print("[Runner] Stop trigger detected in phase 2.")
+                            try: os.remove(STOP_TRIGGER)
                             except: pass
                             f.write("\n\n[Stopped]")
                             break
-
-                        if 'choices' in token_data and len(token_data['choices']) > 0:
-                            delta = token_data['choices'][0].get('delta', {})
-                            text = delta.get('content', '')
+                        if 'choices' in token_data and token_data['choices']:
+                            text = token_data['choices'][0].get('delta', {}).get('content', '')
                             if text:
                                 f.write(text)
                                 f.flush()
 
-                                # Detect the affordance marker across token boundaries
-                                if not marker_seen:
-                                    marker_buf += text
-                                    # Keep only a tail long enough to match the marker
-                                    if len(marker_buf) > len(AFFORDANCE_MARKER) * 2:
-                                        marker_buf = marker_buf[-len(AFFORDANCE_MARKER):]
-                                    if AFFORDANCE_MARKER in marker_buf:
-                                        marker_seen = True
-                                        print("[Runner] ##AF: FINAL_OUTPUT## detected — setting flag.")
-                                        try:
-                                            os.makedirs(os.path.dirname(FINAL_OUTPUT_FLAG), exist_ok=True)
-                                            with open(FINAL_OUTPUT_FLAG, "w") as ff:
-                                                ff.write("active")
-                                        except Exception as e:
-                                            print(f"[Runner] Could not set final_output_mode flag: {e}")
+            print(f"[Runner] Phase 2 complete. Raw output: {raw_output_path}")
 
-            # 5. Parse Metrics from Captured Log
+            # 5. Parse Metrics from Captured Log (both phases)
             log_output = log_capture_buffer.getvalue()
-            # Print to real stderr so start_lyrn can capture it too
             print(log_output, file=sys.stderr)
 
             stats = parse_metrics(log_output)
             if stats:
                 write_stats(stats)
 
-            print(f"[Runner] Generation complete. Raw output: {raw_output_path}")
+            print(f"[Runner] Two-phase generation complete. Raw output: {raw_output_path}")
             set_llm_status("idle")
 
         except Exception as e:

@@ -270,12 +270,16 @@ def main():
 
     # -----------------------------------------------------------------------
     # Phase 2: Tail the file, detect affordance marker, stream to buffer
-    # The wizard ONLY looks for the marker in non-thinking text.
-    # Thinking blocks (<think>...</think>) are ignored for affordance detection.
     # -----------------------------------------------------------------------
     print(f"[Watcher] Phase 2: Starting tail loop (poll={POLL_INTERVAL_STREAM}s, timeout={TIMEOUT_GENERATION}s)")
     char_pos        = 0               # character offset read so far
     in_final_output = flag_was_preset  # already live if flag was pre-set
+
+    # Two-phase mode: runner sets final_output_flag BEFORE creating raw_output_file,
+    # so re-check here — the flag may have been set after our Phase 1 startup check.
+    if not in_final_output and os.path.exists(final_output_flag):
+        in_final_output = True
+        print("[Watcher] Phase 2 start: Final output flag set by runner — entering streaming mode.")
     total_chars_read    = 0
     total_buffer_chars  = 0
     poll_count = 0
@@ -301,6 +305,18 @@ def main():
         except Exception as e:
             if poll_count == 1:
                 print(f"[Watcher] Phase 2: Error reading output file: {e}")
+
+        # Defensive mid-loop check: catch external flag set by runner (two-phase mode)
+        if not in_final_output and os.path.exists(final_output_flag):
+            in_final_output = True
+            print("[Watcher] Phase 2: External final output flag detected mid-loop — switching to streaming mode.")
+            # Stream all content read so far to the buffer (it's all final output in two-phase)
+            if full:
+                clean_full = _strip_thinking(full)
+                if clean_full:
+                    _append_stream_buffer(stream_buffer, clean_full)
+                    total_buffer_chars += len(clean_full)
+                    print(f"[Watcher] Phase 2: Streamed {len(clean_full)} existing chars to buffer.")
 
         if new_content:
             print(f"[Watcher] Phase 2: +{len(new_content)} chars (total={total_chars_read}, "
@@ -368,13 +384,33 @@ def main():
         print(f"[Watcher] Phase 3: ERROR reading final output: {e}")
         full_raw = ""
 
-    marker_in_raw = AFFORDANCE_START in full_raw
-    print(f"[Watcher] Phase 3: Affordance marker in raw output: {marker_in_raw}")
-    print(f"[Watcher] Phase 3: Extracting final response (thinking will be stripped)...")
+    # ── Two-phase: read phase 1 thinking content saved by the runner ──────────
+    last_thinking_file = os.path.join(root_dir, "global_flags", "last_thinking.txt")
+    phase1_content = ""
+    if os.path.exists(last_thinking_file):
+        try:
+            with open(last_thinking_file, "r", encoding="utf-8") as f:
+                phase1_content = f.read()
+            os.remove(last_thinking_file)
+            print(f"[Watcher] Phase 3: Read {len(phase1_content)} chars of phase 1 from last_thinking.txt")
+        except Exception as e:
+            print(f"[Watcher] Phase 3: Error reading last_thinking.txt: {e}")
+    else:
+        print(f"[Watcher] Phase 3: last_thinking.txt not found (single-phase or fallback mode)")
 
-    response_text = _extract_final_response(full_raw)
-    print(f"[Watcher] Phase 3: Extracted response length: "
-          f"{len(response_text) if response_text else 0} chars")
+    # In two-phase mode full_raw = phase 2 response only (no marker).
+    # Strip any <think> tags from phase 2 (in case model thinks again) for chat history.
+    response_text = _strip_thinking(full_raw).strip()
+    if not response_text:
+        # Fallback: try legacy marker extraction
+        response_text = _extract_final_response(full_raw)
+
+    marker_in_log = bool(phase1_content)  # marker is in phase 1 content when two-phase
+    if not marker_in_log:
+        # Fallback: check phase 2 raw (single-phase compatibility)
+        marker_in_log = AFFORDANCE_START in full_raw
+
+    print(f"[Watcher] Phase 3: Response length: {len(response_text) if response_text else 0} chars")
     if response_text:
         print(f"[Watcher] Phase 3: Response preview: {repr(response_text[:80])}")
 
@@ -388,24 +424,31 @@ def main():
               f"{repr(user_input[:60])}")
 
     if response_text:
-        # Save to LLM chat history (chat/ folder — read by model on future turns)
+        # Save to LLM chat history (chat/ folder — read by model on future turns).
+        # Only save the clean response; thinking stays out of LLM context.
         _save_chat_history(root_dir, user_input, response_text)
 
-        # Save to user-visible output history (output_history/ folder — audit log,
-        # never read by LLM, never cleared by LLM history operations)
+        # Save to user-visible output history (audit log, never read by LLM)
         _save_output_history(root_dir, user_input, response_text)
     else:
         print("[Watcher] Phase 3: No response text extracted — skipping history saves.")
 
-    # Write to legacy output log (used by Output Viewer raw stream history)
+    # Build combined raw for Output Viewer history tab:
+    # phase 1 thinking + marker + phase 2 response (shows full picture with thinking)
+    if phase1_content:
+        combined_raw = phase1_content.rstrip() + "\n\n" + AFFORDANCE_START + "\n\n" + (response_text or full_raw)
+    else:
+        combined_raw = full_raw  # single-phase fallback
+
+    # Write to output log (used by Output Viewer history tab)
     log_path = os.path.join(root_dir, "global_flags", "output_log.jsonl")
-    print(f"[Watcher] Phase 3: Appending to legacy output log: {log_path}")
+    print(f"[Watcher] Phase 3: Appending to output log: {log_path}")
     _append_output_log(
         root_dir,
         user_message=user_input,
-        raw_output=full_raw,
+        raw_output=combined_raw,
         final_output=response_text or "",
-        marker_detected=marker_in_raw,
+        marker_detected=marker_in_log,
     )
 
     # Clean up ALL processing flags — always delete final_output_mode.txt regardless
