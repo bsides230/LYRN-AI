@@ -621,7 +621,7 @@ async def lifespan(app: FastAPI):
         LYRN_TOKEN = os.environ.get("LYRN_MODEL_TOKEN")
         if LYRN_TOKEN:
             print("[System] Loaded admin token from Environment Variable")
-        else:
+        elif not Path("global_flags/no_auth").exists():
             print("[System] Warning: No admin token found (admin_token.txt or LYRN_MODEL_TOKEN). Model management will be unavailable.")
 
     await logger.emit("Info", "Backend started.", "System")
@@ -849,22 +849,26 @@ async def get_log_chunk(session_id: str, chunk_id: str):
 # --- Debug Endpoint ---
 
 @app.post("/api/debug/run", dependencies=[Depends(verify_token)])
-async def run_debug_test(background_tasks: BackgroundTasks):
+async def run_debug_test(background_tasks: BackgroundTasks, preset: str = "1"):
     """Launch debug_live.py as a background process. Report written to docs/debug_reports/."""
     debug_script = Path("tests/debug_live.py")
     if not debug_script.exists():
         raise HTTPException(status_code=404, detail="tests/debug_live.py not found")
 
+    Path("docs/debug_reports").mkdir(parents=True, exist_ok=True)
+    runner_log = Path("docs/debug_reports/debug_runner.log")
+
     def _launch():
-        subprocess.Popen(
-            [sys.executable, str(debug_script)],
-            cwd=os.getcwd(),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        with open(runner_log, "w", encoding="utf-8") as log:
+            subprocess.Popen(
+                [sys.executable, "-u", str(debug_script), "--preset", preset],
+                cwd=os.getcwd(),
+                stdout=log,
+                stderr=log
+            )
 
     background_tasks.add_task(_launch)
-    return {"ok": True, "message": "Debug test started. Report will appear in docs/debug_reports/"}
+    return {"ok": True, "message": f"Debug test started (preset {preset}). Report → docs/debug_reports/ | Runner log → {runner_log}"}
 
 # --- Snapshot Management Endpoints ---
 

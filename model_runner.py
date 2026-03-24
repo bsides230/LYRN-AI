@@ -308,6 +308,11 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
 
             if dynamic_snapshot_content:
                 messages.append({"role": "system", "content": f"--- Active Dynamic Snapshots ---\n{dynamic_snapshot_content}"})
+            elif job_instructions and job_instructions.strip():
+                # DSManager not active for this request — inject job_instructions directly
+                # so the affordance trigger instruction always reaches the model.
+                messages.append({"role": "system", "content": job_instructions})
+                print("[Runner] Injected job_instructions from payload (DSManager not active).")
 
             # History (no file exclusion needed — input is JSON, not a chat file)
             history = chat_manager.get_chat_history_messages(exclude_paths=[])

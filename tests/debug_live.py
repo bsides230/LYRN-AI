@@ -1,486 +1,453 @@
 """
 debug_live.py — Live end-to-end debug runner for the LYRN chat flow.
 
-Runs the FULL real pipeline using the actual configured model (no mocking).
-Every process in the chain is captured and written to a timestamped
-debug report in docs/debug_reports/.
+Runs against the LIVE, running start_lyrn.py server via HTTP API calls so
+every step goes through the real scheduler → DSManager → model_runner pipeline.
+The affordance marker (##AF: FINAL_OUTPUT##) is exercised exactly as it would
+be in production.
 
-Usage (from repo root):
-    python tests/debug_live.py            # uses preset 1 from settings.json
-    python tests/debug_live.py --preset 2 # uses a different preset
+Usage (launched automatically by the server via POST /api/debug/run):
+    python tests/debug_live.py
+    python tests/debug_live.py --preset 2
 
 What it does:
-  1. Loads the chosen model_preset from settings.json and temporarily
-     applies it to the "active" config so model_runner.py picks it up.
-     The original active config is restored when the script exits.
-  2. Starts model_runner.py and waits for the model to finish loading.
-  3. For each test prompt, runs the full chain:
-       job_input.json  →  route_chat.py  →  chat_watcher_bg.py (foreground)
-                       →  chat_trigger.txt  →  model_runner  →  output
-  4. Captures stdout/stderr from every process.
-  5. Writes docs/debug_reports/debug_TIMESTAMP.md with all results.
-
-The watcher is run directly (foreground, captured) instead of via
-spawn_chat_watcher.py so all debug output is visible in the report.
+  1. Detects the server URL from port.txt (default: 127.0.0.1:8080).
+  2. Applies the chosen preset via POST /api/config/active.
+  3. Starts model_runner.py via POST /api/system/start_worker.
+  4. Polls GET /health until llm_status == "idle".
+  5. Waits 20 s for the model to fully settle.
+  6. For each of 3 test prompts:
+       a. Clears chat history via DELETE /api/chat (only current-loop pairs).
+       b. Waits for model idle, then injects prompt via POST /api/chat.
+       c. Polls GET /api/chat/stream_status until final_output_active == true
+          (##AF: FINAL_OUTPUT## detected) or generation ends.
+       d. Waits for llm_status == "idle" (generation complete).
+       e. Clears chat history again (post-gen wipe).
+  7. Collects all backend logs from the DiskJournalLogger on disk
+     (includes model_runner.py stdout/stderr captured as WorkerOut/WorkerErr).
+  8. Writes a timestamped Markdown report to docs/debug_reports/.
 """
 
 import sys
 import os
 import json
 import time
-import signal
-import threading
-import subprocess
-import shutil
+import argparse
 from pathlib import Path
 from datetime import datetime
 
 # ---------------------------------------------------------------------------
+# HTTP client (requests preferred, urllib fallback)
+# ---------------------------------------------------------------------------
+
+try:
+    import requests as _req
+    _HAS_REQUESTS = True
+except ImportError:
+    import urllib.request as _urlreq
+    import urllib.error as _urlerr
+    _HAS_REQUESTS = False
+
+
+class APIClient:
+    def __init__(self, base_url: str, token: str):
+        self.base = base_url.rstrip("/")
+        self.token = token
+
+    def _h(self):
+        return {"X-Token": self.token, "Content-Type": "application/json"}
+
+    def get(self, path):
+        if _HAS_REQUESTS:
+            return _req.get(f"{self.base}{path}", headers=self._h(), timeout=15)
+        return self._ureq("GET", path)
+
+    def post(self, path, data=None):
+        if _HAS_REQUESTS:
+            return _req.post(f"{self.base}{path}", headers=self._h(), json=data, timeout=15)
+        return self._ureq("POST", path, data)
+
+    def delete(self, path):
+        if _HAS_REQUESTS:
+            return _req.delete(f"{self.base}{path}", headers=self._h(), timeout=15)
+        return self._ureq("DELETE", path)
+
+    def _ureq(self, method, path, data=None):
+        url = f"{self.base}{path}"
+        body = json.dumps(data).encode() if data else None
+        req = _urlreq.Request(url, data=body, headers=self._h(), method=method)
+        try:
+            with _urlreq.urlopen(req, timeout=15) as resp:
+                payload = json.loads(resp.read().decode())
+                class _R:
+                    status_code = resp.status
+                    @staticmethod
+                    def json(): return payload
+                return _R()
+        except _urlerr.HTTPError as e:
+            payload = json.loads(e.read().decode())
+            class _E:
+                status_code = e.code
+                @staticmethod
+                def json(): return payload
+            return _E()
+
+
+# ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-REPO_ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SETTINGS_FILE   = os.path.join(REPO_ROOT, "settings.json")
-MODEL_RUNNER    = os.path.join(REPO_ROOT, "model_runner.py")
-WATCHER_SCRIPT  = os.path.join(REPO_ROOT, "automation", "job_scripts", "chat_watcher_bg.py")
-ROUTE_SCRIPT    = os.path.join(REPO_ROOT, "automation", "job_scripts", "route_chat.py")
-JOB_INPUT       = os.path.join(REPO_ROOT, "jobs", "job_input.json")
-CHAT_TRIGGER    = os.path.join(REPO_ROOT, "chat_trigger.txt")
-LLM_STATUS      = os.path.join(REPO_ROOT, "global_flags", "llm_status.txt")
-STREAM_BUFFER   = os.path.join(REPO_ROOT, "global_flags", "chat_stream_buffer.txt")
-FINAL_FLAG      = os.path.join(REPO_ROOT, "global_flags", "final_output_mode.txt")
-LOCK_FILE       = os.path.join(REPO_ROOT, "global_flags", "chat_processing.txt")
-RAW_OUTPUT      = os.path.join(REPO_ROOT, "jobs", "job_raw_output.txt")
-OUTPUT_LOG      = os.path.join(REPO_ROOT, "global_flags", "output_log.jsonl")
-REPORT_DIR      = os.path.join(REPO_ROOT, "docs", "debug_reports")
 
-# Which preset to use (can be overridden via --preset N on the command line)
-DEFAULT_PRESET  = "1"
+REPO_ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPORT_DIR     = os.path.join(REPO_ROOT, "docs", "debug_reports")
+RAW_OUTPUT     = os.path.join(REPO_ROOT, "jobs", "job_raw_output.txt")
+STREAM_BUFFER  = os.path.join(REPO_ROOT, "global_flags", "chat_stream_buffer.txt")
+OUTPUT_LOG     = os.path.join(REPO_ROOT, "global_flags", "output_log.jsonl")
 
-MODEL_LOAD_TIMEOUT  = 300   # seconds to wait for model to load
-GENERATION_TIMEOUT  = 300   # seconds to wait for a generation to complete
-STATUS_POLL         = 0.5   # seconds between status checks
+DEFAULT_PRESET      = "1"
+MODEL_LOAD_TIMEOUT  = 300   # seconds to wait for model to reach idle after start
+AFFORDANCE_TIMEOUT  = 300   # seconds to wait for ##AF: FINAL_OUTPUT## after inject
+GENERATION_TIMEOUT  = 120   # extra seconds after affordance to wait for llm_status idle
+POST_LOAD_WAIT      = 20    # seconds to let the model settle after reaching idle
 
-# Test prompts to run through the pipeline
 TEST_PROMPTS = [
-    "Say hello and confirm you are working correctly. Keep it brief.",
-    "What is 2 + 2? Answer directly.",
-    "Explain what the ##AF: FINAL_OUTPUT## marker does in one sentence.",
+    "Say hello and confirm you are working correctly. Use the affordance trigger to start your reply.",
+    "What is 2 + 2? Answer directly with the affordance trigger before your answer.",
+    "In one sentence, describe what the ##AF: FINAL_OUTPUT## marker does in this system.",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Environment detection
+# ---------------------------------------------------------------------------
+
+def detect_server_url() -> str:
+    port_file = os.path.join(REPO_ROOT, "port.txt")
+    try:
+        port = Path(port_file).read_text(encoding="utf-8").strip()
+        if port.isdigit():
+            return f"http://127.0.0.1:{port}"
+    except Exception:
+        pass
+    return "http://127.0.0.1:8080"
+
+
+def detect_token() -> str:
+    if Path(os.path.join(REPO_ROOT, "global_flags", "no_auth")).exists():
+        return "no-auth"
+    try:
+        t = Path(os.path.join(REPO_ROOT, "admin_token.txt")).read_text(encoding="utf-8").strip()
+        if t:
+            return t
+    except Exception:
+        pass
+    return ""
 
 
 # ---------------------------------------------------------------------------
 # Utilities
 # ---------------------------------------------------------------------------
 
-def ts():
+def ts() -> str:
     return datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
 
-def section(title):
+def read_file_safe(path: str) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def list_recent_chat_files() -> list:
+    chat_dir = os.path.join(REPO_ROOT, "chat")
+    if not os.path.isdir(chat_dir):
+        return []
+    return sorted(
+        [str(p) for p in Path(chat_dir).glob("chat_*.txt")],
+        key=os.path.getmtime, reverse=True
+    )[:3]
+
+
+def section(title: str) -> str:
     bar = "=" * 60
     return f"\n{bar}\n  {title}\n{bar}\n"
 
 
-def read_status():
-    try:
-        return Path(LLM_STATUS).read_text(encoding="utf-8").strip()
-    except Exception:
-        return "unknown"
+# ---------------------------------------------------------------------------
+# Polling helpers
+# ---------------------------------------------------------------------------
 
-
-def wait_for_status(target_statuses, timeout, label=""):
+def poll_llm_status(client: APIClient, targets: set, timeout: int) -> str | None:
+    """Poll GET /health until worker.llm_status is in targets. Returns status or None."""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        s = read_status()
-        if s in target_statuses:
-            return s
-        time.sleep(STATUS_POLL)
-    return None  # timed out
-
-
-def clean_flags():
-    """Remove runtime flag files so each test starts clean."""
-    for path in [STREAM_BUFFER, FINAL_FLAG, LOCK_FILE, RAW_OUTPUT]:
         try:
-            if os.path.exists(path):
-                os.remove(path)
-        except Exception:
-            pass
+            r = client.get("/health")
+            if r.status_code == 200:
+                status = r.json().get("worker", {}).get("llm_status", "unknown")
+                if status in targets:
+                    return status
+        except Exception as exc:
+            print(f"[{ts()}] poll_llm_status error: {exc}")
+        time.sleep(1)
+    return None
 
 
-def write_job_input(user_message):
-    os.makedirs(os.path.dirname(JOB_INPUT), exist_ok=True)
-    payload = {
-        "user_message": user_message,
-        "source": "debug_live",
-        "timestamp": datetime.now().isoformat(),
-    }
-    Path(JOB_INPUT).write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
-
-def kick_model_runner(user_message):
-    """Write job_input.json and chat_trigger.txt to trigger model_runner."""
-    write_job_input(user_message)
-    Path(CHAT_TRIGGER).write_text(JOB_INPUT, encoding="utf-8")
-
-
-def run_route_chat():
-    """Run route_chat.py and return (stdout, stderr, returncode)."""
-    result = subprocess.run(
-        [sys.executable, ROUTE_SCRIPT],
-        capture_output=True, text=True, timeout=15,
-        cwd=REPO_ROOT,
-        env={**os.environ, "PYTHONPATH": REPO_ROOT},
-    )
-    return result.stdout, result.stderr, result.returncode
-
-
-# ---------------------------------------------------------------------------
-# Model runner — starts in background, output captured to a rolling buffer
-# ---------------------------------------------------------------------------
-
-class ModelRunnerProcess:
-    def __init__(self):
-        self.proc      = None
-        self.log_lines = []
-        self._lock     = threading.Lock()
-        self._reader   = None
-
-    def start(self):
-        self.proc = subprocess.Popen(
-            [sys.executable, MODEL_RUNNER],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            cwd=REPO_ROOT,
-        )
-        self._reader = threading.Thread(target=self._read_loop, daemon=True)
-        self._reader.start()
-        print(f"[{ts()}] model_runner.py started (PID {self.proc.pid})")
-
-    def _read_loop(self):
-        for line in self.proc.stdout:
-            line = line.rstrip("\n")
-            with self._lock:
-                self.log_lines.append(f"[runner] {line}")
-
-    def get_log(self):
-        with self._lock:
-            return list(self.log_lines)
-
-    def stop(self):
-        if self.proc and self.proc.poll() is None:
-            self.proc.terminate()
-            try:
-                self.proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
-        if self._reader:
-            self._reader.join(timeout=3)
-        print(f"[{ts()}] model_runner.py stopped.")
-
-
-# ---------------------------------------------------------------------------
-# Single test run
-# ---------------------------------------------------------------------------
-
-def run_test(runner: ModelRunnerProcess, prompt: str, index: int) -> dict:
+def poll_affordance(client: APIClient, timeout: int) -> str:
     """
-    Run one full cycle of the pipeline for the given prompt.
-    Returns a dict with all captured data for the report.
+    Poll /api/chat/stream_status until the affordance marker fires or generation ends.
+    Returns: "marker" | "done_no_marker" | "timeout"
     """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            r = client.get("/api/chat/stream_status")
+            if r.status_code == 200:
+                d = r.json()
+                if d.get("final_output_active"):
+                    return "marker"
+                if not d.get("processing"):
+                    # Generation ended without triggering the affordance flag.
+                    # Give a short grace period in case the flag file is written
+                    # just after the lock file disappears.
+                    time.sleep(0.8)
+                    r2 = client.get("/api/chat/stream_status")
+                    if r2.status_code == 200 and r2.json().get("final_output_active"):
+                        return "marker"
+                    return "done_no_marker"
+        except Exception as exc:
+            print(f"[{ts()}] poll_affordance error: {exc}")
+        time.sleep(0.4)
+    return "timeout"
+
+
+# ---------------------------------------------------------------------------
+# Single-test runner
+# ---------------------------------------------------------------------------
+
+def run_test(client: APIClient, prompt: str, index: int) -> dict:
     result = {
-        "index":        index,
-        "prompt":       prompt,
-        "started_at":   ts(),
-        "route_stdout": "",
-        "route_stderr": "",
-        "route_rc":     None,
-        "watcher_stdout": "",
-        "watcher_stderr": "",
-        "watcher_rc":   None,
-        "raw_output":   "",
-        "stream_buffer": "",
-        "chat_files":   [],
-        "status_at_end": "",
-        "elapsed_s":    0.0,
-        "error":        "",
+        "index":             index,
+        "prompt":            prompt,
+        "started_at":        ts(),
+        "marker_detected":   False,
+        "affordance_result": "",
+        "raw_output":        "",
+        "stream_buffer":     "",
+        "chat_files":        [],
+        "status_at_end":     "",
+        "elapsed_s":         0.0,
+        "error":             "",
     }
-
     t0 = time.time()
     print(f"\n[{ts()}] ── Test {index}: {prompt[:60]!r}")
 
-    # Ensure model is idle before starting
-    status = wait_for_status({"idle"}, timeout=10)
+    # A. Clear chat history before this loop (only current-loop pairs shown to LLM)
+    try:
+        client.delete("/api/chat")
+        print(f"[{ts()}]   Pre-test chat history cleared.")
+    except Exception as exc:
+        print(f"[{ts()}]   WARNING: pre-test clear failed: {exc}")
+
+    # B. Wait for model idle before injecting
+    status = poll_llm_status(client, {"idle"}, timeout=60)
     if status != "idle":
-        result["error"] = f"Model not idle at test start (status={read_status()!r})"
+        result["error"] = f"Model not idle before inject (status={status!r})"
+        result["elapsed_s"] = round(time.time() - t0, 2)
         return result
 
-    clean_flags()
-
-    # Step A: Write job_input.json
-    write_job_input(prompt)
-    Path(LOCK_FILE).write_text("processing", encoding="utf-8")
-    print(f"[{ts()}]   job_input.json written")
-
-    # Step B: Run route_chat.py
-    print(f"[{ts()}]   Running route_chat.py...")
+    # C. Inject the message via API (goes through full scheduler → DSManager pipeline)
+    print(f"[{ts()}]   Injecting prompt via /api/chat...")
     try:
-        r_out, r_err, r_rc = run_route_chat()
-    except subprocess.TimeoutExpired:
-        result["error"] = "route_chat.py timed out"
-        return result
-    result["route_stdout"] = r_out
-    result["route_stderr"] = r_err
-    result["route_rc"]     = r_rc
-    print(f"[{ts()}]   route_chat.py → rc={r_rc}")
-
-    if r_rc != 0:
-        result["error"] = f"route_chat.py exited {r_rc}"
+        r = client.post("/api/chat", data={"message": prompt})
+        if r.status_code not in (200, 201):
+            result["error"] = f"/api/chat returned {r.status_code}: {r.json()}"
+            result["elapsed_s"] = round(time.time() - t0, 2)
+            return result
+        print(f"[{ts()}]   Prompt accepted (HTTP {r.status_code}).")
+    except Exception as exc:
+        result["error"] = f"Failed to inject message: {exc}"
+        result["elapsed_s"] = round(time.time() - t0, 2)
         return result
 
-    # Step C: Start watcher in foreground (captured) — BEFORE triggering the model
-    print(f"[{ts()}]   Starting chat_watcher_bg.py (foreground capture)...")
-    watcher_proc = subprocess.Popen(
-        [sys.executable, WATCHER_SCRIPT, REPO_ROOT, prompt],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        cwd=REPO_ROOT,
-    )
+    # D. Wait for the affordance trigger (##AF: FINAL_OUTPUT## marker)
+    print(f"[{ts()}]   Waiting for ##AF: FINAL_OUTPUT## (timeout={AFFORDANCE_TIMEOUT}s)...")
+    af_result = poll_affordance(client, AFFORDANCE_TIMEOUT)
+    result["affordance_result"] = af_result
+    result["marker_detected"]   = af_result == "marker"
+    print(f"[{ts()}]   Affordance result: {af_result}")
 
-    # Step D: Kick model_runner by writing job_input + chat_trigger
-    print(f"[{ts()}]   Writing chat_trigger.txt to kick model_runner...")
-    Path(CHAT_TRIGGER).write_text(JOB_INPUT, encoding="utf-8")
+    # E. Wait for generation to fully complete
+    print(f"[{ts()}]   Waiting for generation complete (timeout={GENERATION_TIMEOUT}s)...")
+    end_status = poll_llm_status(client, {"idle", "error", "stopped"}, GENERATION_TIMEOUT)
+    result["status_at_end"] = end_status or "timeout"
+    print(f"[{ts()}]   Final LLM status: {result['status_at_end']}")
 
-    # Step E: Wait for watcher to finish
-    print(f"[{ts()}]   Waiting for watcher to complete (timeout={GENERATION_TIMEOUT}s)...")
+    # F. Snapshot outputs
+    result["raw_output"]   = read_file_safe(RAW_OUTPUT)
+    result["stream_buffer"] = read_file_safe(STREAM_BUFFER)
+    result["chat_files"]   = list_recent_chat_files()
+
+    # G. Wipe chat history after final gen (loop complete — clear for next cycle)
     try:
-        w_out, w_err = watcher_proc.communicate(timeout=GENERATION_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        watcher_proc.kill()
-        w_out, w_err = watcher_proc.communicate()
-        result["error"] = "watcher timed out"
+        client.delete("/api/chat")
+        print(f"[{ts()}]   Post-gen chat history wiped.")
+    except Exception as exc:
+        print(f"[{ts()}]   WARNING: post-gen clear failed: {exc}")
 
-    result["watcher_stdout"] = w_out
-    result["watcher_stderr"] = w_err
-    result["watcher_rc"]     = watcher_proc.returncode
-    print(f"[{ts()}]   Watcher finished → rc={watcher_proc.returncode}")
-
-    # Collect final state
-    try:
-        result["raw_output"] = Path(RAW_OUTPUT).read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
-
-    try:
-        result["stream_buffer"] = Path(STREAM_BUFFER).read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
-
-    chat_dir = os.path.join(REPO_ROOT, "chat")
-    if os.path.isdir(chat_dir):
-        result["chat_files"] = sorted(
-            [str(p) for p in Path(chat_dir).glob("chat_*.txt")],
-            key=os.path.getmtime, reverse=True
-        )[:3]
-
-    result["status_at_end"] = read_status()
-    result["elapsed_s"]     = round(time.time() - t0, 2)
-
-    print(f"[{ts()}]   Done in {result['elapsed_s']}s. Status={result['status_at_end']}")
+    result["elapsed_s"] = round(time.time() - t0, 2)
+    print(f"[{ts()}]   Test {index} complete in {result['elapsed_s']}s.")
     return result
+
+
+# ---------------------------------------------------------------------------
+# Backend log collector
+# ---------------------------------------------------------------------------
+
+def collect_backend_log() -> str:
+    """
+    Read all log chunks from the most recent DiskJournalLogger session.
+    These include model_runner stdout/stderr (source=WorkerOut/WorkerErr)
+    as well as all backend API events.
+    """
+    logs_dir = Path(REPO_ROOT) / "logs"
+    if not logs_dir.exists():
+        return "(no logs directory)"
+
+    sessions = sorted(logs_dir.glob("session_*"), key=lambda p: p.name, reverse=True)
+    if not sessions:
+        return "(no log sessions found)"
+
+    session = sessions[0]
+    lines = []
+    for chunk in sorted(session.glob("chunk_*.log")):
+        try:
+            for raw in chunk.read_text(encoding="utf-8", errors="replace").splitlines():
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    e = json.loads(raw)
+                    lines.append(
+                        f"[{e.get('ts','')}] [{e.get('source','?'):10s}] "
+                        f"{e.get('level','?'):7s}: {e.get('msg','')}"
+                    )
+                except Exception:
+                    lines.append(raw)
+        except Exception:
+            pass
+
+    return "\n".join(lines) if lines else "(log sessions found but no content)"
 
 
 # ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
 
-def build_report(runner: ModelRunnerProcess, test_results: list, started_at: str,
-                 preset_id: str, preset_cfg: dict) -> str:
+def build_report(test_results: list, started_at: str, preset_id: str,
+                 preset_cfg: dict, backend_log: str) -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    lines = []
+    L = []
 
-    lines.append(f"# LYRN-AI Live Debug Report")
-    lines.append(
+    L.append("# LYRN-AI Live Debug Report")
+    L.append(
         f"**Generated:** {now}  |  **Started:** {started_at}  "
         f"|  **Preset:** {preset_id}  |  **Model:** {preset_cfg.get('model_path', 'unknown')}"
     )
-    lines.append("")
+    L.append("")
 
     # Summary table
-    lines.append("## Results Summary")
-    lines.append("")
-    lines.append("| # | Prompt | RC (route) | RC (watcher) | Elapsed | Marker | Error |")
-    lines.append("|---|--------|-----------|-------------|---------|--------|-------|")
+    L.append("## Results Summary")
+    L.append("")
+    L.append("| # | Prompt (truncated) | Elapsed | Marker | Affordance result | Status | Error |")
+    L.append("|---|--------------------|---------|--------|-------------------|--------|-------|")
     for r in test_results:
-        marker = "✓" if r["watcher_stdout"] and "##AF: FINAL_OUTPUT## detected" in r["watcher_stdout"] else "–"
-        err    = r["error"][:40] if r["error"] else "—"
-        lines.append(
-            f"| {r['index']} | {r['prompt'][:40]!r} | {r['route_rc']} "
-            f"| {r['watcher_rc']} | {r['elapsed_s']}s | {marker} | {err} |"
+        marker  = "✓" if r["marker_detected"] else "✗"
+        err_str = (r["error"][:38] + "…") if len(r.get("error","")) > 38 else (r.get("error","") or "—")
+        L.append(
+            f"| {r['index']} | {r['prompt'][:38]!r} | {r['elapsed_s']}s "
+            f"| {marker} | {r.get('affordance_result','')} | {r['status_at_end']} | {err_str} |"
         )
-    lines.append("")
+    L.append("")
 
     # Per-test details
     for r in test_results:
-        lines.append(f"---")
-        lines.append(f"## Test {r['index']}: {r['prompt']}")
-        lines.append(f"**Started:** {r['started_at']}  **Elapsed:** {r['elapsed_s']}s")
-        if r["error"]:
-            lines.append(f"\n**ERROR:** {r['error']}\n")
+        L.append("---")
+        L.append(f"## Test {r['index']}: {r['prompt']}")
+        L.append(f"**Started:** {r['started_at']}  **Elapsed:** {r['elapsed_s']}s")
+        if r.get("error"):
+            L.append(f"\n> **ERROR:** {r['error']}\n")
+        L.append(f"- Affordance marker detected: `{r['marker_detected']}`  ({r.get('affordance_result','')})")
+        L.append(f"- LLM status at end: `{r['status_at_end']}`")
 
-        lines.append("\n### route_chat.py output")
-        lines.append(f"Return code: `{r['route_rc']}`")
-        if r["route_stdout"].strip():
-            lines.append("```")
-            lines.append(r["route_stdout"].strip())
-            lines.append("```")
-        if r["route_stderr"].strip():
-            lines.append("**stderr:**")
-            lines.append("```")
-            lines.append(r["route_stderr"].strip())
-            lines.append("```")
-
-        lines.append("\n### chat_watcher_bg.py output")
-        lines.append(f"Return code: `{r['watcher_rc']}`")
-        if r["watcher_stdout"].strip():
-            lines.append("```")
-            lines.append(r["watcher_stdout"].strip())
-            lines.append("```")
-        if r["watcher_stderr"].strip():
-            lines.append("**stderr:**")
-            lines.append("```")
-            lines.append(r["watcher_stderr"].strip())
-            lines.append("```")
-
-        lines.append("\n### Raw LLM Output")
-        if r["raw_output"].strip():
-            lines.append("```")
-            lines.append(r["raw_output"].strip()[:3000])  # cap at 3000 chars
-            if len(r["raw_output"]) > 3000:
-                lines.append(f"... [{len(r['raw_output']) - 3000} more chars truncated]")
-            lines.append("```")
+        L.append("\n### Raw LLM Output (pre- and post-marker)")
+        raw = r.get("raw_output", "")
+        if raw.strip():
+            L.append("```")
+            L.append(raw.strip()[:3000])
+            if len(raw) > 3000:
+                L.append(f"… [{len(raw)-3000} more chars truncated]")
+            L.append("```")
         else:
-            lines.append("_(empty)_")
+            L.append("_(empty — model did not produce output)_")
 
-        lines.append("\n### Stream Buffer (post-marker)")
-        if r["stream_buffer"].strip():
-            lines.append("```")
-            lines.append(r["stream_buffer"].strip()[:1500])
-            lines.append("```")
+        L.append("\n### Stream Buffer (post-marker / user-visible output)")
+        buf = r.get("stream_buffer", "")
+        if buf.strip():
+            L.append("```")
+            L.append(buf.strip()[:2000])
+            if len(buf) > 2000:
+                L.append(f"… [{len(buf)-2000} more chars truncated]")
+            L.append("```")
         else:
-            lines.append("_(empty — no affordance marker emitted)_")
+            L.append("_(empty — affordance marker not emitted or not yet detected)_")
 
-        lines.append("\n### Chat History Files Written")
-        if r["chat_files"]:
-            for cf in r["chat_files"]:
+        L.append("\n### Chat History Files (should be empty — wiped after each gen)")
+        chat_files = r.get("chat_files", [])
+        if chat_files:
+            for cf in chat_files:
                 try:
                     content = Path(cf).read_text(encoding="utf-8", errors="replace")
-                    lines.append(f"**{os.path.basename(cf)}:**")
-                    lines.append("```")
-                    lines.append(content.strip()[:1000])
-                    lines.append("```")
-                except Exception as e:
-                    lines.append(f"_(could not read {cf}: {e})_")
+                    L.append(f"**{os.path.basename(cf)}:**")
+                    L.append("```")
+                    L.append(content.strip()[:1000])
+                    L.append("```")
+                except Exception as exc:
+                    L.append(f"_(could not read {cf}: {exc})_")
         else:
-            lines.append("_(none found)_")
-
-        lines.append("")
-
-    # Model runner log
-    lines.append("---")
-    lines.append("## model_runner.py Log (full session)")
-    runner_log = runner.get_log()
-    if runner_log:
-        lines.append("```")
-        lines.append("\n".join(runner_log[-500:]))  # last 500 lines
-        if len(runner_log) > 500:
-            lines.append(f"... [{len(runner_log) - 500} earlier lines omitted]")
-        lines.append("```")
-    else:
-        lines.append("_(no output captured)_")
+            L.append("_(none found — history correctly wiped)_")
+        L.append("")
 
     # output_log.jsonl
-    lines.append("")
-    lines.append("## output_log.jsonl (last 5 entries)")
+    L.append("---")
+    L.append("## output_log.jsonl (last 5 generation entries)")
     try:
-        entries = [l for l in Path(OUTPUT_LOG).read_text(encoding="utf-8").splitlines() if l.strip()]
+        entries = [ln for ln in Path(OUTPUT_LOG).read_text(encoding="utf-8").splitlines() if ln.strip()]
         for raw_entry in entries[-5:]:
             try:
                 e = json.loads(raw_entry)
-                lines.append(f"\n**{e.get('timestamp','')}** — `{e.get('user_message','')[:60]}`")
-                lines.append(f"- marker_detected: `{e.get('marker_detected')}`")
-                lines.append(f"- final_output: `{str(e.get('final_output',''))[:120]}`")
+                L.append(f"\n**{e.get('timestamp','')}** — `{e.get('user_message','')[:60]}`")
+                L.append(f"- marker_detected: `{e.get('marker_detected')}`")
+                L.append(f"- final_output: `{str(e.get('final_output',''))[:120]}`")
             except Exception:
-                lines.append(f"  {raw_entry[:120]}")
+                L.append(f"  {raw_entry[:120]}")
     except Exception:
-        lines.append("_(output_log.jsonl not found or empty)_")
+        L.append("_(output_log.jsonl not found or empty)_")
+    L.append("")
 
-    return "\n".join(lines)
+    # Backend log (start_lyrn.py + model_runner.py via DiskJournalLogger)
+    L.append("---")
+    L.append("## Backend Log  (start_lyrn.py + model_runner.py via DiskJournalLogger)")
+    L.append("_WorkerOut/WorkerErr entries are model_runner.py stdout/stderr captured by WorkerController._")
+    L.append("")
+    log_tail = backend_log[-10000:] if len(backend_log) > 10000 else backend_log
+    L.append("```")
+    L.append(log_tail)
+    if len(backend_log) > 10000:
+        L.append(f"\n… [first {len(backend_log)-10000} chars omitted — showing last 10 000]")
+    L.append("```")
 
-
-# ---------------------------------------------------------------------------
-# Settings helpers — preset loading and active-config patching
-# ---------------------------------------------------------------------------
-
-def load_settings_json() -> dict:
-    return json.loads(Path(SETTINGS_FILE).read_text(encoding="utf-8"))
-
-
-def save_settings_json(data: dict):
-    # settings_manager makes a .bk before saving; mirror that behaviour
-    bk = SETTINGS_FILE + ".bk"
-    if os.path.exists(SETTINGS_FILE):
-        shutil.copy2(SETTINGS_FILE, bk)
-    Path(SETTINGS_FILE).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def apply_preset(preset_id: str) -> tuple:
-    """
-    Copy model_presets[preset_id] into settings.active so model_runner.py
-    will use that preset.  Returns (original_active, preset_cfg).
-    Raises SystemExit with a helpful message if the preset or model is missing.
-    """
-    data      = load_settings_json()
-    presets   = data.get("settings", {}).get("model_presets", {})
-
-    if preset_id not in presets:
-        available = ", ".join(presets.keys()) or "none"
-        print(f"ERROR: Preset '{preset_id}' not found in settings.json.")
-        print(f"       Available presets: {available}")
-        sys.exit(1)
-
-    preset_cfg     = presets[preset_id]
-    original_active = dict(data["settings"].get("active", {}))
-
-    # Validate model path
-    mp = preset_cfg.get("model_path", "")
-    full_mp = os.path.join(REPO_ROOT, mp) if mp and not os.path.isabs(mp) else mp
-    if not mp or not os.path.exists(full_mp):
-        print(f"ERROR: Model file for preset '{preset_id}' not found: {full_mp!r}")
-        print(f"       Update model_presets.{preset_id}.model_path in settings.json.")
-        sys.exit(1)
-
-    # Patch active config
-    data["settings"]["active"] = dict(preset_cfg)
-    # model_runner.py expects an absolute (or repo-relative) path; keep as-is
-    save_settings_json(data)
-    print(f"[settings] Preset '{preset_id}' applied → active.model_path = {mp!r}")
-
-    return original_active, preset_cfg
-
-
-def restore_active(original_active: dict):
-    """Put the original active config back into settings.json."""
-    try:
-        data = load_settings_json()
-        data["settings"]["active"] = original_active
-        save_settings_json(data)
-        print(f"[settings] Original active config restored.")
-    except Exception as e:
-        print(f"[settings] WARNING: could not restore active config: {e}")
+    return "\n".join(L)
 
 
 # ---------------------------------------------------------------------------
@@ -488,83 +455,111 @@ def restore_active(original_active: dict):
 # ---------------------------------------------------------------------------
 
 def main():
-    # Parse --preset N from argv
-    preset_id = DEFAULT_PRESET
-    args = sys.argv[1:]
-    if "--preset" in args:
-        idx = args.index("--preset")
-        if idx + 1 < len(args):
-            preset_id = args[idx + 1]
-        else:
-            print("ERROR: --preset requires a value (e.g. --preset 1)")
-            sys.exit(1)
+    parser = argparse.ArgumentParser(description="LYRN-AI Live Debug Runner (API-driven)")
+    parser.add_argument("--preset", default=DEFAULT_PRESET,
+                        help="Model preset ID to test (default: 1)")
+    args, _ = parser.parse_known_args()
+    preset_id = args.preset
 
     print(section("LYRN-AI Live Debug Runner"))
-    print(f"Repo root:    {REPO_ROOT}")
-    print(f"Model runner: {MODEL_RUNNER}")
-    print(f"Preset:       {preset_id}")
-    print(f"Prompts:      {len(TEST_PROMPTS)}")
+    print(f"Repo root:  {REPO_ROOT}")
+    print(f"Preset:     {preset_id}")
 
-    # Pre-flight checks
-    for label, path in [("model_runner.py", MODEL_RUNNER), ("chat_watcher_bg.py", WATCHER_SCRIPT)]:
-        if not os.path.exists(path):
-            print(f"ERROR: {label} not found at {path}")
+    server_url = detect_server_url()
+    token = detect_token()
+    print(f"Server:     {server_url}")
+    print(f"Auth mode:  {'no-auth' if token == 'no-auth' else 'token'}")
+
+    client = APIClient(server_url, token)
+
+    # Verify server is reachable
+    try:
+        r = client.get("/health")
+        if r.status_code != 200:
+            print(f"ERROR: Server returned HTTP {r.status_code}. Is start_lyrn.py running?")
             sys.exit(1)
+        print(f"Server:     reachable (health check OK)")
+    except Exception as exc:
+        print(f"ERROR: Cannot reach server at {server_url}: {exc}")
+        sys.exit(1)
 
-    # Apply chosen preset to settings.json → model_runner.py will pick it up
-    original_active, preset_cfg = apply_preset(preset_id)
-    print(f"Model:        {preset_cfg.get('model_path')}")
+    # Load and apply preset
+    try:
+        r = client.get("/api/config/presets")
+        presets = r.json()
+    except Exception as exc:
+        print(f"ERROR: Could not load presets: {exc}")
+        sys.exit(1)
 
-    os.makedirs(REPORT_DIR, exist_ok=True)
-    os.makedirs(os.path.join(REPO_ROOT, "jobs"), exist_ok=True)
-    os.makedirs(os.path.join(REPO_ROOT, "global_flags"), exist_ok=True)
-    os.makedirs(os.path.join(REPO_ROOT, "chat"), exist_ok=True)
+    if preset_id not in presets:
+        print(f"ERROR: Preset '{preset_id}' not found. Available: {list(presets.keys())}")
+        sys.exit(1)
 
-    started_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    runner       = ModelRunnerProcess()
-    test_results = []
+    preset_cfg = presets[preset_id]
+    print(f"Model:      {preset_cfg.get('model_path', 'unknown')}")
 
     try:
-        # ── Start model_runner ──────────────────────────────────────────────
-        print(f"\n[{ts()}] Starting model_runner.py (loading model — this may take a moment)...")
-        runner.start()
+        r = client.post("/api/config/active", data={"config": preset_cfg})
+        print(f"Preset {preset_id} applied (HTTP {r.status_code}).")
+    except Exception as exc:
+        print(f"ERROR: Could not apply preset: {exc}")
+        sys.exit(1)
 
-        status = wait_for_status({"idle"}, timeout=MODEL_LOAD_TIMEOUT)
-        if status != "idle":
-            print(f"[{ts()}] ERROR: Model did not reach idle within {MODEL_LOAD_TIMEOUT}s "
-                  f"(last status: {read_status()!r})")
-            print("[runner log so far]")
-            for line in runner.get_log()[-20:]:
-                print(line)
-            sys.exit(1)
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    started_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    test_results = []
 
-        print(f"[{ts()}] Model loaded and ready (preset {preset_id}).")
+    # Start the worker (tolerate "already running")
+    try:
+        r = client.post("/api/system/start_worker")
+        msg = r.json().get("message", "")
+        print(f"[{ts()}] start_worker → {msg}")
+    except Exception as exc:
+        print(f"[{ts()}] start_worker note: {exc}")
 
-        # ── Run test prompts ────────────────────────────────────────────────
-        for i, prompt in enumerate(TEST_PROMPTS, 1):
-            r = run_test(runner, prompt, i)
-            test_results.append(r)
-            time.sleep(1)  # brief gap between tests
+    # Wait for model ready
+    print(f"[{ts()}] Waiting for model to reach idle (timeout={MODEL_LOAD_TIMEOUT}s)...")
+    status = poll_llm_status(client, {"idle"}, MODEL_LOAD_TIMEOUT)
+    if status != "idle":
+        print(f"[{ts()}] ERROR: Model did not reach idle within {MODEL_LOAD_TIMEOUT}s.")
+        backend_log = collect_backend_log()
+        report = build_report([], started_at, preset_id, preset_cfg, backend_log)
+        ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = os.path.join(REPORT_DIR, f"debug_{ts_str}_LOAD_FAILED.md")
+        Path(report_path).write_text(report, encoding="utf-8")
+        print(f"[{ts()}] Partial failure report → {report_path}")
+        sys.exit(1)
 
-    except KeyboardInterrupt:
-        print(f"\n[{ts()}] Interrupted by user.")
-    finally:
-        runner.stop()
-        restore_active(original_active)
+    print(f"[{ts()}] Model is idle and ready.")
+    print(f"[{ts()}] Settling wait: {POST_LOAD_WAIT}s...")
+    time.sleep(POST_LOAD_WAIT)
 
-    # ── Write report ────────────────────────────────────────────────────────
-    report_ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = os.path.join(REPORT_DIR, f"debug_{report_ts}.md")
+    # Run 3 test prompts
+    for i, prompt in enumerate(TEST_PROMPTS, 1):
+        result = run_test(client, prompt, i)
+        test_results.append(result)
+        if i < len(TEST_PROMPTS):
+            print(f"[{ts()}] Pausing 3s before next test...")
+            time.sleep(3)
 
-    print(f"\n[{ts()}] Writing debug report → {report_path} ...")
-    report_text = build_report(runner, test_results, started_at, preset_id, preset_cfg)
+    # Collect backend logs
+    print(f"\n[{ts()}] Collecting backend logs from DiskJournalLogger...")
+    backend_log = collect_backend_log()
+    print(f"[{ts()}] Collected {len(backend_log):,} chars of log data.")
+
+    # Write final report
+    ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = os.path.join(REPORT_DIR, f"debug_{ts_str}.md")
+    report_text = build_report(test_results, started_at, preset_id, preset_cfg, backend_log)
     Path(report_path).write_text(report_text, encoding="utf-8")
 
+    markers_ok = sum(1 for r in test_results if r["marker_detected"])
     print(f"\n{'='*60}")
-    print(f"  Report:  {report_path}")
-    print(f"  Tests:   {len(test_results)}")
-    passed = sum(1 for r in test_results if not r["error"] and r["watcher_rc"] == 0)
-    print(f"  Passed:  {passed}/{len(test_results)}")
+    print(f"  Report:          {report_path}")
+    print(f"  Markers emitted: {markers_ok}/{len(test_results)}")
+    errors = sum(1 for r in test_results if r.get("error"))
+    if errors:
+        print(f"  Errors:          {errors}/{len(test_results)}")
     print(f"{'='*60}\n")
 
 

@@ -726,8 +726,17 @@
                 <button class="btn-full-width" onclick="saveApiConfig()">Save API Map</button>
 
                 <div class="settings-header">Debug</div>
-                <button class="btn-full-width" id="btn-debug-run" onclick="runDebugTest()">Run Debug Test (Preset 1)</button>
-                <div id="debug-run-status" style="font-size:10px; margin-top:4px; font-family:'JetBrains Mono'; min-height:14px;"></div>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <select id="debug-preset-sel" style="flex:1; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); padding:6px; font-size:11px; font-family:'JetBrains Mono'; border-radius:4px;">
+                        <option value="1">Preset 1</option>
+                        <option value="2">Preset 2</option>
+                        <option value="3">Preset 3</option>
+                        <option value="4">Preset 4</option>
+                        <option value="5">Preset 5</option>
+                    </select>
+                    <button class="btn-full-width" id="btn-debug-run" onclick="runDebugTest()" style="flex:2;">Run Debug Test</button>
+                </div>
+                <div id="debug-run-status" style="font-size:10px; margin-top:4px; font-family:'JetBrains Mono'; min-height:14px; word-break:break-all;"></div>
             </div>
         </div>
     </div>
@@ -1018,18 +1027,19 @@
         async function runDebugTest() {
             const btn = document.getElementById('btn-debug-run');
             const status = document.getElementById('debug-run-status');
+            const preset = (document.getElementById('debug-preset-sel') || {value:'1'}).value;
             const setStatus = (msg, color) => { status.textContent = msg; status.style.color = color || 'var(--text-body)'; };
             if(!authToken || !coreUrl) { setStatus('Not connected — check connection settings.', '#ff6666'); return; }
             btn.disabled = true;
-            setStatus('Starting debug run...', 'var(--text-body)');
+            setStatus(`Starting debug run (preset ${preset})…`, 'var(--text-body)');
             try {
-                const res = await fetch(coreUrl + '/api/debug/run', {
+                const res = await fetch(coreUrl + `/api/debug/run?preset=${encodeURIComponent(preset)}`, {
                     method: 'POST',
                     headers: { 'X-Token': authToken }
                 });
                 const data = await res.json();
                 if(res.ok && data.ok) {
-                    setStatus('Running — report → docs/debug_reports/', '#00cc66');
+                    setStatus(data.message || 'Running — report → docs/debug_reports/', '#00cc66');
                 } else {
                     setStatus(`Error: ${data.detail || JSON.stringify(data)}`, '#ff6666');
                 }
