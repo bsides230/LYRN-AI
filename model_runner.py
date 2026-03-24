@@ -281,7 +281,7 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             job_instructions = payload["job_instructions"]
             source = payload["source"]
 
-            print(f"[Runner] Source: {source} | User Message: {user_message[:80]}...")
+            print(f"[Runner] Source: {source} | job_instructions set: {bool(job_instructions.strip())} | User: {user_message[:60]}...")
 
             # 2. Determine Raw Output Path (separate from input)
             raw_output_path = _resolve_raw_output_path(input_path)
@@ -303,16 +303,12 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                 delta_content = delta_manager.get_delta_content()
 
             # Construct Messages
-            # Order: System Prompt -> Dynamic Snapshots -> History -> Deltas -> (Job Instructions if chat) -> User Message
+            # Order: System Prompt -> Dynamic Snapshots -> History -> Deltas ->
+            #        FINAL_OUTPUT flag -> job_instructions -> User Message
             messages = [{"role": "system", "content": system_prompt}]
 
             if dynamic_snapshot_content:
                 messages.append({"role": "system", "content": f"--- Active Dynamic Snapshots ---\n{dynamic_snapshot_content}"})
-            elif job_instructions and job_instructions.strip():
-                # DSManager not active for this request — inject job_instructions directly
-                # so the affordance trigger instruction always reaches the model.
-                messages.append({"role": "system", "content": job_instructions})
-                print("[Runner] Injected job_instructions from payload (DSManager not active).")
 
             # History (no file exclusion needed — input is JSON, not a chat file)
             history = chat_manager.get_chat_history_messages(exclude_paths=[])
@@ -330,9 +326,14 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                     "Your output is streaming live to the user right now."})
                 print("[Runner] FINAL OUTPUT MODE flag detected — injecting status delta.")
 
-            # For job/legacy source: user_message is the user turn (may be same as instructions)
-            # Job instructions are now handled entirely via DSManager as an active dynamic snapshot
-            # injected early in the context window (right after the master system prompt).
+            # Inject job_instructions as the LAST system message before the user turn.
+            # Position matters: placing it here (after history/deltas) keeps it fresh in the
+            # model's context window immediately before it generates, which significantly
+            # improves instruction-following (especially the ##AF: FINAL_OUTPUT## directive).
+            # This fires whether DSManager is active or not — the two don't conflict.
+            if job_instructions and job_instructions.strip():
+                messages.append({"role": "system", "content": job_instructions})
+                print("[Runner] Injected job_instructions before user turn.")
 
             # Append current user message (merge if last was also user to maintain alternating roles)
             if messages and messages[-1].get("role") == "user":
