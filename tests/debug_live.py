@@ -6,15 +6,19 @@ Every process in the chain is captured and written to a timestamped
 debug report in docs/debug_reports/.
 
 Usage (from repo root):
-    python tests/debug_live.py
+    python tests/debug_live.py            # uses preset 1 from settings.json
+    python tests/debug_live.py --preset 2 # uses a different preset
 
 What it does:
-  1. Starts model_runner.py and waits for the model to finish loading.
-  2. For each test prompt, runs the full chain:
+  1. Loads the chosen model_preset from settings.json and temporarily
+     applies it to the "active" config so model_runner.py picks it up.
+     The original active config is restored when the script exits.
+  2. Starts model_runner.py and waits for the model to finish loading.
+  3. For each test prompt, runs the full chain:
        job_input.json  →  route_chat.py  →  chat_watcher_bg.py (foreground)
                        →  chat_trigger.txt  →  model_runner  →  output
-  3. Captures stdout/stderr from every process.
-  4. Writes docs/debug_reports/debug_TIMESTAMP.md with all results.
+  4. Captures stdout/stderr from every process.
+  5. Writes docs/debug_reports/debug_TIMESTAMP.md with all results.
 
 The watcher is run directly (foreground, captured) instead of via
 spawn_chat_watcher.py so all debug output is visible in the report.
@@ -35,6 +39,7 @@ from datetime import datetime
 # Config
 # ---------------------------------------------------------------------------
 REPO_ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SETTINGS_FILE   = os.path.join(REPO_ROOT, "settings.json")
 MODEL_RUNNER    = os.path.join(REPO_ROOT, "model_runner.py")
 WATCHER_SCRIPT  = os.path.join(REPO_ROOT, "automation", "job_scripts", "chat_watcher_bg.py")
 ROUTE_SCRIPT    = os.path.join(REPO_ROOT, "automation", "job_scripts", "route_chat.py")
@@ -47,6 +52,9 @@ LOCK_FILE       = os.path.join(REPO_ROOT, "global_flags", "chat_processing.txt")
 RAW_OUTPUT      = os.path.join(REPO_ROOT, "jobs", "job_raw_output.txt")
 OUTPUT_LOG      = os.path.join(REPO_ROOT, "global_flags", "output_log.jsonl")
 REPORT_DIR      = os.path.join(REPO_ROOT, "docs", "debug_reports")
+
+# Which preset to use (can be overridden via --preset N on the command line)
+DEFAULT_PRESET  = "1"
 
 MODEL_LOAD_TIMEOUT  = 300   # seconds to wait for model to load
 GENERATION_TIMEOUT  = 300   # seconds to wait for a generation to complete
@@ -289,12 +297,16 @@ def run_test(runner: ModelRunnerProcess, prompt: str, index: int) -> dict:
 # Report builder
 # ---------------------------------------------------------------------------
 
-def build_report(runner: ModelRunnerProcess, test_results: list, started_at: str) -> str:
+def build_report(runner: ModelRunnerProcess, test_results: list, started_at: str,
+                 preset_id: str, preset_cfg: dict) -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = []
 
     lines.append(f"# LYRN-AI Live Debug Report")
-    lines.append(f"**Generated:** {now}  |  **Started:** {started_at}  |  **Model:** {_get_model_name()}")
+    lines.append(
+        f"**Generated:** {now}  |  **Started:** {started_at}  "
+        f"|  **Preset:** {preset_id}  |  **Model:** {preset_cfg.get('model_path', 'unknown')}"
+    )
     lines.append("")
 
     # Summary table
@@ -409,12 +421,66 @@ def build_report(runner: ModelRunnerProcess, test_results: list, started_at: str
     return "\n".join(lines)
 
 
-def _get_model_name():
+# ---------------------------------------------------------------------------
+# Settings helpers — preset loading and active-config patching
+# ---------------------------------------------------------------------------
+
+def load_settings_json() -> dict:
+    return json.loads(Path(SETTINGS_FILE).read_text(encoding="utf-8"))
+
+
+def save_settings_json(data: dict):
+    # settings_manager makes a .bk before saving; mirror that behaviour
+    bk = SETTINGS_FILE + ".bk"
+    if os.path.exists(SETTINGS_FILE):
+        shutil.copy2(SETTINGS_FILE, bk)
+    Path(SETTINGS_FILE).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def apply_preset(preset_id: str) -> tuple:
+    """
+    Copy model_presets[preset_id] into settings.active so model_runner.py
+    will use that preset.  Returns (original_active, preset_cfg).
+    Raises SystemExit with a helpful message if the preset or model is missing.
+    """
+    data      = load_settings_json()
+    presets   = data.get("settings", {}).get("model_presets", {})
+
+    if preset_id not in presets:
+        available = ", ".join(presets.keys()) or "none"
+        print(f"ERROR: Preset '{preset_id}' not found in settings.json.")
+        print(f"       Available presets: {available}")
+        sys.exit(1)
+
+    preset_cfg     = presets[preset_id]
+    original_active = dict(data["settings"].get("active", {}))
+
+    # Validate model path
+    mp = preset_cfg.get("model_path", "")
+    full_mp = os.path.join(REPO_ROOT, mp) if mp and not os.path.isabs(mp) else mp
+    if not mp or not os.path.exists(full_mp):
+        print(f"ERROR: Model file for preset '{preset_id}' not found: {full_mp!r}")
+        print(f"       Update model_presets.{preset_id}.model_path in settings.json.")
+        sys.exit(1)
+
+    # Patch active config
+    data["settings"]["active"] = dict(preset_cfg)
+    # model_runner.py expects an absolute (or repo-relative) path; keep as-is
+    save_settings_json(data)
+    print(f"[settings] Preset '{preset_id}' applied → active.model_path = {mp!r}")
+
+    return original_active, preset_cfg
+
+
+def restore_active(original_active: dict):
+    """Put the original active config back into settings.json."""
     try:
-        s = json.loads(Path(os.path.join(REPO_ROOT, "settings.json")).read_text())
-        return s.get("settings", {}).get("active", {}).get("model_path", "unknown")
-    except Exception:
-        return "unknown"
+        data = load_settings_json()
+        data["settings"]["active"] = original_active
+        save_settings_json(data)
+        print(f"[settings] Original active config restored.")
+    except Exception as e:
+        print(f"[settings] WARNING: could not restore active config: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -422,41 +488,48 @@ def _get_model_name():
 # ---------------------------------------------------------------------------
 
 def main():
+    # Parse --preset N from argv
+    preset_id = DEFAULT_PRESET
+    args = sys.argv[1:]
+    if "--preset" in args:
+        idx = args.index("--preset")
+        if idx + 1 < len(args):
+            preset_id = args[idx + 1]
+        else:
+            print("ERROR: --preset requires a value (e.g. --preset 1)")
+            sys.exit(1)
+
     print(section("LYRN-AI Live Debug Runner"))
     print(f"Repo root:    {REPO_ROOT}")
     print(f"Model runner: {MODEL_RUNNER}")
-    print(f"Model:        {_get_model_name()}")
+    print(f"Preset:       {preset_id}")
     print(f"Prompts:      {len(TEST_PROMPTS)}")
 
     # Pre-flight checks
-    if not os.path.exists(MODEL_RUNNER):
-        print(f"ERROR: model_runner.py not found at {MODEL_RUNNER}")
-        sys.exit(1)
-    if not os.path.exists(WATCHER_SCRIPT):
-        print(f"ERROR: chat_watcher_bg.py not found at {WATCHER_SCRIPT}")
-        sys.exit(1)
+    for label, path in [("model_runner.py", MODEL_RUNNER), ("chat_watcher_bg.py", WATCHER_SCRIPT)]:
+        if not os.path.exists(path):
+            print(f"ERROR: {label} not found at {path}")
+            sys.exit(1)
 
-    model_path = _get_model_name()
-    full_model_path = os.path.join(REPO_ROOT, model_path) if not os.path.isabs(model_path) else model_path
-    if not os.path.exists(full_model_path):
-        print(f"ERROR: Model file not found: {full_model_path}")
-        print(f"       Update 'active.model_path' in settings.json to point to your .gguf file.")
-        sys.exit(1)
+    # Apply chosen preset to settings.json → model_runner.py will pick it up
+    original_active, preset_cfg = apply_preset(preset_id)
+    print(f"Model:        {preset_cfg.get('model_path')}")
 
     os.makedirs(REPORT_DIR, exist_ok=True)
     os.makedirs(os.path.join(REPO_ROOT, "jobs"), exist_ok=True)
     os.makedirs(os.path.join(REPO_ROOT, "global_flags"), exist_ok=True)
     os.makedirs(os.path.join(REPO_ROOT, "chat"), exist_ok=True)
 
-    started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    runner     = ModelRunnerProcess()
+    started_at   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    runner       = ModelRunnerProcess()
+    test_results = []
 
     try:
         # ── Start model_runner ──────────────────────────────────────────────
         print(f"\n[{ts()}] Starting model_runner.py (loading model — this may take a moment)...")
         runner.start()
 
-        status = wait_for_status({"idle"}, timeout=MODEL_LOAD_TIMEOUT, label="model load")
+        status = wait_for_status({"idle"}, timeout=MODEL_LOAD_TIMEOUT)
         if status != "idle":
             print(f"[{ts()}] ERROR: Model did not reach idle within {MODEL_LOAD_TIMEOUT}s "
                   f"(last status: {read_status()!r})")
@@ -465,35 +538,33 @@ def main():
                 print(line)
             sys.exit(1)
 
-        print(f"[{ts()}] Model loaded and ready.")
+        print(f"[{ts()}] Model loaded and ready (preset {preset_id}).")
 
         # ── Run test prompts ────────────────────────────────────────────────
-        test_results = []
         for i, prompt in enumerate(TEST_PROMPTS, 1):
             r = run_test(runner, prompt, i)
             test_results.append(r)
-            # Small gap between tests
-            time.sleep(1)
+            time.sleep(1)  # brief gap between tests
 
     except KeyboardInterrupt:
         print(f"\n[{ts()}] Interrupted by user.")
-        test_results = []
     finally:
         runner.stop()
+        restore_active(original_active)
 
     # ── Write report ────────────────────────────────────────────────────────
     report_ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_path = os.path.join(REPORT_DIR, f"debug_{report_ts}.md")
 
-    print(f"\n[{ts()}] Writing debug report to {report_path}...")
-    report_text = build_report(runner, test_results, started_at)
+    print(f"\n[{ts()}] Writing debug report → {report_path} ...")
+    report_text = build_report(runner, test_results, started_at, preset_id, preset_cfg)
     Path(report_path).write_text(report_text, encoding="utf-8")
 
     print(f"\n{'='*60}")
-    print(f"  Report written: {report_path}")
-    print(f"  Tests run:      {len(test_results)}")
+    print(f"  Report:  {report_path}")
+    print(f"  Tests:   {len(test_results)}")
     passed = sum(1 for r in test_results if not r["error"] and r["watcher_rc"] == 0)
-    print(f"  Passed:         {passed}/{len(test_results)}")
+    print(f"  Passed:  {passed}/{len(test_results)}")
     print(f"{'='*60}\n")
 
 
