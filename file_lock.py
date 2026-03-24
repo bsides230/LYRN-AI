@@ -2,7 +2,13 @@ import os
 import time
 import tempfile
 import hashlib
-import psutil
+
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    import errno
 
 class SimpleFileLock:
     """
@@ -19,7 +25,17 @@ class SimpleFileLock:
 
     def _is_pid_running(self, pid):
         """Check if a process with the given PID is currently running."""
-        return psutil.pid_exists(pid)
+        if PSUTIL_AVAILABLE:
+            return psutil.pid_exists(pid)
+        else:
+            try:
+                os.kill(pid, 0)
+                return True
+            except OSError as e:
+                if e.errno == errno.EPERM:
+                    # Permission denied means the process exists
+                    return True
+                return False
 
     def __enter__(self):
         start_time = time.time()
@@ -51,10 +67,10 @@ class SimpleFileLock:
                         # Break the lock and try to acquire it again.
                         os.remove(self.lock_file_path)
                         continue
-                except (IOError, ValueError):
+                except (IOError, ValueError) as e:
                     # Could not read or parse the PID. The lock file might be corrupt.
                     # It's safer to wait and retry.
-                    pass
+                    print(f"[SimpleFileLock] Warning: could not read PID from {self.lock_file_path}: {e}")
 
                 time.sleep(0.1)
 
@@ -68,7 +84,7 @@ class SimpleFileLock:
                     owner_pid = int(f.read().strip())
                 if owner_pid == os.getpid():
                     os.remove(self.lock_file_path)
-            except (IOError, ValueError, FileNotFoundError):
+            except (IOError, ValueError, FileNotFoundError) as e:
                 # The lock file might have been removed by another process
                 # breaking the lock, which is acceptable.
-                pass
+                print(f"[SimpleFileLock] Info: could not remove lock file {self.lock_file_path} (it may have been removed by another process): {e}")

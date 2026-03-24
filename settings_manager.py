@@ -47,6 +47,27 @@ class SettingsManager:
                     self.settings = data.get('settings', {})
                     self.ui_settings.update(data.get('ui_settings', {}))
 
+                # Normalize absolute paths to relative, if they appear to point to old local setups
+                needs_save = False
+                if "paths" in self.settings:
+                    for key, path in self.settings["paths"].items():
+                        # Sometimes paths may not trigger os.path.isabs in Linux if it starts with D:,
+                        # so we check if it looks like a Windows absolute path or isabs
+                        if path and (os.path.isabs(path) or ":" in path or "\\" in path):
+                            normalized = path.replace("\\", "/")
+                            if "LYRN-SAD/" in normalized:
+                                rel_path = normalized.split("LYRN-SAD/")[-1]
+                                self.settings["paths"][key] = rel_path
+                                needs_save = True
+                            elif "LYRN/" in normalized:
+                                rel_path = normalized.split("LYRN/")[-1]
+                                self.settings["paths"][key] = rel_path
+                                needs_save = True
+
+                if needs_save:
+                    print("Normalized absolute paths to relative in settings.json.")
+                    self.save_settings(self.settings)
+
                 # Resolve relative paths for the current session
                 if "paths" in self.settings:
                     for key, path in self.settings["paths"].items():

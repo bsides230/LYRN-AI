@@ -45,7 +45,10 @@ def _read_llm_status(llm_status_path: str) -> str:
     try:
         with open(llm_status_path, "r", encoding="utf-8") as f:
             return f.read().strip()
-    except Exception:
+    except FileNotFoundError:
+        return "idle"
+    except Exception as e:
+        print(f"[Watcher] Error reading LLM status: {e}")
         return "idle"  # assume done if unreadable
 
 
@@ -85,9 +88,8 @@ def _extract_final_response(raw_text: str) -> str | None:
         after = raw_text.split(AFFORDANCE_START, 1)[1]
         # Strip thinking from final output — model may still think after the marker
         after = _strip_thinking(after).strip()
-        if after:
-            print("[Watcher] Extracted response using AFFORDANCE marker (thinking stripped).")
-            return after
+        print("[Watcher] Extracted response using AFFORDANCE marker (thinking stripped).")
+        return after  # Return immediately, even if empty
 
     # 2. Legacy marker extraction
     start_m = "##Response_START##"
@@ -96,9 +98,8 @@ def _extract_final_response(raw_text: str) -> str | None:
         match = re.search(f"{start_m}(.*?){end_m}", raw_text, re.DOTALL)
         if match:
             extracted = _strip_thinking(match.group(1)).strip()
-            if extracted:
-                print("[Watcher] Extracted response using legacy markers (thinking stripped).")
-                return extracted
+            print("[Watcher] Extracted response using legacy markers (thinking stripped).")
+            return extracted  # Return immediately, even if empty
 
     # 3. Fallback: full raw output with thinking stripped
     clean = _strip_thinking(raw_text).strip()
@@ -165,9 +166,11 @@ def _append_output_log(root_dir: str, user_message: str, raw_output: str,
             "marker_detected": marker_detected,
         })
         lines = []
-        if os.path.exists(log_path):
+        try:
             with open(log_path, "r", encoding="utf-8") as f:
                 lines = [l for l in f.read().splitlines() if l.strip()]
+        except FileNotFoundError:
+            pass
         lines.append(entry)
         if len(lines) > MAX_ENTRIES:
             lines = lines[-MAX_ENTRIES:]
@@ -181,10 +184,11 @@ def _get_user_message_from_json(root_dir: str) -> str | None:
     """Fallback: read user_message from job_input.json (may be stale)."""
     try:
         path = os.path.join(root_dir, "jobs", "job_input.json")
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("user_message", "").strip() or None
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("user_message", "").strip() or None
+    except FileNotFoundError:
+        return None
     except Exception as e:
         print(f"[Watcher] Error reading job_input.json: {e}")
     return None
@@ -387,34 +391,34 @@ def main():
     # ── Two-phase: read phase 1 thinking content saved by the runner ──────────
     last_thinking_file = os.path.join(root_dir, "global_flags", "last_thinking.txt")
     phase1_content = ""
-    if os.path.exists(last_thinking_file):
-        try:
-            with open(last_thinking_file, "r", encoding="utf-8") as f:
-                phase1_content = f.read()
-            os.remove(last_thinking_file)
-            print(f"[Watcher] Phase 3: Read {len(phase1_content)} chars of phase 1 from last_thinking.txt")
-        except Exception as e:
-            print(f"[Watcher] Phase 3: Error reading last_thinking.txt: {e}")
-    else:
+    try:
+        with open(last_thinking_file, "r", encoding="utf-8") as f:
+            phase1_content = f.read()
+        os.remove(last_thinking_file)
+        print(f"[Watcher] Phase 3: Read {len(phase1_content)} chars of phase 1 from last_thinking.txt")
+    except FileNotFoundError:
         print(f"[Watcher] Phase 3: last_thinking.txt not found (single-phase or fallback mode)")
+    except Exception as e:
+        print(f"[Watcher] Phase 3: Error reading last_thinking.txt: {e}")
 
-    # In two-phase mode full_raw = phase 2 response only (no marker).
-    # Strip any <think> tags from phase 2 (in case model thinks again) for chat history.
-    # Safety net: also strip the affordance marker if phase 2 somehow re-emitted it.
-    response_text = _strip_thinking(full_raw).strip()
-    if AFFORDANCE_START in response_text:
-        print(f"[Watcher] Phase 3: Safety net — stripping {AFFORDANCE_START!r} from response_text")
-        response_text = response_text.replace(AFFORDANCE_START, "").strip()
-    if not response_text:
-        # Fallback: try legacy marker extraction
-        response_text = _extract_final_response(full_raw)
+    # Use single source of truth for final-output extraction.
+    # In two-phase mode, we still use _extract_final_response on the full raw output (which we ensure contains the marker)
+    # to guarantee we don't leak anything via separate manual stripping logic.
+    if phase1_content and AFFORDANCE_START not in full_raw:
+        # If in two-phase but the marker isn't in phase 2 raw, prepend it so extraction correctly triggers
+        extraction_target = AFFORDANCE_START + "\n" + full_raw
+    else:
+        extraction_target = full_raw
+
+    extracted = _extract_final_response(extraction_target)
+    response_text = extracted if extracted is not None else ""
 
     marker_in_log = bool(phase1_content)  # marker is in phase 1 content when two-phase
     if not marker_in_log:
         # Fallback: check phase 2 raw (single-phase compatibility)
         marker_in_log = AFFORDANCE_START in full_raw
 
-    print(f"[Watcher] Phase 3: Response length: {len(response_text) if response_text else 0} chars")
+    print(f"[Watcher] Phase 3: Extracted response length: {len(response_text) if response_text else 0} chars")
     if response_text:
         print(f"[Watcher] Phase 3: Response preview: {repr(response_text[:80])}")
 
