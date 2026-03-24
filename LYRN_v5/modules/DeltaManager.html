@@ -250,7 +250,6 @@
   <script>
     let CORE_URL = "http://localhost:8000";
     let authToken = localStorage.getItem('lyrn_admin_token') || null;
-    let refreshInterval;
 
     document.addEventListener('DOMContentLoaded', () => {
         const stored = localStorage.getItem('lyrn_core_url');
@@ -280,12 +279,8 @@
     function initModule() {
         fetchDeltas();
         fetchScripts();
-        // Auto-refresh every 2 seconds to show live updates
-        if(refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(() => {
-            fetchDeltas();
-            fetchScripts();
-        }, 2000);
+        // No continuous polling — delta scripts run at model input time only.
+        // Use the 🔄 button to manually refresh.
     }
 
     async function fetchDeltas() {

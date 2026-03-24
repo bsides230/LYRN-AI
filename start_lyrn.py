@@ -209,8 +209,37 @@ chat_manager = ChatManager(
 )
 
 # --- Helper Functions ---
+def run_delta_scripts():
+    """Run all enabled delta scripts synchronously so streams are up-to-date before model input."""
+    try:
+        scripts_config = delta_manager_api.get_scripts_config()
+        for script_name, config in scripts_config.items():
+            if config.get("enabled", False):
+                script_path = Path("deltas") / script_name
+                if script_path.exists():
+                    try:
+                        print(f"[Deltas] Running script: {script_name}")
+                        subprocess.run(
+                            [sys.executable, str(script_path)],
+                            cwd=os.getcwd(),
+                            timeout=30,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL
+                        )
+                        delta_manager_api.update_script_last_run(script_name, time.time())
+                    except subprocess.TimeoutExpired:
+                        print(f"[Deltas] Script {script_name} timed out (30s).")
+                    except Exception as e:
+                        print(f"[Deltas] Error running {script_name}: {e}")
+    except Exception as e:
+        print(f"[Deltas] run_delta_scripts error: {e}")
+
+
 def trigger_chat_generation(message: str, folder: str = "chat"):
     """Creates an input payload and triggers the worker."""
+    # Run enabled delta scripts first so streams are fresh for this generation
+    run_delta_scripts()
+
     # Ensure directory
     os.makedirs(folder, exist_ok=True)
 
@@ -315,28 +344,6 @@ async def scheduler_loop():
                 else:
                     if job.instructions:
                         ds_manager.set_snapshot_active("jobs", job.name, False)
-
-            # Check delta scripts
-            scripts_config = delta_manager_api.get_scripts_config()
-            for script_name, config in scripts_config.items():
-                if config.get("enabled", False):
-                    interval = config.get("interval", 60)
-                    last_run = config.get("last_run", 0)
-                    now = time.time()
-                    if now - last_run >= interval:
-                        script_path = Path("deltas") / script_name
-                        if script_path.exists():
-                            try:
-                                print(f"[Scheduler] Running delta script: {script_name}")
-                                subprocess.Popen(
-                                    [sys.executable, str(script_path)],
-                                    cwd=os.getcwd(),
-                                    stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL
-                                )
-                                delta_manager_api.update_script_last_run(script_name, now)
-                            except Exception as e:
-                                print(f"[Scheduler] Error running delta script {script_name}: {e}")
 
             await asyncio.sleep(5) # Check every 5 seconds
         except Exception as e:
@@ -836,6 +843,26 @@ async def list_log_chunks(session_id: str):
 @app.get("/api/logs/sessions/{session_id}/chunks/{chunk_id}", dependencies=[Depends(verify_token)])
 async def get_log_chunk(session_id: str, chunk_id: str):
     return logger.get_chunk_content(session_id, chunk_id)
+
+# --- Debug Endpoint ---
+
+@app.post("/api/debug/run", dependencies=[Depends(verify_token)])
+async def run_debug_test(background_tasks: BackgroundTasks):
+    """Launch debug_live.py as a background process. Report written to docs/debug_reports/."""
+    debug_script = Path("tests/debug_live.py")
+    if not debug_script.exists():
+        raise HTTPException(status_code=404, detail="tests/debug_live.py not found")
+
+    def _launch():
+        subprocess.Popen(
+            [sys.executable, str(debug_script)],
+            cwd=os.getcwd(),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+    background_tasks.add_task(_launch)
+    return {"ok": True, "message": "Debug test started. Report will appear in docs/debug_reports/"}
 
 # --- Snapshot Management Endpoints ---
 
