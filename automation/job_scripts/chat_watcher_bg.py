@@ -190,16 +190,27 @@ def main():
             sys.exit(1)
         time.sleep(POLL_INTERVAL_WAIT)
 
-    # Clear any stale stream buffer from a previous run
-    _cleanup_flags(stream_buffer, final_output_flag)
+    # Check if a previous generation already set the flag (recursion scenario).
+    # If so, this generation is the "final output" generation — stream everything
+    # from the start without waiting for the marker.
+    flag_was_preset = os.path.exists(final_output_flag)
 
-    print("[Watcher] Output file detected. Starting real-time affordance monitoring...")
+    # Clear stale stream buffer, but do NOT clear the flag if it was already set —
+    # that means a previous job set it and we should honour it.
+    _cleanup_flags(stream_buffer)
+    if not flag_was_preset:
+        _cleanup_flags(final_output_flag)
+
+    if flag_was_preset:
+        print("[Watcher] FINAL OUTPUT flag was pre-set — streaming everything from start.")
+    else:
+        print("[Watcher] Output file detected. Starting real-time affordance monitoring...")
 
     # -----------------------------------------------------------------------
     # Phase 2: Tail the file, detect affordance marker, stream to buffer
     # -----------------------------------------------------------------------
-    char_pos       = 0          # character offset read so far
-    in_final_output= False      # have we passed the AFFORDANCE marker?
+    char_pos       = 0               # character offset read so far
+    in_final_output= flag_was_preset  # already live if flag was pre-set
 
     while True:
         elapsed = time.time() - global_start

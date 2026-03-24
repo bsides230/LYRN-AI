@@ -642,6 +642,89 @@ def test_legacy_markers(sandbox):
 
 
 # ---------------------------------------------------------------------------
+# Test 8: Flag pre-set (recursion scenario) — watcher streams everything from start
+# ---------------------------------------------------------------------------
+def test_flag_preset_recursion(sandbox):
+    log("Test 8: Flag pre-set (recursion) — watcher streams all output from byte 0", "SECTION")
+
+    user_msg = "Recursion final output test"
+    write_job_input(sandbox, user_msg)
+
+    # Clear leftovers
+    for f in ["jobs/job_raw_output.txt", "global_flags/chat_stream_buffer.txt",
+              "global_flags/chat_processing.txt"]:
+        p = os.path.join(sandbox, f)
+        if os.path.exists(p): os.remove(p)
+    for f in Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"):
+        f.unlink()
+
+    Path(os.path.join(sandbox, "global_flags", "chat_processing.txt")).write_text("processing")
+
+    # Pre-set the final_output_mode flag — simulates a previous job (e.g. analysis_job)
+    # having emitted ##AF: FINAL_OUTPUT## and set the flag.
+    Path(os.path.join(sandbox, "global_flags", "final_output_mode.txt")).write_text("active")
+
+    # Mock LLM output with NO marker — because the flag is already set, the watcher
+    # should stream everything from byte 0 without waiting for the marker.
+    tokens = [
+        "This is the ",
+        "final answer ",
+        "to the user. ",
+        "No marker needed here.",
+    ]
+    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
+
+    watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
+    watcher_proc = subprocess.Popen(
+        [sys.executable, watcher_script, sandbox, user_msg],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    try:
+        stdout, stderr = watcher_proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        watcher_proc.kill()
+        stdout, stderr = watcher_proc.communicate()
+        assert_true(False, "Watcher timed out")
+        return
+
+    llm_thread.join(timeout=5)
+
+    assert_true(watcher_proc.returncode == 0, f"Watcher exits 0 (got {watcher_proc.returncode})")
+
+    assert_true(
+        "pre-set" in stdout.lower() or "flag was pre-set" in stdout,
+        "Watcher logs that flag was pre-set"
+    )
+
+    # Stream buffer should have the FULL output (no marker needed)
+    buffer_path = os.path.join(sandbox, "global_flags", "chat_stream_buffer.txt")
+    assert_true(os.path.exists(buffer_path), "Stream buffer was created")
+    if os.path.exists(buffer_path):
+        buf = Path(buffer_path).read_text()
+        assert_true("final answer" in buf, "Stream buffer contains full output")
+        assert_true("No marker needed here" in buf, "Stream buffer has all tokens")
+
+    # Flag should be cleared after completion
+    assert_true(
+        not os.path.exists(os.path.join(sandbox, "global_flags", "final_output_mode.txt")),
+        "final_output_mode.txt cleared after completion"
+    )
+
+    # Chat history should be saved
+    chat_files = list(Path(os.path.join(sandbox, "chat")).glob("chat_*.txt"))
+    assert_true(len(chat_files) >= 1, "Chat history saved")
+    if chat_files:
+        content = chat_files[-1].read_text()
+        assert_true("final answer" in content, "Chat history has the full response")
+        assert_true("Recursion final output test" in content, "Chat history has correct user message")
+
+    if stderr:
+        log(f"  watcher stderr: {stderr.strip()[:200]}")
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 def main():
@@ -661,6 +744,7 @@ def main():
         test_race_condition_fix(sandbox)
         test_full_chain(sandbox)
         test_legacy_markers(sandbox)
+        test_flag_preset_recursion(sandbox)
     finally:
         teardown_sandbox(sandbox)
 

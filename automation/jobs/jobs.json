@@ -26,7 +26,7 @@
     ]
   },
   "chat_response_job": {
-    "instructions": "Answer the user's message.\n\nType this when ready to reply:\n##AF: FINAL_OUTPUT##\n\nEverything you write after that goes to the user.",
+    "instructions": "Answer the user's message.\n\nUse this trigger to start your reply:\n##AF: FINAL_OUTPUT##\n\nOnce you write it, your output is LIVE — the user sees it as you type.\nAnything before the trigger is internal only.",
     "trigger": "",
     "scripts": [
       "spawn_chat_watcher.py"
