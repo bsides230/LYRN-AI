@@ -16,12 +16,21 @@ def main():
     print(f"[spawn] root_dir:       {root_dir}")
     print(f"[spawn] watcher exists: {os.path.exists(watcher_script)}")
 
-    # Check pre-existing flag state before spawning.
+    # Clear any stale final_output_mode.txt BEFORE spawning the new watcher.
+    # A stale flag (from a crashed or incomplete previous generation) would cause
+    # the new watcher to start in "recursion mode" (flag_was_preset=True), bypassing
+    # affordance detection and streaming everything as final output.
+    # Each new chat request must start fresh.
     final_output_flag = os.path.join(root_dir, "global_flags", "final_output_mode.txt")
     if os.path.exists(final_output_flag):
-        print(f"[spawn] NOTE: final_output_mode.txt already exists — recursion mode will be active in watcher")
+        print(f"[spawn] Clearing stale final_output_mode.txt before spawning watcher.")
+        try:
+            os.remove(final_output_flag)
+            print(f"[spawn] Stale final_output_mode.txt removed — affordance detection will be fresh.")
+        except Exception as e:
+            print(f"[spawn] Warning: could not clear stale final_output_mode.txt: {e}")
     else:
-        print(f"[spawn] final_output_mode.txt not set — normal affordance detection mode")
+        print(f"[spawn] final_output_mode.txt not set — normal affordance detection mode.")
 
     # Capture user_message NOW before job_input.json can be overwritten by the next request.
     # This prevents the race condition where the watcher reads a stale/new user_message

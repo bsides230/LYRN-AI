@@ -26,7 +26,7 @@
     ]
   },
   "chat_response_job": {
-    "instructions": "Answer the user's message.\n\nUse this trigger to start your reply:\n##AF: FINAL_OUTPUT##\n\nOnce you write it, your output is LIVE — the user sees it as you type.\nAnything before the trigger is internal only.",
+    "instructions": "Analyze the user's message internally. When you are ready to deliver your final response, output the RECORD signal on its own line:\n\n##AF: FINAL_OUTPUT##\n\nThis is the handoff point. Everything before it is internal processing — the user cannot see it.\nEverything after it is your RECORDED response that goes directly to the user.\n\nAfter the RECORD signal:\n- Write your reply naturally and directly.\n- Do NOT output any <think> or reasoning tags.\n- Do NOT repeat the marker.\n- Just respond to the user.",
     "trigger": "",
     "scripts": [
       "spawn_chat_watcher.py"

@@ -1167,6 +1167,44 @@ async def chat_stream():
 
 # --- Output Viewer Endpoints ---
 
+@app.get("/api/output/history", dependencies=[Depends(verify_token)])
+async def output_history_list():
+    """
+    Returns the user-visible audit log of chat pairs from output_history/.
+    Each entry: timestamp, user_message, response.
+    Newest first. This folder is NEVER read by the LLM and has its own Clear endpoint.
+    """
+    hist_dir = Path("output_history")
+    entries = []
+    if hist_dir.exists():
+        for f in sorted(hist_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:100]:
+            try:
+                data = json.loads(f.read_text(encoding="utf-8", errors="replace"))
+                data["filename"] = f.name
+                entries.append(data)
+            except Exception:
+                pass
+    return {"entries": entries}
+
+
+@app.delete("/api/output/history", dependencies=[Depends(verify_token)])
+async def clear_output_history():
+    """
+    Clears the output_history/ audit log.
+    Does NOT touch chat/ (LLM context history) or system logs.
+    """
+    hist_dir = Path("output_history")
+    deleted = 0
+    if hist_dir.exists():
+        for f in hist_dir.glob("*.json"):
+            try:
+                f.unlink()
+                deleted += 1
+            except Exception:
+                pass
+    return {"success": True, "deleted": deleted}
+
+
 @app.get("/api/output/log", dependencies=[Depends(verify_token)])
 async def output_log():
     """

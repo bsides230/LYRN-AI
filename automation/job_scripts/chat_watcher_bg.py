@@ -5,18 +5,21 @@ Runs as a detached background process spawned by spawn_chat_watcher.py.
 Responsibilities:
   1. Wait for the raw output file to appear (model started generating).
   2. Tail the file in real-time, scanning for affordance markers.
-  3. When ##AFFORDANCE: FINAL_OUTPUT_START## is detected:
+     - Thinking blocks (<think>...</think>) are EXCLUDED from affordance detection.
+       The wizard only triggers on regular (non-thinking) output.
+  3. When ##AF: FINAL_OUTPUT## is detected in non-thinking text:
        - Set global_flags/final_output_mode.txt
-       - Write subsequent tokens to global_flags/chat_stream_buffer.txt
-         so the SSE endpoint can forward them live to the chat module.
+       - Write subsequent tokens (post-marker, thinking stripped) to
+         global_flags/chat_stream_buffer.txt so the SSE endpoint can forward
+         them live to the chat module.
   4. Once LLM status returns to idle/stopped/error:
-       - Extract the final response (content after the affordance marker,
-         or full output as fallback).
-       - Save user/model pair to chat history using the user_message
-         captured at spawn time (prevents race-condition with job_input.json).
+       - Extract the final response (post-marker content, thinking stripped).
+       - Save user/model pair to chat history (for LLM context).
+       - Save clean chat pair to output_history/ (audit log, never seen by LLM).
        - Clean up all processing flags.
 
-Affordance marker: ##AFFORDANCE: FINAL_OUTPUT_START##
+Affordance marker: ##AF: FINAL_OUTPUT##
+Thinking tags:     <think>...</think>  — excluded from wizard + final output
 """
 
 import sys
@@ -27,7 +30,7 @@ import json
 from pathlib import Path
 
 
-AFFORDANCE_START = "##AF: FINAL_OUTPUT##"
+AFFORDANCE_START     = "##AF: FINAL_OUTPUT##"
 POLL_INTERVAL_STREAM = 0.1   # seconds between read ticks while streaming
 POLL_INTERVAL_WAIT   = 0.5   # seconds between ticks while waiting for file to appear
 TIMEOUT_WAIT_FILE    = 300   # 5 min: max wait for raw output file to appear
@@ -46,6 +49,11 @@ def _read_llm_status(llm_status_path: str) -> str:
         return "idle"  # assume done if unreadable
 
 
+def _strip_thinking(text: str) -> str:
+    """Remove all <think>...</think> blocks from text (case-insensitive tags)."""
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
+
+
 def _append_stream_buffer(stream_buffer_file: str, content: str):
     """Append tokens to the live chat stream buffer."""
     try:
@@ -61,9 +69,12 @@ def _extract_final_response(raw_text: str) -> str | None:
     Extract the user-visible response from raw model output.
 
     Priority:
-      1. Content after ##AFFORDANCE: FINAL_OUTPUT_START## (new affordance protocol)
+      1. Content after ##AF: FINAL_OUTPUT## (thinking stripped from both sides)
       2. Content between ##Response_START## / ##Response_END## (legacy markers)
-      3. Full raw output as last-resort fallback
+      3. Full raw output, thinking stripped, as last-resort fallback
+
+    Thinking blocks (<think>...</think>) are always removed from the result
+    before it is saved to chat history or shown to the user.
     """
     raw_text = raw_text.strip()
     if not raw_text:
@@ -71,9 +82,11 @@ def _extract_final_response(raw_text: str) -> str | None:
 
     # 1. Affordance-based extraction
     if AFFORDANCE_START in raw_text:
-        after = raw_text.split(AFFORDANCE_START, 1)[1].strip()
+        after = raw_text.split(AFFORDANCE_START, 1)[1]
+        # Strip thinking from final output — model may still think after the marker
+        after = _strip_thinking(after).strip()
         if after:
-            print("[Watcher] Extracted response using AFFORDANCE marker.")
+            print("[Watcher] Extracted response using AFFORDANCE marker (thinking stripped).")
             return after
 
     # 2. Legacy marker extraction
@@ -82,18 +95,27 @@ def _extract_final_response(raw_text: str) -> str | None:
     if start_m in raw_text and end_m in raw_text:
         match = re.search(f"{start_m}(.*?){end_m}", raw_text, re.DOTALL)
         if match:
-            extracted = match.group(1).strip()
+            extracted = _strip_thinking(match.group(1)).strip()
             if extracted:
-                print("[Watcher] Extracted response using legacy markers.")
+                print("[Watcher] Extracted response using legacy markers (thinking stripped).")
                 return extracted
 
-    # 3. Fallback: full raw output
-    print("[Watcher] Using full raw output as response (no markers found).")
-    return raw_text
+    # 3. Fallback: full raw output with thinking stripped
+    clean = _strip_thinking(raw_text).strip()
+    if clean:
+        print("[Watcher] Using thinking-stripped raw output as response (no markers found).")
+        return clean
+
+    # 4. Absolute fallback: raw output as-is
+    print("[Watcher] Using full raw output as response (thinking strip yielded nothing).")
+    return raw_text.strip()
 
 
 def _save_chat_history(root_dir: str, user_input: str, model_response: str):
-    """Write the user/model exchange to a timestamped chat history file."""
+    """
+    Write the user/model exchange to a timestamped file in chat/.
+    This file IS read by the LLM as conversation context on future turns.
+    """
     try:
         chat_dir = os.path.join(root_dir, "chat")
         os.makedirs(chat_dir, exist_ok=True)
@@ -101,14 +123,37 @@ def _save_chat_history(root_dir: str, user_input: str, model_response: str):
         filepath = os.path.join(chat_dir, f"chat_{timestamp}.txt")
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(f"user\n{user_input}\n\nmodel\n{model_response}\n")
-        print(f"[Watcher] Saved chat response to {filepath}")
+        print(f"[Watcher] Saved chat history to {filepath}")
     except Exception as e:
         print(f"[Watcher] Error saving chat history: {e}")
 
 
+def _save_output_history(root_dir: str, user_message: str, response: str):
+    """
+    Write a clean chat pair to output_history/ as a user-visible audit log.
+    This folder is NEVER read by the LLM and NEVER cleared by chat history operations.
+    Each file contains one complete exchange: the user's message + the clean final response.
+    """
+    try:
+        hist_dir = os.path.join(root_dir, "output_history")
+        os.makedirs(hist_dir, exist_ok=True)
+        timestamp = time.strftime("%Y-%m-%dT%H-%M-%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+        filepath = os.path.join(hist_dir, f"{timestamp}.json")
+        entry = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "user_message": user_message,
+            "response": response,
+        }
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(entry, f, indent=2, ensure_ascii=False)
+        print(f"[Watcher] Saved output history to {filepath}")
+    except Exception as e:
+        print(f"[Watcher] Error saving output history: {e}")
+
+
 def _append_output_log(root_dir: str, user_message: str, raw_output: str,
                        final_output: str, marker_detected: bool):
-    """Append one generation record to global_flags/output_log.jsonl."""
+    """Append one generation record to global_flags/output_log.jsonl (legacy log)."""
     MAX_ENTRIES = 100
     try:
         log_path = os.path.join(root_dir, "global_flags", "output_log.jsonl")
@@ -119,7 +164,6 @@ def _append_output_log(root_dir: str, user_message: str, raw_output: str,
             "final_output": final_output or "",
             "marker_detected": marker_detected,
         })
-        # Read existing lines, append, trim to MAX_ENTRIES
         lines = []
         if os.path.exists(log_path):
             with open(log_path, "r", encoding="utf-8") as f:
@@ -208,14 +252,13 @@ def main():
 
     print(f"[Watcher] Phase 1: Output file appeared after {time.time()-global_start:.2f}s")
 
-    # Check if a previous generation already set the flag (recursion scenario).
-    # If so, this generation is the "final output" generation — stream everything
-    # from the start without waiting for the marker.
+    # spawn_chat_watcher.py now clears any stale final_output_mode.txt before
+    # spawning us, so flag_was_preset should always be False for normal chat flow.
+    # We keep the check for safety (e.g. direct invocations or edge cases).
     flag_was_preset = os.path.exists(final_output_flag)
     print(f"[Watcher] Phase 1: final_output_mode.txt pre-set: {flag_was_preset}")
 
-    # Clear stale stream buffer, but do NOT clear the flag if it was already set —
-    # that means a previous job set it and we should honour it.
+    # Clear stale stream buffer; always clear the flag too (spawn clears it, but be safe).
     _cleanup_flags(stream_buffer)
     if not flag_was_preset:
         _cleanup_flags(final_output_flag)
@@ -227,12 +270,14 @@ def main():
 
     # -----------------------------------------------------------------------
     # Phase 2: Tail the file, detect affordance marker, stream to buffer
+    # The wizard ONLY looks for the marker in non-thinking text.
+    # Thinking blocks (<think>...</think>) are ignored for affordance detection.
     # -----------------------------------------------------------------------
     print(f"[Watcher] Phase 2: Starting tail loop (poll={POLL_INTERVAL_STREAM}s, timeout={TIMEOUT_GENERATION}s)")
-    char_pos       = 0               # character offset read so far
-    in_final_output= flag_was_preset  # already live if flag was pre-set
-    total_chars_read = 0
-    total_buffer_chars = 0
+    char_pos        = 0               # character offset read so far
+    in_final_output = flag_was_preset  # already live if flag was pre-set
+    total_chars_read    = 0
+    total_buffer_chars  = 0
     poll_count = 0
 
     while True:
@@ -245,6 +290,7 @@ def main():
 
         # --- Read new content from file (by character position) ---
         new_content = ""
+        full = ""
         try:
             with open(raw_output_file, "r", encoding="utf-8", errors="replace") as f:
                 full = f.read()
@@ -260,16 +306,15 @@ def main():
             print(f"[Watcher] Phase 2: +{len(new_content)} chars (total={total_chars_read}, "
                   f"in_final_output={in_final_output})")
             if not in_final_output:
-                # Combine with already-read content to catch marker split across reads.
-                # We only need the tail of what we've seen to check for the marker.
-                # Build a look-back window: last (len(AFFORDANCE_START)-1) chars + new
-                # The simplest approach: re-check full content for the marker once we
-                # have the full text up to char_pos.
-                current_full = full  # still in scope from the read above
-                if AFFORDANCE_START in current_full:
-                    marker_pos = current_full.index(AFFORDANCE_START)
-                    print(f"[Watcher] Phase 2: ##AF: FINAL_OUTPUT## detected at char {marker_pos} "
-                          f"— switching to final output mode.")
+                # Strip thinking blocks BEFORE checking for the affordance marker.
+                # The wizard should not trigger on markers embedded in thinking text.
+                text_for_detection = _strip_thinking(full)
+
+                if AFFORDANCE_START in text_for_detection:
+                    # Find marker position in the stripped text to locate context
+                    marker_pos = text_for_detection.index(AFFORDANCE_START)
+                    print(f"[Watcher] Phase 2: ##AF: FINAL_OUTPUT## detected (non-thinking) at "
+                          f"stripped-char {marker_pos} — switching to final output mode.")
                     in_final_output = True
 
                     # Set the final output mode flag file
@@ -281,19 +326,24 @@ def main():
                     except Exception as e:
                         print(f"[Watcher] Phase 2: ERROR setting final_output_mode flag: {e}")
 
-                    # Write everything after the marker to the stream buffer
-                    after_marker = current_full.split(AFFORDANCE_START, 1)[1]
-                    if after_marker:
-                        _append_stream_buffer(stream_buffer, after_marker)
-                        total_buffer_chars += len(after_marker)
-                        print(f"[Watcher] Phase 2: Wrote {len(after_marker)} post-marker chars to stream buffer")
+                    # Write content after the marker to the stream buffer.
+                    # Strip thinking from streamed content too (post-marker thinking
+                    # should not be visible live in the chat module).
+                    after_marker = text_for_detection.split(AFFORDANCE_START, 1)[1]
+                    after_clean  = _strip_thinking(after_marker)
+                    if after_clean:
+                        _append_stream_buffer(stream_buffer, after_clean)
+                        total_buffer_chars += len(after_clean)
+                        print(f"[Watcher] Phase 2: Wrote {len(after_clean)} post-marker chars to stream buffer")
                     else:
                         print(f"[Watcher] Phase 2: No post-marker content yet — waiting for more tokens")
 
             else:
-                # Already past the marker — stream new content directly to buffer
-                _append_stream_buffer(stream_buffer, new_content)
-                total_buffer_chars += len(new_content)
+                # Already past the marker — stream new content (thinking stripped) to buffer
+                clean_new = _strip_thinking(new_content)
+                if clean_new:
+                    _append_stream_buffer(stream_buffer, clean_new)
+                    total_buffer_chars += len(clean_new)
 
         # --- Check if LLM has finished ---
         status = _read_llm_status(llm_status_path)
@@ -307,7 +357,7 @@ def main():
         time.sleep(POLL_INTERVAL_STREAM)
 
     # -----------------------------------------------------------------------
-    # Phase 3: LLM done — extract final response and save chat history
+    # Phase 3: LLM done — extract final response and save history
     # -----------------------------------------------------------------------
     print(f"[Watcher] Phase 3: Reading final raw output from {raw_output_file}")
     try:
@@ -320,7 +370,7 @@ def main():
 
     marker_in_raw = AFFORDANCE_START in full_raw
     print(f"[Watcher] Phase 3: Affordance marker in raw output: {marker_in_raw}")
-    print(f"[Watcher] Phase 3: Extracting final response...")
+    print(f"[Watcher] Phase 3: Extracting final response (thinking will be stripped)...")
 
     response_text = _extract_final_response(full_raw)
     print(f"[Watcher] Phase 3: Extracted response length: "
@@ -338,13 +388,18 @@ def main():
               f"{repr(user_input[:60])}")
 
     if response_text:
+        # Save to LLM chat history (chat/ folder — read by model on future turns)
         _save_chat_history(root_dir, user_input, response_text)
-    else:
-        print("[Watcher] Phase 3: No response text extracted — skipping chat history save.")
 
-    # Write to output log so the Output Viewer module can show the full picture
+        # Save to user-visible output history (output_history/ folder — audit log,
+        # never read by LLM, never cleared by LLM history operations)
+        _save_output_history(root_dir, user_input, response_text)
+    else:
+        print("[Watcher] Phase 3: No response text extracted — skipping history saves.")
+
+    # Write to legacy output log (used by Output Viewer raw stream history)
     log_path = os.path.join(root_dir, "global_flags", "output_log.jsonl")
-    print(f"[Watcher] Phase 3: Appending to output log: {log_path}")
+    print(f"[Watcher] Phase 3: Appending to legacy output log: {log_path}")
     _append_output_log(
         root_dir,
         user_message=user_input,
@@ -353,9 +408,9 @@ def main():
         marker_detected=marker_in_raw,
     )
 
-    # Clean up all processing flags
-    print(f"[Watcher] Phase 3: Cleaning up flags: {os.path.basename(lock_file)}, "
-          f"{os.path.basename(final_output_flag)}")
+    # Clean up ALL processing flags — always delete final_output_mode.txt regardless
+    # of flag_was_preset so the next generation always starts clean.
+    print(f"[Watcher] Phase 3: Cleaning up flags: chat_processing.txt, final_output_mode.txt")
     _cleanup_flags(lock_file, final_output_flag)
 
     elapsed_total = time.time() - global_start
