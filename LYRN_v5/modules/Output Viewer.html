@@ -16,12 +16,14 @@
             --text-head:        #ffffff;
             --text-body:        #b0b0b0;
             --text-dim:         #444444;
-            --text-internal:    #666666;
+            --text-internal:    #555555;
             --border-color:     #1e1e1e;
             --marker-color:     #f59e0b;
             --marker-bg:        rgba(245,158,11,0.08);
             --live-dot:         #10b981;
             --idle-dot:         #444444;
+            --user-bubble:      rgba(124,92,255,0.10);
+            --asst-bubble:      #0d0d0d;
         }
         body[data-theme="light"] {
             --bg-core:          #eef0f4;
@@ -36,6 +38,8 @@
             --border-color:     #d1d5db;
             --marker-color:     #d97706;
             --marker-bg:        rgba(217,119,6,0.08);
+            --user-bubble:      rgba(106,76,224,0.09);
+            --asst-bubble:      #f0f0f3;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 6px; }
@@ -142,6 +146,12 @@
         }
         /* pre-marker text — internal reasoning */
         .chunk-internal { color: var(--text-internal); }
+        /* <think> block visual distinction */
+        .chunk-thinking {
+            color: var(--text-internal);
+            opacity: 0.6;
+            font-style: italic;
+        }
         /* the marker line itself */
         .marker-line {
             display: block;
@@ -161,62 +171,231 @@
             overflow-y: auto;
             padding: 8px 0;
         }
-        .history-entry {
+        .history-card {
             border-bottom: 1px solid var(--border-color);
             padding: 10px 16px;
             cursor: pointer;
             transition: background 0.12s;
-        }
-        .history-entry:hover { background: var(--brand-purple-dim); }
-        .history-entry.expanded { background: var(--bg-block); }
-        .h-meta {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 4px;
+            gap: 10px;
         }
+        .history-card:hover { background: var(--brand-purple-dim); }
         .h-time {
             font-family: 'JetBrains Mono', monospace;
             font-size: 10px;
             color: var(--text-dim);
             flex-shrink: 0;
+            width: 66px;
         }
         .h-user {
+            flex: 1;
             font-size: 11px;
             color: var(--text-head);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .h-badge {
-            font-size: 9px;
-            padding: 1px 5px;
-            border-radius: 3px;
+        .h-arrow {
+            font-size: 10px;
+            color: var(--text-dim);
             flex-shrink: 0;
         }
-        .h-badge.af { background: var(--marker-bg); color: var(--marker-color); }
-        .h-badge.full { background: var(--brand-purple-dim); color: var(--brand-purple); }
-        .h-body {
-            display: none;
-            margin-top: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            line-height: 1.65;
-            white-space: pre-wrap;
-            word-break: break-word;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .history-entry.expanded .h-body { display: block; }
-        .h-internal { color: var(--text-internal); }
-        .h-marker { color: var(--marker-color); }
-        .h-final { color: var(--text-body); }
-
         .empty-state {
             color: var(--text-dim);
             text-align: center;
             padding: 40px 16px;
             font-size: 11px;
+        }
+
+        /* ── Chat Viewer Widget Overlay ── */
+        .viewer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.72);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .viewer-overlay.open { display: flex; }
+
+        .viewer-widget {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: min(720px, 92vw);
+            height: min(580px, 88vh);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+        }
+
+        /* Widget header */
+        .widget-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .widget-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            flex: 1;
+            letter-spacing: 0.06em;
+        }
+        .widget-close {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-size: 16px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: color 0.12s, background 0.12s;
+        }
+        .widget-close:hover { color: var(--text-head); background: var(--brand-purple-dim); }
+
+        /* Chat pair content */
+        .widget-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .chat-pair-user {
+            align-self: flex-end;
+            max-width: 85%;
+            background: var(--user-bubble);
+            border: 1px solid rgba(124,92,255,0.18);
+            border-radius: 10px 10px 2px 10px;
+            padding: 10px 14px;
+        }
+        .chat-pair-user .pair-role {
+            font-size: 9px;
+            letter-spacing: 0.1em;
+            color: var(--brand-purple);
+            margin-bottom: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .chat-pair-asst {
+            align-self: flex-start;
+            max-width: 90%;
+            background: var(--asst-bubble);
+            border: 1px solid var(--border-color);
+            border-radius: 2px 10px 10px 10px;
+            padding: 10px 14px;
+        }
+        .chat-pair-asst .pair-role {
+            font-size: 9px;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .pair-text {
+            font-size: 12px;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text-body);
+        }
+
+        /* Widget bottom nav bar */
+        .widget-nav {
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            height: 40px;
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+            gap: 8px;
+        }
+        .nav-arrow {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            width: 28px; height: 26px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex; align-items: center; justify-content: center;
+            transition: border-color 0.12s, color 0.12s;
+            flex-shrink: 0;
+        }
+        .nav-arrow:hover { border-color: var(--brand-purple); color: var(--text-head); }
+        .nav-arrow:disabled { opacity: 0.3; cursor: default; }
+        .nav-arrow:disabled:hover { border-color: var(--border-color); color: var(--text-body); }
+
+        /* Timestamp button (center of nav) */
+        .nav-ts-wrap {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+        .nav-ts-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            padding: 3px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.05em;
+            transition: border-color 0.12s;
+            white-space: nowrap;
+        }
+        .nav-ts-btn:hover { border-color: var(--brand-purple); }
+
+        /* Timestamp dropdown */
+        .nav-ts-dropdown {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 4px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-block);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 260px;
+            z-index: 10;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        .nav-ts-dropdown.open { display: block; }
+        .ts-option {
+            padding: 7px 12px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            display: flex;
+            gap: 8px;
+            color: var(--text-body);
+            transition: background 0.1s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ts-option:hover { background: var(--brand-purple-dim); }
+        .ts-option.selected { color: var(--brand-purple); }
+        .ts-option .ts-preview { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+
+        .nav-count {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            flex-shrink: 0;
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -226,7 +405,7 @@
     <span class="header-title">OUTPUT VIEWER</span>
     <span class="status-dot" id="statusDot"></span>
     <span class="status-label" id="statusLabel">IDLE</span>
-    <button class="btn-sm" id="clearBtn" title="Clear history">Clear</button>
+    <button class="btn-sm" id="clearBtn" title="Clear output history">Clear</button>
 </div>
 
 <div class="tabs">
@@ -247,6 +426,26 @@
     </div>
 </div>
 
+<!-- Chat Viewer Overlay Widget -->
+<div class="viewer-overlay" id="viewerOverlay">
+    <div class="viewer-widget">
+        <div class="widget-header">
+            <span class="widget-title" id="widgetTitle">CHAT PAIR</span>
+            <button class="widget-close" id="widgetClose" title="Close">✕</button>
+        </div>
+        <div class="widget-content" id="widgetContent"></div>
+        <div class="widget-nav">
+            <button class="nav-arrow" id="navPrev" title="Previous">&#8592;</button>
+            <div class="nav-ts-wrap">
+                <button class="nav-ts-btn" id="navTsBtn">—</button>
+                <div class="nav-ts-dropdown" id="navTsDrop"></div>
+            </div>
+            <span class="nav-count" id="navCount">0 / 0</span>
+            <button class="nav-arrow" id="navNext" title="Next">&#8594;</button>
+        </div>
+    </div>
+</div>
+
 <script>
     /* ── State ── */
     let coreUrl    = 'http://localhost:8080';
@@ -255,6 +454,11 @@
     let pollTimer  = null;
     let isLive     = false;
     const MARKER   = '##AF: FINAL_OUTPUT##';
+
+    /* ── History widget state ── */
+    let allEntries    = [];   // all output_history entries (newest first)
+    let currentIndex  = 0;   // index into allEntries currently shown in widget
+    let dropdownOpen  = false;
 
     /* ── Theme / Config messages from dashboard ── */
     window.addEventListener('message', e => {
@@ -275,19 +479,18 @@
         });
     });
 
-    /* ── Clear ── */
+    /* ── Clear (output_history only — does NOT touch LLM chat history) ── */
     document.getElementById('clearBtn').addEventListener('click', async () => {
-        if (!confirm('Clear output history?')) return;
+        if (!confirm('Clear output history? (LLM context history is unaffected)')) return;
         try {
-            await fetch(`${coreUrl}/api/output/log`, {
-                method: 'DELETE',
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-            });
+            const h = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+            await fetch(`${coreUrl}/api/output/history`, { method: 'DELETE', headers: h });
         } catch {}
+        allEntries = [];
         document.getElementById('historyList').innerHTML = '<div class="empty-state">No history yet.</div>';
     });
 
-    /* ── Status polling ── */
+    /* ── Status polling (live tab) ── */
     function startStatusPoll() {
         if (pollTimer) clearInterval(pollTimer);
         pollTimer = setInterval(checkStatus, 1000);
@@ -322,25 +525,15 @@
         if (liveEs) { liveEs.close(); liveEs = null; }
         isLive = true;
 
-        // Reset live panel
         document.getElementById('liveMeta').innerHTML = '<span>Generating...</span>';
         document.getElementById('liveOutput').innerHTML = '';
 
         const url = `${coreUrl}/api/output/raw_stream` +
                     (authToken ? `?token=${encodeURIComponent(authToken)}` : '');
 
-        // Fetch user message to show in meta
-        const h = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-        fetch(`${coreUrl}/api/chat/status`, { headers: h })
-            .then(r => r.json())
-            .then(d => {
-                // status doesn't have user message — we'll fill it from the stream
-            }).catch(() => {});
-
-        let accumulated  = '';   // full raw text so far
-        let pastMarker   = false;
-        const out        = document.getElementById('liveOutput');
-        out.innerHTML    = '';
+        let accumulated = '';
+        const out = document.getElementById('liveOutput');
+        out.innerHTML = '';
 
         liveEs = new EventSource(url);
 
@@ -359,8 +552,6 @@
             if (!msg.text) return;
 
             accumulated += msg.text;
-
-            // Re-render live output by splitting at the marker
             renderLive(out, accumulated);
         };
 
@@ -375,19 +566,13 @@
         container.innerHTML = '';
 
         if (!text.includes(MARKER)) {
-            // All internal so far
-            const span = document.createElement('span');
-            span.className = 'chunk-internal';
-            span.textContent = text;
-            container.appendChild(span);
+            // All internal so far — render with thinking blocks visually distinct
+            container.appendChild(renderWithThinking(text, 'chunk-internal'));
         } else {
             const [before, after] = text.split(MARKER);
 
             if (before) {
-                const span = document.createElement('span');
-                span.className = 'chunk-internal';
-                span.textContent = before;
-                container.appendChild(span);
+                container.appendChild(renderWithThinking(before, 'chunk-internal'));
             }
 
             const marker = document.createElement('span');
@@ -411,25 +596,61 @@
             }
         }
 
-        // Auto-scroll
         container.scrollTop = container.scrollHeight;
     }
 
-    /* ── History ── */
+    /**
+     * Render text with <think>...</think> blocks visually distinct.
+     * Returns a DocumentFragment containing styled spans.
+     */
+    function renderWithThinking(text, baseClass) {
+        const frag = document.createDocumentFragment();
+        const thinkRe = /(<think>)([\s\S]*?)(<\/think>)/gi;
+        let lastIdx = 0;
+        let match;
+
+        while ((match = thinkRe.exec(text)) !== null) {
+            // Text before <think>
+            if (match.index > lastIdx) {
+                const span = document.createElement('span');
+                span.className = baseClass;
+                span.textContent = text.slice(lastIdx, match.index);
+                frag.appendChild(span);
+            }
+            // The <think> block
+            const block = document.createElement('span');
+            block.className = 'chunk-thinking';
+            block.textContent = match[0];
+            frag.appendChild(block);
+
+            lastIdx = match.index + match[0].length;
+        }
+        // Remaining text after last </think>
+        if (lastIdx < text.length) {
+            const span = document.createElement('span');
+            span.className = baseClass;
+            span.textContent = text.slice(lastIdx);
+            frag.appendChild(span);
+        }
+        return frag;
+    }
+
+    /* ── History — load cards from /api/output/history ── */
     async function loadHistory() {
         try {
             const h = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-            const r = await fetch(`${coreUrl}/api/output/log`, { headers: h });
+            const r = await fetch(`${coreUrl}/api/output/history`, { headers: h });
             if (!r.ok) return;
             const d = await r.json();
-            renderHistory(d.entries || []);
+            allEntries = d.entries || [];
+            renderHistoryCards(allEntries);
         } catch (err) {
             document.getElementById('historyList').innerHTML =
                 `<div class="empty-state">Error loading history.</div>`;
         }
     }
 
-    function renderHistory(entries) {
+    function renderHistoryCards(entries) {
         const list = document.getElementById('historyList');
         if (!entries.length) {
             list.innerHTML = '<div class="empty-state">No history yet.</div>';
@@ -437,37 +658,139 @@
         }
         list.innerHTML = '';
         entries.forEach((entry, i) => {
-            const div = document.createElement('div');
-            div.className = 'history-entry';
+            const card = document.createElement('div');
+            card.className = 'history-card';
 
-            const badgeClass = entry.marker_detected ? 'af' : 'full';
-            const badgeLabel = entry.marker_detected ? '##AF##' : 'RAW';
-            const ts = entry.timestamp ? entry.timestamp.split('T')[1] : '??:??:??';
+            const ts = entry.timestamp
+                ? entry.timestamp.split('T')[1]?.substring(0, 8) || entry.timestamp
+                : '??:??:??';
+            const preview = (entry.user_message || '—').slice(0, 120);
 
-            // Build the body split at the marker
-            let bodyHtml = '';
-            const raw = entry.raw_output || '';
-            if (entry.marker_detected && raw.includes(MARKER)) {
-                const [pre, post] = raw.split(MARKER);
-                if (pre.trim()) bodyHtml += `<span class="h-internal">${escHtml(pre.trim())}</span>`;
-                bodyHtml += `\n<span class="h-marker">${escHtml(MARKER)}</span>\n`;
-                if (post.trim()) bodyHtml += `<span class="h-final">${escHtml(post.trim())}</span>`;
-            } else {
-                bodyHtml += `<span class="h-final">${escHtml(raw.trim())}</span>`;
-            }
+            card.innerHTML = `
+                <span class="h-time">${escHtml(ts)}</span>
+                <span class="h-user">${escHtml(preview)}</span>
+                <span class="h-arrow">›</span>`;
 
-            div.innerHTML = `
-                <div class="h-meta">
-                    <span class="h-time">${escHtml(ts)}</span>
-                    <span class="h-user">${escHtml(entry.user_message || '—')}</span>
-                    <span class="h-badge ${badgeClass}">${badgeLabel}</span>
-                </div>
-                <div class="h-body">${bodyHtml}</div>`;
-
-            div.addEventListener('click', () => div.classList.toggle('expanded'));
-            list.appendChild(div);
+            card.addEventListener('click', () => openWidget(i));
+            list.appendChild(card);
         });
     }
+
+    /* ── Chat Viewer Widget ── */
+    function openWidget(index) {
+        currentIndex = index;
+        renderWidget();
+        document.getElementById('viewerOverlay').classList.add('open');
+        dropdownOpen = false;
+        document.getElementById('navTsDrop').classList.remove('open');
+        buildDropdown();
+    }
+
+    function closeWidget() {
+        document.getElementById('viewerOverlay').classList.remove('open');
+        dropdownOpen = false;
+        document.getElementById('navTsDrop').classList.remove('open');
+    }
+
+    function renderWidget() {
+        const entry = allEntries[currentIndex];
+        if (!entry) return;
+
+        const total = allEntries.length;
+
+        // Title
+        document.getElementById('widgetTitle').textContent =
+            `CHAT PAIR  ·  ${entry.timestamp || ''}`;
+
+        // Content
+        const content = document.getElementById('widgetContent');
+        content.innerHTML = '';
+
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-pair-user';
+        userDiv.innerHTML = `<div class="pair-role">USER</div><div class="pair-text">${escHtml(entry.user_message || '')}</div>`;
+        content.appendChild(userDiv);
+
+        const asstDiv = document.createElement('div');
+        asstDiv.className = 'chat-pair-asst';
+        asstDiv.innerHTML = `<div class="pair-role">ASSISTANT</div><div class="pair-text">${escHtml(entry.response || '(no response)')}</div>`;
+        content.appendChild(asstDiv);
+        content.scrollTop = 0;
+
+        // Nav bar
+        const ts = entry.timestamp
+            ? entry.timestamp.split('T')[1]?.substring(0, 8) || entry.timestamp
+            : '??:??:??';
+        document.getElementById('navTsBtn').textContent = ts;
+        document.getElementById('navCount').textContent = `${currentIndex + 1} / ${total}`;
+        document.getElementById('navPrev').disabled = currentIndex <= 0;
+        document.getElementById('navNext').disabled = currentIndex >= total - 1;
+
+        // Highlight selected in dropdown
+        document.querySelectorAll('.ts-option').forEach((el, i) => {
+            el.classList.toggle('selected', i === currentIndex);
+        });
+    }
+
+    function buildDropdown() {
+        const drop = document.getElementById('navTsDrop');
+        drop.innerHTML = '';
+        allEntries.forEach((entry, i) => {
+            const ts = entry.timestamp
+                ? entry.timestamp.split('T')[1]?.substring(0, 8) || entry.timestamp
+                : '??:??:??';
+            const preview = (entry.user_message || '').slice(0, 40);
+
+            const opt = document.createElement('div');
+            opt.className = 'ts-option' + (i === currentIndex ? ' selected' : '');
+            opt.innerHTML = `<span>${escHtml(ts)}</span><span class="ts-preview">${escHtml(preview)}</span>`;
+            opt.addEventListener('click', () => {
+                currentIndex = i;
+                renderWidget();
+                dropdownOpen = false;
+                drop.classList.remove('open');
+            });
+            drop.appendChild(opt);
+        });
+    }
+
+    /* Widget controls */
+    document.getElementById('widgetClose').addEventListener('click', closeWidget);
+
+    document.getElementById('viewerOverlay').addEventListener('click', e => {
+        // Close if clicking the dim overlay (not the widget itself)
+        if (e.target === document.getElementById('viewerOverlay')) closeWidget();
+    });
+
+    document.getElementById('navPrev').addEventListener('click', () => {
+        if (currentIndex > 0) { currentIndex--; renderWidget(); }
+    });
+
+    document.getElementById('navNext').addEventListener('click', () => {
+        if (currentIndex < allEntries.length - 1) { currentIndex++; renderWidget(); }
+    });
+
+    document.getElementById('navTsBtn').addEventListener('click', e => {
+        e.stopPropagation();
+        dropdownOpen = !dropdownOpen;
+        document.getElementById('navTsDrop').classList.toggle('open', dropdownOpen);
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', () => {
+        if (dropdownOpen) {
+            dropdownOpen = false;
+            document.getElementById('navTsDrop').classList.remove('open');
+        }
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', e => {
+        if (!document.getElementById('viewerOverlay').classList.contains('open')) return;
+        if (e.key === 'Escape') closeWidget();
+        if (e.key === 'ArrowLeft'  && !document.getElementById('navPrev').disabled) { currentIndex--; renderWidget(); }
+        if (e.key === 'ArrowRight' && !document.getElementById('navNext').disabled) { currentIndex++; renderWidget(); }
+    });
 
     function escHtml(s) {
         return String(s)
