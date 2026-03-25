@@ -45,7 +45,10 @@ def _read_llm_status(llm_status_path: str) -> str:
     try:
         with open(llm_status_path, "r", encoding="utf-8") as f:
             return f.read().strip()
-    except Exception:
+    except FileNotFoundError:
+        return "idle"
+    except Exception as e:
+        print(f"[Watcher] Error reading LLM status: {e}")
         return "idle"  # assume done if unreadable
 
 
@@ -85,9 +88,8 @@ def _extract_final_response(raw_text: str) -> str | None:
         after = raw_text.split(AFFORDANCE_START, 1)[1]
         # Strip thinking from final output — model may still think after the marker
         after = _strip_thinking(after).strip()
-        if after:
-            print("[Watcher] Extracted response using AFFORDANCE marker (thinking stripped).")
-            return after
+        print("[Watcher] Extracted response using AFFORDANCE marker (thinking stripped).")
+        return after  # Return immediately, even if empty
 
     # 2. Legacy marker extraction
     start_m = "##Response_START##"
@@ -96,9 +98,8 @@ def _extract_final_response(raw_text: str) -> str | None:
         match = re.search(f"{start_m}(.*?){end_m}", raw_text, re.DOTALL)
         if match:
             extracted = _strip_thinking(match.group(1)).strip()
-            if extracted:
-                print("[Watcher] Extracted response using legacy markers (thinking stripped).")
-                return extracted
+            print("[Watcher] Extracted response using legacy markers (thinking stripped).")
+            return extracted  # Return immediately, even if empty
 
     # 3. Fallback: full raw output with thinking stripped
     clean = _strip_thinking(raw_text).strip()
@@ -165,9 +166,11 @@ def _append_output_log(root_dir: str, user_message: str, raw_output: str,
             "marker_detected": marker_detected,
         })
         lines = []
-        if os.path.exists(log_path):
+        try:
             with open(log_path, "r", encoding="utf-8") as f:
                 lines = [l for l in f.read().splitlines() if l.strip()]
+        except FileNotFoundError:
+            pass
         lines.append(entry)
         if len(lines) > MAX_ENTRIES:
             lines = lines[-MAX_ENTRIES:]
@@ -181,10 +184,11 @@ def _get_user_message_from_json(root_dir: str) -> str | None:
     """Fallback: read user_message from job_input.json (may be stale)."""
     try:
         path = os.path.join(root_dir, "jobs", "job_input.json")
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("user_message", "").strip() or None
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("user_message", "").strip() or None
+    except FileNotFoundError:
+        return None
     except Exception as e:
         print(f"[Watcher] Error reading job_input.json: {e}")
     return None
@@ -215,6 +219,7 @@ def main():
     user_message_arg = sys.argv[2] if len(sys.argv) > 2 else None
 
     raw_output_file  = os.path.join(root_dir, "jobs", "job_raw_output.txt")
+    completion_file  = os.path.join(root_dir, "jobs", "job_completion.json")
     lock_file        = os.path.join(root_dir, "global_flags", "chat_processing.txt")
     llm_status_path  = os.path.join(root_dir, "global_flags", "llm_status.txt")
     final_output_flag= os.path.join(root_dir, "global_flags", "final_output_mode.txt")
@@ -224,6 +229,7 @@ def main():
     print(f"[Watcher] PID: {os.getpid()}")
     print(f"[Watcher] root_dir:          {root_dir}")
     print(f"[Watcher] raw_output_file:   {raw_output_file}")
+    print(f"[Watcher] completion_file:   {completion_file}")
     print(f"[Watcher] lock_file:         {lock_file}")
     print(f"[Watcher] llm_status_path:   {llm_status_path}")
     print(f"[Watcher] final_output_flag: {final_output_flag}")
@@ -275,14 +281,10 @@ def main():
     char_pos        = 0               # character offset read so far
     in_final_output = flag_was_preset  # already live if flag was pre-set
 
-    # Two-phase mode: runner sets final_output_flag BEFORE creating raw_output_file,
-    # so re-check here — the flag may have been set after our Phase 1 startup check.
-    if not in_final_output and os.path.exists(final_output_flag):
-        in_final_output = True
-        print("[Watcher] Phase 2 start: Final output flag set by runner — entering streaming mode.")
     total_chars_read    = 0
     total_buffer_chars  = 0
     poll_count = 0
+    marker_seen_this_run = False
 
     while True:
         elapsed = time.time() - global_start
@@ -306,18 +308,6 @@ def main():
             if poll_count == 1:
                 print(f"[Watcher] Phase 2: Error reading output file: {e}")
 
-        # Defensive mid-loop check: catch external flag set by runner (two-phase mode)
-        if not in_final_output and os.path.exists(final_output_flag):
-            in_final_output = True
-            print("[Watcher] Phase 2: External final output flag detected mid-loop — switching to streaming mode.")
-            # Stream all content read so far to the buffer (it's all final output in two-phase)
-            if full:
-                clean_full = _strip_thinking(full)
-                if clean_full:
-                    _append_stream_buffer(stream_buffer, clean_full)
-                    total_buffer_chars += len(clean_full)
-                    print(f"[Watcher] Phase 2: Streamed {len(clean_full)} existing chars to buffer.")
-
         if new_content:
             print(f"[Watcher] Phase 2: +{len(new_content)} chars (total={total_chars_read}, "
                   f"in_final_output={in_final_output})")
@@ -330,30 +320,8 @@ def main():
                     # Find marker position in the stripped text to locate context
                     marker_pos = text_for_detection.index(AFFORDANCE_START)
                     print(f"[Watcher] Phase 2: ##AF: FINAL_OUTPUT## detected (non-thinking) at "
-                          f"stripped-char {marker_pos} — switching to final output mode.")
-                    in_final_output = True
-
-                    # Set the final output mode flag file
-                    try:
-                        os.makedirs(os.path.dirname(final_output_flag), exist_ok=True)
-                        with open(final_output_flag, "w", encoding="utf-8") as f:
-                            f.write("active")
-                        print(f"[Watcher] Phase 2: final_output_mode.txt written")
-                    except Exception as e:
-                        print(f"[Watcher] Phase 2: ERROR setting final_output_mode flag: {e}")
-
-                    # Write content after the marker to the stream buffer.
-                    # Strip thinking from streamed content too (post-marker thinking
-                    # should not be visible live in the chat module).
-                    after_marker = text_for_detection.split(AFFORDANCE_START, 1)[1]
-                    after_clean  = _strip_thinking(after_marker)
-                    if after_clean:
-                        _append_stream_buffer(stream_buffer, after_clean)
-                        total_buffer_chars += len(after_clean)
-                        print(f"[Watcher] Phase 2: Wrote {len(after_clean)} post-marker chars to stream buffer")
-                    else:
-                        print(f"[Watcher] Phase 2: No post-marker content yet — waiting for more tokens")
-
+                          f"stripped-char {marker_pos} — triggering final output job.")
+                    marker_seen_this_run = True
             else:
                 # Already past the marker — stream new content (thinking stripped) to buffer
                 clean_new = _strip_thinking(new_content)
@@ -361,14 +329,110 @@ def main():
                     _append_stream_buffer(stream_buffer, clean_new)
                     total_buffer_chars += len(clean_new)
 
-        # --- Check if LLM has finished ---
-        status = _read_llm_status(llm_status_path)
-        if status in ("idle", "error", "stopped"):
-            # Give a short grace period for any final token flushes
-            print(f"[Watcher] Phase 2: LLM status='{status}' — generation complete. "
-                  f"Total chars read={total_chars_read}, buffer chars={total_buffer_chars}")
-            time.sleep(0.3)
-            break
+        # --- Explicit Completion Handoff ---
+        # Instead of guessing Phase 1 or Job completion via sleeps and status,
+        # we wait for the explicit completion artifact emitted by the runner.
+        if os.path.exists(completion_file):
+            # Parse and validate completion artifact
+            try:
+                # Add a small delay to ensure file is fully written before reading
+                time.sleep(0.1)
+                with open(completion_file, 'r', encoding='utf-8') as f:
+                    completion_data = json.load(f)
+
+                # Check required fields
+                if isinstance(completion_data, dict) and "status" in completion_data:
+                    completion_status = completion_data.get("status")
+                    print(f"[Watcher] Phase/Job complete: valid completion artifact found (status={completion_status}).")
+
+                    # Read the final chunk of output before dealing with completion
+                    try:
+                        with open(raw_output_file, "r", encoding="utf-8", errors="replace") as f:
+                            full = f.read()
+                        if len(full) > char_pos:
+                            new_content = full[char_pos:]
+                            char_pos = len(full)
+                            total_chars_read += len(new_content)
+                            if in_final_output:
+                                clean_new = _strip_thinking(new_content)
+                                if clean_new:
+                                    _append_stream_buffer(stream_buffer, clean_new)
+                                    total_buffer_chars += len(clean_new)
+                    except Exception as e:
+                        print(f"[Watcher] Warning: failed to read final chunk: {e}")
+
+                    # Delete artifact after confirmed successful read
+                    try:
+                        os.remove(completion_file)
+                        print(f"[Watcher] Cleared completion artifact.")
+                    except Exception as e:
+                        print(f"[Watcher] Warning: failed to delete completion artifact: {e}")
+
+                    # If this was Phase 1 (marker seen but not in final output yet), trigger Phase 2
+                    if marker_seen_this_run and not in_final_output:
+                        print(f"[Watcher] Phase 1 completed successfully. Queueing Phase 2 generation.")
+
+                        # Save the Phase 1 thinking state to last_thinking.txt before wiping
+                        last_thinking_file = os.path.join(root_dir, "global_flags", "last_thinking.txt")
+                        try:
+                            os.makedirs(os.path.dirname(last_thinking_file), exist_ok=True)
+                            with open(last_thinking_file, "w", encoding="utf-8") as f:
+                                f.write(full)
+                            print(f"[Watcher] Phase 1 output saved to last_thinking.txt ({len(full)} chars)")
+                        except Exception as e:
+                            print(f"[Watcher] Error saving last_thinking.txt: {e}")
+
+                        # Update job_input to trigger phase 2
+                        input_path = os.path.join(root_dir, "jobs", "job_input.json")
+                        try:
+                            with open(input_path, "r", encoding="utf-8") as f:
+                                input_payload = json.load(f)
+                        except Exception:
+                            input_payload = {}
+
+                        input_payload["job_instructions"] = ""
+                        input_payload["user_message"] = "##RECORD##"
+                        input_payload["source"] = "chat_phase2"
+
+                        with open(input_path, "w", encoding="utf-8") as f:
+                            json.dump(input_payload, f, indent=2)
+
+                        # Set the final output mode flag
+                        try:
+                            os.makedirs(os.path.dirname(final_output_flag), exist_ok=True)
+                            with open(final_output_flag, "w", encoding="utf-8") as f:
+                                f.write("active")
+                            print(f"[Watcher] Phase 2: final_output_mode.txt written")
+                        except Exception as e:
+                            print(f"[Watcher] Phase 2: ERROR setting final_output_mode flag: {e}")
+
+                        # Delete old raw output and trigger runner
+                        try:
+                            os.remove(raw_output_file)
+                        except: pass
+
+                        trigger_path = os.path.join(root_dir, "chat_trigger.txt")
+                        with open(trigger_path, "w", encoding="utf-8") as f:
+                            f.write(input_path)
+
+                        in_final_output = True
+                        char_pos = 0 # reset read pos for Phase 2
+
+                        print(f"[Watcher] Phase 2 triggered. Waiting for Phase 2 raw output...")
+                        while not os.path.exists(raw_output_file):
+                            time.sleep(POLL_INTERVAL_WAIT)
+                            if time.time() - global_start > TIMEOUT_GENERATION:
+                                break
+                        continue
+                    else:
+                        # Generation finished (Phase 2 completed or single phase completed)
+                        print(f"[Watcher] Phase 2 / Single Phase complete. Total chars read={total_chars_read}, buffer chars={total_buffer_chars}")
+                        break
+            except json.JSONDecodeError:
+                # File is present but unparseable, perhaps still being written. Continue loop.
+                pass
+            except Exception as e:
+                print(f"[Watcher] Error reading completion artifact: {e}")
 
         time.sleep(POLL_INTERVAL_STREAM)
 
@@ -384,37 +448,36 @@ def main():
         print(f"[Watcher] Phase 3: ERROR reading final output: {e}")
         full_raw = ""
 
-    # ── Two-phase: read phase 1 thinking content saved by the runner ──────────
+    # ── Two-phase: read phase 1 thinking content ──────────
     last_thinking_file = os.path.join(root_dir, "global_flags", "last_thinking.txt")
     phase1_content = ""
-    if os.path.exists(last_thinking_file):
-        try:
-            with open(last_thinking_file, "r", encoding="utf-8") as f:
-                phase1_content = f.read()
-            os.remove(last_thinking_file)
-            print(f"[Watcher] Phase 3: Read {len(phase1_content)} chars of phase 1 from last_thinking.txt")
-        except Exception as e:
-            print(f"[Watcher] Phase 3: Error reading last_thinking.txt: {e}")
-    else:
+    try:
+        with open(last_thinking_file, "r", encoding="utf-8") as f:
+            phase1_content = f.read()
+        os.remove(last_thinking_file)
+        print(f"[Watcher] Phase 3: Read {len(phase1_content)} chars of phase 1 from last_thinking.txt")
+    except FileNotFoundError:
         print(f"[Watcher] Phase 3: last_thinking.txt not found (single-phase or fallback mode)")
+    except Exception as e:
+        print(f"[Watcher] Phase 3: Error reading last_thinking.txt: {e}")
 
-    # In two-phase mode full_raw = phase 2 response only (no marker).
-    # Strip any <think> tags from phase 2 (in case model thinks again) for chat history.
-    # Safety net: also strip the affordance marker if phase 2 somehow re-emitted it.
-    response_text = _strip_thinking(full_raw).strip()
-    if AFFORDANCE_START in response_text:
-        print(f"[Watcher] Phase 3: Safety net — stripping {AFFORDANCE_START!r} from response_text")
-        response_text = response_text.replace(AFFORDANCE_START, "").strip()
-    if not response_text:
-        # Fallback: try legacy marker extraction
-        response_text = _extract_final_response(full_raw)
+    # Use single source of truth for final-output extraction.
+    if phase1_content and AFFORDANCE_START not in full_raw:
+        # If in two-phase but the marker isn't in phase 2 raw, prepend it so extraction correctly triggers
+        # (This is needed if the marker was in Phase 1 and we want to reliably strip it)
+        extraction_target = AFFORDANCE_START + "\n" + full_raw
+    else:
+        extraction_target = full_raw
 
-    marker_in_log = bool(phase1_content)  # marker is in phase 1 content when two-phase
+    extracted = _extract_final_response(extraction_target)
+    response_text = extracted if extracted is not None else ""
+
+    marker_in_log = marker_seen_this_run
     if not marker_in_log:
         # Fallback: check phase 2 raw (single-phase compatibility)
         marker_in_log = AFFORDANCE_START in full_raw
 
-    print(f"[Watcher] Phase 3: Response length: {len(response_text) if response_text else 0} chars")
+    print(f"[Watcher] Phase 3: Extracted response length: {len(response_text) if response_text else 0} chars")
     if response_text:
         print(f"[Watcher] Phase 3: Response preview: {repr(response_text[:80])}")
 
@@ -438,9 +501,9 @@ def main():
         print("[Watcher] Phase 3: No response text extracted — skipping history saves.")
 
     # Build combined raw for Output Viewer history tab:
-    # phase 1 thinking + marker + phase 2 response (shows full picture with thinking)
+    # phase 1 thinking + phase 2 response
     if phase1_content:
-        combined_raw = phase1_content.rstrip() + "\n\n" + AFFORDANCE_START + "\n\n" + (response_text or full_raw)
+        combined_raw = phase1_content.rstrip() + "\n\n" + full_raw
     else:
         combined_raw = full_raw  # single-phase fallback
 
