@@ -246,6 +246,7 @@ def trigger_chat_generation(message: str, folder: str = "chat"):
     if folder == "jobs":
         input_path = os.path.join(folder, "job_input.json")
         raw_output_path = os.path.join(folder, "job_raw_output.txt")
+        completion_path = os.path.join(folder, "job_completion.json")
         filepath = os.path.abspath(input_path)
 
         # Read existing input (may have been created by chat_endpoint with user_message)
@@ -276,6 +277,13 @@ def trigger_chat_generation(message: str, folder: str = "chat"):
                 os.remove(raw_output_path)
             except Exception as e:
                 print(f"[System] Error clearing old raw output: {e}")
+
+        # Clear previous completion artifact
+        if os.path.exists(completion_path):
+            try:
+                os.remove(completion_path)
+            except Exception as e:
+                print(f"[System] Error clearing old completion artifact: {e}")
     else:
         # Legacy direct-chat path (non-job)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -351,46 +359,53 @@ async def scheduler_loop():
             await asyncio.sleep(0.5)
 
 async def _monitor_job_completion(filepath: str, job_name: str):
-    """Monitors the raw output file for completion and deactivates dynamic snapshot."""
+    """Monitors the explicit completion artifact to finalize job and deactivate dynamic snapshot."""
     max_retries = 3600  # 1 hour timeout
     retries = 0
 
-    # Determine the raw output path from the input filepath
     input_path = Path(filepath)
     if input_path.parent.name == "jobs":
-        raw_output_path = input_path.parent / "job_raw_output.txt"
+        completion_path = input_path.parent / "job_completion.json"
     else:
-        raw_output_path = input_path.parent / f"{input_path.stem}_raw_output.txt"
+        completion_path = input_path.parent / f"{input_path.stem}_completion.json"
 
     while retries < max_retries:
         await asyncio.sleep(1)
         retries += 1
         try:
-            # Check if raw output exists yet
-            if not raw_output_path.exists():
+            if not completion_path.exists():
                 continue
 
-            content = raw_output_path.read_text(encoding="utf-8")
+            # Parse and validate the completion artifact
+            with open(completion_path, 'r', encoding='utf-8') as f:
+                completion_data = json.load(f)
 
-            # Check if generation produced an error or was stopped
-            if "[Stopped]" in content or "[Error:" in content:
-                print(f"[Scheduler] Job {job_name} finished (Stopped/Error). Deactivating dynamic snapshot.")
-                ds_manager.set_snapshot_active("jobs", job_name, False)
-                return
+            # Validation logic
+            if not isinstance(completion_data, dict) or "status" not in completion_data:
+                print(f"[Scheduler] Invalid completion artifact for job {job_name}. Retrying...")
+                continue
 
-            # If worker is idle/error/stopped and output exists, generation is complete
-            status_info = worker_controller.get_status()
-            llm_status = status_info.get("llm_status", "unknown")
+            status = completion_data.get("status")
+            print(f"[Scheduler] Job {job_name} completed with status: {status}. Deactivating dynamic snapshot.")
 
-            if content.strip() and llm_status in ["idle", "error", "stopped"]:
-                print(f"[Scheduler] Job {job_name} finished generation. Deactivating dynamic snapshot.")
-                ds_manager.set_snapshot_active("jobs", job_name, False)
-                return
+            # Now delete the artifact
+            try:
+                completion_path.unlink()
+            except Exception as e:
+                print(f"[Scheduler] Error deleting completion artifact: {e}")
+
+            ds_manager.set_snapshot_active("jobs", job_name, False)
+            return
+
+        except json.JSONDecodeError:
+            print(f"[Scheduler] Job {job_name} completion artifact is unreadable/not yet complete JSON.")
+            # Let it retry in case of a race (though atomic rename should prevent this)
         except Exception as e:
             print(f"[Scheduler] Error monitoring job completion: {e}")
             break
 
     # Timeout cleanup
+    print(f"[Scheduler] Job {job_name} completion monitor timed out.")
     ds_manager.set_snapshot_active("jobs", job_name, False)
 
 # --- Worker Controller ---

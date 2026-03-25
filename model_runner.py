@@ -257,6 +257,18 @@ def _resolve_raw_output_path(input_path: Path) -> Path:
     else:
         return parent / f"{input_path.stem}_raw_output.txt"
 
+def _resolve_completion_path(input_path: Path) -> Path:
+    """
+    Determines the completion artifact file path based on the input path.
+    For jobs/ folder inputs, writes to jobs/job_completion.json.
+    For other inputs, writes to a sibling _completion.json file.
+    """
+    parent = input_path.parent
+    if parent.name == "jobs":
+        return parent / "job_completion.json"
+    else:
+        return parent / f"{input_path.stem}_completion.json"
+
 
 def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager, chat_manager, settings_manager, ds_manager):
     with model_lock:
@@ -283,12 +295,21 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
 
             print(f"[Runner] Source: {source} | job_instructions set: {bool(job_instructions.strip())} | User: {user_message[:60]}...")
 
-            # 2. Determine Raw Output Path (separate from input)
+            # 2. Determine Output Paths
             raw_output_path = _resolve_raw_output_path(input_path)
+            completion_path = _resolve_completion_path(input_path)
 
-            # Clear any stale raw output
+            # Clear any stale outputs
             if raw_output_path.exists():
-                raw_output_path.unlink()
+                try:
+                    raw_output_path.unlink()
+                except Exception as e:
+                    print(f"[Runner] Error clearing stale raw output: {e}")
+            if completion_path.exists():
+                try:
+                    completion_path.unlink()
+                except Exception as e:
+                    print(f"[Runner] Error clearing stale completion artifact: {e}")
 
             # 3. Build Context
             # Master Prompt
@@ -350,31 +371,44 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             print(f"[Runner] Generation starting...")
             print(f"[Runner] Generating response to: {raw_output_path}")
 
-            # Write stream output directly to raw_output_path
-            with contextlib.redirect_stderr(log_capture_buffer):
-                stream = llm.create_chat_completion(
-                    messages=messages,
-                    max_tokens=active_config.get("max_tokens", 2048),
-                    temperature=active_config.get("temperature", 0.7),
-                    top_p=active_config.get("top_p", 0.95),
-                    top_k=active_config.get("top_k", 40),
-                    stream=True
-                )
-                with open(raw_output_path, "w", encoding="utf-8") as f:
-                    for token_data in stream:
-                        if os.path.exists(STOP_TRIGGER):
-                            print("[Runner] Stop trigger detected.")
-                            try: os.remove(STOP_TRIGGER)
-                            except: pass
-                            f.write("\n\n[Stopped]")
-                            break
-                        if 'choices' in token_data and token_data['choices']:
-                            text = token_data['choices'][0].get('delta', {}).get('content', '')
-                            if text:
-                                f.write(text)
-                                f.flush()
+            final_status = "completed"
+            error_message = None
 
-            print(f"[Runner] Generation complete. Raw output: {raw_output_path}")
+            # Write stream output directly to raw_output_path
+            try:
+                with contextlib.redirect_stderr(log_capture_buffer):
+                    stream = llm.create_chat_completion(
+                        messages=messages,
+                        max_tokens=active_config.get("max_tokens", 2048),
+                        temperature=active_config.get("temperature", 0.7),
+                        top_p=active_config.get("top_p", 0.95),
+                        top_k=active_config.get("top_k", 40),
+                        stream=True
+                    )
+                    with open(raw_output_path, "w", encoding="utf-8") as f:
+                        for token_data in stream:
+                            if os.path.exists(STOP_TRIGGER):
+                                print("[Runner] Stop trigger detected.")
+                                try: os.remove(STOP_TRIGGER)
+                                except: pass
+                                f.write("\n\n[Stopped]")
+                                final_status = "stopped"
+                                break
+                            if 'choices' in token_data and token_data['choices']:
+                                text = token_data['choices'][0].get('delta', {}).get('content', '')
+                                if text:
+                                    f.write(text)
+                                    f.flush()
+
+                print(f"[Runner] Generation complete. Raw output: {raw_output_path}")
+            except Exception as e:
+                print(f"[Runner] Generation loop error: {e}")
+                final_status = "error"
+                error_message = str(e)
+                try:
+                    with open(raw_output_path, "w", encoding="utf-8") as f:
+                        f.write(f"[Error: {e}]")
+                except: pass
 
             # 5. Parse Metrics from Captured Log
             log_output = log_capture_buffer.getvalue()
@@ -384,17 +418,50 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if stats:
                 write_stats(stats)
 
-            set_llm_status("idle")
+            set_llm_status("idle" if final_status != "error" else "error")
+
+            # Write Completion Artifact atomically
+            completion_data = {
+                "status": final_status,
+                "source": source,
+                "raw_output_path": str(raw_output_path),
+                "timestamp": time.time(),
+                "error_message": error_message
+            }
+            tmp_completion = completion_path.with_suffix(".tmp")
+            try:
+                with open(tmp_completion, "w", encoding="utf-8") as f:
+                    json.dump(completion_data, f, indent=2)
+                os.replace(tmp_completion, completion_path)
+                print(f"[Runner] Wrote completion artifact: {completion_path}")
+            except Exception as e:
+                print(f"[Runner] Failed to write completion artifact: {e}")
 
         except Exception as e:
             print(f"Error during generation: {e}")
-            # Write error to raw output so capture layer can detect it
+            set_llm_status("error")
+
             try:
                 raw_output_path = _resolve_raw_output_path(input_path)
                 with open(raw_output_path, "w", encoding="utf-8") as f:
                     f.write(f"[Error: {e}]")
             except: pass
-            set_llm_status("error")
+
+            try:
+                completion_path = _resolve_completion_path(input_path)
+                completion_data = {
+                    "status": "error",
+                    "source": "unknown",
+                    "raw_output_path": str(raw_output_path),
+                    "timestamp": time.time(),
+                    "error_message": str(e)
+                }
+                tmp_completion = completion_path.with_suffix(".tmp")
+                with open(tmp_completion, "w", encoding="utf-8") as f:
+                    json.dump(completion_data, f, indent=2)
+                os.replace(tmp_completion, completion_path)
+            except Exception as write_err:
+                print(f"[Runner] Failed to write error completion artifact: {write_err}")
 
 if __name__ == "__main__":
     main()

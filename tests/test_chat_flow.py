@@ -117,23 +117,74 @@ def write_job_input(sandbox, user_message, source="chat"):
 def mock_llm_output(sandbox, tokens, delay_per_token=0.05, pre_delay=0.5):
     """
     Simulates the model_runner writing tokens to job_raw_output.txt.
-    Sets llm_status to 'busy' first, writes tokens, then sets 'idle'.
-    Runs in a separate thread.
+    If affordance marker is in tokens, simulate a 2-phase process.
+    Otherwise, simulate single phase.
     """
     def _writer():
-        write_llm_status(sandbox, "busy")
         time.sleep(pre_delay)
 
         output_path = os.path.join(sandbox, "jobs", "job_raw_output.txt")
-        with open(output_path, "w", encoding="utf-8") as f:
-            for token in tokens:
-                f.write(token)
-                f.flush()
-                time.sleep(delay_per_token)
+        completion_path = os.path.join(sandbox, "jobs", "job_completion.json")
 
-        # Small pause then set idle (like model_runner does)
-        time.sleep(0.2)
-        write_llm_status(sandbox, "idle")
+        # Check if affordance marker is in any of the tokens
+        has_affordance = any("AF: FINAL_OUTPUT" in t for t in tokens)
+
+        if has_affordance:
+            # Two-phase mock: find where the marker is to split tokens
+            marker_idx = next(i for i, t in enumerate(tokens) if "AF: FINAL_OUTPUT" in t)
+            tokens_p1 = tokens[:marker_idx + 1]
+            tokens_p2 = tokens[marker_idx + 1:]
+
+            # Phase 1
+            write_llm_status(sandbox, "busy")
+            with open(output_path, "w", encoding="utf-8") as f:
+                for token in tokens_p1:
+                    f.write(token)
+                    f.flush()
+                    time.sleep(delay_per_token)
+
+            time.sleep(0.2)
+            write_llm_status(sandbox, "idle")
+
+            with open(completion_path, "w", encoding="utf-8") as f:
+                json.dump({"status": "completed", "source": "chat", "raw_output_path": output_path}, f)
+
+            # Wait for watcher to trigger phase 2 by clearing raw output
+            # (In reality, runner detects trigger, clears file, starts gen)
+            wait_time = 0
+            while os.path.exists(output_path) and wait_time < 5.0:
+                time.sleep(0.1)
+                wait_time += 0.1
+
+            time.sleep(0.2)
+
+            # Phase 2
+            write_llm_status(sandbox, "busy")
+            with open(output_path, "w", encoding="utf-8") as f:
+                for token in tokens_p2:
+                    f.write(token)
+                    f.flush()
+                    time.sleep(delay_per_token)
+
+            time.sleep(0.2)
+            write_llm_status(sandbox, "idle")
+
+            with open(completion_path, "w", encoding="utf-8") as f:
+                json.dump({"status": "completed", "source": "chat_phase2", "raw_output_path": output_path}, f)
+
+        else:
+            # Single phase mock
+            write_llm_status(sandbox, "busy")
+            with open(output_path, "w", encoding="utf-8") as f:
+                for token in tokens:
+                    f.write(token)
+                    f.flush()
+                    time.sleep(delay_per_token)
+
+            time.sleep(0.2)
+            write_llm_status(sandbox, "idle")
+            with open(completion_path, "w", encoding="utf-8") as f:
+                json.dump({"status": "completed", "source": "chat", "raw_output_path": output_path}, f)
 
     t = threading.Thread(target=_writer, daemon=True)
     t.start()
@@ -251,6 +302,7 @@ def test_watcher_with_affordance(sandbox):
         "but finding purpose and connection ",
         "are common themes.",
     ]
+
     llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
 
     # Run the watcher directly (not via spawn) with pre-captured user_message
@@ -267,7 +319,7 @@ def test_watcher_with_affordance(sandbox):
     except subprocess.TimeoutExpired:
         watcher_proc.kill()
         stdout, stderr = watcher_proc.communicate()
-        assert_true(False, "Watcher timed out (should have exited within 30s)")
+        assert_true(False, f"Watcher timed out\nStdout: {stdout}\nStderr: {stderr}")
         return
 
     llm_thread.join(timeout=5)
@@ -433,6 +485,7 @@ def test_race_condition_fix(sandbox):
     llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.5)
 
     # Simulate the race: overwrite job_input.json AFTER spawning but BEFORE watcher reads it
+    # We do this quickly before the watcher exits
     def _overwrite():
         time.sleep(0.3)  # after spawn, before watcher finishes
         write_job_input(sandbox, overwrite_msg)
@@ -452,7 +505,7 @@ def test_race_condition_fix(sandbox):
     except subprocess.TimeoutExpired:
         watcher_proc.kill()
         stdout, stderr = watcher_proc.communicate()
-        assert_true(False, "Watcher timed out")
+        assert_true(False, f"Watcher timed out\nStdout: {stdout}\nStderr: {stderr}")
         return
 
     llm_thread.join(timeout=5)
@@ -524,28 +577,67 @@ def test_full_chain(sandbox):
     assert_true(result.returncode == 0, "Step 2: spawn_chat_watcher.py succeeds")
 
     # Step 3: Mock LLM output (simulating what model_runner would do)
-    tokens = [
+    # The test needs to mock a two-phase run since the affordance marker triggers phase 2.
+    tokens_phase1 = [
         "Thinking about recursion... ",
         "A recursive function calls itself. ",
         "\n##AF: FINAL_OUTPUT##\n",
+    ]
+    tokens_phase2 = [
         "Recursion is when a function calls itself ",
         "to solve smaller subproblems. ",
         "The key is having a base case that stops the recursion.",
     ]
 
-    # Write output file with small delays (background watcher is already running)
+    output_path = os.path.join(sandbox, "jobs", "job_raw_output.txt")
+    completion_path = os.path.join(sandbox, "jobs", "job_completion.json")
+
+    # Phase 1
     write_llm_status(sandbox, "busy")
     time.sleep(0.3)
-
-    output_path = os.path.join(sandbox, "jobs", "job_raw_output.txt")
     with open(output_path, "w", encoding="utf-8") as f:
-        for token in tokens:
+        for token in tokens_phase1:
             f.write(token)
             f.flush()
             time.sleep(0.1)
 
+    # Emit Phase 1 completion artifact
     time.sleep(0.3)
     write_llm_status(sandbox, "idle")
+    completion_data_p1 = {
+        "status": "completed",
+        "source": "chat",
+        "raw_output_path": output_path,
+        "timestamp": time.time(),
+        "error_message": None
+    }
+    with open(completion_path, "w", encoding="utf-8") as f:
+        json.dump(completion_data_p1, f)
+
+    # Wait for watcher to trigger phase 2
+    time.sleep(2)
+
+    # Phase 2
+    write_llm_status(sandbox, "busy")
+    time.sleep(0.3)
+    with open(output_path, "w", encoding="utf-8") as f:
+        for token in tokens_phase2:
+            f.write(token)
+            f.flush()
+            time.sleep(0.1)
+
+    # Emit Phase 2 completion artifact
+    time.sleep(0.3)
+    write_llm_status(sandbox, "idle")
+    completion_data_p2 = {
+        "status": "completed",
+        "source": "chat_phase2",
+        "raw_output_path": output_path,
+        "timestamp": time.time(),
+        "error_message": None
+    }
+    with open(completion_path, "w", encoding="utf-8") as f:
+        json.dump(completion_data_p2, f)
 
     # Wait for watcher to process and save
     time.sleep(3)
@@ -744,15 +836,60 @@ def test_split_token_marker(sandbox):
     Path(os.path.join(sandbox, "global_flags", "chat_processing.txt")).write_text("processing")
 
     # Break the marker into tiny pieces across tokens
-    tokens = [
+    # Note: For our mock to trigger two-phase logic correctly, we need the combined token
+    # to be recognized by our mock logic if we want phase 1 -> phase 2 transition in the test.
+    # To keep the mock simple while testing the watcher's buffering, we'll write them to file.
+    # But wait, our mock_llm_output looks for "AF: FINAL_OUTPUT" in tokens to do the phase switch.
+    # Let's adjust the tokens so the mock understands it, or we can just mock a single phase
+    # and see if the watcher detects the affordance and triggers phase 2.
+    # Actually, if the mock doesn't do two-phase, the watcher will trigger phase 2 and wait forever
+    # because the mock won't write the second completion artifact.
+    # Let's just use the mock's single token for the affordance, but split it in the mock logic?
+    # No, we can just manually run the two phases here for this specific test.
+    tokens_p1 = [
         "Internal processing...\n",
         "##AF",          # first fragment
         ": FINA",        # second fragment
         "L_OUTPUT",      # third fragment
         "##\n",          # closing ##
+    ]
+    tokens_p2 = [
         "Split-token response delivered successfully.",
     ]
-    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.15, pre_delay=0.3)
+
+    # Custom mock for this test
+    def custom_split_mock():
+        output_path = os.path.join(sandbox, "jobs", "job_raw_output.txt")
+        completion_path = os.path.join(sandbox, "jobs", "job_completion.json")
+        time.sleep(0.3)
+        # Phase 1
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p1:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat", "raw_output_path": output_path}, f)
+
+        wait_time = 0
+        while os.path.exists(output_path) and wait_time < 5.0:
+            time.sleep(0.1)
+            wait_time += 0.1
+
+        time.sleep(0.2)
+        # Phase 2
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p2:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat_phase2", "raw_output_path": output_path}, f)
+
+    t = threading.Thread(target=custom_split_mock, daemon=True)
+    t.start()
 
     watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
     watcher_proc = subprocess.Popen(
@@ -769,7 +906,7 @@ def test_split_token_marker(sandbox):
         assert_true(False, "Watcher timed out")
         return
 
-    llm_thread.join(timeout=5)
+    t.join(timeout=5)
 
     assert_true(watcher_proc.returncode == 0, f"Watcher exits 0 (got {watcher_proc.returncode})")
     assert_true(
@@ -811,7 +948,42 @@ def test_output_log_written(sandbox):
         "##AF: FINAL_OUTPUT##\n",
         "The log entry answer.",
     ]
-    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
+
+    def custom_mock_p1_p2():
+        output_path = os.path.join(sandbox, "jobs", "job_raw_output.txt")
+        completion_path = os.path.join(sandbox, "jobs", "job_completion.json")
+        time.sleep(0.3)
+        tokens_p1 = tokens[:2]
+        tokens_p2 = tokens[2:]
+
+        # Phase 1
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p1:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat", "raw_output_path": output_path}, f)
+
+        wait_time = 0
+        while os.path.exists(output_path) and wait_time < 5.0:
+            time.sleep(0.1)
+            wait_time += 0.1
+
+        time.sleep(0.2)
+        # Phase 2
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p2:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat_phase2", "raw_output_path": output_path}, f)
+
+    llm_thread = threading.Thread(target=custom_mock_p1_p2, daemon=True)
+    llm_thread.start()
 
     watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
     watcher_proc = subprocess.Popen(
@@ -935,7 +1107,42 @@ def test_marker_at_start(sandbox):
         "Here is your direct answer.",
         " No preamble at all.",
     ]
-    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
+
+    def custom_mock_p1_p2():
+        output_path = os.path.join(sandbox, "jobs", "job_raw_output.txt")
+        completion_path = os.path.join(sandbox, "jobs", "job_completion.json")
+        time.sleep(0.3)
+        tokens_p1 = tokens[:1]
+        tokens_p2 = tokens[1:]
+
+        # Phase 1
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p1:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat", "raw_output_path": output_path}, f)
+
+        wait_time = 0
+        while os.path.exists(output_path) and wait_time < 5.0:
+            time.sleep(0.1)
+            wait_time += 0.1
+
+        time.sleep(0.2)
+        # Phase 2
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p2:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat_phase2", "raw_output_path": output_path}, f)
+
+    llm_thread = threading.Thread(target=custom_mock_p1_p2, daemon=True)
+    llm_thread.start()
 
     watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
     watcher_proc = subprocess.Popen(
@@ -989,7 +1196,42 @@ def test_debug_output_completeness(sandbox):
         "##AF: FINAL_OUTPUT##\n",
         "Final response here.",
     ]
-    llm_thread = mock_llm_output(sandbox, tokens, delay_per_token=0.1, pre_delay=0.3)
+
+    def custom_mock_p1_p2():
+        output_path = os.path.join(sandbox, "jobs", "job_raw_output.txt")
+        completion_path = os.path.join(sandbox, "jobs", "job_completion.json")
+        time.sleep(0.3)
+        tokens_p1 = tokens[:2]
+        tokens_p2 = tokens[2:]
+
+        # Phase 1
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p1:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat", "raw_output_path": output_path}, f)
+
+        wait_time = 0
+        while os.path.exists(output_path) and wait_time < 5.0:
+            time.sleep(0.1)
+            wait_time += 0.1
+
+        time.sleep(0.2)
+        # Phase 2
+        with open(output_path, "w", encoding="utf-8") as f:
+            for token in tokens_p2:
+                f.write(token)
+                f.flush()
+                time.sleep(0.1)
+        time.sleep(0.2)
+        with open(completion_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "completed", "source": "chat_phase2", "raw_output_path": output_path}, f)
+
+    llm_thread = threading.Thread(target=custom_mock_p1_p2, daemon=True)
+    llm_thread.start()
 
     watcher_script = os.path.join(sandbox, "automation", "job_scripts", "chat_watcher_bg.py")
     watcher_proc = subprocess.Popen(
@@ -1019,7 +1261,7 @@ def test_debug_output_completeness(sandbox):
     assert_true("affordance_marker:" in stdout, "affordance_marker logged at startup")
     assert_true("Output file appeared after" in stdout, "Phase 1 file-detected message logged")
     assert_true("pre-set: False" in stdout, "Phase 1 flag pre-set status logged")
-    assert_true("LLM status=" in stdout, "Phase 2 LLM status logged on completion")
+    assert_true("Phase/Job complete" in stdout, "Phase 2 explicit completion logged")
     assert_true("Raw output length:" in stdout, "Phase 3 raw output length logged")
     assert_true("Extracted response length:" in stdout, "Phase 3 extracted length logged")
     assert_true("Capture complete" in stdout, "Final completion message logged")

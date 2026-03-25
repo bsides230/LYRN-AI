@@ -219,6 +219,7 @@ def main():
     user_message_arg = sys.argv[2] if len(sys.argv) > 2 else None
 
     raw_output_file  = os.path.join(root_dir, "jobs", "job_raw_output.txt")
+    completion_file  = os.path.join(root_dir, "jobs", "job_completion.json")
     lock_file        = os.path.join(root_dir, "global_flags", "chat_processing.txt")
     llm_status_path  = os.path.join(root_dir, "global_flags", "llm_status.txt")
     final_output_flag= os.path.join(root_dir, "global_flags", "final_output_mode.txt")
@@ -228,6 +229,7 @@ def main():
     print(f"[Watcher] PID: {os.getpid()}")
     print(f"[Watcher] root_dir:          {root_dir}")
     print(f"[Watcher] raw_output_file:   {raw_output_file}")
+    print(f"[Watcher] completion_file:   {completion_file}")
     print(f"[Watcher] lock_file:         {lock_file}")
     print(f"[Watcher] llm_status_path:   {llm_status_path}")
     print(f"[Watcher] final_output_flag: {final_output_flag}")
@@ -327,80 +329,110 @@ def main():
                     _append_stream_buffer(stream_buffer, clean_new)
                     total_buffer_chars += len(clean_new)
 
-        # --- Trigger Phase 2 if marker was seen and we are not yet in final output ---
-        if marker_seen_this_run and not in_final_output:
-            status = _read_llm_status(llm_status_path)
-            if status in ("idle", "error", "stopped"):
-                # Now that the LLM is done with Phase 1, queue Phase 2
-                print(f"[Watcher] Phase 2: LLM idle. Queueing Phase 2 generation.")
+        # --- Explicit Completion Handoff ---
+        # Instead of guessing Phase 1 or Job completion via sleeps and status,
+        # we wait for the explicit completion artifact emitted by the runner.
+        if os.path.exists(completion_file):
+            # Parse and validate completion artifact
+            try:
+                # Add a small delay to ensure file is fully written before reading
+                time.sleep(0.1)
+                with open(completion_file, 'r', encoding='utf-8') as f:
+                    completion_data = json.load(f)
 
-                # Save the Phase 1 thinking state to last_thinking.txt before wiping
-                last_thinking_file = os.path.join(root_dir, "global_flags", "last_thinking.txt")
-                try:
-                    os.makedirs(os.path.dirname(last_thinking_file), exist_ok=True)
-                    # full contains all text generated in phase 1, including marker
-                    with open(last_thinking_file, "w", encoding="utf-8") as f:
-                        f.write(full)
-                    print(f"[Watcher] Phase 1 output saved to last_thinking.txt ({len(full)} chars)")
-                except Exception as e:
-                    print(f"[Watcher] Error saving last_thinking.txt: {e}")
+                # Check required fields
+                if isinstance(completion_data, dict) and "status" in completion_data:
+                    completion_status = completion_data.get("status")
+                    print(f"[Watcher] Phase/Job complete: valid completion artifact found (status={completion_status}).")
 
-                # Instead of switching state internally, we append the ##RECORD## command and trigger again
-                # This relies on writing to chat_trigger.txt to wake the runner up for the actual output.
-                input_path = os.path.join(root_dir, "jobs", "job_input.json")
-                try:
-                    with open(input_path, "r", encoding="utf-8") as f:
-                        input_payload = json.load(f)
-                except Exception:
-                    input_payload = {}
+                    # Read the final chunk of output before dealing with completion
+                    try:
+                        with open(raw_output_file, "r", encoding="utf-8", errors="replace") as f:
+                            full = f.read()
+                        if len(full) > char_pos:
+                            new_content = full[char_pos:]
+                            char_pos = len(full)
+                            total_chars_read += len(new_content)
+                            if in_final_output:
+                                clean_new = _strip_thinking(new_content)
+                                if clean_new:
+                                    _append_stream_buffer(stream_buffer, clean_new)
+                                    total_buffer_chars += len(clean_new)
+                    except Exception as e:
+                        print(f"[Watcher] Warning: failed to read final chunk: {e}")
 
-                # Clean up instruction to remove Phase 1 block
-                input_payload["job_instructions"] = ""
-                input_payload["user_message"] = "##RECORD##"
-                input_payload["source"] = "chat_phase2"
+                    # Delete artifact after confirmed successful read
+                    try:
+                        os.remove(completion_file)
+                        print(f"[Watcher] Cleared completion artifact.")
+                    except Exception as e:
+                        print(f"[Watcher] Warning: failed to delete completion artifact: {e}")
 
-                with open(input_path, "w", encoding="utf-8") as f:
-                    json.dump(input_payload, f, indent=2)
+                    # If this was Phase 1 (marker seen but not in final output yet), trigger Phase 2
+                    if marker_seen_this_run and not in_final_output:
+                        print(f"[Watcher] Phase 1 completed successfully. Queueing Phase 2 generation.")
 
-                # Trigger the runner
-                try:
-                    os.remove(raw_output_file) # clear phase 1 output
-                except: pass
+                        # Save the Phase 1 thinking state to last_thinking.txt before wiping
+                        last_thinking_file = os.path.join(root_dir, "global_flags", "last_thinking.txt")
+                        try:
+                            os.makedirs(os.path.dirname(last_thinking_file), exist_ok=True)
+                            with open(last_thinking_file, "w", encoding="utf-8") as f:
+                                f.write(full)
+                            print(f"[Watcher] Phase 1 output saved to last_thinking.txt ({len(full)} chars)")
+                        except Exception as e:
+                            print(f"[Watcher] Error saving last_thinking.txt: {e}")
 
-                # Set the final output mode flag file
-                try:
-                    os.makedirs(os.path.dirname(final_output_flag), exist_ok=True)
-                    with open(final_output_flag, "w", encoding="utf-8") as f:
-                        f.write("active")
-                    print(f"[Watcher] Phase 2: final_output_mode.txt written")
-                except Exception as e:
-                    print(f"[Watcher] Phase 2: ERROR setting final_output_mode flag: {e}")
+                        # Update job_input to trigger phase 2
+                        input_path = os.path.join(root_dir, "jobs", "job_input.json")
+                        try:
+                            with open(input_path, "r", encoding="utf-8") as f:
+                                input_payload = json.load(f)
+                        except Exception:
+                            input_payload = {}
 
-                trigger_path = os.path.join(root_dir, "chat_trigger.txt")
-                with open(trigger_path, "w", encoding="utf-8") as f:
-                    f.write(input_path)
+                        input_payload["job_instructions"] = ""
+                        input_payload["user_message"] = "##RECORD##"
+                        input_payload["source"] = "chat_phase2"
 
-                in_final_output = True
-                char_pos = 0 # reset read pos for Phase 2
+                        with open(input_path, "w", encoding="utf-8") as f:
+                            json.dump(input_payload, f, indent=2)
 
-                # Break to restart loop for Phase 2 observation? No, we wait for Phase 2 output file.
-                print(f"[Watcher] Phase 2 triggered. Waiting for Phase 2 raw output...")
-                while not os.path.exists(raw_output_file):
-                    time.sleep(POLL_INTERVAL_WAIT)
-                    if time.time() - global_start > TIMEOUT_GENERATION:
+                        # Set the final output mode flag
+                        try:
+                            os.makedirs(os.path.dirname(final_output_flag), exist_ok=True)
+                            with open(final_output_flag, "w", encoding="utf-8") as f:
+                                f.write("active")
+                            print(f"[Watcher] Phase 2: final_output_mode.txt written")
+                        except Exception as e:
+                            print(f"[Watcher] Phase 2: ERROR setting final_output_mode flag: {e}")
+
+                        # Delete old raw output and trigger runner
+                        try:
+                            os.remove(raw_output_file)
+                        except: pass
+
+                        trigger_path = os.path.join(root_dir, "chat_trigger.txt")
+                        with open(trigger_path, "w", encoding="utf-8") as f:
+                            f.write(input_path)
+
+                        in_final_output = True
+                        char_pos = 0 # reset read pos for Phase 2
+
+                        print(f"[Watcher] Phase 2 triggered. Waiting for Phase 2 raw output...")
+                        while not os.path.exists(raw_output_file):
+                            time.sleep(POLL_INTERVAL_WAIT)
+                            if time.time() - global_start > TIMEOUT_GENERATION:
+                                break
+                        continue
+                    else:
+                        # Generation finished (Phase 2 completed or single phase completed)
+                        print(f"[Watcher] Phase 2 / Single Phase complete. Total chars read={total_chars_read}, buffer chars={total_buffer_chars}")
                         break
-                continue
-
-        # --- Check if LLM has finished ---
-        status = _read_llm_status(llm_status_path)
-        if status in ("idle", "error", "stopped"):
-            # If in Phase 2 or no marker at all (single phase run):
-            if in_final_output or not marker_seen_this_run:
-                if char_pos > 0:
-                    print(f"[Watcher] Phase 2: LLM status='{status}' — generation complete. "
-                          f"Total chars read={total_chars_read}, buffer chars={total_buffer_chars}")
-                    time.sleep(0.3)
-                    break
+            except json.JSONDecodeError:
+                # File is present but unparseable, perhaps still being written. Continue loop.
+                pass
+            except Exception as e:
+                print(f"[Watcher] Error reading completion artifact: {e}")
 
         time.sleep(POLL_INTERVAL_STREAM)
 
