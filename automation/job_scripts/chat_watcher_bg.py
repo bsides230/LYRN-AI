@@ -316,12 +316,54 @@ def main():
                 # The wizard should not trigger on markers embedded in thinking text.
                 text_for_detection = _strip_thinking(full)
 
-                if AFFORDANCE_START in text_for_detection:
-                    # Find marker position in the stripped text to locate context
-                    marker_pos = text_for_detection.index(AFFORDANCE_START)
-                    print(f"[Watcher] Phase 2: ##AF: FINAL_OUTPUT## detected (non-thinking) at "
-                          f"stripped-char {marker_pos} — triggering final output job.")
-                    marker_seen_this_run = True
+                # Find all affordances: ##AF: (.*?)##
+                affordances = re.findall(r"##AF:\s*(.*?)\s*##", text_for_detection)
+                if affordances:
+                    # Check for FINAL_OUTPUT first to preserve exact legacy behavior
+                    if "FINAL_OUTPUT" in affordances:
+                        marker_pos = text_for_detection.index(AFFORDANCE_START)
+                        print(f"[Watcher] Phase 2: ##AF: FINAL_OUTPUT## detected (non-thinking) at "
+                              f"stripped-char {marker_pos} — triggering final output job.")
+                        marker_seen_this_run = True
+                    else:
+                        # Non-final affordance detected
+                        import csv
+                        # Just grab the first non-final affordance found in this pass
+                        affordance_name = affordances[0]
+                        print(f"[Watcher] Detected affordance: {affordance_name}")
+
+                        jobs_csv_path = os.path.join(root_dir, "automation", "jobs.csv")
+                        sequence = None
+                        if os.path.exists(jobs_csv_path):
+                            try:
+                                with open(jobs_csv_path, "r", encoding="utf-8", newline="") as csvf:
+                                    reader = csv.DictReader(csvf)
+                                    for row in reader:
+                                        if row.get("Trigger", "").strip() == affordance_name:
+                                            sequence = row.get("Sequence", "").strip()
+                                            break
+                            except Exception as e:
+                                print(f"[Watcher] Error reading jobs.csv: {e}")
+
+                        if sequence:
+                            print(f"[Watcher] Found sequence for {affordance_name}: {sequence}")
+                            try:
+                                # Import execute_sequence dynamically to avoid circular issues
+                                sys.path.append(os.path.join(root_dir, "automation"))
+                                from sequence_executor import execute_sequence
+                                execute_sequence(sequence)
+                                # Clean up flag to prevent looping, or exit if needed
+                            except Exception as e:
+                                print(f"[Watcher] Error executing sequence: {e}")
+                        else:
+                            print(f"[Watcher] Error: Affordance '{affordance_name}' not found in jobs.csv trigger column.")
+
+                        # To prevent re-triggering the same affordance multiple times in the loop,
+                        # we either need to clear it or assume the LLM will stop.
+                        # For now, we will mark marker_seen_this_run to true and exit the loop,
+                        # allowing phase 3 cleanup to run.
+                        marker_seen_this_run = True
+                        break
             else:
                 # Already past the marker — stream new content (thinking stripped) to buffer
                 clean_new = _strip_thinking(new_content)
@@ -369,7 +411,7 @@ def main():
                         print(f"[Watcher] Warning: failed to delete completion artifact: {e}")
 
                     # If this was Phase 1 (marker seen but not in final output yet), trigger Phase 2
-                    if marker_seen_this_run and not in_final_output:
+                    if marker_seen_this_run and not in_final_output and AFFORDANCE_START in text_for_detection:
                         print(f"[Watcher] Phase 1 completed successfully. Queueing Phase 2 generation.")
 
                         # Save the Phase 1 thinking state to last_thinking.txt before wiping
