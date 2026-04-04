@@ -901,30 +901,44 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
     try:
         active_downloads[filename]["status"] = "downloading"
 
+        existing_bytes = 0
+        if part_file.exists():
+            existing_bytes = part_file.stat().st_size
+
+        headers = {}
+        if existing_bytes > 0:
+            headers['Range'] = f'bytes={existing_bytes}-'
+
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status not in (200, 206):
                     raise Exception(f"HTTP {resp.status}")
 
+                is_partial = (resp.status == 206)
+                if not is_partial and existing_bytes > 0:
+                    existing_bytes = 0 # Server didn't respect Range header
+
                 content_len = resp.headers.get("Content-Length")
-                if max_bytes > 0 and content_len and int(content_len) > max_bytes:
+                total_size = int(content_len) + existing_bytes if content_len else existing_bytes
+
+                if max_bytes > 0 and total_size > max_bytes:
                      raise Exception("File too large")
 
-                downloaded = 0
-                sha256 = hashlib.sha256()
-                total_size = int(content_len) if content_len else 0
+                downloaded = existing_bytes
+
+                # We need to compute hash of the whole file at the end
                 last_log_time = time.time()
 
                 # Update total
                 active_downloads[filename]["total"] = total_size
 
-                async with aiofiles.open(part_file, "wb") as f:
+                mode = "ab" if is_partial else "wb"
+                async with aiofiles.open(part_file, mode) as f:
                     async for chunk in resp.content.iter_chunked(1024 * 1024): # 1MB chunks
                         downloaded += len(chunk)
                         if max_bytes > 0 and downloaded > max_bytes:
                              raise Exception("File limit exceeded")
 
-                        sha256.update(chunk)
                         await f.write(chunk)
 
                         # Update status
@@ -941,6 +955,13 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
 
         # Hash Verification
         active_downloads[filename]["status"] = "verifying"
+
+        # Compute hash from the full downloaded file
+        sha256 = hashlib.sha256()
+        async with aiofiles.open(part_file, "rb") as f:
+            while chunk := await f.read(1024 * 1024):
+                sha256.update(chunk)
+
         computed_hash = sha256.hexdigest()
         if expected_sha256 and computed_hash.lower() != expected_sha256.lower():
             if part_file.exists(): part_file.unlink()

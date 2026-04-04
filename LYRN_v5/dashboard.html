@@ -690,6 +690,14 @@
                     <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
                 </div>
 
+                <div class="settings-row">
+                    <span>Tab Tag</span>
+                    <div style="display: flex; gap: 4px;">
+                        <input type="text" id="setting-tab-tag" style="padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); border-radius:4px; width:100px;" value="LYRN" onchange="updateTabTag(this.value, document.getElementById('setting-tab-suffix').value)">
+                        <input type="text" id="setting-tab-suffix" style="padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); border-radius:4px; width:100px;" value="LYRN-AI" onchange="updateTabTag(document.getElementById('setting-tab-tag').value, this.value)">
+                    </div>
+                </div>
+
                 <div class="settings-header">Connection</div>
                 <button class="btn-full-width" onclick="openConnectionPopup()">Configure Connection</button>
 
@@ -755,7 +763,9 @@
             dockPinned: true, 
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
-            fontSize: 12
+            fontSize: 12,
+            tabTag: 'LYRN',
+            tabSuffix: 'LYRN-AI'
         };
 
         let zIndexCounter = 100;
@@ -1639,6 +1649,28 @@
             });
         }
         
+        async function updateTabTag(tag, suffix) {
+            if(!tag) tag = "LYRN";
+            if(!suffix) suffix = "LYRN-AI";
+            appSettings.tabTag = tag;
+            appSettings.tabSuffix = suffix;
+            document.title = `${tag} | ${suffix}`;
+            saveSettings();
+
+            // Save to backend so it is persistent across all instances
+            if(authToken && coreUrl) {
+                try {
+                    await fetch(coreUrl + '/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                        body: JSON.stringify({ ui_settings: { tab_tag: tag, tab_suffix: suffix } })
+                    });
+                } catch(e) {
+                    console.error("Failed to save Tab Tag to backend:", e);
+                }
+            }
+        }
+
         function toggleDockPin(pinned) { 
             appSettings.dockPinned = pinned; 
             const dock = document.getElementById('floating-dock'); 
@@ -1663,7 +1695,7 @@
         function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
         function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '32px'; win.style.left = '0'; win.style.width = '100%'; win.style.height = 'calc(100% - 32px)'; } }
         function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
-        function loadSettings() { const s = localStorage.getItem('lyrn-settings'); if(s) appSettings = { ...appSettings, ...JSON.parse(s) }; if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme); }
+        function loadSettings() { const s = localStorage.getItem('lyrn-settings'); if(s) appSettings = { ...appSettings, ...JSON.parse(s) }; if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme); if(appSettings.tabTag || appSettings.tabSuffix) { const t = appSettings.tabTag || "LYRN"; const suf = appSettings.tabSuffix || "LYRN-AI"; document.title = `${t} | ${suf}`; document.getElementById('setting-tab-tag').value = t; document.getElementById('setting-tab-suffix').value = suf; } }
         
         function startClock() { 
             const timeEl = document.getElementById('sys-clock'); 
@@ -1759,6 +1791,24 @@
         }
 
         let hasCheckedAuth = false;
+        async function syncBackendSettings() {
+            if(!authToken || !coreUrl) return;
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                if(res.ok) {
+                    const data = await res.json();
+                    if(data.ui_settings && (data.ui_settings.tab_tag || data.ui_settings.tab_suffix)) {
+                        appSettings.tabTag = data.ui_settings.tab_tag || "LYRN";
+                        appSettings.tabSuffix = data.ui_settings.tab_suffix || "LYRN-AI";
+                        document.title = `${appSettings.tabTag} | ${appSettings.tabSuffix}`;
+                        document.getElementById('setting-tab-tag').value = appSettings.tabTag;
+                        document.getElementById('setting-tab-suffix').value = appSettings.tabSuffix;
+                        saveSettings();
+                    }
+                }
+            } catch(e) { console.error("Failed to sync backend settings:", e); }
+        }
+
         async function checkAuth() {
             if(hasCheckedAuth) return;
 
@@ -1773,6 +1823,7 @@
                         broadcastToken();
                         hasCheckedAuth = true;
                         document.getElementById('auth-overlay').style.display = 'none';
+                        syncBackendSettings();
                         return;
                     }
                 }
@@ -1787,6 +1838,7 @@
                     authToken = storedToken;
                     broadcastToken();
                     hasCheckedAuth = true;
+                    syncBackendSettings();
                     return;
                 }
             }
@@ -1834,6 +1886,7 @@
                 document.getElementById('auth-overlay').style.display = 'none';
                 broadcastToken();
                 hasCheckedAuth = true;
+                syncBackendSettings();
             } else {
                 err.innerText = "Invalid Token. Please check admin_token.txt";
             }
