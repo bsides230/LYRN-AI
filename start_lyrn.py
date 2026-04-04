@@ -901,57 +901,79 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
     try:
         active_downloads[filename]["status"] = "downloading"
 
-        existing_bytes = 0
-        if part_file.exists():
-            existing_bytes = part_file.stat().st_size
+        max_retries = 5
+        base_delay = 2
 
-        headers = {}
-        if existing_bytes > 0:
-            headers['Range'] = f'bytes={existing_bytes}-'
+        for attempt in range(max_retries):
+            try:
+                existing_bytes = 0
+                if part_file.exists():
+                    existing_bytes = part_file.stat().st_size
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status not in (200, 206):
-                    raise Exception(f"HTTP {resp.status}")
+                headers = {}
+                if existing_bytes > 0:
+                    headers['Range'] = f'bytes={existing_bytes}-'
 
-                is_partial = (resp.status == 206)
-                if not is_partial and existing_bytes > 0:
-                    existing_bytes = 0 # Server didn't respect Range header
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, headers=headers) as resp:
+                        if resp.status not in (200, 206):
+                            raise ValueError(f"HTTP {resp.status}")
 
-                content_len = resp.headers.get("Content-Length")
-                total_size = int(content_len) + existing_bytes if content_len else existing_bytes
+                        is_partial = (resp.status == 206)
+                        if not is_partial and existing_bytes > 0:
+                            existing_bytes = 0 # Server didn't respect Range header
+                            # In this case we have to truncate the part file
+                            mode = "wb"
+                        else:
+                            mode = "ab" if is_partial else "wb"
 
-                if max_bytes > 0 and total_size > max_bytes:
-                     raise Exception("File too large")
+                        content_len = resp.headers.get("Content-Length")
+                        total_size = int(content_len) + existing_bytes if content_len else existing_bytes
 
-                downloaded = existing_bytes
+                        if max_bytes > 0 and total_size > max_bytes:
+                             raise ValueError("File too large")
 
-                # We need to compute hash of the whole file at the end
-                last_log_time = time.time()
+                        downloaded = existing_bytes
 
-                # Update total
-                active_downloads[filename]["total"] = total_size
+                        # We need to compute hash of the whole file at the end
+                        last_log_time = time.time()
 
-                mode = "ab" if is_partial else "wb"
-                async with aiofiles.open(part_file, mode) as f:
-                    async for chunk in resp.content.iter_chunked(1024 * 1024): # 1MB chunks
-                        downloaded += len(chunk)
-                        if max_bytes > 0 and downloaded > max_bytes:
-                             raise Exception("File limit exceeded")
+                        # Update total
+                        active_downloads[filename]["total"] = total_size
 
-                        await f.write(chunk)
+                        async with aiofiles.open(part_file, mode) as f:
+                            async for chunk in resp.content.iter_chunked(1024 * 1024): # 1MB chunks
+                                downloaded += len(chunk)
+                                if max_bytes > 0 and downloaded > max_bytes:
+                                     raise ValueError("File limit exceeded")
 
-                        # Update status
-                        active_downloads[filename]["bytes"] = downloaded
-                        if total_size > 0:
-                            active_downloads[filename]["pct"] = int(downloaded / total_size * 100)
+                                await f.write(chunk)
 
-                        if time.time() - last_log_time > 2:
-                            pct = ""
-                            if total_size > 0:
-                                pct = f" ({int(downloaded/total_size*100)}%)"
-                            await logger.emit("Info", f"Downloading {filename}: {downloaded // (1024*1024)}MB{pct}", "ModelManager")
-                            last_log_time = time.time()
+                                # Update status
+                                active_downloads[filename]["bytes"] = downloaded
+                                if total_size > 0:
+                                    active_downloads[filename]["pct"] = int(downloaded / total_size * 100)
+
+                                if time.time() - last_log_time > 2:
+                                    pct = ""
+                                    if total_size > 0:
+                                        pct = f" ({int(downloaded/total_size*100)}%)"
+                                    await logger.emit("Info", f"Downloading {filename}: {downloaded // (1024*1024)}MB{pct}", "ModelManager")
+                                    last_log_time = time.time()
+
+                # If successful, break the retry loop
+                break
+            except ValueError as e:
+                # Fatal errors, no retry
+                raise e
+            except Exception as e:
+                err_msg = str(e) or e.__class__.__name__
+                if attempt < max_retries - 1:
+                    await logger.emit("Warning", f"Download interrupted: {err_msg}. Retrying in {base_delay}s... (Attempt {attempt+1}/{max_retries})", "ModelManager")
+                    await asyncio.sleep(base_delay)
+                    base_delay *= 2
+                else:
+                    raise e
 
         # Hash Verification
         active_downloads[filename]["status"] = "verifying"
@@ -965,7 +987,7 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
         computed_hash = sha256.hexdigest()
         if expected_sha256 and computed_hash.lower() != expected_sha256.lower():
             if part_file.exists(): part_file.unlink()
-            raise Exception(f"Hash mismatch. Computed: {computed_hash}")
+            raise ValueError(f"Hash mismatch. Computed: {computed_hash}")
 
         # Atomic Move
         shutil.move(str(part_file), str(final_staging))
@@ -978,14 +1000,11 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
         active_downloads[filename]["bytes"] = downloaded
 
     except Exception as e:
-        if part_file.exists():
-            try:
-                part_file.unlink()
-            except: pass
-        print(f"Download error: {e}")
-        await logger.emit("Error", f"Download failed: {str(e)}", "ModelManager")
+        err_msg = str(e) or e.__class__.__name__
+        print(f"Download error: {err_msg}")
+        await logger.emit("Error", f"Download failed: {err_msg}", "ModelManager")
         active_downloads[filename]["status"] = "error"
-        active_downloads[filename]["error"] = str(e)
+        active_downloads[filename]["error"] = err_msg
 
 @app.post("/api/models/fetch", dependencies=[Depends(verify_token)])
 async def fetch_model(request: ModelFetchRequest, background_tasks: BackgroundTasks):
