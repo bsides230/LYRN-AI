@@ -120,6 +120,8 @@
     "terminal_start_path": "",
     "enable_deltas": false,
     "enable_chat_history": true,
-    "theme": "LYRN Dark"
+    "theme": "LYRN Dark",
+    "tab_tag": "LYRN",
+    "tab_suffix": "LYRN-AI"
   }
 }
