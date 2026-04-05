@@ -416,12 +416,12 @@ worker_controller = WorkerController()
 class FileTreeSelectionModel(BaseModel):
     root_path: str
     root_name: str
-    selections: Dict[str, Dict[str, bool]]
+    selections: Dict[str, Dict[str, Any]]
 
 class FileTreeProfileModel(BaseModel):
     name: str
     root_path: str
-    selections: Dict[str, Dict[str, bool]]
+    selections: Dict[str, Dict[str, Any]]
 
 class InjectArtifactModel(BaseModel):
     artifact: str
