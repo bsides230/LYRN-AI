@@ -253,8 +253,18 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
                 delta_content = delta_manager.get_delta_content()
 
             # Construct Messages
-            # Order: Snapshot -> History -> Deltas -> New Input
+            # Order: Snapshot -> Repo Context -> History -> Deltas -> New Input
             messages = [{"role": "system", "content": system_prompt}]
+
+            # Repo Context (Dynamic Injection)
+            repo_context_path = Path("global_flags/repo_context.txt")
+            if repo_context_path.exists():
+                try:
+                    repo_content = repo_context_path.read_text(encoding='utf-8')
+                    if repo_content.strip():
+                        messages.append({"role": "system", "content": repo_content})
+                except Exception as e:
+                    print(f"Error loading repo context: {e}")
 
             # History
             # IMPORTANT: Exclude the current chat file so we don't duplicate it or treat it as history yet
