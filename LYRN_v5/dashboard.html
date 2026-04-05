@@ -751,6 +751,7 @@
         const MODULE_REGISTRY = [
             { id: "mod_chat", file: "Chat Interface.html", name: "Chat", icon: "💬" },
             { id: "mod_builder", file: "Snapshot Builder.html", name: "Snapshot Builder", icon: "🛠️" },
+            { id: "mod_file_tree", file: "FileTreeViewer.html", name: "File Tree Viewer", icon: "📁" },
             { id: "mod_models", file: "ModelController.html", name: "Model Controller", icon: "🧠" },
             { id: "mod_model_manager", file: "ModelManager.html", name: "Model Manager", icon: "📦" },
             { id: "mod_job_manager", file: "Job Manager.html", name: "Job Automation", icon: "🤖" },
@@ -759,7 +760,7 @@
         ];
 
         let appSettings = {
-            activeModules: ['mod_chat', 'mod_builder', 'mod_models', 'mod_model_manager', 'mod_job_manager', 'mod_logs', 'mod_server_status'],
+            activeModules: ['mod_chat', 'mod_builder', 'mod_file_tree', 'mod_models', 'mod_model_manager', 'mod_job_manager', 'mod_logs', 'mod_server_status'],
             dockPinned: true, 
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
