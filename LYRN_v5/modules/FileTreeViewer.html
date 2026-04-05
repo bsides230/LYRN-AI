@@ -180,7 +180,10 @@
         <!-- Preview Panel -->
         <div class="panel preview-panel" id="preview-panel">
             <div class="panel-header">
-                <span>Compiled Artifact Preview</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>Compiled Artifact Preview</span>
+                    <span id="char-count" style="color: var(--brand-purple); font-size: 11px;"></span>
+                </div>
                 <button onclick="copyPreview()">Copy</button>
             </div>
             <div class="panel-content" style="padding:0;">
@@ -235,7 +238,7 @@
         }
 
         // --- Tree Loading & Rendering ---
-        async function loadTree() {
+        async function loadTree(keepState = false) {
             const rootPath = document.getElementById('inp-root-path').value.trim();
             if (!rootPath) return alert("Please enter a path.");
 
@@ -244,7 +247,9 @@
             try {
                 const data = await fetchAPI(`/api/fs/list?path=${encodeURIComponent(rootPath)}`);
                 treeData = data;
-                treeState = {}; // Reset state on new load
+                if (!keepState) {
+                    treeState = {}; // Reset state on new load
+                }
                 renderTree();
             } catch (e) {
                 document.getElementById('tree-container').innerHTML = `<div style="color:var(--error-color); text-align:center; margin-top:20px;">Error: ${e.message}</div>`;
@@ -491,10 +496,12 @@
 
             const btn = document.querySelector('button[onclick="compileTree()"]');
             btn.innerText = "Compiling...";
+            document.getElementById('char-count').innerText = "";
 
             try {
                 const res = await fetchAPI('/api/fs/compile', 'POST', payload);
                 document.getElementById('compile-preview').value = res.artifact;
+                document.getElementById('char-count').innerText = `(${res.artifact.length} chars)`;
                 document.getElementById('preview-panel').classList.add('active');
                 document.getElementById('btn-inject').style.display = 'inline-block';
             } catch (e) {
@@ -599,7 +606,7 @@
                 treeState = data.selections || {};
 
                 // Reload tree and apply state
-                await loadTree();
+                await loadTree(true);
                 refreshCheckboxes();
                 updateStats();
                 closeProfileModal();
