@@ -387,13 +387,22 @@ class ClaudeRunManager:
     """Tracks Claude Code runs: lifecycle, transcript, git diff snapshot."""
 
     STORE_DIR = Path("claude_runs")
+    VALID_MODES = ("oneshot", "inspect", "patch")
 
     def __init__(self):
         self.STORE_DIR.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._index_path = self.STORE_DIR / "index.json"
         self._procs: Dict[str, subprocess.Popen] = {}
+        self._log_handles: Dict[str, Any] = {}
         self.runs: Dict[str, Dict[str, Any]] = self._load_index()
+        # Any runs left in 'running' state from a prior server process are
+        # orphaned -- the subprocess is gone. Mark them so the UI is honest.
+        for run in self.runs.values():
+            if run.get("status") == "running":
+                run["status"] = "interrupted"
+                run["ended_at"] = run.get("ended_at") or time.time()
+        self._save_index()
 
     # ---------- Persistence ----------
     def _load_index(self) -> Dict[str, Dict[str, Any]]:
@@ -467,6 +476,61 @@ class ClaudeRunManager:
             print(f"[ClaudeRun] revert error: {e}")
             return False
 
+    # ---------- Validation / argv (single source of truth) ----------
+    def resolve_cwd(self, cwd: Optional[str]) -> Dict[str, Any]:
+        """Validate a user-supplied cwd. Returns a result dict with either
+        ``path`` (resolved) or ``error`` (human-readable)."""
+        raw = (cwd or "").strip()
+        if not raw:
+            return {"ok": False, "error": "Working directory is required."}
+        try:
+            p = Path(raw).expanduser()
+            if not p.exists():
+                return {"ok": False, "error": f"Path does not exist: {raw}"}
+            if not p.is_dir():
+                return {"ok": False, "error": f"Not a directory: {raw}"}
+            resolved = str(p.resolve())
+        except Exception as e:
+            return {"ok": False, "error": f"Invalid path: {e}"}
+        return {
+            "ok": True,
+            "path": resolved,
+            "is_git_repo": self._is_git_repo(resolved),
+        }
+
+    def build_argv(self, payload: Dict[str, Any]) -> List[str]:
+        """Backend is the source of truth for the actual command. The
+        frontend preview is informational only."""
+        mode = payload.get("mode") or "oneshot"
+        argv: List[str] = ["claude"]
+        if mode == "oneshot":
+            argv.append("--print")
+        elif mode == "inspect":
+            argv.append("--read-only")
+        elif mode == "patch":
+            argv.append("--patch-only")
+
+        if payload.get("model"):
+            argv += ["--model", str(payload["model"])]
+        if payload.get("effort"):
+            argv += ["--effort", str(payload["effort"])]
+        if payload.get("system_prompt"):
+            argv += ["--system-prompt", str(payload["system_prompt"])]
+        if payload.get("auto"):
+            argv.append("--enable-auto-mode")
+        if payload.get("perms"):
+            argv.append("--dangerously-skip-permissions")
+
+        task = (payload.get("task") or "").strip()
+        if task:
+            argv.append(task)
+        return argv
+
+    def preview(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        argv = self.build_argv(payload)
+        cwd_check = self.resolve_cwd(payload.get("cwd"))
+        return {"argv": argv, "cwd": cwd_check}
+
     # ---------- Auth ----------
     def auth_status(self) -> Dict[str, Any]:
         try:
@@ -475,7 +539,12 @@ class ClaudeRunManager:
                 capture_output=True, text=True, timeout=10,
             )
             output = (r.stdout + r.stderr).strip()
-            authed = r.returncode == 0 and ("logged in" in output.lower() or "authenticated" in output.lower())
+            low = output.lower()
+            authed = r.returncode == 0 and any(
+                marker in low for marker in (
+                    "logged in", "authenticated", "account:", "you are signed in",
+                )
+            )
             return {
                 "available": True,
                 "authenticated": authed,
@@ -522,6 +591,10 @@ class ClaudeRunManager:
                     run["ended_at"] = time.time()
                     self._save_index()
                 self._procs.pop(run_id, None)
+                fh = self._log_handles.pop(run_id, None)
+                if fh is not None:
+                    try: fh.close()
+                    except Exception: pass
 
     def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
@@ -574,9 +647,13 @@ class ClaudeRunManager:
 
     def delete_run(self, run_id: str) -> Dict[str, Any]:
         with self._lock:
-            run = self.runs.pop(run_id, None)
-            if not run:
-                return {"success": False}
+            self._refresh_statuses()
+            existing = self.runs.get(run_id)
+            if not existing:
+                return {"success": False, "message": "run not found"}
+            if existing.get("status") == "running":
+                return {"success": False, "message": "cannot delete a running run"}
+            self.runs.pop(run_id, None)
             try:
                 d = self.STORE_DIR / run_id
                 if d.exists():
@@ -587,47 +664,26 @@ class ClaudeRunManager:
             return {"success": True}
 
     def start_run(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        cwd = (payload.get("cwd") or os.getcwd()).strip()
-        try:
-            cwd_resolved = str(Path(cwd).expanduser().resolve())
-            if not Path(cwd_resolved).is_dir():
-                return {"success": False, "message": f"cwd not a directory: {cwd}"}
-        except Exception as e:
-            return {"success": False, "message": f"invalid cwd: {e}"}
+        mode = payload.get("mode") or "oneshot"
+        if mode not in self.VALID_MODES:
+            return {"success": False, "message": f"unsupported mode: {mode}"}
 
-        mode = payload.get("mode", "oneshot")
+        cwd_check = self.resolve_cwd(payload.get("cwd"))
+        if not cwd_check["ok"]:
+            return {"success": False, "message": cwd_check["error"]}
+        cwd_resolved = cwd_check["path"]
+
         task = (payload.get("task") or "").strip()
         if mode == "oneshot" and not task:
-            return {"success": False, "message": "task is required for one-shot runs"}
+            return {"success": False, "message": "Task is required for one-shot runs."}
+
+        argv = self.build_argv({**payload, "mode": mode, "task": task})
 
         run_id = "run_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + os.urandom(2).hex()
         run_dir = self.STORE_DIR / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         transcript_path = run_dir / "transcript.log"
 
-        # Build CLI arguments
-        argv = ["claude"]
-        if mode == "oneshot":
-            argv += ["--print"]
-        elif mode == "inspect":
-            argv += ["--read-only"]
-        elif mode == "patch":
-            argv += ["--patch-only"]
-
-        if payload.get("model"):
-            argv += ["--model", str(payload["model"])]
-        if payload.get("effort"):
-            argv += ["--effort", str(payload["effort"])]
-        if payload.get("system_prompt"):
-            argv += ["--system-prompt", str(payload["system_prompt"])]
-        if payload.get("auto"):
-            argv += ["--enable-auto-mode"]
-        if payload.get("perms"):
-            argv += ["--dangerously-skip-permissions"]
-        if task:
-            argv += [task]
-
-        # Snapshot baseline
         baseline = self._snapshot_baseline(cwd_resolved)
 
         try:
@@ -640,13 +696,17 @@ class ClaudeRunManager:
                 text=True,
             )
         except FileNotFoundError:
+            try: log_fh.close()
+            except Exception: pass
             return {"success": False, "message": "claude CLI not found in PATH"}
         except Exception as e:
+            try: log_fh.close()
+            except Exception: pass
             return {"success": False, "message": f"failed to start: {e}"}
 
         run = {
             "id": run_id,
-            "label": payload.get("label", ""),
+            "label": (payload.get("label") or "").strip(),
             "mode": mode,
             "cwd": cwd_resolved,
             "argv": argv,
@@ -665,9 +725,10 @@ class ClaudeRunManager:
         with self._lock:
             self.runs[run_id] = run
             self._procs[run_id] = proc
+            self._log_handles[run_id] = log_fh
             self._save_index()
 
-        return {"success": True, "run": self._summary(run)}
+        return {"success": True, "run": self._summary(run), "argv": argv}
 
 
 claude_run_manager = ClaudeRunManager()
@@ -1634,6 +1695,22 @@ async def get_proxy_status():
 @app.get("/api/claude/auth", dependencies=[Depends(verify_token)])
 async def claude_auth():
     return claude_run_manager.auth_status()
+
+@app.post("/api/claude/validate_cwd", dependencies=[Depends(verify_token)])
+async def claude_validate_cwd(req: Request):
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    return claude_run_manager.resolve_cwd((body or {}).get("cwd"))
+
+@app.post("/api/claude/preview", dependencies=[Depends(verify_token)])
+async def claude_preview(req: Request):
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    return claude_run_manager.preview(body or {})
 
 @app.get("/api/claude/runs", dependencies=[Depends(verify_token)])
 async def claude_list_runs():

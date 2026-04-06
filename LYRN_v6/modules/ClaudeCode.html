@@ -234,6 +234,7 @@
     .run-status.running   { color: var(--status-warn); border: 1px solid var(--status-warn); }
     .run-status.completed { color: var(--status-ok);   border: 1px solid var(--status-ok); }
     .run-status.failed    { color: var(--status-err);  border: 1px solid var(--status-err); }
+    .run-status.interrupted { color: var(--text-dim); border: 1px solid var(--border-color); }
     .run-status.unknown   { color: var(--text-dim);    border: 1px solid var(--border-color); }
 
     /* --- Modal --- */
@@ -328,6 +329,7 @@
             <div class="input-group">
               <label>Working Directory (cwd)</label>
               <input type="text" id="flag-cwd" placeholder="/path/to/repo">
+              <div id="cwd-hint" style="font-size:10px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;min-height:12px;"></div>
             </div>
             <div class="input-group">
               <label>Session Label</label>
@@ -429,12 +431,12 @@
           <div class="section-header">Interactive Commands</div>
           <div class="section-body">
             <div class="cmd-grid">
-              <button onclick="injectCmd('/compact')">/compact</button>
-              <button onclick="injectCmd('/clear')">/clear</button>
-              <button onclick="injectCmd('/cost')">/cost</button>
-              <button onclick="injectCmd('/status')">/status</button>
-              <button onclick="injectCmd('/doctor')">/doctor</button>
-              <button onclick="injectCmd('/insights')">/insights</button>
+              <button onclick="sendToTerminal('/compact')">/compact</button>
+              <button onclick="sendToTerminal('/clear')">/clear</button>
+              <button onclick="sendToTerminal('/cost')">/cost</button>
+              <button onclick="sendToTerminal('/status')">/status</button>
+              <button onclick="sendToTerminal('/doctor')">/doctor</button>
+              <button onclick="sendToTerminal('/insights')">/insights</button>
             </div>
           </div>
         </div>
@@ -456,11 +458,11 @@
           <div class="section-header">Auth & Session</div>
           <div class="section-body">
             <div class="cmd-grid">
-              <button onclick="injectCmd('claude auth login')">Auth Login</button>
-              <button onclick="injectCmd('claude auth status')">Auth Status</button>
+              <button onclick="sendToTerminal('claude auth login')">Auth Login</button>
+              <button onclick="sendToTerminal('claude auth status')">Auth Status</button>
             </div>
             <hr class="divider">
-            <button class="btn-ghost" onclick="injectCmd('claude remote-control')">Start Remote Control</button>
+            <button class="btn-ghost" onclick="sendToTerminal('claude remote-control')">Start Remote Control</button>
           </div>
         </div>
 
@@ -497,19 +499,29 @@
   <div id="toast">Message</div>
 
   <script>
-    // ---- Connection State ----
-    let authToken = localStorage.getItem('lyrn_admin_token') || null;
-    let coreUrl = localStorage.getItem('lyrn_core_url') || '';
+    // =====================================================================
+    // Claude Code Control Center
+    // ---------------------------------------------------------------------
+    //  - Interactive mode  -> live terminal websocket (/api/terminal/{sid})
+    //  - Non-interactive   -> orchestrated runs (/api/claude/runs)
+    //  - Backend is the source of truth for the actual command (argv).
+    //    The frontend preview is informational only.
+    //  - Polling is centralized in pollOnce() so it is easy to replace.
+    // =====================================================================
 
-    // Terminal state
+    // ---- Connection state ----
+    let authToken = localStorage.getItem('lyrn_admin_token') || null;
+    let coreUrl   = localStorage.getItem('lyrn_core_url') || '';
+
+    // ---- Terminal state ----
     let term = null;
     let fitAddon = null;
     let socket = null;
-    // Separate IDs: terminal SID stays stable across reconnects of the same
-    // terminal pty. Run ID rotates on each Claude launch for clean boundaries.
+    // Terminal SID stays stable across reconnects of the same pty.
+    // Run ID is informational and rotates on each launch.
     const sid = 'term_' + Math.random().toString(36).substr(2, 9);
     let runId = newRunIdValue();
-    let lastSysMsg = null; // dedupe noisy system messages
+    let lastSysMsg = null; // dedupe consecutive [sys] lines
 
     function newRunIdValue() {
       return 'run_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
@@ -520,14 +532,31 @@
       document.getElementById('sid-display').innerText = sid;
       document.getElementById('run-id-display').innerText = runId;
 
-      // Live-update preview as flags change
-      ['flag-mode','flag-model','flag-effort','flag-prompt','flag-auto','flag-perms','flag-cwd']
+      // Live-update preview as flags change.
+      ['flag-mode','flag-model','flag-effort','flag-prompt','flag-task',
+       'flag-auto','flag-perms','flag-cwd']
         .forEach(id => {
           const el = document.getElementById(id);
-          if (el) el.addEventListener('input', updatePreview);
-          if (el) el.addEventListener('change', updatePreview);
+          if (!el) return;
+          el.addEventListener('input',  updatePreview);
+          el.addEventListener('change', updatePreview);
         });
       updatePreview();
+
+      // Debounced live cwd validation hint.
+      const cwdInput = document.getElementById('flag-cwd');
+      let cwdTimer = null;
+      if (cwdInput) {
+        cwdInput.addEventListener('input', () => {
+          clearTimeout(cwdTimer);
+          setCwdHint('checking...', 'dim');
+          cwdTimer = setTimeout(() => {
+            const v = cwdInput.value.trim();
+            if (!v) { setCwdHint('', 'dim'); return; }
+            validateCwd(v);
+          }, 350);
+        });
+      }
 
       // Try connecting immediately if we have config from localStorage
       if (coreUrl) connectTerminal();
@@ -562,7 +591,7 @@
       });
     });
 
-    // ---- UI Helpers ----
+    // ---- UI helpers ----
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.innerText = msg;
@@ -571,16 +600,15 @@
     }
 
     function sysMsg(color, text) {
-      // Quiet duplicate system noise (e.g. repeated Disconnected lines)
+      // Quiet duplicate system noise (e.g. repeated Disconnected lines).
       if (lastSysMsg === text) return;
       lastSysMsg = text;
-      term.writeln(`\r\n\x1b[2m[sys]\x1b[0m \x1b[${color}m${text}\x1b[0m`);
+      if (term) term.writeln(`\r\n\x1b[2m[sys]\x1b[0m \x1b[${color}m${text}\x1b[0m`);
     }
 
     function newRun() {
       runId = newRunIdValue();
       document.getElementById('run-id-display').innerText = runId;
-      showToast('New run id: ' + runId);
       updatePreview();
     }
 
@@ -589,56 +617,63 @@
       return "'" + String(s).replace(/'/g, "'\\''") + "'";
     }
 
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
     function setStatus(state, label) {
       const pill = document.getElementById('status-pill');
       pill.classList.remove('connected', 'connecting', 'error');
-      if (state === 'connected') pill.classList.add('connected');
-      else if (state === 'connecting') pill.classList.add('connecting');
-      else if (state === 'error') pill.classList.add('error');
+      if (['connected','connecting','error'].includes(state)) pill.classList.add(state);
       document.getElementById('status-text').innerText = label;
     }
 
-    // ---- Terminal Logic ----
+    function setCwdHint(text, kind) {
+      const el = document.getElementById('cwd-hint');
+      if (!el) return;
+      el.innerText = text || '';
+      el.style.color = kind === 'ok'  ? 'var(--status-ok)'
+                     : kind === 'err' ? 'var(--status-err)'
+                                      : 'var(--text-dim)';
+    }
+
+    // ---- Terminal ----
     function initTerminal() {
       const container = document.getElementById('terminal-wrapper');
       term = new Terminal({
         cursorBlink: true,
-        theme: {
-          background: '#000000',
-          foreground: '#ffffff',
-          cursor: '#7c5cff'
-        },
+        theme: { background: '#000000', foreground: '#ffffff', cursor: '#7c5cff' },
         fontFamily: '"JetBrains Mono", monospace',
         fontSize: 13,
-        allowProposedApi: true
+        allowProposedApi: true,
       });
-
       fitAddon = new FitAddon.FitAddon();
       term.loadAddon(fitAddon);
       term.open(container);
 
       term.onData(data => {
         if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ type: 'input', data: data }));
+          socket.send(JSON.stringify({ type: 'input', data }));
         }
       });
-
       term.onResize(size => {
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
         }
       });
-
       setTimeout(() => { try { fitAddon.fit(); } catch(e){} }, 100);
     }
 
-    function clearTerminal() {
-      if (term) term.clear();
-    }
+    function clearTerminal() { if (term) term.clear(); }
 
-    function connectTerminal() {
+    async function connectTerminal() {
+      // Tear down any existing socket cleanly first.
       if (socket) {
-        try { socket.close(); } catch(e){}
+        try {
+          socket.onclose = null;
+          socket.onerror = null;
+          socket.close();
+        } catch (e) {}
         socket = null;
       }
 
@@ -648,11 +683,22 @@
         return;
       }
 
+      // If a cwd is set, validate it before opening the websocket so we
+      // surface a clean error in the UI rather than silently falling back.
+      const cwd = (document.getElementById('flag-cwd').value || '').trim();
+      if (cwd) {
+        const v = await validateCwd(cwd, /*silent*/ true);
+        if (!v.ok) {
+          sysMsg('31', 'Invalid cwd: ' + v.error);
+          setStatus('error', 'Bad cwd');
+          return;
+        }
+      }
+
       let wsUrl = coreUrl.replace(/^http/, 'ws') + `/api/terminal/${sid}`;
       const params = new URLSearchParams();
       if (authToken) params.set('token', authToken);
-      const cwd = (document.getElementById('flag-cwd').value || '').trim();
-      if (cwd) params.set('cwd', cwd);
+      if (cwd)       params.set('cwd', cwd);
       const qs = params.toString();
       if (qs) wsUrl += '?' + qs;
 
@@ -673,7 +719,6 @@
         setStatus('connected', 'Connected');
         setTimeout(() => { try { fitAddon.fit(); } catch(e){} }, 100);
       };
-
       socket.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
@@ -682,45 +727,50 @@
           console.error('Failed to parse WS msg', e);
         }
       };
-
       socket.onclose = () => {
         sysMsg('31', 'Disconnected.');
         setStatus('error', 'Disconnected');
       };
-
       socket.onerror = () => {
-        sysMsg('31', 'WebSocket Error.');
+        sysMsg('31', 'WebSocket error.');
         setStatus('error', 'Error');
       };
     }
 
+    // ---- Command preview (informational; backend builds the real argv) ----
     function copyPreview() {
       const ta = document.getElementById('cmd-preview');
       ta.select();
-      try { document.execCommand('copy'); showToast('Copied'); } catch(e){ showToast('Copy failed'); }
+      try { document.execCommand('copy'); showToast('Copied'); }
+      catch (e) { showToast('Copy failed'); }
+    }
+
+    function readPayload() {
+      return {
+        mode:          document.getElementById('flag-mode').value,
+        cwd:           document.getElementById('flag-cwd').value || '',
+        model:         document.getElementById('flag-model').value || '',
+        effort:        document.getElementById('flag-effort').value || '',
+        system_prompt: document.getElementById('flag-prompt').value || '',
+        task:          document.getElementById('flag-task').value || '',
+        label:         document.getElementById('session-label').value || '',
+        auto:          document.getElementById('flag-auto').checked,
+        perms:         document.getElementById('flag-perms').checked,
+      };
     }
 
     function buildLaunchCommand() {
+      const p = readPayload();
       const parts = ['claude'];
-
-      const mode = document.getElementById('flag-mode').value;
-      // Mode → flag mapping (frontend convention; backend wraps as appropriate)
-      if (mode === 'oneshot') parts.push('--print');
-      else if (mode === 'inspect') parts.push('--read-only');
-      else if (mode === 'patch') parts.push('--patch-only');
-
-      const model = document.getElementById('flag-model').value;
-      if (model) parts.push('--model', model);
-
-      const effort = document.getElementById('flag-effort').value;
-      if (effort) parts.push('--effort', effort);
-
-      const prompt = document.getElementById('flag-prompt').value;
-      if (prompt) parts.push('--system-prompt', shellQuote(prompt));
-
-      if (document.getElementById('flag-auto').checked) parts.push('--enable-auto-mode');
-      if (document.getElementById('flag-perms').checked) parts.push('--dangerously-skip-permissions');
-
+      if (p.mode === 'oneshot') parts.push('--print');
+      else if (p.mode === 'inspect') parts.push('--read-only');
+      else if (p.mode === 'patch') parts.push('--patch-only');
+      if (p.model)         parts.push('--model', p.model);
+      if (p.effort)        parts.push('--effort', p.effort);
+      if (p.system_prompt) parts.push('--system-prompt', shellQuote(p.system_prompt));
+      if (p.auto)          parts.push('--enable-auto-mode');
+      if (p.perms)         parts.push('--dangerously-skip-permissions');
+      if (p.mode !== 'interactive' && p.task) parts.push(shellQuote(p.task));
       return parts.join(' ');
     }
 
@@ -729,8 +779,8 @@
       if (ta) ta.value = buildLaunchCommand();
     }
 
-    // ---- Claude Code Control Logic ----
-    function injectCmd(cmdStr) {
+    // ---- Send to live terminal (interactive mode) ----
+    function sendToTerminal(cmdStr) {
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         showToast('Terminal not connected');
         return;
@@ -738,101 +788,135 @@
       socket.send(JSON.stringify({ type: 'input', data: cmdStr + '\r\n' }));
       term.focus();
     }
+    // Backwards-compatible alias for any external callers.
+    const injectCmd = sendToTerminal;
 
-    function launchClaudeCode() {
-      // Rotate run id on each launch for clean run boundaries
+    async function launchClaudeCode() {
       newRun();
-      const mode = document.getElementById('flag-mode').value;
-      // Non-interactive modes go through the orchestrator REST API so we can
-      // capture transcript + diff. Interactive falls through to the terminal.
-      if (mode !== 'interactive') {
-        startOrchestratedRun();
+      const payload = readPayload();
+      // Pre-flight cwd validation for both paths so failures are visible.
+      const v = await validateCwd(payload.cwd);
+      if (!v.ok) {
+        showToast('Invalid cwd: ' + v.error);
+        return;
+      }
+      if (payload.mode === 'interactive') {
+        sendToTerminal(buildLaunchCommand());
       } else {
-        injectCmd(buildLaunchCommand());
+        startOrchestratedRun(payload);
       }
     }
 
     // ========== Orchestrator API ==========
-    function authHeaders() {
-      const h = { 'Content-Type': 'application/json' };
-      if (authToken) h['X-Token'] = authToken;
-      return h;
+    async function api(path, opts = {}) {
+      if (!coreUrl) throw new Error('Core URL not set');
+      let r;
+      try {
+        r = await fetch(coreUrl + path, {
+          ...opts,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { 'X-Token': authToken } : {}),
+            ...(opts.headers || {}),
+          },
+        });
+      } catch (e) {
+        throw new Error('Network error: ' + e.message);
+      }
+      if (!r.ok) {
+        // Try to extract a JSON detail message; fall back to status text.
+        let msg = `HTTP ${r.status}`;
+        try {
+          const j = await r.json();
+          if (j && (j.detail || j.message)) msg += ' — ' + (j.detail || j.message);
+        } catch (e) {}
+        throw new Error(msg);
+      }
+      return r.json();
     }
 
-    async function api(path, opts = {}) {
-      if (!coreUrl) throw new Error('No core URL');
-      const r = await fetch(coreUrl + path, {
-        ...opts,
-        headers: { ...authHeaders(), ...(opts.headers || {}) },
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
+    // Pre-flight cwd validation. When ``silent`` is true, the cwd hint is
+    // not updated (used by the terminal reconnect path which has its own
+    // surfacing in the terminal itself).
+    async function validateCwd(cwd, silent) {
+      const value = (cwd || '').trim();
+      if (!value) {
+        if (!silent) setCwdHint('cwd is required', 'err');
+        return { ok: false, error: 'cwd is required' };
+      }
+      try {
+        const r = await api('/api/claude/validate_cwd', {
+          method: 'POST',
+          body: JSON.stringify({ cwd: value }),
+        });
+        if (r.ok) {
+          if (!silent) setCwdHint(`✓ ${r.path}${r.is_git_repo ? ' · git' : ''}`, 'ok');
+          return r;
+        }
+        if (!silent) setCwdHint(r.error || 'invalid', 'err');
+        return { ok: false, error: r.error || 'invalid' };
+      } catch (e) {
+        if (!silent) setCwdHint(e.message, 'err');
+        return { ok: false, error: e.message };
+      }
     }
 
     async function refreshAuth() {
       const pill = document.getElementById('auth-pill');
-      const txt = document.getElementById('auth-text');
+      const txt  = document.getElementById('auth-text');
       pill.classList.remove('connected', 'connecting', 'error');
       try {
         const data = await api('/api/claude/auth');
-        if (!data.available) {
-          pill.classList.add('error');
-          txt.innerText = 'No CLI';
-        } else if (data.authenticated) {
-          pill.classList.add('connected');
-          txt.innerText = 'Authed';
-        } else {
-          pill.classList.add('error');
-          txt.innerText = 'Logged out';
-        }
+        if (!data.available)         { pill.classList.add('error');     txt.innerText = 'No CLI'; }
+        else if (data.authenticated) { pill.classList.add('connected'); txt.innerText = 'Authed'; }
+        else                         { pill.classList.add('error');     txt.innerText = 'Logged out'; }
       } catch (e) {
         pill.classList.add('error');
         txt.innerText = 'Auth ?';
       }
     }
 
+    function renderRunRow(r) {
+      const ts = r.started_at ? new Date(r.started_at * 1000).toLocaleTimeString() : '';
+      const label = r.label || r.id;
+      const statusCls = ['running','completed','failed','interrupted'].includes(r.status) ? r.status : 'unknown';
+      const tags = [
+        r.mode,
+        ts,
+        r.has_diff ? 'diff' : '',
+        r.approved === true ? '✓ approved' : '',
+        r.approved === false ? '✗ reverted' : '',
+      ].filter(Boolean).join(' · ');
+      return `<div class="run-item" data-run-id="${r.id}" onclick="openRunModal('${r.id}')">
+        <div class="row">
+          <span class="label">${escapeHtml(label)}</span>
+          <span class="run-status ${statusCls}">${escapeHtml(r.status)}</span>
+        </div>
+        <div class="meta">${escapeHtml(tags)}</div>
+      </div>`;
+    }
+
+    let lastRunSignature = '';
     async function refreshRuns() {
       const list = document.getElementById('run-list');
       try {
         const data = await api('/api/claude/runs');
         const runs = data.runs || [];
-        if (!runs.length) {
-          list.innerHTML = '<div style="color:var(--text-dim);font-size:10px;text-align:center;">No runs yet</div>';
-          return;
-        }
-        list.innerHTML = runs.map(r => {
-          const ts = r.started_at ? new Date(r.started_at * 1000).toLocaleTimeString() : '';
-          const label = r.label || r.id;
-          const statusCls = ['running','completed','failed'].includes(r.status) ? r.status : 'unknown';
-          return `<div class="run-item" onclick="openRunModal('${r.id}')">
-            <div class="row">
-              <span class="label">${escapeHtml(label)}</span>
-              <span class="run-status ${statusCls}">${r.status}</span>
-            </div>
-            <div class="meta">${r.mode} · ${ts}${r.has_diff ? ' · diff' : ''}${r.approved===true?' · ✓':''}${r.approved===false?' · ✗':''}</div>
-          </div>`;
-        }).join('');
+        // Cheap diff: only re-render when the visible signature changes.
+        const sig = JSON.stringify(runs.map(r => [r.id, r.status, r.approved, r.has_diff]));
+        if (sig === lastRunSignature) return runs;
+        lastRunSignature = sig;
+        list.innerHTML = runs.length
+          ? runs.map(renderRunRow).join('')
+          : '<div style="color:var(--text-dim);font-size:10px;text-align:center;">No runs yet</div>';
+        return runs;
       } catch (e) {
-        list.innerHTML = `<div style="color:var(--status-err);font-size:10px;">${e.message}</div>`;
+        list.innerHTML = `<div style="color:var(--status-err);font-size:10px;">${escapeHtml(e.message)}</div>`;
+        return [];
       }
     }
 
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
-
-    async function startOrchestratedRun() {
-      const payload = {
-        mode: document.getElementById('flag-mode').value,
-        cwd: document.getElementById('flag-cwd').value || '',
-        model: document.getElementById('flag-model').value || '',
-        effort: document.getElementById('flag-effort').value || '',
-        system_prompt: document.getElementById('flag-prompt').value || '',
-        task: document.getElementById('flag-task').value || '',
-        label: document.getElementById('session-label').value || '',
-        auto: document.getElementById('flag-auto').checked,
-        perms: document.getElementById('flag-perms').checked,
-      };
+    async function startOrchestratedRun(payload) {
       try {
         const data = await api('/api/claude/runs', {
           method: 'POST',
@@ -843,7 +927,12 @@
           return;
         }
         showToast('Run started');
-        refreshRuns();
+        // Force an immediate poll cycle so the new run appears.
+        lastRunSignature = '';
+        const runs = await refreshRuns();
+        // Auto-open the new run for convenience.
+        if (data.run && data.run.id) openRunModal(data.run.id);
+        else if (runs.length) openRunModal(runs[0].id);
       } catch (e) {
         showToast('Run start error: ' + e.message);
       }
@@ -851,10 +940,12 @@
 
     // ---- Modal ----
     let currentRunId = null;
+    let currentRunStatus = null;
     let modalTab = 'transcript';
 
-    async function openRunModal(runId) {
+    function openRunModal(runId) {
       currentRunId = runId;
+      currentRunStatus = null;
       modalTab = 'transcript';
       document.getElementById('run-modal-title').innerText = 'Run ' + runId;
       document.getElementById('run-modal').classList.add('show');
@@ -864,6 +955,7 @@
     function closeRunModal() {
       document.getElementById('run-modal').classList.remove('show');
       currentRunId = null;
+      currentRunStatus = null;
     }
 
     function switchModalTab(tab) {
@@ -875,14 +967,27 @@
       renderModalBody();
     }
 
+    function modalLoading(body) {
+      body.innerHTML = '<div style="color:var(--text-dim)">Loading...</div>';
+    }
+
+    function modalError(body, msg) {
+      body.innerHTML = `<div style="color:var(--status-err);">${escapeHtml(msg)}</div>`;
+    }
+
     async function renderModalBody() {
       const body = document.getElementById('modal-body');
       if (!currentRunId) { body.innerHTML = ''; return; }
-      body.innerHTML = '<div style="color:var(--text-dim)">Loading...</div>';
+      modalLoading(body);
       try {
+        // Always pull the latest run record so currentRunStatus stays in sync.
+        const run = await api(`/api/claude/runs/${currentRunId}`);
+        currentRunStatus = run.status;
+
         if (modalTab === 'transcript') {
           const data = await api(`/api/claude/runs/${currentRunId}/transcript`);
-          body.innerHTML = `<pre class="transcript">${escapeHtml(data.transcript || '(empty)')}</pre>`;
+          const text = data.transcript || '(empty)';
+          body.innerHTML = `<pre class="transcript">${escapeHtml(text)}</pre>`;
         } else if (modalTab === 'diff') {
           const data = await api(`/api/claude/runs/${currentRunId}/diff`);
           if (data.error) {
@@ -893,23 +998,23 @@
             body.innerHTML = '<div style="color:var(--text-dim)">No file changes detected.</div>';
             return;
           }
-          let html = '';
-          data.files.forEach(f => {
-            html += `<div class="diff-file-card">
+          const cards = data.files.map(f => `
+            <div class="diff-file-card">
               <div class="head">
                 <span class="path">${escapeHtml(f.path)}</span>
                 <span><span class="diff-add">+${f.additions}</span> <span class="diff-del">-${f.deletions}</span></span>
               </div>
-            </div>`;
-          });
-          html += `<details style="margin-top:10px;"><summary style="cursor:pointer;color:var(--text-dim);">Raw patch</summary><pre class="diff-raw" style="margin-top:6px;">${escapeHtml(data.raw || '')}</pre></details>`;
-          body.innerHTML = html;
+            </div>`).join('');
+          const raw = `<details style="margin-top:10px;">
+            <summary style="cursor:pointer;color:var(--text-dim);">Raw patch</summary>
+            <pre class="diff-raw" style="margin-top:6px;">${escapeHtml(data.raw || '')}</pre>
+          </details>`;
+          body.innerHTML = cards + raw;
         } else if (modalTab === 'meta') {
-          const run = await api(`/api/claude/runs/${currentRunId}`);
           body.innerHTML = `<pre class="transcript">${escapeHtml(JSON.stringify(run, null, 2))}</pre>`;
         }
       } catch (e) {
-        body.innerHTML = `<div style="color:var(--status-err);">${escapeHtml(e.message)}</div>`;
+        modalError(body, e.message);
       }
     }
 
@@ -917,38 +1022,54 @@
       if (!currentRunId) return;
       try {
         const r = await api(`/api/claude/runs/${currentRunId}/approve`, { method: 'POST' });
-        showToast(r.success ? 'Approved' : 'Approve failed');
-        refreshRuns();
+        showToast(r.success ? 'Approved' : ('Approve failed: ' + (r.message || '')));
+        lastRunSignature = '';
+        await refreshRuns();
+        await renderModalBody();
       } catch (e) { showToast('Error: ' + e.message); }
     }
 
     async function rejectCurrentRun() {
       if (!currentRunId) return;
-      if (!confirm('Revert working tree to baseline snapshot? This is destructive.')) return;
+      if (!confirm('Revert working tree to the baseline snapshot? This is destructive.')) return;
       try {
         const r = await api(`/api/claude/runs/${currentRunId}/reject`, { method: 'POST' });
         showToast(r.success ? 'Reverted to baseline' : ('Revert failed: ' + (r.message || '')));
-        refreshRuns();
-        renderModalBody();
+        lastRunSignature = '';
+        await refreshRuns();
+        await renderModalBody();
       } catch (e) { showToast('Error: ' + e.message); }
     }
 
     function downloadCurrentTranscript() {
       if (!currentRunId || !coreUrl) return;
-      const url = `${coreUrl}/api/claude/runs/${currentRunId}/transcript/download${authToken ? '?token='+encodeURIComponent(authToken) : ''}`;
+      const qs = authToken ? '?token=' + encodeURIComponent(authToken) : '';
+      const url = `${coreUrl}/api/claude/runs/${currentRunId}/transcript/download${qs}`;
       window.open(url, '_blank');
     }
 
-    // Periodic refresh once we have config
+    // ---- Polling (centralized; intentionally simple, easy to replace) ----
     let pollTimer = null;
+    const POLL_INTERVAL_MS = 4000;
+
+    async function pollOnce() {
+      const runs = await refreshRuns();
+      // If the modal is open on a still-running run, refresh its body so
+      // transcript/diff stay in sync without requiring a manual reload.
+      if (currentRunId) {
+        const cur = runs && runs.find(r => r.id === currentRunId);
+        if (cur && cur.status !== currentRunStatus) {
+          await renderModalBody();
+        }
+      }
+    }
+
     function startPolling() {
-      if (pollTimer) clearInterval(pollTimer);
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       if (!coreUrl || !authToken) return;
       refreshAuth();
-      refreshRuns();
-      pollTimer = setInterval(() => {
-        refreshRuns();
-      }, 4000);
+      pollOnce();
+      pollTimer = setInterval(pollOnce, POLL_INTERVAL_MS);
     }
   </script>
 </body>
