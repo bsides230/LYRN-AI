@@ -1,5 +1,30 @@
 # Build Notes
 
+## v6.0.4 - Claude-Scoped Quick Status Panel + Dashboard Cleanup
+
+This update moves the quick status surface into the Claude Code module (where it is needed during Claude operations) and removes the dashboard-level quick panel experiment.
+
+- **Claude module quick status panel (`LYRN_v6/modules/ClaudeCode.html`)**
+  - Added a right-edge toggle button in the terminal area that opens/closes a hidden-by-default status drawer.
+  - Added at-a-glance status cards for terminal connection, Claude auth, worker state, model state, CPU/RAM, and last update timestamp.
+  - Wired updates to existing module events (`setStatus`, `refreshAuth`) and the existing polling loop (`pollOnce` + `/health`) without backend API changes.
+
+- **Claude mobile usability**
+  - Retained and documented the explicit in-panel mobile close button for the left drawer (`✕`) plus backdrop close behavior.
+
+- **Dashboard rollback + maximize fix retention (`LYRN_v6/dashboard.html`)**
+  - Removed the dashboard-scoped quick status panel so status glance behavior lives only in the Claude module.
+  - Kept the maximize geometry fix (`top: 0`, `height: 100%`) to eliminate top-gap artifacts.
+
+- **Versioning + archival**
+  - Bumped dashboard title to `v0.62`.
+  - Archived prior dashboard iteration to `deprecated/Old/dashboard_v0.61.html`.
+  - Archived prior Claude module iteration to `deprecated/Old/ClaudeCode_v6.0.3.html` before applying this update.
+
+- **Logging updates**
+  - No backend log format/schema changes were made.
+  - Quick status values in the Claude module are derived from existing `/health` and auth polling responses.
+
 ## v6.0.3 - Claude Panel Readability, Mobile Close Controls, and Quick Status Drawer
 
 This update improves dashboard/module usability on smaller screens, adds a fast right-side health glance panel, and removes maximize spacing artifacts.
