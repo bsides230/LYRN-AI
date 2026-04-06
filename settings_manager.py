@@ -143,8 +143,21 @@ class SettingsManager:
                 backup_path = SETTINGS_PATH + '.bk'
                 shutil.copy2(SETTINGS_PATH, backup_path)
 
+            # Create a copy to avoid mutating the live settings object
+            settings_to_save = (settings or self.settings).copy()
+            if "paths" in settings_to_save:
+                settings_to_save["paths"] = settings_to_save["paths"].copy()
+                for key, path in settings_to_save["paths"].items():
+                    if path and os.path.isabs(path):
+                        try:
+                            # Convert back to relative path for saving
+                            settings_to_save["paths"][key] = os.path.relpath(path, SCRIPT_DIR).replace('\\', '/')
+                        except ValueError:
+                            # Fallback if paths are on different drives
+                            pass
+
             data = {
-                "settings": settings or self.settings,
+                "settings": settings_to_save,
                 "ui_settings": self.ui_settings
             }
 
