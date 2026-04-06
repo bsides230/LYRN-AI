@@ -51,6 +51,13 @@
 
         * { box-sizing: border-box; }
 
+        /* Themed scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 6px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--brand-purple); }
+
+
         body {
             margin: 0; padding: 0; width: 100vw;
             min-height: 100vh; overflow: hidden;
@@ -505,10 +512,107 @@
         input:checked + .toggle-slider { background-color: var(--brand-purple); }
         input:checked + .toggle-slider:before { transform: translateX(14px); background-color: white; }
 
+
+        /* =========================================
+           QUICK STATUS PANEL (RIGHT)
+           ========================================= */
+        #quick-status-toggle {
+            position: fixed;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 20010;
+            width: 34px;
+            height: 78px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: var(--bg-panel);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.45);
+        }
+        #quick-status-toggle:hover {
+            color: var(--brand-purple);
+            border-color: var(--brand-purple);
+        }
+        #quick-status-toggle.open {
+            right: 286px;
+        }
+
+        #quick-status-panel {
+            position: fixed;
+            right: 0;
+            top: 32px;
+            height: calc(100vh - 32px);
+            width: min(280px, 78vw);
+            transform: translateX(102%);
+            transition: transform 0.2s ease;
+            z-index: 20009;
+            border-left: 1px solid var(--border-color);
+            background: rgba(10, 10, 10, 0.94);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+        }
+        #quick-status-panel.open {
+            transform: translateX(0);
+        }
+        .quick-status-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--brand-purple);
+        }
+        .quick-status-body {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+        .quick-row {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .quick-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 5px;
+        }
+        .quick-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .quick-value.ok { color: #00cc66; }
+        .quick-value.warn { color: #ffbb33; }
+        .quick-value.err { color: #ff6666; }
+
         /* =========================================
            MEDIA QUERIES
            ========================================= */
         @media (max-width: 600px) {
+            #quick-status-panel { width: min(86vw, 320px); }
+            #quick-status-toggle { right: 10px; height: 64px; }
+            #quick-status-toggle.open { right: calc(min(86vw, 320px) + 10px); }
             /* STACKED CARD LAYOUT FOR MOBILE */
             #desktop-area {
                 display: flex;
@@ -580,6 +684,37 @@
             <button class="bar-btn close-iframe-btn" id="btn-close-iframe" onclick="closeDashboard()">✕</button>
         </div>
     </div>
+
+    <button id="quick-status-toggle" onclick="toggleQuickStatusPanel()" aria-label="Open quick status panel" title="Quick Status">◀</button>
+
+    <aside id="quick-status-panel" aria-hidden="true">
+        <div class="quick-status-head">
+            <span>Quick Status</span>
+            <button class="bar-btn" onclick="closeQuickStatusPanel()" aria-label="Close quick status panel">✕</button>
+        </div>
+        <div class="quick-status-body">
+            <div class="quick-row">
+                <div class="quick-label">Backend</div>
+                <div class="quick-value" id="quick-backend">Unknown</div>
+            </div>
+            <div class="quick-row">
+                <div class="quick-label">Worker</div>
+                <div class="quick-value" id="quick-worker">Unknown</div>
+            </div>
+            <div class="quick-row">
+                <div class="quick-label">Model State</div>
+                <div class="quick-value" id="quick-model">Unknown</div>
+            </div>
+            <div class="quick-row">
+                <div class="quick-label">CPU / RAM</div>
+                <div class="quick-value" id="quick-cpu-ram">--</div>
+            </div>
+            <div class="quick-row">
+                <div class="quick-label">Last Health Check</div>
+                <div class="quick-value" id="quick-updated">Never</div>
+            </div>
+        </div>
+    </aside>
 
     <div id="auth-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); backdrop-filter:blur(15px); z-index:30000; align-items:center; justify-content:center; flex-direction:column;">
         <div style="background:var(--bg-panel); border:1px solid var(--brand-purple); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
@@ -773,6 +908,7 @@
         let zIndexCounter = 100;
         let activeWindows = new Set();
         let isEditMode = false;
+        let quickStatusOpen = false;
 
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
@@ -815,7 +951,7 @@
             });
 
             // Handle Window Resize (Keep windows on screen)
-            window.addEventListener('resize', constrainWindows);
+            window.addEventListener('resize', () => { constrainWindows(); if (window.innerWidth <= 600) closeQuickStatusPanel(); });
 
             // Init Layouts
             loadLayoutsAndCheckDefault();
@@ -1953,24 +2089,69 @@
                 const llmEl = document.getElementById(llmLight);
                 llmEl.style.display = 'block';
 
+                let workerText = 'Status Unknown';
+                let workerTone = 'err';
+                let modelText = 'Unknown';
+                let modelTone = 'err';
+
                 if (data.worker) {
                     if (!data.worker.running) {
                         setLight(llmLight, 'orange', 'Worker Stopped');
+                        workerText = 'Stopped';
+                        workerTone = 'warn';
+                        modelText = 'Not loaded';
+                        modelTone = 'warn';
                     } else {
                         const s = data.worker.llm_status;
-                        if (s === 'busy') setLight(llmLight, 'blue pulse', 'LLM Generating...');
-                        else if (s === 'loading') setLight(llmLight, 'yellow pulse', 'Loading Model...');
-                        else if (s === 'error') setLight(llmLight, 'red pulse', 'Model Error');
-                        else setLight(llmLight, 'green', 'Worker Idle / Ready');
+                        if (s === 'busy') {
+                            setLight(llmLight, 'blue pulse', 'LLM Generating...');
+                            workerText = 'Running';
+                            workerTone = 'ok';
+                            modelText = 'Generating';
+                            modelTone = 'warn';
+                        } else if (s === 'loading') {
+                            setLight(llmLight, 'yellow pulse', 'Loading Model...');
+                            workerText = 'Running';
+                            workerTone = 'ok';
+                            modelText = 'Loading';
+                            modelTone = 'warn';
+                        } else if (s === 'error') {
+                            setLight(llmLight, 'red pulse', 'Model Error');
+                            workerText = 'Running';
+                            workerTone = 'warn';
+                            modelText = 'Error';
+                            modelTone = 'err';
+                        } else {
+                            setLight(llmLight, 'green', 'Worker Idle / Ready');
+                            workerText = 'Running';
+                            workerTone = 'ok';
+                            modelText = 'Ready';
+                            modelTone = 'ok';
+                        }
                     }
                 } else {
                     setLight(llmLight, 'red', 'Worker Status Unknown');
                 }
 
+                updateQuickStatusPanel({
+                    backend: { text: 'Connected', tone: 'ok' },
+                    worker: { text: workerText, tone: workerTone },
+                    model: { text: modelText, tone: modelTone },
+                    cpuRam: { text: finalText, tone: '' },
+                    updatedAt: { text: new Date().toLocaleTimeString(), tone: '' }
+                });
+
             } catch (e) {
                 document.getElementById('sys-cpu').innerText = "";
                 setLight(srvLight, 'red', 'Disconnected / Offline');
                 document.getElementById(llmLight).style.display = 'none';
+                updateQuickStatusPanel({
+                    backend: { text: 'Offline', tone: 'err' },
+                    worker: { text: 'Unknown', tone: 'err' },
+                    model: { text: 'Unknown', tone: 'err' },
+                    cpuRam: { text: '--', tone: '' },
+                    updatedAt: { text: new Date().toLocaleTimeString(), tone: '' }
+                });
             }
         }
 
@@ -1980,6 +2161,38 @@
                 el.className = 'status-light ' + status;
                 el.title = title || status;
             }
+        }
+
+
+        function setQuickValue(id, text, tone = '') {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.className = 'quick-value' + (tone ? ` ${tone}` : '');
+            el.innerText = text;
+        }
+
+        function updateQuickStatusPanel({ backend, worker, model, cpuRam, updatedAt }) {
+            if (backend) setQuickValue('quick-backend', backend.text, backend.tone);
+            if (worker) setQuickValue('quick-worker', worker.text, worker.tone);
+            if (model) setQuickValue('quick-model', model.text, model.tone);
+            if (cpuRam) setQuickValue('quick-cpu-ram', cpuRam.text, cpuRam.tone);
+            if (updatedAt) setQuickValue('quick-updated', updatedAt.text, updatedAt.tone);
+        }
+
+        function toggleQuickStatusPanel(forceOpen = null) {
+            quickStatusOpen = forceOpen === null ? !quickStatusOpen : !!forceOpen;
+            const panel = document.getElementById('quick-status-panel');
+            const btn = document.getElementById('quick-status-toggle');
+            if (!panel || !btn) return;
+            panel.classList.toggle('open', quickStatusOpen);
+            panel.setAttribute('aria-hidden', quickStatusOpen ? 'false' : 'true');
+            btn.classList.toggle('open', quickStatusOpen);
+            btn.innerText = quickStatusOpen ? '▶' : '◀';
+            btn.setAttribute('aria-label', quickStatusOpen ? 'Close quick status panel' : 'Open quick status panel');
+        }
+
+        function closeQuickStatusPanel() {
+            toggleQuickStatusPanel(false);
         }
 
         function initSystemMonitor() {

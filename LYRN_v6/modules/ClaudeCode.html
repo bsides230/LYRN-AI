@@ -261,6 +261,93 @@
     }
 
 
+    .quick-status-toggle {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      width: 30px;
+      height: 72px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-panel);
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    }
+    .quick-status-toggle:hover {
+      color: var(--brand-purple);
+      border-color: var(--brand-purple);
+    }
+    .quick-status-toggle.open {
+      right: calc(min(280px, 72vw) + 10px);
+    }
+
+    .quick-status-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: min(280px, 72vw);
+      height: 100%;
+      border-left: 1px solid var(--border-color);
+      background: rgba(10, 10, 10, 0.95);
+      backdrop-filter: blur(8px);
+      transform: translateX(102%);
+      transition: transform 0.2s ease;
+      z-index: 55;
+      display: flex;
+      flex-direction: column;
+    }
+    .quick-status-panel.open {
+      transform: translateX(0);
+    }
+    .quick-status-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-color);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--brand-purple);
+    }
+    .quick-status-body {
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .quick-status-card {
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-panel);
+      padding: 8px 10px;
+    }
+    .quick-status-label {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 4px;
+    }
+    .quick-status-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-head);
+      line-height: 1.35;
+    }
+    .quick-status-value.ok { color: var(--status-ok); }
+    .quick-status-value.warn { color: var(--status-warn); }
+    .quick-status-value.err { color: var(--status-err); }
+
+
     /* --- SECTIONS --- */
     .section {
       border: 1px solid var(--border-color);
@@ -573,38 +660,15 @@
         width: 100%;
       }
       .quick-status-toggle {
-        right: 6px;
+        right: 8px;
         width: 28px;
         height: 64px;
       }
       .quick-status-toggle.open {
-        right: 6px;
+        right: calc(min(86vw, 320px) + 8px);
       }
       .quick-status-panel {
-        position: fixed;
-        top: 0;
-        right: 0;
         width: min(86vw, 320px);
-        max-width: 320px;
-        transform: translateX(102%);
-        transition: transform 0.2s ease;
-        border-left: 1px solid var(--border-color);
-        box-shadow: 0 24px 80px rgba(0,0,0,0.65);
-        z-index: 12000;
-      }
-      .quick-status-panel.open {
-        width: min(86vw, 320px);
-        transform: translateX(0);
-      }
-      .quick-panel-backdrop {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.62);
-        z-index: 11960;
-      }
-      .quick-panel-backdrop.show {
-        display: block;
       }
       .guide-item {
         grid-template-columns: 1fr;
@@ -802,7 +866,7 @@
 
       <!-- Terminal View -->
       <div class="terminal-container">
-        <button class="quick-status-toggle" id="quick-status-toggle" onclick="toggleQuickStatusPanel()" aria-label="Open quick status panel" title="Quick Status">STAT</button>
+        <button class="quick-status-toggle" id="quick-status-toggle" onclick="toggleQuickStatusPanel()" aria-label="Open quick status panel" title="Quick Status">◀</button>
         <aside class="quick-status-panel" id="quick-status-panel" aria-hidden="true">
           <div class="quick-status-head">
             <span>Quick Status</span>
@@ -824,16 +888,10 @@
             <div class="quick-status-card">
               <div class="quick-status-label">Model</div>
               <div class="quick-status-value" id="quick-model">Unknown</div>
-              <div class="quick-status-mini" id="quick-model-details">Prompt: 0 tok @ 0.0 T/s<br>Eval: 0 tok @ 0.0 T/s</div>
             </div>
             <div class="quick-status-card">
               <div class="quick-status-label">CPU / RAM</div>
               <div class="quick-status-value" id="quick-cpu-ram">--</div>
-            </div>
-            <div class="quick-status-card">
-              <div class="quick-status-label">Totals</div>
-              <div class="quick-status-value" id="quick-total-tokens">0 tokens</div>
-              <div class="quick-status-mini" id="quick-runtime-details">KV reuse: 0 | Load: 0 ms | Total: 0.00 s</div>
             </div>
             <div class="quick-status-card">
               <div class="quick-status-label">Updated</div>
@@ -990,7 +1048,7 @@
             <div>
               <h4>Mobile behavior</h4>
               <p>On phones/tablets, the left panel becomes a slide-in drawer. Use the top-left ☰ button to open it, use the in-panel ✕ to close, and scroll for full section access while terminal remains full-width behind it.</p>
-              <p>The terminal side includes a right-edge quick status toggle: on desktop it expands as a right-side panel without covering terminal text, and on mobile it slides inward with a dim backdrop so it can be closed quickly.</p>
+              <p>The terminal side includes a right-edge quick status toggle so you can peek backend/model/worker state without opening another module.</p>
             </div>
           </div>
         </div>
@@ -1044,9 +1102,6 @@
         worker: { text: 'Unknown', tone: '' },
         model: { text: 'Unknown', tone: '' },
         cpuRam: { text: '--', tone: '' },
-        modelDetails: 'Prompt: 0 tok @ 0.0 T/s<br>Eval: 0 tok @ 0.0 T/s',
-        totalTokens: { text: '0 tokens', tone: '' },
-        runtimeDetails: 'KV reuse: 0 | Load: 0 ms | Total: 0.00 s',
       });
 
       // Live-update preview as flags change.
@@ -1159,15 +1214,6 @@
       if (data.worker) setQuickValue('quick-worker', data.worker.text, data.worker.tone);
       if (data.model) setQuickValue('quick-model', data.model.text, data.model.tone);
       if (data.cpuRam) setQuickValue('quick-cpu-ram', data.cpuRam.text, data.cpuRam.tone);
-      if (data.modelDetails) {
-        const el = document.getElementById('quick-model-details');
-        if (el) el.innerHTML = data.modelDetails;
-      }
-      if (data.totalTokens) setQuickValue('quick-total-tokens', data.totalTokens.text, data.totalTokens.tone);
-      if (data.runtimeDetails) {
-        const el = document.getElementById('quick-runtime-details');
-        if (el) el.innerText = data.runtimeDetails;
-      }
       setQuickValue('quick-updated', new Date().toLocaleTimeString(), '');
     }
 
@@ -1175,14 +1221,12 @@
       quickPanelOpen = forceOpen === null ? !quickPanelOpen : !!forceOpen;
       const panel = document.getElementById('quick-status-panel');
       const btn = document.getElementById('quick-status-toggle');
-      const overlay = document.getElementById('quick-panel-overlay');
       if (!panel || !btn) return;
       panel.classList.toggle('open', quickPanelOpen);
       panel.setAttribute('aria-hidden', quickPanelOpen ? 'false' : 'true');
-      btn.innerText = quickPanelOpen ? 'HIDE' : 'STAT';
+      btn.innerText = quickPanelOpen ? '▶' : '◀';
       btn.setAttribute('aria-label', quickPanelOpen ? 'Close quick status panel' : 'Open quick status panel');
       btn.classList.toggle('open', quickPanelOpen);
-      if (overlay) overlay.classList.toggle('show', quickPanelOpen && window.innerWidth <= MOBILE_BREAKPOINT);
     }
 
     function closeQuickStatusPanel() {
@@ -1205,9 +1249,6 @@
         worker: { text: 'Unknown', tone: '' },
         model: { text: 'Unknown', tone: '' },
         cpuRam: { text: '--', tone: '' },
-        modelDetails: 'Prompt: 0 tok @ 0.0 T/s<br>Eval: 0 tok @ 0.0 T/s',
-        totalTokens: { text: '0 tokens', tone: '' },
-        runtimeDetails: 'KV reuse: 0 | Load: 0 ms | Total: 0.00 s',
       });
       updatePreview();
     }
@@ -1674,9 +1715,6 @@
 
         let worker = { text: 'Unknown', tone: 'err' };
         let model = { text: 'Unknown', tone: 'err' };
-        let modelDetails = 'Prompt: 0 tok @ 0.0 T/s<br>Eval: 0 tok @ 0.0 T/s';
-        let totalTokens = { text: '0 tokens', tone: '' };
-        let runtimeDetails = 'KV reuse: 0 | Load: 0 ms | Total: 0.00 s';
         if (health.worker) {
           if (!health.worker.running) {
             worker = { text: 'Stopped', tone: 'warn' };
@@ -1691,34 +1729,16 @@
           }
         }
 
-        if (health.llm_stats) {
-          const st = health.llm_stats;
-          if (st.model_name) model = { text: st.model_name, tone: model.tone || '' };
-          const promptTok = st.prompt_tokens || 0;
-          const promptSpeed = (st.prompt_speed || 0).toFixed(1);
-          const evalTok = st.eval_tokens || st.last_tokens || 0;
-          const evalSpeed = (st.eval_speed || st.tps || 0).toFixed(1);
-          modelDetails = `Prompt: ${promptTok} tok @ ${promptSpeed} T/s<br>Eval: ${evalTok} tok @ ${evalSpeed} T/s`;
-          totalTokens = { text: `${st.total_tokens || 0} tokens`, tone: '' };
-          runtimeDetails = `KV reuse: ${st.kv_cache_reused || 0} | Load: ${(st.load_time || 0).toFixed(0)} ms | Total: ${(st.total_time || 0).toFixed(2)} s`;
-        }
-
         setQuickSnapshot({
           worker,
           model,
           cpuRam: { text: cpuRam, tone: '' },
-          modelDetails,
-          totalTokens,
-          runtimeDetails,
         });
       } catch (e) {
         setQuickSnapshot({
           worker: { text: 'Unavailable', tone: 'err' },
           model: { text: 'Unavailable', tone: 'err' },
           cpuRam: { text: '--', tone: '' },
-          modelDetails: 'Prompt: --<br>Eval: --',
-          totalTokens: { text: '--', tone: '' },
-          runtimeDetails: 'KV reuse: -- | Load: -- | Total: --',
         });
       }
     }

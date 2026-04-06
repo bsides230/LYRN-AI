@@ -1,29 +1,5 @@
 # Build Notes
 
-## v6.0.5 - Claude Quick Panel Layout/Styling + Full Model Stats
-
-This update addresses module usability feedback by refining the Claude quick panel behavior, restoring full model-stat visibility, and enforcing non-compressing control-panel sizing.
-
-- **Claude control panel sizing + scrolling (`LYRN_v6/modules/ClaudeCode.html`)**
-  - Removed manual horizontal resize from the left control panel to prevent accidental compression behavior.
-  - Kept strict panel minimum sizing and explicit vertical scrolling so all sections remain accessible when the module window is short.
-
-- **Claude quick panel UX (desktop + mobile)**
-  - Restyled the quick-panel handle to better match LYRN aesthetics (purple gradient/glow, mono label, cleaner edge treatment).
-  - Changed desktop quick panel behavior to expand as a dedicated right-side column (non-overlay) so terminal content is not covered.
-  - Added mobile inward slide behavior with a dim backdrop for quick glance + easy dismissal.
-
-- **Claude model stat coverage in quick panel**
-  - Added model stats parity fields from health payloads: prompt tokens/speed, eval tokens/speed, total tokens, KV reuse, load time, and total runtime.
-  - Continued showing terminal/auth/worker/model/CPU-RAM status with timestamp refresh.
-
-- **Versioning + archival**
-  - Archived prior Claude module iteration to `deprecated/Old/ClaudeCode_v6.0.4.html` before applying this update.
-
-- **Logging updates**
-  - No backend log schema changes were required.
-  - All quick-panel values are derived from existing `/health` and auth polling responses.
-
 ## v6.0.4 - Claude-Scoped Quick Status Panel + Dashboard Cleanup
 
 This update moves the quick status surface into the Claude Code module (where it is needed during Claude operations) and removes the dashboard-level quick panel experiment.
