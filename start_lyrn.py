@@ -24,6 +24,16 @@ from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
+import platform
+import struct
+if platform.system() != "Windows":
+    import pty
+    import termios
+    import fcntl
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+
 from settings_manager import SettingsManager
 from automation_controller import AutomationController
 from chat_manager import ChatManager
@@ -589,7 +599,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-app = FastAPI(title="LYRN v5 Backend", lifespan=lifespan)
+app = FastAPI(title="LYRN v6 Backend", lifespan=lifespan)
 
 # Determine allowed origins
 allowed_origins = settings_manager.settings.get("allowed_origins", [])
@@ -1685,13 +1695,222 @@ async def rebuild_snapshot():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+
+# --- Terminal Logic ---
+
+import platform
+import struct
+if platform.system() != "Windows":
+    import pty
+    import termios
+    import fcntl
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+class WebTerminalSession:
+    def __init__(self, session_id: str, cwd: Optional[str] = None):
+        self.id = session_id
+        self.created_at = time.time()
+        self.cwd = cwd
+        self.cols = 80
+        self.rows = 24
+        self.process = None
+        self.master_fd = None
+        self.os_type = platform.system()
+        self.loop = asyncio.get_running_loop()
+        self.history = []
+        self.subscribers: set[WebSocket] = set()
+        self.reader_task = None
+        self.closed = False
+        self._start()
+
+    def _start(self):
+        if self.os_type == "Windows":
+            self.process = subprocess.Popen(
+                ["cmd.exe"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0,
+                shell=False,
+                cwd=self.cwd
+            )
+            self.reader_task = asyncio.create_task(self._read_loop())
+        else:
+            self.closed = True
+            self.history.append("Internal Error: WebTerminalSession used on Linux. Use LocalPTYSession.\r\n")
+
+    async def _read_loop(self):
+        while not self.closed:
+            data = await self._read_output()
+            if not data:
+                break
+            try:
+                text = data.decode(errors="replace")
+                self.history.append(text)
+                if len(self.history) > 1000:
+                     self.history = self.history[-1000:]
+                await self._broadcast(text)
+            except Exception as e:
+                break
+        if not self.closed:
+             msg = "\r\n\x1b[1;31m[Process terminated]\x1b[0m\r\n"
+             self.history.append(msg)
+             await self._broadcast(msg)
+        self.close()
+
+    async def _broadcast(self, text: str):
+        msg = json.dumps({"type": "output", "data": text})
+        to_remove = []
+        for ws in self.subscribers:
+            try:
+                await ws.send_text(msg)
+            except:
+                to_remove.append(ws)
+        for ws in to_remove:
+            self.subscribers.discard(ws)
+
+    async def _read_output(self):
+        if self.os_type == "Windows":
+            return await self.loop.run_in_executor(None, self._read_windows)
+        else:
+            return await self.loop.run_in_executor(None, self._read_linux)
+
+    def _read_windows(self):
+        if self.process and self.process.stdout:
+            return self.process.stdout.read(1024)
+        return b""
+
+    def _read_linux(self):
+        if self.master_fd:
+            try:
+                return os.read(self.master_fd, 1024)
+            except OSError:
+                return b""
+        return b""
+
+    def write_input(self, data: str):
+        if self.closed: return
+        if self.os_type == "Windows":
+            if self.process and self.process.stdin:
+                try:
+                    self.process.stdin.write(data.encode())
+                    self.process.stdin.flush()
+                except: pass
+        else:
+            if self.master_fd:
+                try:
+                    os.write(self.master_fd, data.encode())
+                except: pass
+
+    def resize(self, cols, rows):
+        self.cols = cols
+        self.rows = rows
+        if self.os_type != "Windows" and self.master_fd is not None:
+            try:
+                winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+            except: pass
+
+    def close(self):
+        self.closed = True
+        if self.process:
+            self.process.terminate()
+        if self.os_type != "Windows" and self.master_fd:
+            try: os.close(self.master_fd)
+            except: pass
+
+
+class LocalPTYSession(WebTerminalSession):
+    def _start(self):
+        if self.os_type == "Windows":
+            self.closed = True
+            self.history.append("Local PTY mode is not supported on Windows.\r\n")
+            return
+
+        shell = os.environ.get("SHELL", "/bin/bash")
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+
+        try:
+            pid, master_fd = pty.fork()
+            if pid == 0:
+                if self.cwd:
+                    try: os.chdir(self.cwd)
+                    except: pass
+                try:
+                    os.execve(shell, [shell], env)
+                except Exception as e:
+                    os._exit(1)
+            else:
+                self.pid = pid
+                self.master_fd = master_fd
+                self.reader_task = asyncio.create_task(self._read_loop())
+        except Exception as e:
+            self.history.append(f"Error: Failed to start PTY. {str(e)}\r\n")
+            self.close()
+
+    def close(self):
+        self.closed = True
+        if hasattr(self, 'pid') and self.pid:
+            try:
+                os.kill(self.pid, 9)
+                os.waitpid(self.pid, os.WNOHANG)
+            except: pass
+        if self.master_fd:
+            try: os.close(self.master_fd)
+            except: pass
+
+
+@app.websocket("/api/terminal/{sid}")
+async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None):
+    try:
+        # Auth check
+        if not Path("global_flags/no_auth").exists():
+            if not LYRN_TOKEN or not token or token != LYRN_TOKEN:
+                print(f"[Terminal] Denied access. Expected: {LYRN_TOKEN} Got: {token}")
+                await websocket.close(code=4003)
+                return
+
+        await websocket.accept()
+
+        if platform.system() == "Windows":
+            session = WebTerminalSession(sid)
+        else:
+            session = LocalPTYSession(sid)
+
+        session.subscribers.add(websocket)
+        print(f"[Terminal] Connected {sid}")
+
+        for chunk in session.history:
+             await websocket.send_text(json.dumps({"type": "output", "data": chunk}))
+
+        while True:
+            msg_text = await websocket.receive_text()
+            msg = json.loads(msg_text)
+
+            if msg["type"] == "input":
+                session.write_input(msg["data"])
+            elif msg["type"] == "resize":
+                session.resize(msg.get("cols", 80), msg.get("rows", 24))
+
+    except WebSocketDisconnect:
+        print(f"[Terminal] Disconnected {sid}")
+    except Exception as e:
+        print(f"[Terminal] Error: {e}")
+    finally:
+        if 'session' in locals():
+            session.close()
+
 # Serve dashboard at root
+
 @app.get("/")
 async def read_root():
-    return FileResponse('LYRN_v5/dashboard.html')
+    return FileResponse('LYRN_v6/dashboard.html')
 
 # Serve Static Files
-app.mount("/", StaticFiles(directory="LYRN_v5", html=True), name="static")
+app.mount("/", StaticFiles(directory="LYRN_v6", html=True), name="static")
 
 if __name__ == "__main__":
     port = 8000

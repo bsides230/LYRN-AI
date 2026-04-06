@@ -87,3 +87,13 @@ This update marks the official transition to the Dashboard v5 architecture and a
 -   **Structured Memory over Prompt Injection:** All core context—personality, memory, goals—lives in structured text files and memory tables. The LLM reasons from this stable foundation rather than having it repeatedly injected into a limited context window.
 -   **Simplicity and Robustness:** The architecture is inspired by the simplicity of 1990s text-based game parsers. The framework's job is to be a robust, simple system for moving data; the LLM's job is to do the heavy lifting of reasoning.
 -   **UI Development:** New modules must be implemented as single-file solutions (combining HTML, CSS, and JS) in `LYRN_v5/modules/` to facilitate loading on smaller systems and minimize floating dependencies. UI must strictly follow `LYRN Style Guide.html`.
+
+### Version 6.0 Update
+- **Feature**: Added Claude Code Control Center GUI
+  - Integrated `xterm.js` for an interactive terminal.
+  - Added configuration flags and preset execution commands in the UI.
+- **Backend**: Implemented WebSocket terminal streaming in `start_lyrn.py`.
+  - Added `WebTerminalSession` (Windows) and `LocalPTYSession` (Linux/Mac using `pty`).
+  - Added dependencies: `websockets`, `uvicorn[standard]`, `pty`.
+- **Logging Updates**:
+  - Terminal connection status and errors are now printed to `stdout` securely.
