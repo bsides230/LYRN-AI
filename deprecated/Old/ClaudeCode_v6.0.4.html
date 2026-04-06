@@ -146,120 +146,14 @@
       background: var(--bg-panel);
       display: flex; flex-direction: column;
       overflow-y: auto; padding: 16px; gap: 16px;
+      resize: horizontal;
       overflow-x: hidden;
     }
 
     .terminal-container {
-      flex: 1;
-      background: #000;
-      position: relative;
-      min-width: 0;
-      display: flex;
-      overflow: hidden;
+      flex: 1; background: #000; position: relative; min-width: 0;
     }
-    #terminal-wrapper {
-      flex: 1;
-      min-width: 0;
-      height: 100%;
-      padding: 8px;
-      transition: width 0.2s ease;
-    }
-
-    .quick-status-toggle {
-      position: absolute;
-      top: 50%;
-      right: 8px;
-      transform: translateY(-50%);
-      width: 30px;
-      height: 78px;
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      background: linear-gradient(180deg, rgba(124,92,255,0.15), rgba(5,5,5,0.95));
-      color: var(--brand-purple);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      cursor: pointer;
-      z-index: 60;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(124,92,255,0.2);
-      letter-spacing: 0.08em;
-    }
-    .quick-status-toggle:hover {
-      color: #fff;
-      border-color: var(--brand-purple);
-      box-shadow: 0 10px 28px rgba(0,0,0,0.6), 0 0 12px rgba(124,92,255,0.35);
-    }
-    .quick-status-toggle.open {
-      right: 288px;
-    }
-
-    .quick-status-panel {
-      width: 0;
-      height: 100%;
-      border-left: 0 solid var(--border-color);
-      background: rgba(10, 10, 10, 0.96);
-      transition: width 0.2s ease, border-left-width 0.2s ease;
-      z-index: 50;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .quick-status-panel.open {
-      width: 280px;
-      border-left-width: 1px;
-    }
-    .quick-status-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border-color);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--brand-purple);
-    }
-    .quick-status-body {
-      padding: 12px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .quick-status-card {
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background: var(--bg-panel);
-      padding: 8px 10px;
-    }
-    .quick-status-label {
-      font-size: 9px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-      margin-bottom: 4px;
-    }
-    .quick-status-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--text-head);
-      line-height: 1.35;
-    }
-    .quick-status-value.ok { color: var(--status-ok); }
-    .quick-status-value.warn { color: var(--status-warn); }
-    .quick-status-value.err { color: var(--status-err); }
-    .quick-status-mini {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: var(--text-dim);
-      margin-top: 4px;
-      line-height: 1.35;
-    }
-    .quick-panel-backdrop {
-      display: none;
-    }
-
+    #terminal-wrapper { width: 100%; height: 100%; padding: 8px; }
 
     .quick-status-toggle {
       position: absolute;
@@ -708,7 +602,6 @@
 
     <div class="main-content">
       <div class="mobile-drawer-backdrop" id="panel-overlay" onclick="closeMobilePanel()"></div>
-      <div class="quick-panel-backdrop" id="quick-panel-overlay" onclick="closeQuickStatusPanel()"></div>
       <!-- Control Panel -->
       <div class="control-panel" id="control-panel">
         <div class="mobile-panel-top">
