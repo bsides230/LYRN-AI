@@ -11,3 +11,6 @@ uvicorn
 python-multipart
 aiohttp
 aiofiles
+websockets
+uvicorn[standard]
+ptyprocess
