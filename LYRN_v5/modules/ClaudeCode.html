@@ -321,10 +321,17 @@
 
                 // Update instructions
                 const port = data.port || 8001;
-                document.getElementById('proxy-instructions').innerText = `# Using the included launcher script:
-./lcc.sh lyrn-model
+                document.getElementById('proxy-instructions').innerText = `# 1. (Optional) Make lcc.sh globally available:
+sudo cp lcc.sh /usr/local/bin/lcc
+sudo chmod +x /usr/local/bin/lcc
 
-# Or manually:
+# 2. Run Claude Code using the launcher:
+./lcc.sh lyrn-model    # If not installed globally
+# OR
+lcc lyrn-model         # If installed globally
+
+# ---------------------------------------------
+# Or run manually without the script:
 export ANTHROPIC_BASE_URL="http://localhost:${port}"
 export ANTHROPIC_AUTH_TOKEN="lyrn"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
