@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYRN Dashboard v0.62 (Center Dock)</title>
+    <title>LYRN Dashboard v0.60 (Center Dock)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -1695,7 +1695,7 @@
         }
 
         function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
-        function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '0'; win.style.left = '0'; win.style.width = '100%'; win.style.height = '100%'; } }
+        function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '32px'; win.style.left = '0'; win.style.width = '100%'; win.style.height = 'calc(100% - 32px)'; } }
         function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
         function loadSettings() { const s = localStorage.getItem('lyrn-settings'); if(s) appSettings = { ...appSettings, ...JSON.parse(s) }; if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme); if(appSettings.tabTag || appSettings.tabSuffix) { const t = appSettings.tabTag || "LYRN"; const suf = appSettings.tabSuffix || "LYRN-AI"; document.title = `${t} | ${suf}`; document.getElementById('setting-tab-tag').value = t; document.getElementById('setting-tab-suffix').value = suf; } }
 

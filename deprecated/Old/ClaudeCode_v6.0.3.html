@@ -155,93 +155,6 @@
     }
     #terminal-wrapper { width: 100%; height: 100%; padding: 8px; }
 
-    .quick-status-toggle {
-      position: absolute;
-      top: 50%;
-      right: 10px;
-      transform: translateY(-50%);
-      width: 30px;
-      height: 72px;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      background: var(--bg-panel);
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      cursor: pointer;
-      z-index: 50;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
-    }
-    .quick-status-toggle:hover {
-      color: var(--brand-purple);
-      border-color: var(--brand-purple);
-    }
-    .quick-status-toggle.open {
-      right: calc(min(280px, 72vw) + 10px);
-    }
-
-    .quick-status-panel {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: min(280px, 72vw);
-      height: 100%;
-      border-left: 1px solid var(--border-color);
-      background: rgba(10, 10, 10, 0.95);
-      backdrop-filter: blur(8px);
-      transform: translateX(102%);
-      transition: transform 0.2s ease;
-      z-index: 55;
-      display: flex;
-      flex-direction: column;
-    }
-    .quick-status-panel.open {
-      transform: translateX(0);
-    }
-    .quick-status-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border-color);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--brand-purple);
-    }
-    .quick-status-body {
-      padding: 12px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .quick-status-card {
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background: var(--bg-panel);
-      padding: 8px 10px;
-    }
-    .quick-status-label {
-      font-size: 9px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-      margin-bottom: 4px;
-    }
-    .quick-status-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--text-head);
-      line-height: 1.35;
-    }
-    .quick-status-value.ok { color: var(--status-ok); }
-    .quick-status-value.warn { color: var(--status-warn); }
-    .quick-status-value.err { color: var(--status-err); }
-
-
     /* --- SECTIONS --- */
     .section {
       border: 1px solid var(--border-color);
@@ -553,17 +466,6 @@
       .terminal-container {
         width: 100%;
       }
-      .quick-status-toggle {
-        right: 8px;
-        width: 28px;
-        height: 64px;
-      }
-      .quick-status-toggle.open {
-        right: calc(min(86vw, 320px) + 8px);
-      }
-      .quick-status-panel {
-        width: min(86vw, 320px);
-      }
       .guide-item {
         grid-template-columns: 1fr;
       }
@@ -759,39 +661,6 @@
 
       <!-- Terminal View -->
       <div class="terminal-container">
-        <button class="quick-status-toggle" id="quick-status-toggle" onclick="toggleQuickStatusPanel()" aria-label="Open quick status panel" title="Quick Status">◀</button>
-        <aside class="quick-status-panel" id="quick-status-panel" aria-hidden="true">
-          <div class="quick-status-head">
-            <span>Quick Status</span>
-            <button style="width:auto; padding:2px 8px;" onclick="closeQuickStatusPanel()" aria-label="Close quick status panel">✕</button>
-          </div>
-          <div class="quick-status-body">
-            <div class="quick-status-card">
-              <div class="quick-status-label">Terminal</div>
-              <div class="quick-status-value" id="quick-terminal">Disconnected</div>
-            </div>
-            <div class="quick-status-card">
-              <div class="quick-status-label">Claude Auth</div>
-              <div class="quick-status-value" id="quick-auth">Unknown</div>
-            </div>
-            <div class="quick-status-card">
-              <div class="quick-status-label">Worker</div>
-              <div class="quick-status-value" id="quick-worker">Unknown</div>
-            </div>
-            <div class="quick-status-card">
-              <div class="quick-status-label">Model</div>
-              <div class="quick-status-value" id="quick-model">Unknown</div>
-            </div>
-            <div class="quick-status-card">
-              <div class="quick-status-label">CPU / RAM</div>
-              <div class="quick-status-value" id="quick-cpu-ram">--</div>
-            </div>
-            <div class="quick-status-card">
-              <div class="quick-status-label">Updated</div>
-              <div class="quick-status-value" id="quick-updated">Never</div>
-            </div>
-          </div>
-        </aside>
         <div id="terminal-wrapper"></div>
       </div>
     </div>
@@ -940,8 +809,7 @@
             </div>
             <div>
               <h4>Mobile behavior</h4>
-              <p>On phones/tablets, the left panel becomes a slide-in drawer. Use the top-left ☰ button to open it, use the in-panel ✕ to close, and scroll for full section access while terminal remains full-width behind it.</p>
-              <p>The terminal side includes a right-edge quick status toggle so you can peek backend/model/worker state without opening another module.</p>
+              <p>On phones/tablets, the left panel becomes a slide-in drawer. Use the top-left ☰ button to open it, then scroll the panel for all controls while terminal remains full-width behind it.</p>
             </div>
           </div>
         </div>
@@ -979,7 +847,6 @@
     const sid = 'term_' + Math.random().toString(36).substr(2, 9);
     let runId = newRunIdValue();
     let lastSysMsg = null; // dedupe consecutive [sys] lines
-    let quickPanelOpen = false;
 
     function newRunIdValue() {
       return 'run_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
@@ -989,13 +856,6 @@
       initTerminal();
       document.getElementById('sid-display').innerText = sid;
       document.getElementById('run-id-display').innerText = runId;
-      setQuickSnapshot({
-        terminal: { text: 'Idle', tone: '' },
-        auth: { text: 'Unknown', tone: '' },
-        worker: { text: 'Unknown', tone: '' },
-        model: { text: 'Unknown', tone: '' },
-        cpuRam: { text: '--', tone: '' },
-      });
 
       // Live-update preview as flags change.
       ['flag-mode','flag-model','flag-effort','flag-prompt','flag-task',
@@ -1054,7 +914,6 @@
       window.addEventListener('resize', () => {
         if (fitAddon) { try { fitAddon.fit(); } catch(e){} }
         if (window.innerWidth > MOBILE_BREAKPOINT) closeMobilePanel();
-        if (window.innerWidth <= MOBILE_BREAKPOINT && quickPanelOpen) closeQuickStatusPanel();
       });
     });
 
@@ -1094,38 +953,6 @@
       if (modal) modal.classList.remove('show');
     }
 
-    function setQuickValue(id, text, tone = '') {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.className = 'quick-status-value' + (tone ? ` ${tone}` : '');
-      el.innerText = text;
-    }
-
-    function setQuickSnapshot(data) {
-      if (data.terminal) setQuickValue('quick-terminal', data.terminal.text, data.terminal.tone);
-      if (data.auth) setQuickValue('quick-auth', data.auth.text, data.auth.tone);
-      if (data.worker) setQuickValue('quick-worker', data.worker.text, data.worker.tone);
-      if (data.model) setQuickValue('quick-model', data.model.text, data.model.tone);
-      if (data.cpuRam) setQuickValue('quick-cpu-ram', data.cpuRam.text, data.cpuRam.tone);
-      setQuickValue('quick-updated', new Date().toLocaleTimeString(), '');
-    }
-
-    function toggleQuickStatusPanel(forceOpen = null) {
-      quickPanelOpen = forceOpen === null ? !quickPanelOpen : !!forceOpen;
-      const panel = document.getElementById('quick-status-panel');
-      const btn = document.getElementById('quick-status-toggle');
-      if (!panel || !btn) return;
-      panel.classList.toggle('open', quickPanelOpen);
-      panel.setAttribute('aria-hidden', quickPanelOpen ? 'false' : 'true');
-      btn.innerText = quickPanelOpen ? '▶' : '◀';
-      btn.setAttribute('aria-label', quickPanelOpen ? 'Close quick status panel' : 'Open quick status panel');
-      btn.classList.toggle('open', quickPanelOpen);
-    }
-
-    function closeQuickStatusPanel() {
-      toggleQuickStatusPanel(false);
-    }
-
     function sysMsg(color, text) {
       // Quiet duplicate system noise (e.g. repeated Disconnected lines).
       if (lastSysMsg === text) return;
@@ -1136,13 +963,6 @@
     function newRun() {
       runId = newRunIdValue();
       document.getElementById('run-id-display').innerText = runId;
-      setQuickSnapshot({
-        terminal: { text: 'Idle', tone: '' },
-        auth: { text: 'Unknown', tone: '' },
-        worker: { text: 'Unknown', tone: '' },
-        model: { text: 'Unknown', tone: '' },
-        cpuRam: { text: '--', tone: '' },
-      });
       updatePreview();
     }
 
@@ -1160,8 +980,6 @@
       pill.classList.remove('connected', 'connecting', 'error');
       if (['connected','connecting','error'].includes(state)) pill.classList.add(state);
       document.getElementById('status-text').innerText = label;
-      const tone = state === 'connected' ? 'ok' : state === 'connecting' ? 'warn' : state === 'error' ? 'err' : '';
-      setQuickSnapshot({ terminal: { text: label, tone } });
     }
 
     function setCwdHint(text, kind) {
@@ -1403,13 +1221,12 @@
       pill.classList.remove('connected', 'connecting', 'error');
       try {
         const data = await api('/api/claude/auth');
-        if (!data.available)         { pill.classList.add('error');     txt.innerText = 'No CLI'; setQuickSnapshot({ auth: { text: 'CLI missing', tone: 'err' } }); }
-        else if (data.authenticated) { pill.classList.add('connected'); txt.innerText = 'Authed'; setQuickSnapshot({ auth: { text: 'Authenticated', tone: 'ok' } }); }
-        else                         { pill.classList.add('error');     txt.innerText = 'Logged out'; setQuickSnapshot({ auth: { text: 'Logged out', tone: 'warn' } }); }
+        if (!data.available)         { pill.classList.add('error');     txt.innerText = 'No CLI'; }
+        else if (data.authenticated) { pill.classList.add('connected'); txt.innerText = 'Authed'; }
+        else                         { pill.classList.add('error');     txt.innerText = 'Logged out'; }
       } catch (e) {
         pill.classList.add('error');
         txt.innerText = 'Auth ?';
-        setQuickSnapshot({ auth: { text: 'Unknown', tone: 'err' } });
       }
     }
 
@@ -1598,41 +1415,6 @@
         if (cur && cur.status !== currentRunStatus) {
           await renderModalBody();
         }
-      }
-
-      try {
-        const health = await api('/health');
-        const cpuRam = health.cpu !== null && health.cpu !== undefined
-          ? `CPU: ${health.cpu}% | RAM: ${Math.round(health.ram.percent)}%`
-          : `RAM: ${Math.round(health.ram.percent)}%`;
-
-        let worker = { text: 'Unknown', tone: 'err' };
-        let model = { text: 'Unknown', tone: 'err' };
-        if (health.worker) {
-          if (!health.worker.running) {
-            worker = { text: 'Stopped', tone: 'warn' };
-            model = { text: 'Not loaded', tone: 'warn' };
-          } else {
-            worker = { text: 'Running', tone: 'ok' };
-            const s = health.worker.llm_status;
-            if (s === 'busy') model = { text: 'Generating', tone: 'warn' };
-            else if (s === 'loading') model = { text: 'Loading', tone: 'warn' };
-            else if (s === 'error') model = { text: 'Error', tone: 'err' };
-            else model = { text: 'Ready', tone: 'ok' };
-          }
-        }
-
-        setQuickSnapshot({
-          worker,
-          model,
-          cpuRam: { text: cpuRam, tone: '' },
-        });
-      } catch (e) {
-        setQuickSnapshot({
-          worker: { text: 'Unavailable', tone: 'err' },
-          model: { text: 'Unavailable', tone: 'err' },
-          cpuRam: { text: '--', tone: '' },
-        });
       }
     }
 
