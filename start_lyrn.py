@@ -374,6 +374,304 @@ class ProxyController:
 
 proxy_controller = ProxyController()
 
+
+# =====================================================================
+# Claude Code Orchestrator
+# ---------------------------------------------------------------------
+# Self-contained, additive orchestration layer for the Claude Code GUI
+# module. Stores per-run metadata, transcripts, and git snapshots under
+# claude_runs/. Does NOT touch any other LYRN subsystem.
+# =====================================================================
+
+class ClaudeRunManager:
+    """Tracks Claude Code runs: lifecycle, transcript, git diff snapshot."""
+
+    STORE_DIR = Path("claude_runs")
+
+    def __init__(self):
+        self.STORE_DIR.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
+        self._index_path = self.STORE_DIR / "index.json"
+        self._procs: Dict[str, subprocess.Popen] = {}
+        self.runs: Dict[str, Dict[str, Any]] = self._load_index()
+
+    # ---------- Persistence ----------
+    def _load_index(self) -> Dict[str, Dict[str, Any]]:
+        if self._index_path.exists():
+            try:
+                return json.loads(self._index_path.read_text())
+            except Exception:
+                return {}
+        return {}
+
+    def _save_index(self):
+        try:
+            self._index_path.write_text(json.dumps(self.runs, indent=2))
+        except Exception as e:
+            print(f"[ClaudeRun] Failed to save index: {e}")
+
+    # ---------- Git helpers (best-effort, no-op if not a git repo) ----------
+    def _git(self, cwd: str, *args: str, capture: bool = True) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["git", *args], cwd=cwd, capture_output=capture, text=True, timeout=30
+        )
+
+    def _is_git_repo(self, cwd: str) -> bool:
+        try:
+            r = self._git(cwd, "rev-parse", "--is-inside-work-tree")
+            return r.returncode == 0 and r.stdout.strip() == "true"
+        except Exception:
+            return False
+
+    def _snapshot_baseline(self, cwd: str) -> Optional[str]:
+        """Use 'git stash create' to capture the working tree as a commit
+        object without altering anything. Returns the SHA, or None."""
+        if not self._is_git_repo(cwd):
+            return None
+        try:
+            # Make sure untracked are included by adding them to a temp index.
+            # Simpler: stash create only captures tracked. We accept that.
+            r = self._git(cwd, "stash", "create")
+            sha = r.stdout.strip()
+            return sha or self._git(cwd, "rev-parse", "HEAD").stdout.strip()
+        except Exception as e:
+            print(f"[ClaudeRun] snapshot error: {e}")
+            return None
+
+    def _compute_diff(self, cwd: str, baseline_sha: str) -> Dict[str, Any]:
+        """Diff working tree against the baseline SHA."""
+        try:
+            raw = self._git(cwd, "diff", "--no-color", baseline_sha).stdout
+            stat = self._git(cwd, "diff", "--numstat", baseline_sha).stdout
+            files = []
+            for line in stat.strip().splitlines():
+                parts = line.split("\t")
+                if len(parts) == 3:
+                    add, delete, path = parts
+                    files.append({
+                        "path": path,
+                        "additions": int(add) if add.isdigit() else 0,
+                        "deletions": int(delete) if delete.isdigit() else 0,
+                    })
+            return {"raw": raw, "files": files}
+        except Exception as e:
+            return {"raw": "", "files": [], "error": str(e)}
+
+    def _revert_to_baseline(self, cwd: str, baseline_sha: str) -> bool:
+        """Restore working tree to the baseline snapshot (destructive)."""
+        try:
+            # Hard reset tracked files to the snapshot tree.
+            r = self._git(cwd, "checkout", baseline_sha, "--", ".")
+            return r.returncode == 0
+        except Exception as e:
+            print(f"[ClaudeRun] revert error: {e}")
+            return False
+
+    # ---------- Auth ----------
+    def auth_status(self) -> Dict[str, Any]:
+        try:
+            r = subprocess.run(
+                ["claude", "auth", "status"],
+                capture_output=True, text=True, timeout=10,
+            )
+            output = (r.stdout + r.stderr).strip()
+            authed = r.returncode == 0 and ("logged in" in output.lower() or "authenticated" in output.lower())
+            return {
+                "available": True,
+                "authenticated": authed,
+                "raw": output,
+            }
+        except FileNotFoundError:
+            return {"available": False, "authenticated": False, "raw": "claude CLI not installed"}
+        except subprocess.TimeoutExpired:
+            return {"available": True, "authenticated": False, "raw": "auth status timed out"}
+        except Exception as e:
+            return {"available": False, "authenticated": False, "raw": str(e)}
+
+    # ---------- Run lifecycle ----------
+    def list_runs(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            self._refresh_statuses()
+            return sorted(
+                [self._summary(r) for r in self.runs.values()],
+                key=lambda r: r.get("started_at", 0),
+                reverse=True,
+            )
+
+    def _summary(self, run: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "id": run["id"],
+            "label": run.get("label", ""),
+            "mode": run.get("mode", ""),
+            "cwd": run.get("cwd", ""),
+            "status": run.get("status", "unknown"),
+            "started_at": run.get("started_at", 0),
+            "ended_at": run.get("ended_at"),
+            "exit_code": run.get("exit_code"),
+            "approved": run.get("approved"),
+            "has_diff": bool(run.get("baseline_sha")),
+        }
+
+    def _refresh_statuses(self):
+        for run_id, proc in list(self._procs.items()):
+            if proc.poll() is not None:
+                run = self.runs.get(run_id)
+                if run and run.get("status") == "running":
+                    run["status"] = "completed" if proc.returncode == 0 else "failed"
+                    run["exit_code"] = proc.returncode
+                    run["ended_at"] = time.time()
+                    self._save_index()
+                self._procs.pop(run_id, None)
+
+    def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            self._refresh_statuses()
+            run = self.runs.get(run_id)
+            if not run:
+                return None
+            return dict(run)
+
+    def get_transcript(self, run_id: str) -> str:
+        run = self.runs.get(run_id)
+        if not run:
+            return ""
+        path = Path(run.get("transcript_path", ""))
+        if path.exists():
+            try:
+                return path.read_text(errors="replace")
+            except Exception:
+                return ""
+        return ""
+
+    def get_diff(self, run_id: str) -> Dict[str, Any]:
+        run = self.runs.get(run_id)
+        if not run or not run.get("baseline_sha"):
+            return {"raw": "", "files": [], "error": "no baseline snapshot"}
+        return self._compute_diff(run["cwd"], run["baseline_sha"])
+
+    def approve(self, run_id: str) -> Dict[str, Any]:
+        with self._lock:
+            run = self.runs.get(run_id)
+            if not run:
+                return {"success": False, "message": "run not found"}
+            run["approved"] = True
+            self._save_index()
+            return {"success": True}
+
+    def reject(self, run_id: str) -> Dict[str, Any]:
+        with self._lock:
+            run = self.runs.get(run_id)
+            if not run:
+                return {"success": False, "message": "run not found"}
+            sha = run.get("baseline_sha")
+            if not sha:
+                return {"success": False, "message": "no baseline to revert to"}
+            ok = self._revert_to_baseline(run["cwd"], sha)
+            run["approved"] = False if ok else None
+            run["reverted"] = ok
+            self._save_index()
+            return {"success": ok}
+
+    def delete_run(self, run_id: str) -> Dict[str, Any]:
+        with self._lock:
+            run = self.runs.pop(run_id, None)
+            if not run:
+                return {"success": False}
+            try:
+                d = self.STORE_DIR / run_id
+                if d.exists():
+                    shutil.rmtree(d)
+            except Exception:
+                pass
+            self._save_index()
+            return {"success": True}
+
+    def start_run(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        cwd = (payload.get("cwd") or os.getcwd()).strip()
+        try:
+            cwd_resolved = str(Path(cwd).expanduser().resolve())
+            if not Path(cwd_resolved).is_dir():
+                return {"success": False, "message": f"cwd not a directory: {cwd}"}
+        except Exception as e:
+            return {"success": False, "message": f"invalid cwd: {e}"}
+
+        mode = payload.get("mode", "oneshot")
+        task = (payload.get("task") or "").strip()
+        if mode == "oneshot" and not task:
+            return {"success": False, "message": "task is required for one-shot runs"}
+
+        run_id = "run_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + os.urandom(2).hex()
+        run_dir = self.STORE_DIR / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        transcript_path = run_dir / "transcript.log"
+
+        # Build CLI arguments
+        argv = ["claude"]
+        if mode == "oneshot":
+            argv += ["--print"]
+        elif mode == "inspect":
+            argv += ["--read-only"]
+        elif mode == "patch":
+            argv += ["--patch-only"]
+
+        if payload.get("model"):
+            argv += ["--model", str(payload["model"])]
+        if payload.get("effort"):
+            argv += ["--effort", str(payload["effort"])]
+        if payload.get("system_prompt"):
+            argv += ["--system-prompt", str(payload["system_prompt"])]
+        if payload.get("auto"):
+            argv += ["--enable-auto-mode"]
+        if payload.get("perms"):
+            argv += ["--dangerously-skip-permissions"]
+        if task:
+            argv += [task]
+
+        # Snapshot baseline
+        baseline = self._snapshot_baseline(cwd_resolved)
+
+        try:
+            log_fh = open(transcript_path, "w", buffering=1)
+            proc = subprocess.Popen(
+                argv,
+                cwd=cwd_resolved,
+                stdout=log_fh,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except FileNotFoundError:
+            return {"success": False, "message": "claude CLI not found in PATH"}
+        except Exception as e:
+            return {"success": False, "message": f"failed to start: {e}"}
+
+        run = {
+            "id": run_id,
+            "label": payload.get("label", ""),
+            "mode": mode,
+            "cwd": cwd_resolved,
+            "argv": argv,
+            "task": task,
+            "baseline_sha": baseline,
+            "transcript_path": str(transcript_path),
+            "status": "running",
+            "started_at": time.time(),
+            "ended_at": None,
+            "exit_code": None,
+            "approved": None,
+            "reverted": False,
+            "pid": proc.pid,
+        }
+
+        with self._lock:
+            self.runs[run_id] = run
+            self._procs[run_id] = proc
+            self._save_index()
+
+        return {"success": True, "run": self._summary(run)}
+
+
+claude_run_manager = ClaudeRunManager()
+
 class WorkerController:
     """Manages the headless worker process."""
     def __init__(self):
@@ -1330,6 +1628,68 @@ async def stop_claude_proxy():
 @app.get("/api/system/proxy_status", dependencies=[Depends(verify_token)])
 async def get_proxy_status():
     return proxy_controller.get_status()
+
+# --- Claude Code Orchestrator Endpoints ---
+
+@app.get("/api/claude/auth", dependencies=[Depends(verify_token)])
+async def claude_auth():
+    return claude_run_manager.auth_status()
+
+@app.get("/api/claude/runs", dependencies=[Depends(verify_token)])
+async def claude_list_runs():
+    return {"runs": claude_run_manager.list_runs()}
+
+@app.post("/api/claude/runs", dependencies=[Depends(verify_token)])
+async def claude_start_run(req: Request):
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    return claude_run_manager.start_run(body or {})
+
+@app.get("/api/claude/runs/{run_id}", dependencies=[Depends(verify_token)])
+async def claude_get_run(run_id: str):
+    run = claude_run_manager.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="run not found")
+    return run
+
+@app.get("/api/claude/runs/{run_id}/transcript", dependencies=[Depends(verify_token)])
+async def claude_get_transcript(run_id: str):
+    run = claude_run_manager.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="run not found")
+    text = claude_run_manager.get_transcript(run_id)
+    return {"run_id": run_id, "transcript": text}
+
+@app.get("/api/claude/runs/{run_id}/transcript/download", dependencies=[Depends(verify_token)])
+async def claude_download_transcript(run_id: str):
+    run = claude_run_manager.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="run not found")
+    path = run.get("transcript_path", "")
+    if not path or not Path(path).exists():
+        raise HTTPException(status_code=404, detail="transcript file missing")
+    return FileResponse(path, filename=f"{run_id}.log", media_type="text/plain")
+
+@app.get("/api/claude/runs/{run_id}/diff", dependencies=[Depends(verify_token)])
+async def claude_get_diff(run_id: str):
+    run = claude_run_manager.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="run not found")
+    return claude_run_manager.get_diff(run_id)
+
+@app.post("/api/claude/runs/{run_id}/approve", dependencies=[Depends(verify_token)])
+async def claude_approve(run_id: str):
+    return claude_run_manager.approve(run_id)
+
+@app.post("/api/claude/runs/{run_id}/reject", dependencies=[Depends(verify_token)])
+async def claude_reject(run_id: str):
+    return claude_run_manager.reject(run_id)
+
+@app.delete("/api/claude/runs/{run_id}", dependencies=[Depends(verify_token)])
+async def claude_delete_run(run_id: str):
+    return claude_run_manager.delete_run(run_id)
 
 # --- Automation Endpoints ---
 

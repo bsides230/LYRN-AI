@@ -217,6 +217,79 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 11000;
     }
     #toast.show { opacity: 1; }
+
+    /* --- Run List --- */
+    .run-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+    .run-item {
+      border: 1px solid var(--border-color); border-radius: 4px;
+      padding: 6px 8px; background: var(--bg-panel); cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .run-item:hover { border-color: var(--brand-purple); }
+    .run-item .row { display: flex; justify-content: space-between; gap: 6px; }
+    .run-item .label { color: var(--text-head); font-weight: 600; }
+    .run-item .meta { color: var(--text-dim); font-size: 9px; }
+    .run-status { font-size: 9px; padding: 1px 6px; border-radius: 8px; text-transform: uppercase; }
+    .run-status.running   { color: var(--status-warn); border: 1px solid var(--status-warn); }
+    .run-status.completed { color: var(--status-ok);   border: 1px solid var(--status-ok); }
+    .run-status.failed    { color: var(--status-err);  border: 1px solid var(--status-err); }
+    .run-status.unknown   { color: var(--text-dim);    border: 1px solid var(--border-color); }
+
+    /* --- Modal --- */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: none; justify-content: center; align-items: center;
+      z-index: 12000;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      width: min(900px, 92vw); height: min(680px, 88vh);
+      background: var(--bg-panel); border: 1px solid var(--border-color);
+      border-radius: 8px; display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    }
+    .modal-header {
+      padding: 12px 16px; border-bottom: 1px solid var(--border-color);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-header h3 {
+      margin: 0; font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--text-head);
+    }
+    .modal-tabs { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--border-color); }
+    .modal-tabs button {
+      width: auto; background: transparent; border: none; border-bottom: 2px solid transparent;
+      color: var(--text-dim); padding: 8px 12px; border-radius: 0;
+    }
+    .modal-tabs button.active { color: var(--brand-purple); border-bottom-color: var(--brand-purple); background: transparent; }
+    .modal-body { flex: 1; overflow: auto; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .modal-footer {
+      padding: 10px 16px; border-top: 1px solid var(--border-color);
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .modal-footer button { width: auto; }
+    button.btn-success { border-color: var(--status-ok); color: var(--status-ok); }
+    button.btn-success:hover { background: rgba(16,185,129,0.1); color: var(--status-ok); }
+    button.btn-danger { border-color: var(--status-err); color: var(--status-err); }
+    button.btn-danger:hover { background: rgba(239,68,68,0.1); color: var(--status-err); }
+
+    pre.transcript, pre.diff-raw {
+      background: var(--bg-input); border: 1px solid var(--border-color);
+      padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-word;
+      color: var(--text-body); margin: 0;
+    }
+    .diff-file-card {
+      border: 1px solid var(--border-color); border-radius: 4px;
+      margin-bottom: 8px; background: var(--bg-input);
+    }
+    .diff-file-card .head {
+      padding: 6px 10px; display: flex; justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .diff-file-card .head .path { color: var(--text-head); }
+    .diff-add { color: var(--status-ok); }
+    .diff-del { color: var(--status-err); }
   </style>
 </head>
 <body>
@@ -228,10 +301,15 @@
         <h2>Claude Code Control Center</h2>
       </div>
       <div class="header-actions">
+        <span class="status-pill" id="auth-pill" title="Backend-reported Claude auth state">
+          <span class="status-dot"></span>
+          <span id="auth-text">Auth ?</span>
+        </span>
         <span class="status-pill" id="status-pill">
           <span class="status-dot"></span>
           <span id="status-text">Idle</span>
         </span>
+        <button onclick="refreshAuth()">Auth</button>
         <button onclick="clearTerminal()">Clear</button>
         <button onclick="connectTerminal()">Reconnect</button>
       </div>
@@ -310,6 +388,11 @@
               <input type="text" id="flag-prompt" placeholder="Optional override...">
             </div>
 
+            <div class="input-group">
+              <label>Task (one-shot)</label>
+              <input type="text" id="flag-task" placeholder="Describe the task...">
+            </div>
+
             <div class="toggle-row">
               <span>Auto Mode</span>
               <label class="toggle-switch">
@@ -356,6 +439,18 @@
           </div>
         </div>
 
+        <!-- Run History -->
+        <div class="section">
+          <div class="section-header">Run History
+            <button onclick="refreshRuns()" style="float:right; width:auto; padding:0 6px; font-size:9px; margin-top:-2px;">↻</button>
+          </div>
+          <div class="section-body">
+            <div class="run-list" id="run-list">
+              <div style="color: var(--text-dim); font-size: 10px; text-align: center;">No runs yet</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Auth & Settings -->
         <div class="section">
           <div class="section-header">Auth & Session</div>
@@ -374,6 +469,27 @@
       <!-- Terminal View -->
       <div class="terminal-container">
         <div id="terminal-wrapper"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run Detail Modal -->
+  <div class="modal-backdrop" id="run-modal" onclick="if(event.target===this)closeRunModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="run-modal-title">Run</h3>
+        <button onclick="closeRunModal()" style="width:auto;">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="active" id="tab-btn-transcript" onclick="switchModalTab('transcript')">Transcript</button>
+        <button id="tab-btn-diff" onclick="switchModalTab('diff')">Diff</button>
+        <button id="tab-btn-meta" onclick="switchModalTab('meta')">Metadata</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer">
+        <button onclick="downloadCurrentTranscript()">Export Transcript</button>
+        <button class="btn-danger" onclick="rejectCurrentRun()">Reject (Revert)</button>
+        <button class="btn-success" onclick="approveCurrentRun()">Approve</button>
       </div>
     </div>
   </div>
@@ -416,6 +532,7 @@
       // Try connecting immediately if we have config from localStorage
       if (coreUrl) connectTerminal();
       else setStatus('idle', 'Waiting for config');
+      if (coreUrl && authToken) startPolling();
 
       window.addEventListener('message', (event) => {
         const d = event.data || {};
@@ -431,10 +548,12 @@
         if (d.type === 'TOKEN_UPDATE') {
           authToken = d.token;
           connectTerminal();
+          startPolling();
         }
         if (d.type === 'CORE_URL_CHANGE') {
           coreUrl = d.url;
           connectTerminal();
+          startPolling();
         }
       });
 
@@ -623,7 +742,213 @@
     function launchClaudeCode() {
       // Rotate run id on each launch for clean run boundaries
       newRun();
-      injectCmd(buildLaunchCommand());
+      const mode = document.getElementById('flag-mode').value;
+      // Non-interactive modes go through the orchestrator REST API so we can
+      // capture transcript + diff. Interactive falls through to the terminal.
+      if (mode !== 'interactive') {
+        startOrchestratedRun();
+      } else {
+        injectCmd(buildLaunchCommand());
+      }
+    }
+
+    // ========== Orchestrator API ==========
+    function authHeaders() {
+      const h = { 'Content-Type': 'application/json' };
+      if (authToken) h['X-Token'] = authToken;
+      return h;
+    }
+
+    async function api(path, opts = {}) {
+      if (!coreUrl) throw new Error('No core URL');
+      const r = await fetch(coreUrl + path, {
+        ...opts,
+        headers: { ...authHeaders(), ...(opts.headers || {}) },
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+
+    async function refreshAuth() {
+      const pill = document.getElementById('auth-pill');
+      const txt = document.getElementById('auth-text');
+      pill.classList.remove('connected', 'connecting', 'error');
+      try {
+        const data = await api('/api/claude/auth');
+        if (!data.available) {
+          pill.classList.add('error');
+          txt.innerText = 'No CLI';
+        } else if (data.authenticated) {
+          pill.classList.add('connected');
+          txt.innerText = 'Authed';
+        } else {
+          pill.classList.add('error');
+          txt.innerText = 'Logged out';
+        }
+      } catch (e) {
+        pill.classList.add('error');
+        txt.innerText = 'Auth ?';
+      }
+    }
+
+    async function refreshRuns() {
+      const list = document.getElementById('run-list');
+      try {
+        const data = await api('/api/claude/runs');
+        const runs = data.runs || [];
+        if (!runs.length) {
+          list.innerHTML = '<div style="color:var(--text-dim);font-size:10px;text-align:center;">No runs yet</div>';
+          return;
+        }
+        list.innerHTML = runs.map(r => {
+          const ts = r.started_at ? new Date(r.started_at * 1000).toLocaleTimeString() : '';
+          const label = r.label || r.id;
+          const statusCls = ['running','completed','failed'].includes(r.status) ? r.status : 'unknown';
+          return `<div class="run-item" onclick="openRunModal('${r.id}')">
+            <div class="row">
+              <span class="label">${escapeHtml(label)}</span>
+              <span class="run-status ${statusCls}">${r.status}</span>
+            </div>
+            <div class="meta">${r.mode} · ${ts}${r.has_diff ? ' · diff' : ''}${r.approved===true?' · ✓':''}${r.approved===false?' · ✗':''}</div>
+          </div>`;
+        }).join('');
+      } catch (e) {
+        list.innerHTML = `<div style="color:var(--status-err);font-size:10px;">${e.message}</div>`;
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function startOrchestratedRun() {
+      const payload = {
+        mode: document.getElementById('flag-mode').value,
+        cwd: document.getElementById('flag-cwd').value || '',
+        model: document.getElementById('flag-model').value || '',
+        effort: document.getElementById('flag-effort').value || '',
+        system_prompt: document.getElementById('flag-prompt').value || '',
+        task: document.getElementById('flag-task').value || '',
+        label: document.getElementById('session-label').value || '',
+        auto: document.getElementById('flag-auto').checked,
+        perms: document.getElementById('flag-perms').checked,
+      };
+      try {
+        const data = await api('/api/claude/runs', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        if (!data.success) {
+          showToast('Run failed: ' + (data.message || 'unknown'));
+          return;
+        }
+        showToast('Run started');
+        refreshRuns();
+      } catch (e) {
+        showToast('Run start error: ' + e.message);
+      }
+    }
+
+    // ---- Modal ----
+    let currentRunId = null;
+    let modalTab = 'transcript';
+
+    async function openRunModal(runId) {
+      currentRunId = runId;
+      modalTab = 'transcript';
+      document.getElementById('run-modal-title').innerText = 'Run ' + runId;
+      document.getElementById('run-modal').classList.add('show');
+      switchModalTab('transcript');
+    }
+
+    function closeRunModal() {
+      document.getElementById('run-modal').classList.remove('show');
+      currentRunId = null;
+    }
+
+    function switchModalTab(tab) {
+      modalTab = tab;
+      ['transcript','diff','meta'].forEach(t => {
+        const btn = document.getElementById('tab-btn-' + t);
+        if (btn) btn.classList.toggle('active', t === tab);
+      });
+      renderModalBody();
+    }
+
+    async function renderModalBody() {
+      const body = document.getElementById('modal-body');
+      if (!currentRunId) { body.innerHTML = ''; return; }
+      body.innerHTML = '<div style="color:var(--text-dim)">Loading...</div>';
+      try {
+        if (modalTab === 'transcript') {
+          const data = await api(`/api/claude/runs/${currentRunId}/transcript`);
+          body.innerHTML = `<pre class="transcript">${escapeHtml(data.transcript || '(empty)')}</pre>`;
+        } else if (modalTab === 'diff') {
+          const data = await api(`/api/claude/runs/${currentRunId}/diff`);
+          if (data.error) {
+            body.innerHTML = `<div style="color:var(--text-dim)">No diff: ${escapeHtml(data.error)}</div>`;
+            return;
+          }
+          if (!data.files || !data.files.length) {
+            body.innerHTML = '<div style="color:var(--text-dim)">No file changes detected.</div>';
+            return;
+          }
+          let html = '';
+          data.files.forEach(f => {
+            html += `<div class="diff-file-card">
+              <div class="head">
+                <span class="path">${escapeHtml(f.path)}</span>
+                <span><span class="diff-add">+${f.additions}</span> <span class="diff-del">-${f.deletions}</span></span>
+              </div>
+            </div>`;
+          });
+          html += `<details style="margin-top:10px;"><summary style="cursor:pointer;color:var(--text-dim);">Raw patch</summary><pre class="diff-raw" style="margin-top:6px;">${escapeHtml(data.raw || '')}</pre></details>`;
+          body.innerHTML = html;
+        } else if (modalTab === 'meta') {
+          const run = await api(`/api/claude/runs/${currentRunId}`);
+          body.innerHTML = `<pre class="transcript">${escapeHtml(JSON.stringify(run, null, 2))}</pre>`;
+        }
+      } catch (e) {
+        body.innerHTML = `<div style="color:var(--status-err);">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    async function approveCurrentRun() {
+      if (!currentRunId) return;
+      try {
+        const r = await api(`/api/claude/runs/${currentRunId}/approve`, { method: 'POST' });
+        showToast(r.success ? 'Approved' : 'Approve failed');
+        refreshRuns();
+      } catch (e) { showToast('Error: ' + e.message); }
+    }
+
+    async function rejectCurrentRun() {
+      if (!currentRunId) return;
+      if (!confirm('Revert working tree to baseline snapshot? This is destructive.')) return;
+      try {
+        const r = await api(`/api/claude/runs/${currentRunId}/reject`, { method: 'POST' });
+        showToast(r.success ? 'Reverted to baseline' : ('Revert failed: ' + (r.message || '')));
+        refreshRuns();
+        renderModalBody();
+      } catch (e) { showToast('Error: ' + e.message); }
+    }
+
+    function downloadCurrentTranscript() {
+      if (!currentRunId || !coreUrl) return;
+      const url = `${coreUrl}/api/claude/runs/${currentRunId}/transcript/download${authToken ? '?token='+encodeURIComponent(authToken) : ''}`;
+      window.open(url, '_blank');
+    }
+
+    // Periodic refresh once we have config
+    let pollTimer = null;
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      if (!coreUrl || !authToken) return;
+      refreshAuth();
+      refreshRuns();
+      pollTimer = setInterval(() => {
+        refreshRuns();
+      }, 4000);
     }
   </script>
 </body>
