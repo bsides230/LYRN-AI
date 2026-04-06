@@ -80,13 +80,7 @@
       background: var(--bg-panel);
       flex-shrink: 0;
     }
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-    header .title-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    header .title-block { display: flex; flex-direction: column; gap: 2px; }
     .meta-label {
       font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
@@ -95,28 +89,6 @@
       letter-spacing: 0.12em;
     }
     .header-actions { display: flex; gap: 8px; align-items: center; }
-    .icon-btn {
-      width: 30px;
-      height: 30px;
-      min-width: 30px;
-      padding: 0;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      line-height: 1;
-      font-weight: 600;
-    }
-    #mobile-menu-btn {
-      display: none;
-      width: 32px;
-      height: 32px;
-      min-width: 32px;
-      padding: 0;
-      border-radius: 6px;
-      font-size: 14px;
-    }
 
     /* --- STATUS PILL --- */
     .status-pill {
@@ -139,15 +111,11 @@
     .main-content { display: flex; flex: 1; overflow: hidden; }
 
     .control-panel {
-      width: clamp(360px, 34vw, 500px);
-      min-width: 360px;
-      max-width: 500px;
+      width: 320px;
       border-right: 1px solid var(--border-color);
       background: var(--bg-panel);
       display: flex; flex-direction: column;
       overflow-y: auto; padding: 16px; gap: 16px;
-      resize: horizontal;
-      overflow-x: hidden;
     }
 
     .terminal-container {
@@ -323,135 +291,15 @@
     .diff-file-card .head .path { color: var(--text-head); }
     .diff-add { color: var(--status-ok); }
     .diff-del { color: var(--status-err); }
-
-    .guide-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .guide-item {
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background: var(--bg-input);
-      padding: 10px;
-      display: grid;
-      grid-template-columns: 180px 1fr;
-      gap: 10px;
-      align-items: center;
-    }
-    .guide-visual {
-      display: inline-flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-    .guide-chip {
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 4px 8px;
-      font-size: 10px;
-      text-transform: uppercase;
-      color: var(--text-head);
-      background: var(--bg-panel);
-    }
-    .guide-chip.primary {
-      background: var(--brand-purple);
-      border-color: var(--brand-purple);
-      color: #fff;
-    }
-    .guide-chip.toggle {
-      border-radius: 10px;
-      font-size: 9px;
-      letter-spacing: 0.08em;
-    }
-    .guide-item h4 {
-      margin: 0 0 4px;
-      font-size: 11px;
-      color: var(--text-head);
-    }
-    .guide-item p {
-      margin: 0;
-      color: var(--text-body);
-      line-height: 1.45;
-    }
-    .guide-list {
-      margin: 0;
-      padding-left: 16px;
-      color: var(--text-body);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .mobile-drawer-backdrop {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.62);
-      z-index: 11950;
-    }
-    .mobile-drawer-backdrop.show {
-      display: block;
-    }
-
-    @media (max-width: 960px) {
-      header {
-        padding: 10px 12px;
-        gap: 10px;
-      }
-      .header-left {
-        flex: 1;
-      }
-      #mobile-menu-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .header-actions {
-        gap: 6px;
-      }
-      .header-actions .status-pill {
-        display: none;
-      }
-      .main-content {
-        position: relative;
-      }
-      .control-panel {
-        position: fixed;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        z-index: 12000;
-        width: min(88vw, 430px);
-        min-width: 280px;
-        max-width: 430px;
-        resize: none;
-        transform: translateX(-102%);
-        transition: transform 0.2s ease;
-        border-right: 1px solid var(--border-color);
-        box-shadow: 0 24px 80px rgba(0,0,0,0.65);
-      }
-      .control-panel.mobile-open {
-        transform: translateX(0);
-      }
-      .terminal-container {
-        width: 100%;
-      }
-      .guide-item {
-        grid-template-columns: 1fr;
-      }
-    }
   </style>
 </head>
 <body>
 
   <div class="app-wrapper">
     <header>
-      <div class="header-left">
-        <button id="mobile-menu-btn" onclick="toggleMobilePanel()" aria-label="Open controls">☰</button>
-        <div class="title-block">
-          <span class="meta-label">LYRN MODULE</span>
-          <h2>Claude Code Control Center</h2>
-        </div>
+      <div class="title-block">
+        <span class="meta-label">LYRN MODULE</span>
+        <h2>Claude Code Control Center</h2>
       </div>
       <div class="header-actions">
         <span class="status-pill" id="auth-pill" title="Backend-reported Claude auth state">
@@ -465,14 +313,12 @@
         <button onclick="refreshAuth()">Auth</button>
         <button onclick="clearTerminal()">Clear</button>
         <button onclick="connectTerminal()">Reconnect</button>
-        <button class="icon-btn" onclick="openGuideModal()" title="Claude module guide" aria-label="Open module guide">?</button>
       </div>
     </header>
 
     <div class="main-content">
-      <div class="mobile-drawer-backdrop" id="panel-overlay" onclick="closeMobilePanel()"></div>
       <!-- Control Panel -->
-      <div class="control-panel" id="control-panel">
+      <div class="control-panel">
 
         <button class="btn-primary" onclick="launchClaudeCode()">▶ Launch Claude Code</button>
 
@@ -650,139 +496,6 @@
     </div>
   </div>
 
-  <!-- Module Guide -->
-  <div class="modal-backdrop" id="guide-modal" onclick="if(event.target===this)closeGuideModal()">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Claude Module User Guide</h3>
-        <button onclick="closeGuideModal()" style="width:auto;">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="guide-grid">
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip primary">▶ Launch Claude Code</span>
-            </div>
-            <div>
-              <h4>Start command</h4>
-              <p>Runs the command preview with your current options. In interactive mode it sends the command into the terminal. In one-shot/inspect/patch modes it starts a tracked run in Run History.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip">AUTH</span>
-              <span class="guide-chip">CLEAR</span>
-              <span class="guide-chip">RECONNECT</span>
-              <span class="guide-chip">?</span>
-            </div>
-            <div>
-              <h4>Top-right controls</h4>
-              <p><strong>Auth</strong> refreshes Claude login state, <strong>Clear</strong> wipes visible terminal lines, <strong>Reconnect</strong> reopens the terminal websocket, and <strong>?</strong> opens this guide.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip">Working Directory</span>
-              <span class="guide-chip">Session Label</span>
-              <span class="guide-chip">New Run ID</span>
-            </div>
-            <div>
-              <h4>Workspace section</h4>
-              <p>Set the repository path, optional label, and rotate to a fresh run ID. The cwd hint validates your path and shows whether it is a git repo.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip">Run Mode</span>
-              <span class="guide-chip">Model</span>
-              <span class="guide-chip">Effort</span>
-              <span class="guide-chip toggle">AUTO</span>
-              <span class="guide-chip toggle">SKIP PERMS</span>
-            </div>
-            <div>
-              <h4>Launch flags section</h4>
-              <p>Choose execution mode and optional Claude flags. Auto mode and Skip Permissions map directly to their corresponding CLI switches.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip">Command Preview</span>
-              <span class="guide-chip">Copy</span>
-            </div>
-            <div>
-              <h4>Command preview section</h4>
-              <p>Shows the exact command string created from your current settings. Use Copy to share or inspect before launch.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip">/compact</span>
-              <span class="guide-chip">/clear</span>
-              <span class="guide-chip">/cost</span>
-              <span class="guide-chip">/status</span>
-              <span class="guide-chip">/doctor</span>
-              <span class="guide-chip">/insights</span>
-            </div>
-            <div>
-              <h4>Interactive commands section</h4>
-              <p>Quick-injects Claude slash commands into the active terminal session so you do not need to type them manually.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip">↻</span>
-              <span class="guide-chip">Run row</span>
-              <span class="guide-chip">Approve</span>
-              <span class="guide-chip">Reject</span>
-              <span class="guide-chip">Export Transcript</span>
-            </div>
-            <div>
-              <h4>Run history + run detail</h4>
-              <p>Refresh run list with ↻, click any run row to open details, approve accepted changes, reject/revert to baseline, or export transcript for audit.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div class="guide-visual">
-              <span class="guide-chip">Auth Login</span>
-              <span class="guide-chip">Auth Status</span>
-              <span class="guide-chip">Start Remote Control</span>
-            </div>
-            <div>
-              <h4>Auth &amp; session section</h4>
-              <p>Runs authentication helpers and remote control command inside the terminal session.</p>
-            </div>
-          </div>
-
-          <div class="guide-item">
-            <div>
-              <h4>Recommended startup order (important)</h4>
-              <ul class="guide-list">
-                <li>Start the model first using normal LYRN controls in the main app.</li>
-                <li>Then open the Claude module.</li>
-                <li>Set workspace/flags, then press <strong>Reconnect</strong> if needed to attach terminal.</li>
-                <li>Finally launch Claude Code with the purple launch button.</li>
-              </ul>
-            </div>
-            <div>
-              <h4>Mobile behavior</h4>
-              <p>On phones/tablets, the left panel becomes a slide-in drawer. Use the top-left ☰ button to open it, then scroll the panel for all controls while terminal remains full-width behind it.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button onclick="closeGuideModal()">Close Guide</button>
-      </div>
-    </div>
-  </div>
-
   <div id="toast">Message</div>
 
   <script>
@@ -799,7 +512,6 @@
     // ---- Connection state ----
     let authToken = localStorage.getItem('lyrn_admin_token') || null;
     let coreUrl   = localStorage.getItem('lyrn_core_url') || '';
-    const MOBILE_BREAKPOINT = 960;
 
     // ---- Terminal state ----
     let term = null;
@@ -876,7 +588,6 @@
 
       window.addEventListener('resize', () => {
         if (fitAddon) { try { fitAddon.fit(); } catch(e){} }
-        if (window.innerWidth > MOBILE_BREAKPOINT) closeMobilePanel();
       });
     });
 
@@ -886,34 +597,6 @@
       t.innerText = msg;
       t.classList.add('show');
       setTimeout(() => t.classList.remove('show'), 3000);
-    }
-
-    function toggleMobilePanel() {
-      const panel = document.getElementById('control-panel');
-      const backdrop = document.getElementById('panel-overlay');
-      if (!panel || !backdrop) return;
-      const next = !panel.classList.contains('mobile-open');
-      panel.classList.toggle('mobile-open', next);
-      backdrop.classList.toggle('show', next);
-    }
-
-    function closeMobilePanel() {
-      const panel = document.getElementById('control-panel');
-      const backdrop = document.getElementById('panel-overlay');
-      if (!panel || !backdrop) return;
-      panel.classList.remove('mobile-open');
-      backdrop.classList.remove('show');
-    }
-
-    function openGuideModal() {
-      const modal = document.getElementById('guide-modal');
-      if (modal) modal.classList.add('show');
-      closeMobilePanel();
-    }
-
-    function closeGuideModal() {
-      const modal = document.getElementById('guide-modal');
-      if (modal) modal.classList.remove('show');
     }
 
     function sysMsg(color, text) {
