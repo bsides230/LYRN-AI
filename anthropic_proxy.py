@@ -129,6 +129,15 @@ async def read_and_stream(filepath: str, request: Request):
     yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': 'end_turn', 'stop_sequence': None}, 'usage': {'output_tokens': 1}})}\n\n"
     yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+@app.get("/v1/models")
+async def list_models():
+    # Return a dummy model so tools like jq can detect it
+    return {"data": [{"id": "lyrn-model"}]}
+
 @app.post("/v1/messages")
 async def messages(request: Request):
     body = await request.json()
