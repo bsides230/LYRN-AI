@@ -1864,7 +1864,7 @@ class LocalPTYSession(WebTerminalSession):
 
 
 @app.websocket("/api/terminal/{sid}")
-async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None):
+async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, cwd: Optional[str] = None):
     try:
         # Auth check
         if not Path("global_flags/no_auth").exists():
@@ -1873,12 +1873,24 @@ async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str
                 await websocket.close(code=4003)
                 return
 
+        # Validate optional cwd
+        safe_cwd: Optional[str] = None
+        if cwd:
+            try:
+                p = Path(cwd).expanduser()
+                if p.is_dir():
+                    safe_cwd = str(p.resolve())
+                else:
+                    print(f"[Terminal] Ignoring invalid cwd: {cwd}")
+            except Exception as e:
+                print(f"[Terminal] cwd validation error: {e}")
+
         await websocket.accept()
 
         if platform.system() == "Windows":
-            session = WebTerminalSession(sid)
+            session = WebTerminalSession(sid, cwd=safe_cwd)
         else:
-            session = LocalPTYSession(sid)
+            session = LocalPTYSession(sid, cwd=safe_cwd)
 
         session.subscribers.add(websocket)
         print(f"[Terminal] Connected {sid}")

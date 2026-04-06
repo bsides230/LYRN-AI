@@ -243,10 +243,44 @@
 
         <button class="btn-primary" onclick="launchClaudeCode()">▶ Launch Claude Code</button>
 
+        <!-- Session / Workspace -->
+        <div class="section">
+          <div class="section-header">Workspace</div>
+          <div class="section-body">
+            <div class="input-group">
+              <label>Working Directory (cwd)</label>
+              <input type="text" id="flag-cwd" placeholder="/path/to/repo">
+            </div>
+            <div class="input-group">
+              <label>Session Label</label>
+              <input type="text" id="session-label" placeholder="optional name">
+            </div>
+            <div class="toggle-row" style="color: var(--text-dim); font-size: 10px;">
+              <span>Terminal SID</span>
+              <span id="sid-display" style="color: var(--brand-purple);">--</span>
+            </div>
+            <div class="toggle-row" style="color: var(--text-dim); font-size: 10px;">
+              <span>Run ID</span>
+              <span id="run-id-display" style="color: var(--brand-purple);">--</span>
+            </div>
+            <button class="btn-ghost" onclick="newRun()">New Run ID</button>
+          </div>
+        </div>
+
         <!-- Flags & Config -->
         <div class="section">
           <div class="section-header">Launch Flags</div>
           <div class="section-body">
+            <div class="input-group">
+              <label>Run Mode</label>
+              <select id="flag-mode">
+                <option value="interactive">Interactive</option>
+                <option value="oneshot">One-shot Task</option>
+                <option value="inspect">Read-only Inspect</option>
+                <option value="patch">Patch-only</option>
+              </select>
+            </div>
+
             <div class="input-group">
               <label>Model (--model)</label>
               <select id="flag-model">
@@ -291,6 +325,19 @@
                 <span class="toggle-slider"></span>
               </label>
             </div>
+          </div>
+        </div>
+
+        <!-- Command Preview -->
+        <div class="section">
+          <div class="section-header">Command Preview</div>
+          <div class="section-body">
+            <textarea id="cmd-preview" readonly rows="3"
+              style="background: var(--bg-input); border: 1px solid var(--border-color);
+                     color: var(--brand-purple); font-family: 'JetBrains Mono', monospace;
+                     font-size: 11px; padding: 8px; border-radius: 4px; resize: vertical;
+                     width: 100%; outline: none;"></textarea>
+            <button class="btn-ghost" onclick="copyPreview()">Copy</button>
           </div>
         </div>
 
@@ -342,10 +389,30 @@
     let term = null;
     let fitAddon = null;
     let socket = null;
-    let sid = 'claude_code_' + Math.random().toString(36).substr(2, 9);
+    // Separate IDs: terminal SID stays stable across reconnects of the same
+    // terminal pty. Run ID rotates on each Claude launch for clean boundaries.
+    const sid = 'term_' + Math.random().toString(36).substr(2, 9);
+    let runId = newRunIdValue();
+    let lastSysMsg = null; // dedupe noisy system messages
+
+    function newRunIdValue() {
+      return 'run_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
       initTerminal();
+      document.getElementById('sid-display').innerText = sid;
+      document.getElementById('run-id-display').innerText = runId;
+
+      // Live-update preview as flags change
+      ['flag-mode','flag-model','flag-effort','flag-prompt','flag-auto','flag-perms','flag-cwd']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.addEventListener('input', updatePreview);
+          if (el) el.addEventListener('change', updatePreview);
+        });
+      updatePreview();
+
       // Try connecting immediately if we have config from localStorage
       if (coreUrl) connectTerminal();
       else setStatus('idle', 'Waiting for config');
@@ -382,6 +449,25 @@
       t.innerText = msg;
       t.classList.add('show');
       setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function sysMsg(color, text) {
+      // Quiet duplicate system noise (e.g. repeated Disconnected lines)
+      if (lastSysMsg === text) return;
+      lastSysMsg = text;
+      term.writeln(`\r\n\x1b[2m[sys]\x1b[0m \x1b[${color}m${text}\x1b[0m`);
+    }
+
+    function newRun() {
+      runId = newRunIdValue();
+      document.getElementById('run-id-display').innerText = runId;
+      showToast('New run id: ' + runId);
+      updatePreview();
+    }
+
+    function shellQuote(s) {
+      // POSIX-safe single-quote wrapping; handles backticks, $, newlines, etc.
+      return "'" + String(s).replace(/'/g, "'\\''") + "'";
     }
 
     function setStatus(state, label) {
@@ -438,28 +524,33 @@
       }
 
       if (!coreUrl) {
-        term.writeln('\r\n\x1b[31m[System]\x1b[0m Core URL not set. Waiting for configuration...');
+        sysMsg('31', 'Core URL not set. Waiting for configuration...');
         setStatus('error', 'No Core URL');
         return;
       }
 
-      let wsUrl = coreUrl.replace(/^http/, 'ws');
-      wsUrl += `/api/terminal/${sid}`;
-      if (authToken) wsUrl += `?token=${encodeURIComponent(authToken)}`;
+      let wsUrl = coreUrl.replace(/^http/, 'ws') + `/api/terminal/${sid}`;
+      const params = new URLSearchParams();
+      if (authToken) params.set('token', authToken);
+      const cwd = (document.getElementById('flag-cwd').value || '').trim();
+      if (cwd) params.set('cwd', cwd);
+      const qs = params.toString();
+      if (qs) wsUrl += '?' + qs;
 
-      term.writeln('\r\n\x1b[36m[System]\x1b[0m Connecting to terminal...');
+      sysMsg('36', 'Connecting to terminal...');
       setStatus('connecting', 'Connecting');
 
       try {
         socket = new WebSocket(wsUrl);
       } catch (e) {
-        term.writeln('\r\n\x1b[31m[System]\x1b[0m Failed to open WebSocket.\r\n');
+        sysMsg('31', 'Failed to open WebSocket.');
         setStatus('error', 'Error');
         return;
       }
 
       socket.onopen = () => {
-        term.writeln('\r\n\x1b[32m[System]\x1b[0m Connected.\r\n');
+        lastSysMsg = null;
+        sysMsg('32', 'Connected.');
         setStatus('connected', 'Connected');
         setTimeout(() => { try { fitAddon.fit(); } catch(e){} }, 100);
       };
@@ -474,14 +565,49 @@
       };
 
       socket.onclose = () => {
-        term.writeln('\r\n\x1b[31m[System]\x1b[0m Disconnected.\r\n');
+        sysMsg('31', 'Disconnected.');
         setStatus('error', 'Disconnected');
       };
 
       socket.onerror = () => {
-        term.writeln('\r\n\x1b[31m[System]\x1b[0m WebSocket Error.\r\n');
+        sysMsg('31', 'WebSocket Error.');
         setStatus('error', 'Error');
       };
+    }
+
+    function copyPreview() {
+      const ta = document.getElementById('cmd-preview');
+      ta.select();
+      try { document.execCommand('copy'); showToast('Copied'); } catch(e){ showToast('Copy failed'); }
+    }
+
+    function buildLaunchCommand() {
+      const parts = ['claude'];
+
+      const mode = document.getElementById('flag-mode').value;
+      // Mode → flag mapping (frontend convention; backend wraps as appropriate)
+      if (mode === 'oneshot') parts.push('--print');
+      else if (mode === 'inspect') parts.push('--read-only');
+      else if (mode === 'patch') parts.push('--patch-only');
+
+      const model = document.getElementById('flag-model').value;
+      if (model) parts.push('--model', model);
+
+      const effort = document.getElementById('flag-effort').value;
+      if (effort) parts.push('--effort', effort);
+
+      const prompt = document.getElementById('flag-prompt').value;
+      if (prompt) parts.push('--system-prompt', shellQuote(prompt));
+
+      if (document.getElementById('flag-auto').checked) parts.push('--enable-auto-mode');
+      if (document.getElementById('flag-perms').checked) parts.push('--dangerously-skip-permissions');
+
+      return parts.join(' ');
+    }
+
+    function updatePreview() {
+      const ta = document.getElementById('cmd-preview');
+      if (ta) ta.value = buildLaunchCommand();
     }
 
     // ---- Claude Code Control Logic ----
@@ -495,21 +621,9 @@
     }
 
     function launchClaudeCode() {
-      let cmd = 'claude';
-
-      const model = document.getElementById('flag-model').value;
-      if (model) cmd += ` --model ${model}`;
-
-      const effort = document.getElementById('flag-effort').value;
-      if (effort) cmd += ` --effort ${effort}`;
-
-      const prompt = document.getElementById('flag-prompt').value;
-      if (prompt) cmd += ` --system-prompt "${prompt.replace(/"/g, '\\"')}"`;
-
-      if (document.getElementById('flag-auto').checked) cmd += ' --enable-auto-mode';
-      if (document.getElementById('flag-perms').checked) cmd += ' --dangerously-skip-permissions';
-
-      injectCmd(cmd);
+      // Rotate run id on each launch for clean run boundaries
+      newRun();
+      injectCmd(buildLaunchCommand());
     }
   </script>
 </body>
