@@ -404,6 +404,48 @@ class ClaudeRunManager:
                 run["ended_at"] = run.get("ended_at") or time.time()
         self._save_index()
 
+    # ---------- Claude CLI resolution ----------
+    def _resolve_claude_binary(self) -> Optional[str]:
+        """Resolve a concrete claude executable path for non-interactive
+        backend execution. Avoids relying on shell init files."""
+        env = os.environ
+        explicit = (env.get("LYRN_CLAUDE_BIN") or env.get("CLAUDE_BIN") or "").strip()
+        candidates: List[Path] = []
+        if explicit:
+            candidates.append(Path(explicit).expanduser())
+
+        via_path = shutil.which("claude")
+        if via_path:
+            candidates.append(Path(via_path))
+
+        home = Path(env.get("HOME", "~")).expanduser()
+        candidates += [
+            home / ".local/bin/claude",
+            home / ".npm-global/bin/claude",
+            Path("/usr/local/bin/claude"),
+            Path("/opt/homebrew/bin/claude"),
+        ]
+
+        for c in candidates:
+            try:
+                p = c.expanduser().resolve()
+                if p.exists() and os.access(p, os.X_OK):
+                    return str(p)
+            except Exception:
+                continue
+        return None
+
+    def _claude_env(self) -> Dict[str, str]:
+        env = os.environ.copy()
+        claude_bin = self._resolve_claude_binary()
+        if claude_bin:
+            env["LYRN_CLAUDE_BIN"] = claude_bin
+            bin_dir = str(Path(claude_bin).parent)
+            path_val = env.get("PATH", "")
+            if bin_dir not in path_val.split(os.pathsep):
+                env["PATH"] = bin_dir + (os.pathsep + path_val if path_val else "")
+        return env
+
     # ---------- Persistence ----------
     def _load_index(self) -> Dict[str, Dict[str, Any]]:
         if self._index_path.exists():
@@ -529,14 +571,27 @@ class ClaudeRunManager:
     def preview(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         argv = self.build_argv(payload)
         cwd_check = self.resolve_cwd(payload.get("cwd"))
-        return {"argv": argv, "cwd": cwd_check}
+        return {
+            "argv": argv,
+            "cwd": cwd_check,
+            "claude_bin": self._resolve_claude_binary(),
+        }
 
     # ---------- Auth ----------
     def auth_status(self) -> Dict[str, Any]:
+        claude_bin = self._resolve_claude_binary()
+        if not claude_bin:
+            return {
+                "available": False,
+                "authenticated": False,
+                "raw": "claude CLI not installed or not visible in backend PATH",
+                "claude_bin": None,
+            }
         try:
             r = subprocess.run(
-                ["claude", "auth", "status"],
+                [claude_bin, "auth", "status"],
                 capture_output=True, text=True, timeout=10,
+                env=self._claude_env(),
             )
             output = (r.stdout + r.stderr).strip()
             low = output.lower()
@@ -549,13 +604,29 @@ class ClaudeRunManager:
                 "available": True,
                 "authenticated": authed,
                 "raw": output,
+                "claude_bin": claude_bin,
             }
         except FileNotFoundError:
-            return {"available": False, "authenticated": False, "raw": "claude CLI not installed"}
+            return {
+                "available": False,
+                "authenticated": False,
+                "raw": "claude CLI not installed",
+                "claude_bin": claude_bin,
+            }
         except subprocess.TimeoutExpired:
-            return {"available": True, "authenticated": False, "raw": "auth status timed out"}
+            return {
+                "available": True,
+                "authenticated": False,
+                "raw": "auth status timed out",
+                "claude_bin": claude_bin,
+            }
         except Exception as e:
-            return {"available": False, "authenticated": False, "raw": str(e)}
+            return {
+                "available": False,
+                "authenticated": False,
+                "raw": str(e),
+                "claude_bin": claude_bin,
+            }
 
     # ---------- Run lifecycle ----------
     def list_runs(self) -> List[Dict[str, Any]]:
@@ -678,6 +749,16 @@ class ClaudeRunManager:
             return {"success": False, "message": "Task is required for one-shot runs."}
 
         argv = self.build_argv({**payload, "mode": mode, "task": task})
+        claude_bin = self._resolve_claude_binary()
+        if not claude_bin:
+            return {
+                "success": False,
+                "message": (
+                    "claude CLI not found. Set LYRN_CLAUDE_BIN/CLAUDE_BIN or "
+                    f"ensure PATH includes claude. PATH={os.environ.get('PATH','')}"
+                ),
+            }
+        argv[0] = claude_bin
 
         run_id = "run_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + os.urandom(2).hex()
         run_dir = self.STORE_DIR / run_id
@@ -694,11 +775,12 @@ class ClaudeRunManager:
                 stdout=log_fh,
                 stderr=subprocess.STDOUT,
                 text=True,
+                env=self._claude_env(),
             )
         except FileNotFoundError:
             try: log_fh.close()
             except Exception: pass
-            return {"success": False, "message": "claude CLI not found in PATH"}
+            return {"success": False, "message": "claude CLI not found in backend runtime environment"}
         except Exception as e:
             try: log_fh.close()
             except Exception: pass
@@ -2269,6 +2351,13 @@ class LocalPTYSession(WebTerminalSession):
         shell = os.environ.get("SHELL", "/bin/bash")
         env = os.environ.copy()
         env["TERM"] = "xterm-256color"
+        claude_bin = claude_run_manager._resolve_claude_binary()
+        if claude_bin:
+            env["LYRN_CLAUDE_BIN"] = claude_bin
+            bin_dir = str(Path(claude_bin).parent)
+            path_val = env.get("PATH", "")
+            if bin_dir not in path_val.split(os.pathsep):
+                env["PATH"] = bin_dir + (os.pathsep + path_val if path_val else "")
 
         try:
             pid, master_fd = pty.fork()
@@ -2299,6 +2388,35 @@ class LocalPTYSession(WebTerminalSession):
             try: os.close(self.master_fd)
             except: pass
 
+terminal_sessions: Dict[str, WebTerminalSession] = {}
+terminal_sessions_lock = asyncio.Lock()
+
+async def get_or_create_terminal_session(sid: str, cwd: Optional[str]) -> WebTerminalSession:
+    async with terminal_sessions_lock:
+        existing = terminal_sessions.get(sid)
+        if existing and not getattr(existing, "closed", True):
+            return existing
+
+        if platform.system() == "Windows":
+            session = WebTerminalSession(sid, cwd=cwd)
+        else:
+            session = LocalPTYSession(sid, cwd=cwd)
+        terminal_sessions[sid] = session
+        return session
+
+async def maybe_cleanup_terminal_session(sid: str):
+    await asyncio.sleep(15)
+    async with terminal_sessions_lock:
+        session = terminal_sessions.get(sid)
+        if not session:
+            return
+        if session.subscribers:
+            return
+        try:
+            session.close()
+        finally:
+            terminal_sessions.pop(sid, None)
+
 
 @app.websocket("/api/terminal/{sid}")
 async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, cwd: Optional[str] = None):
@@ -2323,11 +2441,7 @@ async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str
                 print(f"[Terminal] cwd validation error: {e}")
 
         await websocket.accept()
-
-        if platform.system() == "Windows":
-            session = WebTerminalSession(sid, cwd=safe_cwd)
-        else:
-            session = LocalPTYSession(sid, cwd=safe_cwd)
+        session = await get_or_create_terminal_session(sid, safe_cwd)
 
         session.subscribers.add(websocket)
         print(f"[Terminal] Connected {sid}")
@@ -2350,7 +2464,9 @@ async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str
         print(f"[Terminal] Error: {e}")
     finally:
         if 'session' in locals():
-            session.close()
+            session.subscribers.discard(websocket)
+            if not session.subscribers:
+                asyncio.create_task(maybe_cleanup_terminal_session(sid))
 
 # Serve dashboard at root
 
