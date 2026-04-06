@@ -197,9 +197,16 @@
             </div>
             <button onclick="closeOverlay()">Hide (Keep Running)</button>
         </div>
-        <div class="proxy-body">
-            <div class="chat-view" id="live-chat">Waiting for Claude Code connection...</div>
-            <div class="sidebar">
+        <div class="proxy-body" style="flex-direction: column;">
+            <div style="background: var(--bg-core); border-bottom: 1px solid var(--border-color); padding: 16px;">
+                <h4 style="color: var(--text-dim); margin-bottom: 8px; font-size: 11px; text-transform: uppercase;">Connection Instructions</h4>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #10B981; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <div id="proxy-instructions" style="white-space: pre-wrap;">Waiting for proxy start...</div>
+                </div>
+            </div>
+            <div style="display: flex; flex: 1; overflow: hidden;">
+                <div class="chat-view" id="live-chat">Waiting for Claude Code connection...</div>
+                <div class="sidebar">
                 <div class="sidebar-section">
                     <h4>Proxy Stats</h4>
                     <div class="stat-row"><span>Requests</span><span class="stat-val" id="stat-req">0</span></div>
@@ -211,8 +218,9 @@
                     <div class="stat-row"><span>Status</span><span class="stat-val" id="runner-status">Idle</span></div>
                     <div class="stat-row"><span>Speed</span><span class="stat-val" id="runner-speed">0 t/s</span></div>
                 </div>
-                <div style="margin-top: auto;">
-                    <button style="width: 100%; border-color: #ef4444; color: #ef4444;" onclick="stopGeneration()">Stop Generation</button>
+                    <div style="margin-top: auto;">
+                        <button style="width: 100%; border-color: #ef4444; color: #ef4444;" onclick="stopGeneration()">Stop Generation</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -229,6 +237,7 @@
     let coreUrl = localStorage.getItem('lyrn_core_url') || '';
     let healthInterval = null;
     let proxyRunning = false;
+    let originalChatHistorySetting = null;
 
     document.addEventListener('DOMContentLoaded', () => {
         loadConfig();
@@ -271,6 +280,30 @@
         if (!coreUrl) return;
         try {
             const base = coreUrl.replace(/\/$/, "");
+
+            // Save and disable chat history
+            try {
+                const cfgRes = await fetch(`${base}/api/config`, { headers: authToken ? { 'X-Token': authToken } : {} });
+                if (cfgRes.ok) {
+                    const cfgData = await cfgRes.json();
+                    if (cfgData.settings && cfgData.settings.enable_chat_history !== undefined) {
+                        originalChatHistorySetting = cfgData.settings.enable_chat_history;
+                    } else {
+                        originalChatHistorySetting = true; // Default
+                    }
+
+                    // Disable it
+                    const newSettings = { ...cfgData.settings, enable_chat_history: false };
+                    await fetch(`${base}/api/config`, {
+                        method: 'POST',
+                        headers: authToken ? { 'X-Token': authToken, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ settings: newSettings })
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to disable chat history", e);
+            }
+
             const res = await fetch(`${base}/api/system/start_claude_proxy`, {
                 method: 'POST',
                 headers: authToken ? { 'X-Token': authToken } : {}
@@ -285,6 +318,13 @@
                 document.getElementById('proxy-status').innerText = 'Running';
                 document.getElementById('start-proxy-btn').innerText = 'Open Terminal';
                 document.getElementById('api-endpoint').innerText = `http://localhost:${data.port}/v1/messages`;
+
+                // Update instructions
+                const port = data.port || 8001;
+                document.getElementById('proxy-instructions').innerText = `export ANTHROPIC_BASE_URL="http://localhost:${port}"
+export ANTHROPIC_AUTH_TOKEN="lyrn"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+claude`;
 
                 // Open overlay
                 document.getElementById('proxy-overlay').classList.add('active');
@@ -304,6 +344,26 @@
         if (!coreUrl) return;
         try {
             const base = coreUrl.replace(/\/$/, "");
+
+            // Restore chat history setting
+            if (originalChatHistorySetting !== null) {
+                try {
+                    const cfgRes = await fetch(`${base}/api/config`, { headers: authToken ? { 'X-Token': authToken } : {} });
+                    if (cfgRes.ok) {
+                        const cfgData = await cfgRes.json();
+                        const newSettings = { ...cfgData.settings, enable_chat_history: originalChatHistorySetting };
+                        await fetch(`${base}/api/config`, {
+                            method: 'POST',
+                            headers: authToken ? { 'X-Token': authToken, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ settings: newSettings })
+                        });
+                        originalChatHistorySetting = null;
+                    }
+                } catch (e) {
+                    console.error("Failed to restore chat history", e);
+                }
+            }
+
             await fetch(`${base}/api/system/stop_claude_proxy`, {
                 method: 'POST',
                 headers: authToken ? { 'X-Token': authToken } : {}
