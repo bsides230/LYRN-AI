@@ -1,5 +1,30 @@
 # Build Notes
 
+## v6.0.2 - Claude Module Guide, Panel Sizing, and Mobile Drawer
+
+This update improves Claude Code module usability for first-time users and fixes left-panel layout constraints on smaller displays.
+
+- **Claude module UX (`LYRN_v6/modules/ClaudeCode.html`)**
+  - Added an always-visible circular **`?` guide button** to the header, positioned to the right of **Reconnect**.
+  - Added a full in-module **User Guide popup** that documents every control group and action button with visual button chips and plain-language descriptions.
+  - Added a clear **startup sequence section** in the guide so users launch the model with normal LYRN controls first, then connect/launch in the Claude module.
+
+- **Left panel sizing and readability**
+  - Updated the desktop control panel to use a wider, constrained range (`clamp`) with a minimum width to prevent form content compression.
+  - Enabled horizontal resize on desktop so users can expand the control panel while keeping a vertical scrollbar for full section access.
+
+- **Mobile vertical layout**
+  - Added a top-left hamburger (`☰`) control for mobile widths.
+  - Converted the left panel into an overlay drawer on mobile with a dim backdrop and smooth slide-in behavior.
+  - Kept terminal content full width behind the drawer to match vertical app behavior across LYRN modules.
+
+- **Versioning + archival**
+  - Archived the previous Claude module implementation to `deprecated/Old/ClaudeCode_v6.0.html` before applying the new UX update.
+
+- **Logging updates**
+  - No backend log format changes were required in this update.
+  - Existing Claude module runtime indicators remain intact (auth pill, connection status pill, and terminal `[sys]` state lines), now supplemented by guide-first onboarding to reduce operator error.
+
 ## v5.0.3 - Restore v4 KV-Cache Reuse
 
 This update restores the high-performance KV-cache reuse behavior from v4 while maintaining compatibility with the v5 headless architecture. It resolves the "inconsistent sequence position" errors observed with llama-cpp-python when reusing context.
