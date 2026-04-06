@@ -444,6 +444,28 @@ class ClaudeRunManager:
             path_val = env.get("PATH", "")
             if bin_dir not in path_val.split(os.pathsep):
                 env["PATH"] = bin_dir + (os.pathsep + path_val if path_val else "")
+
+        # Set Anthropic Proxy Environment Variables
+        # Attempt to read port from port.txt + 1
+        default_port = 8001
+        try:
+            if os.path.exists("port.txt"):
+                with open("port.txt", "r") as f:
+                    val = f.read().strip()
+                    if val.isdigit():
+                        default_port = int(val) + 1
+        except:
+            pass
+
+        host = os.environ.get("LCC_HOST", "127.0.0.1")
+        port = os.environ.get("LCC_PORT", str(default_port))
+        base_url = f"http://{host}:{port}"
+
+        env["ANTHROPIC_BASE_URL"] = base_url
+        env["ANTHROPIC_AUTH_TOKEN"] = "lyrn"
+        env["ANTHROPIC_API_KEY"] = ""
+        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+
         return env
 
     # ---------- Persistence ----------
@@ -2358,6 +2380,28 @@ class LocalPTYSession(WebTerminalSession):
             path_val = env.get("PATH", "")
             if bin_dir not in path_val.split(os.pathsep):
                 env["PATH"] = bin_dir + (os.pathsep + path_val if path_val else "")
+
+        # Set Anthropic Proxy Environment Variables
+        # Attempt to read port from port.txt + 1
+        default_port = 8001
+        try:
+            if os.path.exists("port.txt"):
+                with open("port.txt", "r") as f:
+                    val = f.read().strip()
+                    if val.isdigit():
+                        default_port = int(val) + 1
+        except:
+            pass
+
+        host = os.environ.get("LCC_HOST", "127.0.0.1")
+        port = os.environ.get("LCC_PORT", str(default_port))
+        base_url = f"http://{host}:{port}"
+
+        env["ANTHROPIC_BASE_URL"] = base_url
+        env["ANTHROPIC_AUTH_TOKEN"] = "lyrn"
+        env["ANTHROPIC_API_KEY"] = ""
+        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+
 
         try:
             pid, master_fd = pty.fork()
