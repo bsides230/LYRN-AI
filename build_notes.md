@@ -1,5 +1,34 @@
 # Build Notes
 
+## v6.0.3 - Claude Panel Readability, Mobile Close Controls, and Quick Status Drawer
+
+This update improves dashboard/module usability on smaller screens, adds a fast right-side health glance panel, and removes maximize spacing artifacts.
+
+- **Claude Code module panel sizing (`LYRN_v6/modules/ClaudeCode.html`)**
+  - Increased desktop control panel minimum width and clamp range so section inputs are no longer compressed into unreadable widths.
+  - Raised baseline input/preview control heights to improve readability and touch usability.
+  - Preserved vertical scrolling behavior with themed scrollbars so all sections remain reachable when viewport height is limited.
+
+- **Claude Code mobile drawer close behavior**
+  - Added an explicit in-panel close button (`✕`) at the top of the mobile control drawer.
+  - Kept backdrop-close behavior and existing hamburger open action for consistent open/close affordances on phones.
+
+- **Dashboard quick status drawer (`LYRN_v6/dashboard.html`)**
+  - Added a right-side quick status drawer (hidden by default) with a slim edge toggle button.
+  - Drawer now provides at-a-glance values for backend connectivity, worker state, model state, CPU/RAM, and last health check time.
+  - Wired drawer updates directly to existing `/health` polling so no backend contract changes were required.
+
+- **Maximized window top-gap fix**
+  - Updated maximize logic to fill the desktop workspace (`top: 0`, `height: 100%`) and remove the visual gap between dashboard top bar and app top bars when maximized.
+
+- **Versioning + archival**
+  - Bumped GUI title from `v0.60` to `v0.61`.
+  - Archived previous dashboard file to `deprecated/Old/dashboard_v0.60.html` before applying this update.
+
+- **Logging updates**
+  - No new backend log files or schemas were introduced.
+  - Quick status values are derived from the existing dashboard `/health` polling loop and existing status-light updates.
+
 ## v6.0.2 - Claude Module Guide, Panel Sizing, and Mobile Drawer
 
 This update improves Claude Code module usability for first-time users and fixes left-panel layout constraints on smaller displays.
