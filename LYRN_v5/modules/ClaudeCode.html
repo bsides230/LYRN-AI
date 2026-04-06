@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LYRN Claude Code Module</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-core: #050505;
+      --bg-panel: #0a0a0a;
+      --brand-purple: #7c5cff;
+      --text-head: #ffffff;
+      --text-body: #b0b0b0;
+      --text-dim: #666666;
+      --border-color: #222222;
+      --btn-text: #e0e0e0;
+      --btn-border: #444444;
+      --btn-bg: rgba(255,255,255,0.03);
+      --font-size-base: 13px;
+    }
+
+    body[data-theme="light"] {
+        --bg-core: #eef0f4;
+        --bg-panel: #ffffff;
+        --brand-purple: #6a4ce0;
+        --text-head: #111111;
+        --text-body: #333333;
+        --text-dim: #555555;
+        --border-color: #d1d5db;
+        --btn-text: #333;
+        --btn-border: #ccc;
+        --btn-bg: rgba(0,0,0,0.03);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-core); color: var(--text-body);
+      font-family: 'Inter', system-ui, sans-serif;
+      height: 100vh; width: 100vw; overflow: hidden;
+      font-size: var(--font-size-base);
+    }
+
+    h1, h2, h3, h4 { font-family: 'JetBrains Mono', monospace; color: var(--text-head); margin: 0; }
+
+    .app-wrapper {
+      display: flex; flex-direction: column; height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color); padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel); flex-shrink: 0;
+    }
+
+    .meta-label { font-family: 'JetBrains Mono'; font-size: calc(var(--font-size-base) - 2px); color: var(--brand-purple); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; display: block; }
+    .panel-title { font-size: calc(var(--font-size-base) + 2px); font-weight: 600; }
+
+    .content-area {
+      padding: 20px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+
+    .info-card {
+      background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px;
+      padding: 24px; width: 100%; max-width: 500px; margin-bottom: 20px;
+    }
+
+    .info-row {
+      display: flex; justify-content: space-between; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace;
+      border-bottom: 1px dashed var(--border-color); padding-bottom: 8px;
+    }
+    .info-row span:first-child { color: var(--text-dim); }
+    .info-row span:last-child { color: var(--text-head); }
+
+    button {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--font-size-base);
+      background: var(--btn-bg); border: 1px solid var(--btn-border); color: var(--btn-text);
+      padding: 12px 24px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em;
+      transition: all 0.2s ease; border-radius: 4px; font-weight: 600;
+    }
+    button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+    button.btn-primary { background: var(--brand-purple); color: #ffffff; border-color: var(--brand-purple); }
+    button.btn-primary:hover { background: #6a4ce0; }
+
+    .status-indicator {
+      display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+      background: var(--text-dim); margin-right: 8px;
+    }
+    .status-indicator.active { background: #10B981; box-shadow: 0 0 8px #10B981; }
+
+    /* OVERLAY STYLES */
+    .proxy-overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.85); z-index: 9999;
+      display: flex; justify-content: center; align-items: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+
+    .proxy-overlay.active { opacity: 1; pointer-events: auto; }
+
+    .proxy-modal {
+      background: var(--bg-panel); border: 1px solid var(--brand-purple);
+      border-radius: 8px; width: 90%; max-width: 800px; height: 80vh;
+      display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+
+    .proxy-header {
+      padding: 16px; border-bottom: 1px solid var(--border-color);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .proxy-body {
+      display: flex; flex: 1; overflow: hidden;
+    }
+
+    .chat-view {
+      flex: 1; padding: 20px; overflow-y: auto; font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: var(--text-head);
+    }
+
+    .sidebar {
+      width: 250px; border-left: 1px solid var(--border-color); background: rgba(0,0,0,0.2);
+      padding: 16px; display: flex; flex-direction: column; gap: 16px;
+    }
+
+    .sidebar-section h4 { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+
+    .stat-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; font-family: 'JetBrains Mono'; }
+    .stat-val { color: var(--brand-purple); }
+
+    .proxy-footer {
+      padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px;
+    }
+
+    #toast {
+        position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+        background: var(--bg-panel); border: 1px solid var(--brand-purple);
+        color: var(--text-head); padding: 10px 20px; border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base);
+        opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 11000;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="app-wrapper">
+    <header>
+        <div>
+            <div class="meta-label">LYRN INTEGRATION MODULE</div>
+            <h1 class="panel-title">Claude Code Proxy</h1>
+        </div>
+        <div>
+            <span class="status-indicator" id="status-dot"></span>
+            <span id="proxy-status" style="font-family:'JetBrains Mono'; font-size:12px;">Stopped</span>
+        </div>
+    </header>
+
+    <div class="content-area">
+      <div class="info-card">
+        <h3 style="margin-bottom: 20px;">Configuration</h3>
+        <div class="info-row">
+            <span>Active Model:</span>
+            <span id="model-name">Loading...</span>
+        </div>
+        <div class="info-row">
+            <span>Context Size:</span>
+            <span id="model-ctx">Loading...</span>
+        </div>
+        <div class="info-row">
+            <span>API Endpoint:</span>
+            <span id="api-endpoint">Waiting for proxy start...</span>
+        </div>
+        <div class="info-row" style="border-bottom: none;">
+            <span>Required Headers:</span>
+            <span>None (Local Bypass)</span>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="start-proxy-btn" onclick="startProxy()">Start Proxy & Open Terminal</button>
+    </div>
+  </div>
+
+  <!-- PROXY OVERLAY -->
+  <div class="proxy-overlay" id="proxy-overlay">
+    <div class="proxy-modal">
+        <div class="proxy-header">
+            <div>
+                <h3 style="color: var(--brand-purple);">Claude Code Mode</h3>
+                <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Intercepting /v1/messages...</div>
+            </div>
+            <button onclick="closeOverlay()">Hide (Keep Running)</button>
+        </div>
+        <div class="proxy-body">
+            <div class="chat-view" id="live-chat">Waiting for Claude Code connection...</div>
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <h4>Proxy Stats</h4>
+                    <div class="stat-row"><span>Requests</span><span class="stat-val" id="stat-req">0</span></div>
+                    <div class="stat-row"><span>Tokens In</span><span class="stat-val" id="stat-in">0</span></div>
+                    <div class="stat-row"><span>Tokens Out</span><span class="stat-val" id="stat-out">0</span></div>
+                </div>
+                <div class="sidebar-section">
+                    <h4>Model Runner</h4>
+                    <div class="stat-row"><span>Status</span><span class="stat-val" id="runner-status">Idle</span></div>
+                    <div class="stat-row"><span>Speed</span><span class="stat-val" id="runner-speed">0 t/s</span></div>
+                </div>
+                <div style="margin-top: auto;">
+                    <button style="width: 100%; border-color: #ef4444; color: #ef4444;" onclick="stopGeneration()">Stop Generation</button>
+                </div>
+            </div>
+        </div>
+        <div class="proxy-footer">
+            <button onclick="stopProxy()" style="color: #ef4444;">Stop Proxy</button>
+        </div>
+    </div>
+  </div>
+
+  <div id="toast">Message</div>
+
+  <script>
+    let authToken = localStorage.getItem('lyrn_admin_token') || null;
+    let coreUrl = localStorage.getItem('lyrn_core_url') || '';
+    let healthInterval = null;
+    let proxyRunning = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadConfig();
+
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', event.data.theme);
+            if (event.data.type === 'TOKEN_UPDATE') authToken = event.data.token;
+            if (event.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = event.data.url;
+                loadConfig();
+            }
+        });
+    });
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    async function loadConfig() {
+        if (!coreUrl) return;
+        try {
+            const base = coreUrl.replace(/\/$/, "");
+            const res = await fetch(`${base}/api/config`, { headers: authToken ? { 'X-Token': authToken } : {} });
+            if (res.ok) {
+                const data = await res.json();
+                const active = data.settings.active || {};
+
+                const modelPath = active.model_path || '';
+                const parts = modelPath.split(/[\/\\]/);
+                document.getElementById('model-name').innerText = parts[parts.length - 1] || 'None loaded';
+                document.getElementById('model-ctx').innerText = active.n_ctx || 'Unknown';
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    async function startProxy() {
+        if (!coreUrl) return;
+        try {
+            const base = coreUrl.replace(/\/$/, "");
+            const res = await fetch(`${base}/api/system/start_claude_proxy`, {
+                method: 'POST',
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                proxyRunning = true;
+
+                // Update UI
+                document.getElementById('status-dot').classList.add('active');
+                document.getElementById('proxy-status').innerText = 'Running';
+                document.getElementById('start-proxy-btn').innerText = 'Open Terminal';
+                document.getElementById('api-endpoint').innerText = `http://localhost:${data.port}/v1/messages`;
+
+                // Open overlay
+                document.getElementById('proxy-overlay').classList.add('active');
+
+                // Start polling health for sidebar stats
+                if(!healthInterval) healthInterval = setInterval(pollHealth, 1000);
+            } else {
+                showToast('Failed to start proxy server.');
+            }
+        } catch(e) {
+            console.error(e);
+            showToast('Error starting proxy.');
+        }
+    }
+
+    async function stopProxy() {
+        if (!coreUrl) return;
+        try {
+            const base = coreUrl.replace(/\/$/, "");
+            await fetch(`${base}/api/system/stop_claude_proxy`, {
+                method: 'POST',
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
+
+            proxyRunning = false;
+            document.getElementById('status-dot').classList.remove('active');
+            document.getElementById('proxy-status').innerText = 'Stopped';
+            document.getElementById('start-proxy-btn').innerText = 'Start Proxy & Open Terminal';
+            document.getElementById('api-endpoint').innerText = 'Waiting for proxy start...';
+
+            closeOverlay();
+            if(healthInterval) { clearInterval(healthInterval); healthInterval = null; }
+            showToast('Proxy Stopped');
+        } catch(e) { console.error(e); }
+    }
+
+    function closeOverlay() {
+        document.getElementById('proxy-overlay').classList.remove('active');
+    }
+
+    async function stopGeneration() {
+        if (!coreUrl) return;
+        try {
+            const base = coreUrl.replace(/\/$/, "");
+            await fetch(`${base}/api/chat/stop`, {
+                method: 'POST',
+                headers: authToken ? { 'X-Token': authToken } : {}
+            });
+            showToast("Stop signal sent");
+        } catch(e) {}
+    }
+
+    async function pollHealth() {
+        if (!coreUrl || !proxyRunning) return;
+        try {
+            const base = coreUrl.replace(/\/$/, "");
+            const res = await fetch(`${base}/health`, { headers: authToken ? { 'X-Token': authToken } : {} });
+            if (res.ok) {
+                const data = await res.json();
+
+                // Update Sidebar
+                const llm = data.llm_stats || {};
+                document.getElementById('runner-status').innerText = data.worker.llm_status || 'Unknown';
+                document.getElementById('runner-speed').innerText = llm.eval_speed ? `${llm.eval_speed.toFixed(1)} t/s` : '0 t/s';
+
+                // Fetch recent logs for chat view (hacky way to stream model output in UI)
+                // In a real implementation we might have the proxy emit events or read the active file
+                fetchActiveLog(base);
+            }
+        } catch(e) {}
+    }
+
+    // Simplistic log viewer to show activity
+    async function fetchActiveLog(base) {
+         try {
+             const res = await fetch(`${base}/api/automation/job_content?path=chat_trigger.txt`, {
+                 headers: authToken ? { 'X-Token': authToken } : {}
+             });
+
+             if(res.ok) {
+                 const data = await res.json();
+                 if(data.content) {
+                     // Get the target file
+                     const targetRes = await fetch(`${base}/api/automation/job_content?path=${data.content.trim()}`, {
+                         headers: authToken ? { 'X-Token': authToken } : {}
+                     });
+                     if(targetRes.ok) {
+                         const targetData = await targetRes.json();
+                         const chatView = document.getElementById('live-chat');
+                         chatView.innerText = targetData.content;
+                         chatView.scrollTop = chatView.scrollHeight;
+                     }
+                 }
+             }
+         } catch(e) {}
+    }
+  </script>
+</body>
+</html>

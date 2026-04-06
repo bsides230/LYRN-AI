@@ -271,6 +271,99 @@ async def scheduler_loop():
             await asyncio.sleep(5)
 
 # --- Worker Controller ---
+class ProxyController:
+    """Manages the anthropic proxy process."""
+    def __init__(self):
+        self.process: Optional[subprocess.Popen] = None
+        self._lock = threading.Lock()
+        self.proxy_script = "anthropic_proxy.py"
+        self.port = 8001
+
+    def get_status(self):
+        with self._lock:
+            running = self.process is not None and self.process.poll() is None
+
+            # Determine port from port.txt + 1
+            try:
+                if os.path.exists("port.txt"):
+                    with open("port.txt", "r") as f:
+                        val = f.read().strip()
+                        if val.isdigit():
+                            self.port = int(val) + 1
+            except: pass
+
+            return {
+                "running": running,
+                "pid": self.process.pid if running else None,
+                "port": self.port
+            }
+
+    def start_proxy(self):
+        with self._lock:
+            if self.process is not None and self.process.poll() is None:
+                return {"success": False, "message": "Proxy already running.", "port": self.port}
+
+            try:
+                # Start the proxy process
+                self.process = subprocess.Popen(
+                    [sys.executable, "-u", self.proxy_script],
+                    cwd=os.getcwd(),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+
+                # Start threads to forward output to logger
+                threading.Thread(target=self._monitor_output, args=(self.process.stdout, "ProxyOut"), daemon=True).start()
+                threading.Thread(target=self._monitor_output, args=(self.process.stderr, "ProxyErr"), daemon=True).start()
+
+                # Determine port
+                try:
+                    if os.path.exists("port.txt"):
+                        with open("port.txt", "r") as f:
+                            val = f.read().strip()
+                            if val.isdigit():
+                                self.port = int(val) + 1
+                except: pass
+
+                return {"success": True, "message": "Proxy started.", "port": self.port}
+            except Exception as e:
+                return {"success": False, "message": f"Failed to start proxy: {e}"}
+
+    def stop_proxy(self):
+        with self._lock:
+            if self.process is None or self.process.poll() is not None:
+                return {"success": False, "message": "Proxy not running."}
+
+            try:
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+
+                self.process = None
+                return {"success": True, "message": "Proxy stopped."}
+            except Exception as e:
+                return {"success": False, "message": f"Error stopping proxy: {e}"}
+
+    def _monitor_output(self, stream, source):
+        """Reads output from the subprocess and logs it."""
+        try:
+            for line in iter(stream.readline, ''):
+                if line:
+                    clean_line = line.strip()
+                    if main_loop and clean_line:
+                        asyncio.run_coroutine_threadsafe(logger.emit("Info", clean_line, source), main_loop)
+                    elif clean_line:
+                        print(f"[{source}] {clean_line}")
+        except Exception:
+            pass
+        finally:
+            stream.close()
+
+proxy_controller = ProxyController()
+
 class WorkerController:
     """Manages the headless worker process."""
     def __init__(self):
@@ -619,6 +712,7 @@ async def health_check():
         } if disk else None,
         "gpu": gpu_stats,
         "worker": worker_status,
+        "proxy": proxy_controller.get_status(),
         "llm_stats": llm_stats
     }
 
@@ -1214,6 +1308,18 @@ async def start_worker():
 @app.post("/api/system/stop_worker", dependencies=[Depends(verify_token)])
 async def stop_worker():
     return worker_controller.stop_worker()
+
+@app.post("/api/system/start_claude_proxy", dependencies=[Depends(verify_token)])
+async def start_claude_proxy():
+    return proxy_controller.start_proxy()
+
+@app.post("/api/system/stop_claude_proxy", dependencies=[Depends(verify_token)])
+async def stop_claude_proxy():
+    return proxy_controller.stop_proxy()
+
+@app.get("/api/system/proxy_status", dependencies=[Depends(verify_token)])
+async def get_proxy_status():
+    return proxy_controller.get_status()
 
 # --- Automation Endpoints ---
 
