@@ -97,3 +97,21 @@ This update marks the official transition to the Dashboard v5 architecture and a
   - Added dependencies: `websockets`, `uvicorn[standard]`, `pty`.
 - **Logging Updates**:
   - Terminal connection status and errors are now printed to `stdout` securely.
+
+## v6.0.1 - Claude Code Runtime Reliability Audit (Remote + venv)
+
+- **Backend hardening (`start_lyrn.py`)**
+  - Added deterministic Claude binary resolution for backend-launched subprocesses.
+  - Added support for explicit `LYRN_CLAUDE_BIN` / `CLAUDE_BIN` overrides.
+  - Added PATH normalization for backend child processes so resolved Claude bin directories are inherited even when service PATH differs from interactive shells.
+  - Updated orchestrated run launch and auth status checks to use resolved binary path and explicit subprocess environment.
+  - Improved failure messaging when Claude is not visible in backend runtime context.
+
+- **Terminal reliability (`start_lyrn.py`)**
+  - Fixed websocket terminal reconnect behavior by introducing session reuse keyed by SID.
+  - Added delayed cleanup for terminal sessions so brief browser disconnect/reconnect does not kill the shell.
+  - Injected resolved Claude binary directory into PTY session PATH to reduce “works in local shell, fails in remote backend terminal” drift.
+
+- **Logging updates**
+  - Added clearer backend-facing error messages for Claude binary discovery failures (includes actionable env guidance).
+  - Preserved terminal connection/disconnection logs and now keep reconnect continuity visible through session reuse behavior.
