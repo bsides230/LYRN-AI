@@ -321,7 +321,11 @@
 
                 // Update instructions
                 const port = data.port || 8001;
-                document.getElementById('proxy-instructions').innerText = `export ANTHROPIC_BASE_URL="http://localhost:${port}"
+                document.getElementById('proxy-instructions').innerText = `# Using the included launcher script:
+./lcc.sh lyrn-model
+
+# Or manually:
+export ANTHROPIC_BASE_URL="http://localhost:${port}"
 export ANTHROPIC_AUTH_TOKEN="lyrn"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
 claude`;
