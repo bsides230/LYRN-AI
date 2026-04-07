@@ -142,11 +142,12 @@
       width: clamp(420px, 38vw, 560px);
       min-width: 420px;
       max-width: 560px;
+      flex-shrink: 0;
       border-right: 1px solid var(--border-color);
       background: var(--bg-panel);
       display: flex; flex-direction: column;
       overflow-y: auto; padding: 16px; gap: 16px;
-      overflow-x: hidden;
+      overflow-x: auto;
     }
 
     .terminal-container {
@@ -168,40 +169,40 @@
     .quick-status-toggle {
       position: absolute;
       top: 50%;
-      right: 8px;
+      right: 0;
       transform: translateY(-50%);
-      width: 30px;
-      height: 78px;
+      width: 24px;
+      height: 60px;
       border: 1px solid var(--border-color);
-      border-radius: 10px;
-      background: linear-gradient(180deg, rgba(124,92,255,0.15), rgba(5,5,5,0.95));
-      color: var(--brand-purple);
+      border-right: none;
+      border-radius: 6px 0 0 6px;
+      background: var(--bg-panel);
+      color: var(--text-dim);
       font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
+      font-size: 12px;
       cursor: pointer;
       z-index: 60;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(124,92,255,0.2);
-      letter-spacing: 0.08em;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.2);
     }
     .quick-status-toggle:hover {
-      color: #fff;
-      border-color: var(--brand-purple);
-      box-shadow: 0 10px 28px rgba(0,0,0,0.6), 0 0 12px rgba(124,92,255,0.35);
+      color: var(--brand-purple);
+      background: var(--brand-purple-dim);
     }
     .quick-status-toggle.open {
-      right: 288px;
+      right: 280px;
     }
 
     .quick-status-panel {
       width: 0;
       height: 100%;
       border-left: 0 solid var(--border-color);
-      background: rgba(10, 10, 10, 0.96);
+      background: var(--bg-panel);
       transition: width 0.2s ease, border-left-width 0.2s ease;
       z-index: 50;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      flex-shrink: 0;
     }
     .quick-status-panel.open {
       width: 280px;
@@ -218,6 +219,7 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--brand-purple);
+      white-space: nowrap;
     }
     .quick-status-body {
       padding: 12px;
@@ -229,8 +231,9 @@
     .quick-status-card {
       border: 1px solid var(--border-color);
       border-radius: 6px;
-      background: var(--bg-panel);
+      background: var(--bg-input);
       padding: 8px 10px;
+      white-space: nowrap;
     }
     .quick-status-label {
       font-size: 9px;
@@ -249,103 +252,10 @@
     .quick-status-value.ok { color: var(--status-ok); }
     .quick-status-value.warn { color: var(--status-warn); }
     .quick-status-value.err { color: var(--status-err); }
-    .quick-status-mini {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: var(--text-dim);
-      margin-top: 4px;
-      line-height: 1.35;
-    }
+
     .quick-panel-backdrop {
       display: none;
     }
-
-
-    .quick-status-toggle {
-      position: absolute;
-      top: 50%;
-      right: 10px;
-      transform: translateY(-50%);
-      width: 30px;
-      height: 72px;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      background: var(--bg-panel);
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      cursor: pointer;
-      z-index: 50;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
-    }
-    .quick-status-toggle:hover {
-      color: var(--brand-purple);
-      border-color: var(--brand-purple);
-    }
-    .quick-status-toggle.open {
-      right: calc(min(280px, 72vw) + 10px);
-    }
-
-    .quick-status-panel {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: min(280px, 72vw);
-      height: 100%;
-      border-left: 1px solid var(--border-color);
-      background: rgba(10, 10, 10, 0.95);
-      backdrop-filter: blur(8px);
-      transform: translateX(102%);
-      transition: transform 0.2s ease;
-      z-index: 55;
-      display: flex;
-      flex-direction: column;
-    }
-    .quick-status-panel.open {
-      transform: translateX(0);
-    }
-    .quick-status-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border-color);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--brand-purple);
-    }
-    .quick-status-body {
-      padding: 12px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .quick-status-card {
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background: var(--bg-panel);
-      padding: 8px 10px;
-    }
-    .quick-status-label {
-      font-size: 9px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-      margin-bottom: 4px;
-    }
-    .quick-status-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--text-head);
-      line-height: 1.35;
-    }
-    .quick-status-value.ok { color: var(--status-ok); }
-    .quick-status-value.warn { color: var(--status-warn); }
-    .quick-status-value.err { color: var(--status-err); }
 
 
     /* --- SECTIONS --- */
@@ -660,14 +570,29 @@
         width: 100%;
       }
       .quick-status-toggle {
-        right: 8px;
-        width: 28px;
-        height: 64px;
+        right: 0;
+        width: 24px;
+        height: 60px;
+        box-shadow: none;
+        border-right: none;
       }
       .quick-status-toggle.open {
-        right: calc(min(86vw, 320px) + 8px);
+        right: min(86vw, 320px);
       }
       .quick-status-panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        background: rgba(10, 10, 10, 0.95);
+        backdrop-filter: blur(8px);
+        transform: translateX(100%);
+        transition: transform 0.2s ease;
+        z-index: 55;
+        width: min(86vw, 320px);
+      }
+      .quick-status-panel.open {
+        transform: translateX(0);
         width: min(86vw, 320px);
       }
       .guide-item {
