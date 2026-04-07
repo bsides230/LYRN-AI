@@ -264,6 +264,7 @@
       border-radius: 6px;
       background: var(--bg-core);
       overflow: hidden;
+      flex-shrink: 0;
     }
     .section-header {
       background: var(--brand-purple-dim);
@@ -791,7 +792,8 @@
 
       <!-- Terminal View -->
       <div class="terminal-container">
-        <button class="quick-status-toggle" id="quick-status-toggle" onclick="toggleQuickStatusPanel()" aria-label="Open quick status panel" title="Quick Status">◀</button>
+        <div id="terminal-wrapper"></div>
+        <button class="quick-status-toggle" id="quick-status-toggle" onclick="toggleQuickStatusPanel()" aria-label="Open quick status panel" title="Quick Status">☰</button>
         <aside class="quick-status-panel" id="quick-status-panel" aria-hidden="true">
           <div class="quick-status-head">
             <span>Quick Status</span>
@@ -824,7 +826,6 @@
             </div>
           </div>
         </aside>
-        <div id="terminal-wrapper"></div>
       </div>
     </div>
   </div>
@@ -1149,7 +1150,7 @@
       if (!panel || !btn) return;
       panel.classList.toggle('open', quickPanelOpen);
       panel.setAttribute('aria-hidden', quickPanelOpen ? 'false' : 'true');
-      btn.innerText = quickPanelOpen ? '▶' : '◀';
+      btn.innerText = quickPanelOpen ? '✕' : '☰';
       btn.setAttribute('aria-label', quickPanelOpen ? 'Close quick status panel' : 'Open quick status panel');
       btn.classList.toggle('open', quickPanelOpen);
     }
