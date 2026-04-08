@@ -60,162 +60,11 @@ try:
 except ImportError:
     pynvml = None
 
-# Global reference to the main event loop
-main_loop: Optional[asyncio.AbstractEventLoop] = None
-LYRN_TOKEN: Optional[str] = None
-
-# Global LLM Stats (populated from log parsing)
-extended_llm_stats = {
-    "kv_cache_reused": 0,
-    "prompt_tokens": 0,
-    "prompt_speed": 0.0,
-    "eval_tokens": 0,
-    "eval_speed": 0.0,
-    "total_tokens": 0,
-    "load_time": 0.0,
-    "total_time": 0.0,
-    "tokenization_time_ms": 0.0,
-    "generation_time_ms": 0.0
-}
-
-# Global Active Downloads
-active_downloads = {} # filename -> { status, bytes, total, pct, error, timestamp }
-
-# --- DiskJournalLogger ---
-class DiskJournalLogger:
-    def __init__(self, log_dir="logs", lines_per_chunk=1000):
-        self.log_dir = Path(log_dir)
-        self.lines_per_chunk = lines_per_chunk
-        self.current_session_dir = None
-        self.current_chunk_index = 0
-        self.current_chunk_lines = 0
-        self.current_chunk_path = None
-
-        # In-memory buffer for live streaming (tail)
-        self.subscribers = set()
-        self._lock = None
-
-        # Initialize session
-        self._start_session()
-
-    @property
-    def lock(self):
-        if self._lock is None:
-            self._lock = asyncio.Lock()
-        return self._lock
-
-    def _start_session(self):
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.current_session_dir = self.log_dir / f"session_{timestamp}"
-        self.current_session_dir.mkdir(parents=True, exist_ok=True)
-        self._start_new_chunk()
-        print(f"[System] Logging to session: {self.current_session_dir}")
-
-    def _start_new_chunk(self):
-        self.current_chunk_index += 1
-        filename = f"chunk_{self.current_chunk_index:03d}.log"
-        self.current_chunk_path = self.current_session_dir / filename
-        self.current_chunk_lines = 0
-        # Create empty file
-        with open(self.current_chunk_path, "w", encoding="utf-8") as f:
-            pass
-
-    async def emit(self, level: str, msg: str, source: str = "System"):
-        event = {
-            "ts": datetime.datetime.now().isoformat(),
-            "level": level,
-            "msg": msg,
-            "source": source
-        }
-
-        # 1. Write to Disk
-        try:
-            line = json.dumps(event) + "\n"
-            with open(self.current_chunk_path, "a", encoding="utf-8") as f:
-                f.write(line)
-
-            self.current_chunk_lines += 1
-            if self.current_chunk_lines >= self.lines_per_chunk:
-                self._start_new_chunk()
-
-        except Exception as e:
-            print(f"Logging Failed: {e}")
-
-        # 2. Log to console
-        print(f"[{level}] {source}: {msg}")
-
-        # 3. Notify subscribers (Live Stream)
-        async with self.lock:
-            for q in self.subscribers:
-                await q.put(event)
-
-    async def subscribe(self, request: Request):
-        q = asyncio.Queue()
-        async with self.lock:
-            self.subscribers.add(q)
-
-        try:
-            # Yield initial connection message
-            yield f"data: {json.dumps({'level':'Success', 'msg': 'Connected to Log Stream', 'ts': datetime.datetime.now().isoformat(), 'source': 'System'})}\n\n"
-
-            while True:
-                if await request.is_disconnected():
-                    break
-
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=15.0)
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    yield f": heartbeat\n\n"
-        finally:
-            async with self.lock:
-                if q in self.subscribers:
-                    self.subscribers.remove(q)
-
-    # --- Historical Access Methods ---
-    def list_sessions(self):
-        if not self.log_dir.exists():
-            return []
-        sessions = []
-        for d in self.log_dir.iterdir():
-            if d.is_dir() and d.name.startswith("session_"):
-                # timestamp from name
-                ts_str = d.name.replace("session_", "")
-                sessions.append({"id": d.name, "timestamp": ts_str})
-        return sorted(sessions, key=lambda x: x["timestamp"], reverse=True)
-
-    def list_chunks(self, session_id):
-        session_path = self.log_dir / session_id
-        if not session_path.exists():
-            return []
-        chunks = []
-        for f in session_path.glob("chunk_*.log"):
-            # Parse index
-            try:
-                idx = int(f.stem.split("_")[1])
-                chunks.append({"id": f.name, "index": idx, "size": f.stat().st_size})
-            except: pass
-        return sorted(chunks, key=lambda x: x["index"])
-
-    def get_chunk_content(self, session_id, chunk_id):
-        path = self.log_dir / session_id / chunk_id
-        if not path.exists():
-            return []
-
-        lines = []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        try:
-                            lines.append(json.loads(line))
-                        except: pass
-        except Exception:
-            return []
-        return lines
-
-# Global Logger
-logger = DiskJournalLogger()
+import core.state as state
+from services.logger import logger
+from services.claude import proxy_controller, claude_run_manager
+from services.worker import worker_controller
+from services.terminal import get_or_create_terminal_session, terminal_sessions_lock, terminal_sessions, maybe_cleanup_terminal_session
 settings_manager = SettingsManager()
 automation_controller = AutomationController()
 
@@ -270,7 +119,7 @@ async def scheduler_loop():
                 if job.scripts:
                     print(f"[Scheduler] Running scripts for job: {job.name}")
                     # Run in executor to avoid blocking the event loop
-                    result = await main_loop.run_in_executor(None, automation_controller.execute_job_scripts, job)
+                    result = await state.main_loop.run_in_executor(None, automation_controller.execute_job_scripts, job)
                     if result["status"] != "success":
                         print(f"[Scheduler] Scripts failed for job {job.name}. Aborting chat generation.")
                         scripts_ok = False
@@ -297,724 +146,25 @@ async def scheduler_loop():
             print(f"[Scheduler] Error in loop: {e}")
             await asyncio.sleep(5)
 
-# --- Worker Controller ---
-class ProxyController:
-    """Manages the anthropic proxy process."""
-    def __init__(self):
-        self.process: Optional[subprocess.Popen] = None
-        self._lock = threading.Lock()
-        self.proxy_script = "anthropic_proxy.py"
-        self.port = 8001
-
-    def get_status(self):
-        with self._lock:
-            running = self.process is not None and self.process.poll() is None
-
-            # Determine port from port.txt + 1
-            try:
-                if os.path.exists("port.txt"):
-                    with open("port.txt", "r") as f:
-                        val = f.read().strip()
-                        if val.isdigit():
-                            self.port = int(val) + 1
-            except: pass
-
-            return {
-                "running": running,
-                "pid": self.process.pid if running else None,
-                "port": self.port
-            }
-
-    def start_proxy(self):
-        with self._lock:
-            if self.process is not None and self.process.poll() is None:
-                return {"success": False, "message": "Proxy already running.", "port": self.port}
-
-            try:
-                # Start the proxy process
-                self.process = subprocess.Popen(
-                    [sys.executable, "-u", self.proxy_script],
-                    cwd=os.getcwd(),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-
-                # Start threads to forward output to logger
-                threading.Thread(target=self._monitor_output, args=(self.process.stdout, "ProxyOut"), daemon=True).start()
-                threading.Thread(target=self._monitor_output, args=(self.process.stderr, "ProxyErr"), daemon=True).start()
-
-                # Determine port
-                try:
-                    if os.path.exists("port.txt"):
-                        with open("port.txt", "r") as f:
-                            val = f.read().strip()
-                            if val.isdigit():
-                                self.port = int(val) + 1
-                except: pass
-
-                return {"success": True, "message": "Proxy started.", "port": self.port}
-            except Exception as e:
-                return {"success": False, "message": f"Failed to start proxy: {e}"}
-
-    def stop_proxy(self):
-        with self._lock:
-            if self.process is None or self.process.poll() is not None:
-                return {"success": False, "message": "Proxy not running."}
-
-            try:
-                self.process.terminate()
-                try:
-                    self.process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    self.process.kill()
-
-                self.process = None
-                return {"success": True, "message": "Proxy stopped."}
-            except Exception as e:
-                return {"success": False, "message": f"Error stopping proxy: {e}"}
-
-    def _monitor_output(self, stream, source):
-        """Reads output from the subprocess and logs it."""
-        try:
-            for line in iter(stream.readline, ''):
-                if line:
-                    clean_line = line.strip()
-                    if main_loop and clean_line:
-                        asyncio.run_coroutine_threadsafe(logger.emit("Info", clean_line, source), main_loop)
-                    elif clean_line:
-                        print(f"[{source}] {clean_line}")
-        except Exception:
-            pass
-        finally:
-            stream.close()
-
-proxy_controller = ProxyController()
-
-
-# =====================================================================
-# Claude Code Orchestrator
-# ---------------------------------------------------------------------
-# Self-contained, additive orchestration layer for the Claude Code GUI
-# module. Stores per-run metadata, transcripts, and git snapshots under
-# claude_runs/. Does NOT touch any other LYRN subsystem.
-# =====================================================================
-
-class ClaudeRunManager:
-    """Tracks Claude Code runs: lifecycle, transcript, git diff snapshot."""
-
-    STORE_DIR = Path("claude_runs")
-    VALID_MODES = ("oneshot", "inspect", "patch")
-
-    def __init__(self):
-        self.STORE_DIR.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
-        self._index_path = self.STORE_DIR / "index.json"
-        self._procs: Dict[str, subprocess.Popen] = {}
-        self._log_handles: Dict[str, Any] = {}
-        self.runs: Dict[str, Dict[str, Any]] = self._load_index()
-        # Any runs left in 'running' state from a prior server process are
-        # orphaned -- the subprocess is gone. Mark them so the UI is honest.
-        for run in self.runs.values():
-            if run.get("status") == "running":
-                run["status"] = "interrupted"
-                run["ended_at"] = run.get("ended_at") or time.time()
-        self._save_index()
-
-    # ---------- Claude CLI resolution ----------
-    def _resolve_claude_binary(self) -> Optional[str]:
-        """Resolve a concrete claude executable path for non-interactive
-        backend execution. Avoids relying on shell init files."""
-        env = os.environ
-        explicit = (env.get("LYRN_CLAUDE_BIN") or env.get("CLAUDE_BIN") or "").strip()
-        candidates: List[Path] = []
-        if explicit:
-            candidates.append(Path(explicit).expanduser())
-
-        via_path = shutil.which("claude")
-        if via_path:
-            candidates.append(Path(via_path))
-
-        home = Path(env.get("HOME", "~")).expanduser()
-        candidates += [
-            home / ".local/bin/claude",
-            home / ".npm-global/bin/claude",
-            Path("/usr/local/bin/claude"),
-            Path("/opt/homebrew/bin/claude"),
-        ]
-
-        for c in candidates:
-            try:
-                p = c.expanduser().resolve()
-                if p.exists() and os.access(p, os.X_OK):
-                    return str(p)
-            except Exception:
-                continue
-        return None
-
-    def _claude_env(self) -> Dict[str, str]:
-        env = os.environ.copy()
-        claude_bin = self._resolve_claude_binary()
-        if claude_bin:
-            env["LYRN_CLAUDE_BIN"] = claude_bin
-            bin_dir = str(Path(claude_bin).parent)
-            path_val = env.get("PATH", "")
-            if bin_dir not in path_val.split(os.pathsep):
-                env["PATH"] = bin_dir + (os.pathsep + path_val if path_val else "")
-
-        # Set Anthropic Proxy Environment Variables
-        # Attempt to read port from port.txt + 1
-        default_port = 8001
-        try:
-            if os.path.exists("port.txt"):
-                with open("port.txt", "r") as f:
-                    val = f.read().strip()
-                    if val.isdigit():
-                        default_port = int(val) + 1
-        except:
-            pass
-
-        host = os.environ.get("LCC_HOST", "127.0.0.1")
-        port = os.environ.get("LCC_PORT", str(default_port))
-        base_url = f"http://{host}:{port}"
-
-        env["ANTHROPIC_BASE_URL"] = base_url
-        env["ANTHROPIC_AUTH_TOKEN"] = "lyrn"
-        env["ANTHROPIC_API_KEY"] = ""
-        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-
-        return env
-
-    # ---------- Persistence ----------
-    def _load_index(self) -> Dict[str, Dict[str, Any]]:
-        if self._index_path.exists():
-            try:
-                return json.loads(self._index_path.read_text())
-            except Exception:
-                return {}
-        return {}
-
-    def _save_index(self):
-        try:
-            self._index_path.write_text(json.dumps(self.runs, indent=2))
-        except Exception as e:
-            print(f"[ClaudeRun] Failed to save index: {e}")
-
-    # ---------- Git helpers (best-effort, no-op if not a git repo) ----------
-    def _git(self, cwd: str, *args: str, capture: bool = True) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["git", *args], cwd=cwd, capture_output=capture, text=True, timeout=30
-        )
-
-    def _is_git_repo(self, cwd: str) -> bool:
-        try:
-            r = self._git(cwd, "rev-parse", "--is-inside-work-tree")
-            return r.returncode == 0 and r.stdout.strip() == "true"
-        except Exception:
-            return False
-
-    def _snapshot_baseline(self, cwd: str) -> Optional[str]:
-        """Use 'git stash create' to capture the working tree as a commit
-        object without altering anything. Returns the SHA, or None."""
-        if not self._is_git_repo(cwd):
-            return None
-        try:
-            # Make sure untracked are included by adding them to a temp index.
-            # Simpler: stash create only captures tracked. We accept that.
-            r = self._git(cwd, "stash", "create")
-            sha = r.stdout.strip()
-            return sha or self._git(cwd, "rev-parse", "HEAD").stdout.strip()
-        except Exception as e:
-            print(f"[ClaudeRun] snapshot error: {e}")
-            return None
-
-    def _compute_diff(self, cwd: str, baseline_sha: str) -> Dict[str, Any]:
-        """Diff working tree against the baseline SHA."""
-        try:
-            raw = self._git(cwd, "diff", "--no-color", baseline_sha).stdout
-            stat = self._git(cwd, "diff", "--numstat", baseline_sha).stdout
-            files = []
-            for line in stat.strip().splitlines():
-                parts = line.split("\t")
-                if len(parts) == 3:
-                    add, delete, path = parts
-                    files.append({
-                        "path": path,
-                        "additions": int(add) if add.isdigit() else 0,
-                        "deletions": int(delete) if delete.isdigit() else 0,
-                    })
-            return {"raw": raw, "files": files}
-        except Exception as e:
-            return {"raw": "", "files": [], "error": str(e)}
-
-    def _revert_to_baseline(self, cwd: str, baseline_sha: str) -> bool:
-        """Restore working tree to the baseline snapshot (destructive)."""
-        try:
-            # Hard reset tracked files to the snapshot tree.
-            r = self._git(cwd, "checkout", baseline_sha, "--", ".")
-            return r.returncode == 0
-        except Exception as e:
-            print(f"[ClaudeRun] revert error: {e}")
-            return False
-
-    # ---------- Validation / argv (single source of truth) ----------
-    def resolve_cwd(self, cwd: Optional[str]) -> Dict[str, Any]:
-        """Validate a user-supplied cwd. Returns a result dict with either
-        ``path`` (resolved) or ``error`` (human-readable)."""
-        raw = (cwd or "").strip()
-        if not raw:
-            return {"ok": False, "error": "Working directory is required."}
-        try:
-            p = Path(raw).expanduser()
-            if not p.exists():
-                return {"ok": False, "error": f"Path does not exist: {raw}"}
-            if not p.is_dir():
-                return {"ok": False, "error": f"Not a directory: {raw}"}
-            resolved = str(p.resolve())
-        except Exception as e:
-            return {"ok": False, "error": f"Invalid path: {e}"}
-        return {
-            "ok": True,
-            "path": resolved,
-            "is_git_repo": self._is_git_repo(resolved),
-        }
-
-    def build_argv(self, payload: Dict[str, Any]) -> List[str]:
-        """Backend is the source of truth for the actual command. The
-        frontend preview is informational only."""
-        mode = payload.get("mode") or "oneshot"
-        argv: List[str] = ["claude"]
-        if mode == "oneshot":
-            argv.append("--print")
-        elif mode == "inspect":
-            argv.append("--read-only")
-        elif mode == "patch":
-            argv.append("--patch-only")
-
-        if payload.get("model"):
-            argv += ["--model", str(payload["model"])]
-        if payload.get("effort"):
-            argv += ["--effort", str(payload["effort"])]
-        if payload.get("system_prompt"):
-            argv += ["--system-prompt", str(payload["system_prompt"])]
-        if payload.get("auto"):
-            argv.append("--enable-auto-mode")
-        if payload.get("perms"):
-            argv.append("--dangerously-skip-permissions")
-
-        task = (payload.get("task") or "").strip()
-        if task:
-            argv.append(task)
-        return argv
-
-    def preview(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        argv = self.build_argv(payload)
-        cwd_check = self.resolve_cwd(payload.get("cwd"))
-        return {
-            "argv": argv,
-            "cwd": cwd_check,
-            "claude_bin": self._resolve_claude_binary(),
-        }
-
-    # ---------- Auth ----------
-    def auth_status(self) -> Dict[str, Any]:
-        claude_bin = self._resolve_claude_binary()
-        if not claude_bin:
-            return {
-                "available": False,
-                "authenticated": False,
-                "raw": "claude CLI not installed or not visible in backend PATH",
-                "claude_bin": None,
-            }
-        try:
-            r = subprocess.run(
-                [claude_bin, "auth", "status"],
-                capture_output=True, text=True, timeout=10,
-                env=self._claude_env(),
-            )
-            output = (r.stdout + r.stderr).strip()
-            low = output.lower()
-            authed = r.returncode == 0 and any(
-                marker in low for marker in (
-                    "logged in", "authenticated", "account:", "you are signed in",
-                )
-            )
-            return {
-                "available": True,
-                "authenticated": authed,
-                "raw": output,
-                "claude_bin": claude_bin,
-            }
-        except FileNotFoundError:
-            return {
-                "available": False,
-                "authenticated": False,
-                "raw": "claude CLI not installed",
-                "claude_bin": claude_bin,
-            }
-        except subprocess.TimeoutExpired:
-            return {
-                "available": True,
-                "authenticated": False,
-                "raw": "auth status timed out",
-                "claude_bin": claude_bin,
-            }
-        except Exception as e:
-            return {
-                "available": False,
-                "authenticated": False,
-                "raw": str(e),
-                "claude_bin": claude_bin,
-            }
-
-    # ---------- Run lifecycle ----------
-    def list_runs(self) -> List[Dict[str, Any]]:
-        with self._lock:
-            self._refresh_statuses()
-            return sorted(
-                [self._summary(r) for r in self.runs.values()],
-                key=lambda r: r.get("started_at", 0),
-                reverse=True,
-            )
-
-    def _summary(self, run: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "id": run["id"],
-            "label": run.get("label", ""),
-            "mode": run.get("mode", ""),
-            "cwd": run.get("cwd", ""),
-            "status": run.get("status", "unknown"),
-            "started_at": run.get("started_at", 0),
-            "ended_at": run.get("ended_at"),
-            "exit_code": run.get("exit_code"),
-            "approved": run.get("approved"),
-            "has_diff": bool(run.get("baseline_sha")),
-        }
-
-    def _refresh_statuses(self):
-        for run_id, proc in list(self._procs.items()):
-            if proc.poll() is not None:
-                run = self.runs.get(run_id)
-                if run and run.get("status") == "running":
-                    run["status"] = "completed" if proc.returncode == 0 else "failed"
-                    run["exit_code"] = proc.returncode
-                    run["ended_at"] = time.time()
-                    self._save_index()
-                self._procs.pop(run_id, None)
-                fh = self._log_handles.pop(run_id, None)
-                if fh is not None:
-                    try: fh.close()
-                    except Exception: pass
-
-    def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            self._refresh_statuses()
-            run = self.runs.get(run_id)
-            if not run:
-                return None
-            return dict(run)
-
-    def get_transcript(self, run_id: str) -> str:
-        run = self.runs.get(run_id)
-        if not run:
-            return ""
-        path = Path(run.get("transcript_path", ""))
-        if path.exists():
-            try:
-                return path.read_text(errors="replace")
-            except Exception:
-                return ""
-        return ""
-
-    def get_diff(self, run_id: str) -> Dict[str, Any]:
-        run = self.runs.get(run_id)
-        if not run or not run.get("baseline_sha"):
-            return {"raw": "", "files": [], "error": "no baseline snapshot"}
-        return self._compute_diff(run["cwd"], run["baseline_sha"])
-
-    def approve(self, run_id: str) -> Dict[str, Any]:
-        with self._lock:
-            run = self.runs.get(run_id)
-            if not run:
-                return {"success": False, "message": "run not found"}
-            run["approved"] = True
-            self._save_index()
-            return {"success": True}
-
-    def reject(self, run_id: str) -> Dict[str, Any]:
-        with self._lock:
-            run = self.runs.get(run_id)
-            if not run:
-                return {"success": False, "message": "run not found"}
-            sha = run.get("baseline_sha")
-            if not sha:
-                return {"success": False, "message": "no baseline to revert to"}
-            ok = self._revert_to_baseline(run["cwd"], sha)
-            run["approved"] = False if ok else None
-            run["reverted"] = ok
-            self._save_index()
-            return {"success": ok}
-
-    def delete_run(self, run_id: str) -> Dict[str, Any]:
-        with self._lock:
-            self._refresh_statuses()
-            existing = self.runs.get(run_id)
-            if not existing:
-                return {"success": False, "message": "run not found"}
-            if existing.get("status") == "running":
-                return {"success": False, "message": "cannot delete a running run"}
-            self.runs.pop(run_id, None)
-            try:
-                d = self.STORE_DIR / run_id
-                if d.exists():
-                    shutil.rmtree(d)
-            except Exception:
-                pass
-            self._save_index()
-            return {"success": True}
-
-    def start_run(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        mode = payload.get("mode") or "oneshot"
-        if mode not in self.VALID_MODES:
-            return {"success": False, "message": f"unsupported mode: {mode}"}
-
-        cwd_check = self.resolve_cwd(payload.get("cwd"))
-        if not cwd_check["ok"]:
-            return {"success": False, "message": cwd_check["error"]}
-        cwd_resolved = cwd_check["path"]
-
-        task = (payload.get("task") or "").strip()
-        if mode == "oneshot" and not task:
-            return {"success": False, "message": "Task is required for one-shot runs."}
-
-        argv = self.build_argv({**payload, "mode": mode, "task": task})
-        claude_bin = self._resolve_claude_binary()
-        if not claude_bin:
-            return {
-                "success": False,
-                "message": (
-                    "claude CLI not found. Set LYRN_CLAUDE_BIN/CLAUDE_BIN or "
-                    f"ensure PATH includes claude. PATH={os.environ.get('PATH','')}"
-                ),
-            }
-        argv[0] = claude_bin
-
-        run_id = "run_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + os.urandom(2).hex()
-        run_dir = self.STORE_DIR / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
-        transcript_path = run_dir / "transcript.log"
-
-        baseline = self._snapshot_baseline(cwd_resolved)
-
-        try:
-            log_fh = open(transcript_path, "w", buffering=1)
-            proc = subprocess.Popen(
-                argv,
-                cwd=cwd_resolved,
-                stdout=log_fh,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env=self._claude_env(),
-            )
-        except FileNotFoundError:
-            try: log_fh.close()
-            except Exception: pass
-            return {"success": False, "message": "claude CLI not found in backend runtime environment"}
-        except Exception as e:
-            try: log_fh.close()
-            except Exception: pass
-            return {"success": False, "message": f"failed to start: {e}"}
-
-        run = {
-            "id": run_id,
-            "label": (payload.get("label") or "").strip(),
-            "mode": mode,
-            "cwd": cwd_resolved,
-            "argv": argv,
-            "task": task,
-            "baseline_sha": baseline,
-            "transcript_path": str(transcript_path),
-            "status": "running",
-            "started_at": time.time(),
-            "ended_at": None,
-            "exit_code": None,
-            "approved": None,
-            "reverted": False,
-            "pid": proc.pid,
-        }
-
-        with self._lock:
-            self.runs[run_id] = run
-            self._procs[run_id] = proc
-            self._log_handles[run_id] = log_fh
-            self._save_index()
-
-        return {"success": True, "run": self._summary(run), "argv": argv}
-
-
-claude_run_manager = ClaudeRunManager()
-
-class WorkerController:
-    """Manages the headless worker process."""
-    def __init__(self):
-        self.process: Optional[subprocess.Popen] = None
-        self._lock = threading.Lock()
-        self.worker_script = "model_runner.py"
-
-    def get_status(self):
-        with self._lock:
-            running = self.process is not None and self.process.poll() is None
-
-            # Check LLM status flag if running
-            llm_status = "unknown"
-            error_msg = None
-
-            if running:
-                try:
-                    flag_path = Path("global_flags/llm_status.txt")
-                    if flag_path.exists():
-                        llm_status = flag_path.read_text().strip()
-                except Exception:
-                    pass
-            else:
-                llm_status = "stopped"
-
-            # Check for error file if status is error
-            if llm_status == "error":
-                 try:
-                    err_path = Path("global_flags/last_error.txt")
-                    if err_path.exists():
-                        error_msg = err_path.read_text().strip()
-                 except: pass
-
-            return {
-                "running": running,
-                "pid": self.process.pid if running else None,
-                "llm_status": llm_status,
-                "error_message": error_msg
-            }
-
-    def start_worker(self):
-        with self._lock:
-            if self.process is not None and self.process.poll() is None:
-                return {"success": False, "message": "Worker already running."}
-
-            try:
-                # Start the worker process
-                self.process = subprocess.Popen(
-                    [sys.executable, "-u", self.worker_script],
-                    cwd=os.getcwd(),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-
-                # Start threads to forward output to logger
-                threading.Thread(target=self._monitor_output, args=(self.process.stdout, "WorkerOut"), daemon=True).start()
-                threading.Thread(target=self._monitor_output, args=(self.process.stderr, "WorkerErr"), daemon=True).start()
-
-                return {"success": True, "message": "Worker started."}
-            except Exception as e:
-                return {"success": False, "message": f"Failed to start worker: {e}"}
-
-    def stop_worker(self):
-        with self._lock:
-            if self.process is None or self.process.poll() is not None:
-                return {"success": False, "message": "Worker not running."}
-
-            try:
-                self.process.terminate()
-                try:
-                    self.process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    self.process.kill()
-
-                self.process = None
-                return {"success": True, "message": "Worker stopped."}
-            except Exception as e:
-                return {"success": False, "message": f"Error stopping worker: {e}"}
-
-    def _monitor_output(self, stream, source):
-        """Reads output from the subprocess and logs it."""
-        try:
-            for line in iter(stream.readline, ''):
-                if line:
-                    clean_line = line.strip()
-
-                    # Parse extended stats from llama.cpp logs
-                    try:
-                        # KV Cache
-                        kv_match = re.search(r'(\d+)\s+prefix-match hit', clean_line)
-                        if kv_match:
-                            extended_llm_stats["kv_cache_reused"] = int(kv_match.group(1))
-
-                        # Prompt Eval
-                        prompt_match = re.search(r'prompt eval time\s*=\s*([\d.]+)\s*ms\s*/\s*(\d+)\s*tokens.*?([\d.]+)\s*ms per token', clean_line)
-                        if prompt_match:
-                            ms = float(prompt_match.group(1))
-                            tokens = int(prompt_match.group(2))
-                            ms_per_tok = float(prompt_match.group(3))
-                            extended_llm_stats["tokenization_time_ms"] = ms
-                            extended_llm_stats["prompt_tokens"] = tokens
-                            extended_llm_stats["prompt_speed"] = 1000.0 / ms_per_tok if ms_per_tok > 0 else 0.0
-
-                        # Eval (Generation)
-                        eval_match = re.search(r'eval time\s*=\s*([\d.]+)\s*ms\s*/\s*(\d+)\s*runs.*?([\d.]+)\s*ms per token', clean_line)
-                        if eval_match:
-                            ms = float(eval_match.group(1))
-                            tokens = int(eval_match.group(2))
-                            ms_per_tok = float(eval_match.group(3))
-                            extended_llm_stats["generation_time_ms"] = ms
-                            extended_llm_stats["eval_tokens"] = tokens
-                            extended_llm_stats["eval_speed"] = 1000.0 / ms_per_tok if ms_per_tok > 0 else 0.0
-
-                        # Load Time
-                        load_match = re.search(r'load time\s*=\s*([\d.]+)\s*ms', clean_line)
-                        if load_match:
-                            extended_llm_stats["load_time"] = float(load_match.group(1))
-
-                        # Total Time
-                        total_match = re.search(r'total time\s*=\s*([\d.]+)\s*ms', clean_line)
-                        if total_match:
-                            extended_llm_stats["total_time"] = float(total_match.group(1)) / 1000.0 # Convert to seconds
-
-                        # Update totals
-                        extended_llm_stats["total_tokens"] = extended_llm_stats["prompt_tokens"] + extended_llm_stats["eval_tokens"]
-
-                    except Exception:
-                        pass
-
-                    if main_loop and clean_line:
-                        asyncio.run_coroutine_threadsafe(logger.emit("Info", clean_line, source), main_loop)
-                    elif clean_line:
-                        print(f"[{source}] {clean_line}")
-        except Exception:
-            pass
-        finally:
-            stream.close()
-
-worker_controller = WorkerController()
-
 # --- App Setup ---
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global main_loop, LYRN_TOKEN
-    main_loop = asyncio.get_running_loop()
+    state.main_loop = asyncio.get_running_loop()
 
     # Load Admin Token
     token_file = Path("admin_token.txt")
     if token_file.exists():
         try:
-            LYRN_TOKEN = token_file.read_text(encoding="utf-8").strip()
+            state.LYRN_TOKEN = token_file.read_text(encoding="utf-8").strip()
             print("[System] Loaded admin token from admin_token.txt")
         except Exception as e:
             print(f"[System] Failed to read admin_token.txt: {e}")
 
     # Fallback to env var
-    if not LYRN_TOKEN:
-        LYRN_TOKEN = os.environ.get("LYRN_MODEL_TOKEN")
-        if LYRN_TOKEN:
+    if not state.LYRN_TOKEN:
+        state.LYRN_TOKEN = os.environ.get("LYRN_MODEL_TOKEN")
+        if state.LYRN_TOKEN:
             print("[System] Loaded admin token from Environment Variable")
         else:
             print("[System] Warning: No admin token found (admin_token.txt or LYRN_MODEL_TOKEN). Model management will be unavailable.")
@@ -1067,7 +217,7 @@ async def verify_token(x_token: Optional[str] = Header(None, alias="X-Token"), t
 
     # Support both Header (preferred) and Query Param (SSE/EventSource)
     auth_token = x_token or token
-    if not LYRN_TOKEN or not auth_token or auth_token != LYRN_TOKEN:
+    if not state.LYRN_TOKEN or not auth_token or auth_token != state.LYRN_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return auth_token
 
@@ -1132,7 +282,7 @@ async def health_check():
         pass
 
     # Merge with extended stats from memory
-    llm_stats.update(extended_llm_stats)
+    llm_stats.update(state.extended_llm_stats)
 
     return {
         "status": "ok",
@@ -1443,7 +593,7 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
     dest_file = models_dir / filename
 
     try:
-        active_downloads[filename]["status"] = "downloading"
+        state.active_downloads[filename]["status"] = "downloading"
 
         max_retries = 5
         base_delay = 2
@@ -1483,7 +633,7 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
                         last_log_time = time.time()
 
                         # Update total
-                        active_downloads[filename]["total"] = total_size
+                        state.active_downloads[filename]["total"] = total_size
 
                         async with aiofiles.open(part_file, mode) as f:
                             async for chunk in resp.content.iter_chunked(1024 * 1024): # 1MB chunks
@@ -1494,9 +644,9 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
                                 await f.write(chunk)
 
                                 # Update status
-                                active_downloads[filename]["bytes"] = downloaded
+                                state.active_downloads[filename]["bytes"] = downloaded
                                 if total_size > 0:
-                                    active_downloads[filename]["pct"] = int(downloaded / total_size * 100)
+                                    state.active_downloads[filename]["pct"] = int(downloaded / total_size * 100)
 
                                 if time.time() - last_log_time > 2:
                                     pct = ""
@@ -1520,7 +670,7 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
                     raise e
 
         # Hash Verification
-        active_downloads[filename]["status"] = "verifying"
+        state.active_downloads[filename]["status"] = "verifying"
 
         # Compute hash from the full downloaded file
         sha256 = hashlib.sha256()
@@ -1540,15 +690,15 @@ async def _download_model_task(url: str, filename: str, expected_sha256: Optiona
         await logger.emit("Success", f"Downloaded model: {filename} ({downloaded} bytes)", "ModelManager")
 
         # Mark done
-        active_downloads[filename]["status"] = "completed"
-        active_downloads[filename]["bytes"] = downloaded
+        state.active_downloads[filename]["status"] = "completed"
+        state.active_downloads[filename]["bytes"] = downloaded
 
     except Exception as e:
         err_msg = str(e) or e.__class__.__name__
         print(f"Download error: {err_msg}")
         await logger.emit("Error", f"Download failed: {err_msg}", "ModelManager")
-        active_downloads[filename]["status"] = "error"
-        active_downloads[filename]["error"] = err_msg
+        state.active_downloads[filename]["status"] = "error"
+        state.active_downloads[filename]["error"] = err_msg
 
 @app.post("/api/models/fetch", dependencies=[Depends(verify_token)])
 async def fetch_model(request: ModelFetchRequest, background_tasks: BackgroundTasks):
@@ -1565,14 +715,14 @@ async def fetch_model(request: ModelFetchRequest, background_tasks: BackgroundTa
     if not filename or filename in ['.', '..']:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    if filename in active_downloads and active_downloads[filename]["status"] in ["pending", "downloading", "verifying"]:
+    if filename in state.active_downloads and state.active_downloads[filename]["status"] in ["pending", "downloading", "verifying"]:
         raise HTTPException(status_code=400, detail="Download already in progress")
 
     # 2. Size Limit
     max_bytes = int(os.environ.get("LYRN_MAX_MODEL_BYTES", 0))
 
     # Initialize tracking
-    active_downloads[filename] = {
+    state.active_downloads[filename] = {
         "status": "pending",
         "bytes": 0,
         "total": 0,
@@ -1591,16 +741,16 @@ async def fetch_model(request: ModelFetchRequest, background_tasks: BackgroundTa
 async def get_active_downloads():
     current_time = time.time()
     to_remove = []
-    for fname, data in active_downloads.items():
+    for fname, data in state.active_downloads.items():
         if data["status"] in ["completed", "error"]:
             # Clean up old statuses after 10 minutes
             if current_time - data.get("timestamp", 0) > 600:
                 to_remove.append(fname)
 
     for fname in to_remove:
-        del active_downloads[fname]
+        del state.active_downloads[fname]
 
-    return active_downloads
+    return state.active_downloads
 
 @app.get("/api/models/list", dependencies=[Depends(verify_token)])
 async def list_models():
@@ -2182,237 +1332,13 @@ async def rebuild_snapshot():
 
 
 
-# --- Terminal Logic ---
-
-import platform
-import struct
-if platform.system() != "Windows":
-    import pty
-    import termios
-    import fcntl
-
-from fastapi import WebSocket, WebSocketDisconnect
-
-class WebTerminalSession:
-    def __init__(self, session_id: str, cwd: Optional[str] = None):
-        self.id = session_id
-        self.created_at = time.time()
-        self.cwd = cwd
-        self.cols = 80
-        self.rows = 24
-        self.process = None
-        self.master_fd = None
-        self.os_type = platform.system()
-        self.loop = asyncio.get_running_loop()
-        self.history = []
-        self.subscribers: set[WebSocket] = set()
-        self.reader_task = None
-        self.closed = False
-        self._start()
-
-    def _start(self):
-        if self.os_type == "Windows":
-            self.process = subprocess.Popen(
-                ["cmd.exe"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                bufsize=0,
-                shell=False,
-                cwd=self.cwd
-            )
-            self.reader_task = asyncio.create_task(self._read_loop())
-        else:
-            self.closed = True
-            self.history.append("Internal Error: WebTerminalSession used on Linux. Use LocalPTYSession.\r\n")
-
-    async def _read_loop(self):
-        while not self.closed:
-            data = await self._read_output()
-            if not data:
-                break
-            try:
-                text = data.decode(errors="replace")
-                self.history.append(text)
-                if len(self.history) > 1000:
-                     self.history = self.history[-1000:]
-                await self._broadcast(text)
-            except Exception as e:
-                break
-        if not self.closed:
-             msg = "\r\n\x1b[1;31m[Process terminated]\x1b[0m\r\n"
-             self.history.append(msg)
-             await self._broadcast(msg)
-        self.close()
-
-    async def _broadcast(self, text: str):
-        msg = json.dumps({"type": "output", "data": text})
-        to_remove = []
-        for ws in self.subscribers:
-            try:
-                await ws.send_text(msg)
-            except:
-                to_remove.append(ws)
-        for ws in to_remove:
-            self.subscribers.discard(ws)
-
-    async def _read_output(self):
-        if self.os_type == "Windows":
-            return await self.loop.run_in_executor(None, self._read_windows)
-        else:
-            return await self.loop.run_in_executor(None, self._read_linux)
-
-    def _read_windows(self):
-        if self.process and self.process.stdout:
-            return self.process.stdout.read(1024)
-        return b""
-
-    def _read_linux(self):
-        if self.master_fd:
-            try:
-                return os.read(self.master_fd, 1024)
-            except OSError:
-                return b""
-        return b""
-
-    def write_input(self, data: str):
-        if self.closed: return
-        if self.os_type == "Windows":
-            if self.process and self.process.stdin:
-                try:
-                    self.process.stdin.write(data.encode())
-                    self.process.stdin.flush()
-                except: pass
-        else:
-            if self.master_fd:
-                try:
-                    os.write(self.master_fd, data.encode())
-                except: pass
-
-    def resize(self, cols, rows):
-        self.cols = cols
-        self.rows = rows
-        if self.os_type != "Windows" and self.master_fd is not None:
-            try:
-                winsize = struct.pack("HHHH", rows, cols, 0, 0)
-                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
-            except: pass
-
-    def close(self):
-        self.closed = True
-        if self.process:
-            self.process.terminate()
-        if self.os_type != "Windows" and self.master_fd:
-            try: os.close(self.master_fd)
-            except: pass
-
-
-class LocalPTYSession(WebTerminalSession):
-    def _start(self):
-        if self.os_type == "Windows":
-            self.closed = True
-            self.history.append("Local PTY mode is not supported on Windows.\r\n")
-            return
-
-        shell = os.environ.get("SHELL", "/bin/bash")
-        env = os.environ.copy()
-        env["TERM"] = "xterm-256color"
-        claude_bin = claude_run_manager._resolve_claude_binary()
-        if claude_bin:
-            env["LYRN_CLAUDE_BIN"] = claude_bin
-            bin_dir = str(Path(claude_bin).parent)
-            path_val = env.get("PATH", "")
-            if bin_dir not in path_val.split(os.pathsep):
-                env["PATH"] = bin_dir + (os.pathsep + path_val if path_val else "")
-
-        # Set Anthropic Proxy Environment Variables
-        # Attempt to read port from port.txt + 1
-        default_port = 8001
-        try:
-            if os.path.exists("port.txt"):
-                with open("port.txt", "r") as f:
-                    val = f.read().strip()
-                    if val.isdigit():
-                        default_port = int(val) + 1
-        except:
-            pass
-
-        host = os.environ.get("LCC_HOST", "127.0.0.1")
-        port = os.environ.get("LCC_PORT", str(default_port))
-        base_url = f"http://{host}:{port}"
-
-        env["ANTHROPIC_BASE_URL"] = base_url
-        env["ANTHROPIC_AUTH_TOKEN"] = "lyrn"
-        env["ANTHROPIC_API_KEY"] = ""
-        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-
-
-        try:
-            pid, master_fd = pty.fork()
-            if pid == 0:
-                if self.cwd:
-                    try: os.chdir(self.cwd)
-                    except: pass
-                try:
-                    os.execve(shell, [shell], env)
-                except Exception as e:
-                    os._exit(1)
-            else:
-                self.pid = pid
-                self.master_fd = master_fd
-                self.reader_task = asyncio.create_task(self._read_loop())
-        except Exception as e:
-            self.history.append(f"Error: Failed to start PTY. {str(e)}\r\n")
-            self.close()
-
-    def close(self):
-        self.closed = True
-        if hasattr(self, 'pid') and self.pid:
-            try:
-                os.kill(self.pid, 9)
-                os.waitpid(self.pid, os.WNOHANG)
-            except: pass
-        if self.master_fd:
-            try: os.close(self.master_fd)
-            except: pass
-
-terminal_sessions: Dict[str, WebTerminalSession] = {}
-terminal_sessions_lock = asyncio.Lock()
-
-async def get_or_create_terminal_session(sid: str, cwd: Optional[str]) -> WebTerminalSession:
-    async with terminal_sessions_lock:
-        existing = terminal_sessions.get(sid)
-        if existing and not getattr(existing, "closed", True):
-            return existing
-
-        if platform.system() == "Windows":
-            session = WebTerminalSession(sid, cwd=cwd)
-        else:
-            session = LocalPTYSession(sid, cwd=cwd)
-        terminal_sessions[sid] = session
-        return session
-
-async def maybe_cleanup_terminal_session(sid: str):
-    await asyncio.sleep(15)
-    async with terminal_sessions_lock:
-        session = terminal_sessions.get(sid)
-        if not session:
-            return
-        if session.subscribers:
-            return
-        try:
-            session.close()
-        finally:
-            terminal_sessions.pop(sid, None)
-
-
 @app.websocket("/api/terminal/{sid}")
 async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, cwd: Optional[str] = None):
     try:
         # Auth check
         if not Path("global_flags/no_auth").exists():
-            if not LYRN_TOKEN or not token or token != LYRN_TOKEN:
-                print(f"[Terminal] Denied access. Expected: {LYRN_TOKEN} Got: {token}")
+            if not state.LYRN_TOKEN or not token or token != state.LYRN_TOKEN:
+                print(f"[Terminal] Denied access. Expected: {state.LYRN_TOKEN} Got: {token}")
                 await websocket.close(code=4003)
                 return
 

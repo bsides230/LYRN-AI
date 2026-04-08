@@ -19,7 +19,7 @@ As part of standardizing the API system, an API manifest CSV will be generated t
 ## The 4-Phase Plan
 1. **[X] Phase 1: Foundation (Models & Utils)**
    Extract shared dependencies first to ensure that higher-level services and routes can cleanly import them.
-2. **Phase 2: Core Services**
+2. **[X] Phase 2: Core Services**
    Untangle the complex state managers and controller classes.
 3. **Phase 3: Domain Routers**
    Extract the FastAPI endpoints into dedicated router modules.
@@ -40,3 +40,8 @@ By keeping the extraction phased, we ensure the system remains stable and verifi
 - **What was moved:** Extracted Pydantic models to `models/schemas.py` and `_get_file_explanation` to `utils/helpers.py`.
 - **Issues encountered:** None.
 - **Risks or follow-ups:** Pydantic imports needed to be maintained correctly. No cyclic dependencies introduced since these are leaf nodes.
+
+### Phase 2
+- **What was moved:** Extracted global state to `core/state.py`. Extracted `DiskJournalLogger` to `services/logger.py`. Extracted `ProxyController` and `ClaudeRunManager` to `services/claude.py`. Extracted `WorkerController` to `services/worker.py`. Extracted Terminal session classes to `services/terminal.py`.
+- **Issues encountered:** Encountered circular dependency concerns but circumvented them by creating `core/state.py` for global variables (`main_loop`, `LYRN_TOKEN`, `extended_llm_stats`, `active_downloads`) which services and `start_lyrn.py` both reference.
+- **Risks or follow-ups:** `start_lyrn.py` still has remaining route code to be extracted, but the orchestration logic has been effectively decoupled.
