@@ -24,6 +24,23 @@ from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
+from utils.helpers import _get_file_explanation
+
+from models.schemas import (
+    FileTreeSelectionModel,
+    FileTreeProfileModel,
+    InjectArtifactModel,
+    PresetModel,
+    ActiveConfigModel,
+    ChatRequest,
+    JobDefinitionModel,
+    JobScheduleModel,
+    CycleModel,
+    ModelFetchRequest,
+    SnapshotSaveModel,
+    SnapshotLoadModel,
+)
+
 import platform
 import struct
 if platform.system() != "Windows":
@@ -977,59 +994,6 @@ class WorkerController:
             stream.close()
 
 worker_controller = WorkerController()
-
-# --- Pydantic Models ---
-class FileTreeSelectionModel(BaseModel):
-    root_path: str
-    root_name: str
-    selections: Dict[str, Dict[str, Any]]
-
-class FileTreeProfileModel(BaseModel):
-    name: str
-    root_path: str
-    selections: Dict[str, Dict[str, Any]]
-
-class InjectArtifactModel(BaseModel):
-    artifact: str
-
-class PresetModel(BaseModel):
-    preset_id: str
-    config: Dict[str, Any]
-
-class ActiveConfigModel(BaseModel):
-    config: Dict[str, Any]
-
-class ChatRequest(BaseModel):
-    message: str
-
-class JobDefinitionModel(BaseModel):
-    name: str
-    instructions: str
-    trigger: str
-    scripts: List[str] = []
-
-class JobScheduleModel(BaseModel):
-    id: Optional[str] = None
-    job_name: str
-    scheduled_datetime_iso: str
-    priority: int = 100
-    args: Optional[Dict[str, Any]] = None
-
-class CycleModel(BaseModel):
-    name: str
-    triggers: List[Any]
-
-class ModelFetchRequest(BaseModel):
-    url: str
-    filename: Optional[str] = None
-    expected_sha256: Optional[str] = None
-
-class SnapshotSaveModel(BaseModel):
-    filename: str
-    components: List[Dict[str, Any]]
-
-class SnapshotLoadModel(BaseModel):
-    filename: str
 
 # --- App Setup ---
 
@@ -1987,26 +1951,6 @@ async def fs_list(path: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-def _get_file_explanation(filepath: Path) -> str:
-    """Heuristic logic to generate a short file explanation."""
-    name = filepath.name.lower()
-    ext = filepath.suffix.lower()
-
-    if ext == '.py':
-        if 'test' in name: return "Python test script"
-        if 'manager' in name or 'controller' in name: return "Python management/controller logic"
-        return "Python source file"
-    if ext == '.js': return "JavaScript file"
-    if ext == '.html': return "HTML structure"
-    if ext == '.css': return "CSS stylesheet"
-    if ext == '.json': return "JSON configuration/data file"
-    if ext == '.csv': return "CSV data file"
-    if ext == '.md': return "Markdown documentation"
-    if ext == '.txt': return "Text file"
-    if ext in ['.png', '.jpg', '.jpeg', '.gif', '.ico']: return "Image file"
-
-    return "Unknown file type"
 
 @app.post("/api/fs/compile", dependencies=[Depends(verify_token)])
 async def fs_compile(payload: FileTreeSelectionModel):
