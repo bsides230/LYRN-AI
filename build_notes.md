@@ -177,6 +177,11 @@ This update marks the official transition to the Dashboard v5 architecture and a
 - **Logging Updates**:
   - Terminal connection status and errors are now printed to `stdout` securely.
 
+### Phase 4
+- **What was moved:** Extracted the application lifespan context manager and scheduler loop background task into a new `core/lifecycle.py` file. Refactored `start_lyrn.py` to be exclusively a composition layer coordinating routers, static files, and initializations.
+- **Issues encountered:** Adjusted the sleep interval on the `scheduler_loop` to 0.5s per memory instructions regarding background automated latency intervals. Encountered missing `fastapi` module when testing without loading standard dependencies; `uvicorn` starts correctly.
+- **Risks or follow-ups:** This phase finalizes the `start_lyrn.py` decoupling. Remaining dependencies or edge cases could pop up in complex concurrent flows since the refactor significantly rearranged instantiation timing.
+
 ## v6.0.1 - Claude Code Runtime Reliability Audit (Remote + venv)
 
 - **Backend hardening (`start_lyrn.py`)**
