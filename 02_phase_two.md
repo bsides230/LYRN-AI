@@ -26,14 +26,14 @@ To isolate the heavy lifting and orchestration logic from the API routing layer.
 - **Process Management**: `ProxyController` and `WorkerController` interact with system processes. Ensure pathing to the proxy and worker scripts remains accurate relative to their new location in `services/`.
 
 ## Completion Checklist
-- [ ] `services/` directory created.
-- [ ] `DiskJournalLogger` extracted and wired up.
-- [ ] `WorkerController` extracted and wired up.
-- [ ] `ProxyController` and `ClaudeRunManager` extracted.
-- [ ] Terminal session classes extracted.
-- [ ] Application starts and background workers/proxy behave correctly.
+- [x] `services/` directory created.
+- [x] `DiskJournalLogger` extracted and wired up.
+- [x] `WorkerController` extracted and wired up.
+- [x] `ProxyController` and `ClaudeRunManager` extracted.
+- [x] Terminal session classes extracted.
+- [x] Application starts and background workers/proxy behave correctly.
 
 ## Build Notes
-*(To be filled by the executor during implementation)*
--
--
+- **What was moved:** Extracted global state to `core/state.py`. Extracted `DiskJournalLogger` to `services/logger.py`. Extracted `ProxyController` and `ClaudeRunManager` to `services/claude.py`. Extracted `WorkerController` to `services/worker.py`. Extracted Terminal session classes to `services/terminal.py`.
+- **Issues encountered:** Encountered circular dependency concerns but circumvented them by creating `core/state.py` for global variables (`main_loop`, `LYRN_TOKEN`, `extended_llm_stats`, `active_downloads`) which services and `start_lyrn.py` both reference.
+- **Risks or follow-ups:** `start_lyrn.py` still has remaining route code to be extracted, but the orchestration logic has been effectively decoupled.
