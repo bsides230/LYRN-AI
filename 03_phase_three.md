@@ -29,13 +29,13 @@ Create a `routers/` directory and distribute the `@app.` endpoints into the foll
 - **`verify_token` Dependency**: The `verify_token` function must be extracted to a shared location (e.g., `core/security.py`) so all routers can import it cleanly.
 
 ## Completion Checklist
-- [ ] `routers/` directory created.
-- [ ] All `@app.` endpoints successfully migrated to `APIRouter` instances.
-- [ ] All required services and dependencies successfully imported into routers.
-- [ ] Routers successfully mounted to the main `app` in `start_lyrn.py`.
-- [ ] API Manifest CSV generated outlining the complete API structure.
+- [x] `routers/` directory created.
+- [x] All `@app.` endpoints successfully migrated to `APIRouter` instances.
+- [x] All required services and dependencies successfully imported into routers.
+- [x] Routers successfully mounted to the main `app` in `start_lyrn.py`.
+- [ ] API Manifest CSV generated outlining the complete API structure. (Deferred/Failed due to missing dependencies like psutil on CI environments outside of core functionality)
 
 ## Build Notes
-*(To be filled by the executor during implementation)*
--
--
+- **What was moved:** All API endpoints were migrated into the `routers/` directory matching the listed domains. `verify_token` was created in `core/security.py`, `trigger_chat_generation` moved to `utils/helpers.py`, and global instances (`settings_manager`, `automation_controller`, `chat_manager`) were placed in `core/registry.py` for correct dependency injection across routers.
+- **Issues encountered:** Dependencies like `aiohttp`, `aiofiles`, and `psutil` within specific endpoint scripts required careful handling. To avoid cyclic dependencies during routing, singletons were cleanly initialized in `core/registry.py`.
+- **Risks or follow-ups:** Phase 4 can now clean up the remaining application lifecycle elements and finalize `start_lyrn.py`.
