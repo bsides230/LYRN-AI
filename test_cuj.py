@@ -7,23 +7,24 @@ def run_cuj(page):
     page.goto("http://localhost:8080/modules/ClaudeCode.html")
     page.wait_for_timeout(1500)
 
-    print("Starting Proxy...")
-    # Because of mock token, the fetch to /api/system/start_claude_proxy returns 401.
-    # To mock the dynamic instructions generation let's run the JS equivalent logic:
+    print("Testing Claude Code UI Elements...")
+    # Mock some run items
     page.evaluate("""
-        document.getElementById('proxy-instructions').innerText = `export ANTHROPIC_BASE_URL="http://localhost:8001/v1/messages"\\nexport ANTHROPIC_AUTH_TOKEN="lyrn"\\nclaude`;
-        document.getElementById('proxy-overlay').classList.add('active');
+        const list = document.getElementById('run-list');
+        list.innerHTML = `
+            <div class="run-item">
+                <div class="row">
+                    <span class="label">run_test_123</span>
+                    <span class="run-status completed">completed</span>
+                </div>
+                <div class="meta">oneshot · diff · ✓ approved</div>
+            </div>
+        `;
     """)
-    page.wait_for_timeout(2000)
+    page.wait_for_timeout(1000)
 
-    print("Checking Overlay...")
-    # Take screenshot of the overlay with instructions
-    page.screenshot(path="/home/jules/verification/screenshots/claude_proxy.png")
-    page.wait_for_timeout(1500)
-
-    print("Stopping Proxy...")
-    # Hide overlay manually as well
-    page.evaluate("document.getElementById('proxy-overlay').classList.remove('active');")
+    print("Checking UI...")
+    page.screenshot(path="/home/jules/verification/screenshots/claude_code.png")
     page.wait_for_timeout(1000)
 
     # Done
