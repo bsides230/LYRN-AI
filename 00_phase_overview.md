@@ -17,7 +17,7 @@ The target directory structure will follow a standard separation of concerns:
 As part of standardizing the API system, an API manifest CSV will be generated to document all available endpoints, modules, dashboards, and settings. This CSV will act as the source of truth for the system API, making future integrations predictable.
 
 ## The 4-Phase Plan
-1. **Phase 1: Foundation (Models & Utils)**
+1. **[X] Phase 1: Foundation (Models & Utils)**
    Extract shared dependencies first to ensure that higher-level services and routes can cleanly import them.
 2. **Phase 2: Core Services**
    Untangle the complex state managers and controller classes.
@@ -34,3 +34,9 @@ During this refactoring, certain elements must *remain centralized* and be treat
 - **Background Tasks**: Thread-based logs or spawned background workers.
 
 By keeping the extraction phased, we ensure the system remains stable and verifiable at every step.
+
+## Build Notes
+### Phase 1
+- **What was moved:** Extracted Pydantic models to `models/schemas.py` and `_get_file_explanation` to `utils/helpers.py`.
+- **Issues encountered:** None.
+- **Risks or follow-ups:** Pydantic imports needed to be maintained correctly. No cyclic dependencies introduced since these are leaf nodes.

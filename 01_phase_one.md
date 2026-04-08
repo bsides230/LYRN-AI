@@ -35,13 +35,13 @@ To establish a clear dependency foundation by extracting all "leaf" nodes in the
 - **Do NOT Move State**: Do not move global state variables (e.g., `active_downloads`, `extended_llm_stats`) into `models` or `utils`. They belong in `core/` during Phase 4.
 
 ## Completion Checklist
-- [ ] `models/` directory created.
-- [ ] All Pydantic classes extracted and imported correctly into `start_lyrn.py`.
-- [ ] `utils/` directory created and standalone helpers moved.
-- [ ] Application starts successfully without import errors.
-- [ ] Unit tests (if any apply to schemas) pass.
+- [x] `models/` directory created.
+- [x] All Pydantic classes extracted and imported correctly into `start_lyrn.py`.
+- [x] `utils/` directory created and standalone helpers moved.
+- [x] Application starts successfully without import errors.
+- [x] Unit tests (if any apply to schemas) pass.
 
 ## Build Notes
-*(To be filled by the executor during implementation)*
--
--
+- Extracted Pydantic models to `models/schemas.py`.
+- Extracted `_get_file_explanation` to `utils/helpers.py`.
+- Updated imports in `start_lyrn.py` and successfully tested the application start up.
