@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 import uvicorn
+import httpx
 
 app = FastAPI(title="LYRN Anthropic Proxy")
 
@@ -24,6 +25,42 @@ def get_port():
     except:
         pass
     return 8001
+
+def get_main_port():
+    try:
+        with open("port.txt", "r") as f:
+            val = f.read().strip()
+            if val.isdigit():
+                return int(val)
+    except:
+        pass
+    return 8080
+
+def toggle_chat_history(enabled: bool):
+    try:
+        main_port = get_main_port()
+        config_url = f"http://127.0.0.1:{main_port}/api/config"
+        token = None
+        try:
+            if os.path.exists("admin_token.txt"):
+                with open("admin_token.txt", "r") as f:
+                    token = f.read().strip()
+        except:
+            pass
+        if not token:
+            token = "lyrn"
+
+        headers = {"X-Token": token}
+
+        # Get current settings
+        resp = httpx.get(config_url, headers=headers, timeout=5.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if "settings" in data:
+                data["settings"]["enable_chat_history"] = enabled
+                httpx.post(config_url, headers=headers, json={"settings": data["settings"]}, timeout=5.0)
+    except Exception as e:
+        print(f"Failed to toggle chat history: {e}")
 
 def trigger_generation(messages):
     """Writes the chat context to a file and triggers model_runner.py"""
@@ -149,6 +186,16 @@ async def messages(request: Request):
         read_and_stream(filepath, request),
         media_type="text/event-stream"
     )
+
+@app.on_event("startup")
+async def startup_event():
+    # Disable chat history when proxy starts
+    toggle_chat_history(False)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Re-enable chat history when proxy stops
+    toggle_chat_history(True)
 
 if __name__ == "__main__":
     port = get_port()
