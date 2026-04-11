@@ -38,15 +38,7 @@ Don't just load a model—tune it. The Model Controller gives you granular acces
 *   **Context Size**: Adjust the context window (e.g., 4k, 8k, 32k) on the fly.
 *   **Presets**: Save your favorite configurations (e.g., "Coding - 32k Context" or "Roleplay - High Temp") for one-click switching.
 
-### 3. Job Automation
-![Job Manager](assets/screenshots/03_job_manager.png)
-**Agentic Workflow Automation.**
-Turn your AI into an autonomous agent. The Job Manager allows you to schedule tasks and recurring cycles.
-*   **Scheduled Jobs**: Queue prompts to run at specific times (e.g., "Summarize news at 8:00 AM").
-*   **Cycles**: Define complex, multi-step loops where the AI wakes up, checks its environment, and acts without user input.
-*   **Queue Management**: Visually inspect and reorder the automation queue.
-
-### 4. Snapshot Builder
+### 3. Snapshot Builder
 ![Snapshot Builder](assets/screenshots/07_snapshot_builder.png)
 **Prompt Engineering IDE.**
 The "System Prompt" is the soul of your AI. The Snapshot Builder allows you to compose complex system prompts from modular components.
@@ -54,7 +46,7 @@ The "System Prompt" is the soul of your AI. The Snapshot Builder allows you to c
 *   **Dynamic Rebuilds**: Edit a component and instantly rebuild the snapshot without restarting the server.
 *   **Visual Editor**: Clean, distraction-free text areas for crafting the perfect instructions.
 
-### 5. Model Manager
+### 4. Model Manager
 ![Model Manager](assets/screenshots/05_model_manager.png)
 **Integrated Supply Chain.**
 Stop manually moving files around. The Model Manager handles the entire lifecycle of your GGUF models.
@@ -62,7 +54,7 @@ Stop manually moving files around. The Model Manager handles the entire lifecycl
 *   **Hash Verification**: Automatically verifies SHA256 hashes to ensure file integrity.
 *   **Staging Area**: Downloads to a temporary staging folder before finalizing, preventing corrupted reads.
 
-### 6. System Status
+### 5. System Status
 ![System Status](assets/screenshots/06_server_status.png)
 **Real-Time Telemetry.**
 Monitor the heartbeat of your infrastructure.
@@ -70,14 +62,14 @@ Monitor the heartbeat of your infrastructure.
 *   **Resource Usage**: Real-time graphs for CPU, RAM, and GPU VRAM consumption.
 *   **KV Cache**: Monitor cache saturation to optimize context usage.
 
-### 7. Log Viewer
+### 6. Log Viewer
 ![Log Viewer](assets/screenshots/08_log_viewer.png)
 **Absolute Transparency.**
 See exactly what the "brain" is thinking. The Log Viewer streams the raw `stdout/stderr` from the worker process.
 *   **Live Stream**: Watch tokenization and inference logs in real-time.
 *   **Session History**: Browse logs from previous runs to debug issues or analyze performance.
 
-### 8. System Settings
+### 7. System Settings
 ![Settings](assets/screenshots/09_settings.png)
 **Personalize Your Deck.**
 *   **Theme Engine**: Toggle between Light and Dark modes.
