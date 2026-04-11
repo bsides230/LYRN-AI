@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 from typing import Optional, List, Dict
 from settings_manager import SettingsManager
-from automation_controller import AutomationController
 
 # Script directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -11,9 +10,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 class SnapshotLoader:
     """Loads the static base prompt from the 'build_prompt' directory."""
 
-    def __init__(self, settings_manager: SettingsManager, automation_controller: AutomationController):
+    def __init__(self, settings_manager: SettingsManager):
         self.settings_manager = settings_manager
-        self.automation_controller = automation_controller
         self.build_prompt_dir = os.path.join(SCRIPT_DIR, "build_prompt")
         self.master_prompt_path = os.path.join(self.build_prompt_dir, "master_prompt.txt")
         self.config_path = os.path.join(self.build_prompt_dir, "builder_config.json")

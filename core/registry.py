@@ -1,9 +1,7 @@
 from settings_manager import SettingsManager
-from automation_controller import AutomationController
 from chat_manager import ChatManager
 
 settings_manager = SettingsManager()
-automation_controller = AutomationController()
 
 # Initialize ChatManager (Needs settings to be loaded)
 settings_manager.load_or_detect_first_boot()

@@ -23,7 +23,6 @@ from settings_manager import SettingsManager
 from snapshot_loader import SnapshotLoader
 from delta_manager import DeltaManager
 from chat_manager import ChatManager
-from automation_controller import AutomationController
 
 # Global flag for clean shutdown
 running = True
@@ -115,8 +114,7 @@ def main():
     settings_manager.load_or_detect_first_boot()
     settings = settings_manager.settings
 
-    automation_controller = AutomationController()
-    snapshot_loader = SnapshotLoader(settings_manager, automation_controller)
+    snapshot_loader = SnapshotLoader(settings_manager)
     delta_manager = DeltaManager()
 
     role_mappings = {

@@ -99,15 +99,6 @@ class TestStartLyrnExhaustive(unittest.TestCase):
         response = self.client.post("/api/claude/validate_cwd", json={"cwd": "."})
         self.assertEqual(response.status_code, 200)
 
-    # --- Automation Router ---
-    def test_automation_queue(self):
-        response = self.client.get("/api/automation/schedule")
-        self.assertEqual(response.status_code, 200)
-
-    def test_automation_jobs(self):
-        response = self.client.get("/api/automation/jobs")
-        self.assertEqual(response.status_code, 200)
-
     # --- Snapshot Router ---
     def test_snapshot_list(self):
         response = self.client.get("/api/snapshots")

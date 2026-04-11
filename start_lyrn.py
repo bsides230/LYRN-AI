@@ -51,7 +51,6 @@ from routers.models_router import router as models_router
 from routers.config_router import router as config_router
 from routers.system_router import router as system_router
 from routers.claude_router import router as claude_router
-from routers.automation_router import router as automation_router
 from routers.fs_router import router as fs_router
 from routers.snapshot_router import router as snapshot_router
 from routers.terminal_router import router as terminal_router
@@ -62,7 +61,6 @@ app.include_router(models_router)
 app.include_router(config_router)
 app.include_router(system_router)
 app.include_router(claude_router)
-app.include_router(automation_router)
 app.include_router(fs_router)
 app.include_router(snapshot_router)
 app.include_router(terminal_router)
