@@ -94,7 +94,7 @@
         "chat_format": null
       }
     },
-    "enable_chat_history": true,
+    "enable_chat_history": false,
     "chat_history_length": 10,
     "worker_timeout_seconds": 1800,
     "active_snapshot": "gregos.sns"
