@@ -152,6 +152,7 @@
     <!-- LLM Tab -->
     <div id="tab-llm" class="tab-content">
         <button class="pop-out-btn" onclick="popOut('llm')">⬈ POP OUT</button>
+        <button class="pop-out-btn" style="right: 80px;" onclick="clearStats()">↻ CLEAR</button>
         <h2>Model Statistics</h2>
 
         <div class="chart-card" style="margin-bottom:10px;">
@@ -274,6 +275,19 @@
 
                 const data = await res.json();
                 updateUI(data);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function clearStats() {
+            if(!authToken) return;
+            try {
+                await fetch(coreUrl + '/api/system/clear_stats', {
+                    method: 'POST',
+                    headers: { 'X-Token': authToken }
+                });
+                fetchStats();
             } catch(e) {
                 console.error(e);
             }

@@ -75,6 +75,30 @@
             display: flex; flex-direction: column;
         }
 
+        .favorites-panel {
+            width: 350px;
+            max-width: 100%;
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            display: none; flex-direction: column;
+            position: absolute; right: -350px; top: 45px; bottom: 30px;
+            z-index: 100; box-shadow: -2px 0 5px rgba(0,0,0,0.5);
+            transition: right 0.3s ease;
+        }
+
+        .favorites-panel.open {
+            display: flex;
+            right: 0;
+        }
+
+        .favorite-card {
+            padding: 10px 15px; border-bottom: 1px solid var(--border-color);
+            cursor: pointer; transition: background 0.2s;
+        }
+        .favorite-card:hover { background: rgba(255,255,255,0.02); }
+        .favorite-meta { display: none; font-size: 11px; font-family: 'JetBrains Mono'; margin-top: 5px; color: var(--text-dim); }
+        .favorite-card.expanded .favorite-meta { display: block; }
+
         .content {
             flex: 1;
             padding: 20px;
@@ -125,6 +149,8 @@
             color: var(--text-head); padding: 8px; border-radius: 4px;
             width: 100%; box-sizing: border-box; font-family: 'JetBrains Mono'; font-size: 12px;
             margin-bottom: 10px;
+            word-wrap: break-word;
+            word-break: break-all;
         }
         input[type="text"]:focus { outline: none; border-color: var(--brand-purple); }
 
@@ -150,17 +176,45 @@
         .status-msg { color: var(--brand-purple); }
         .status-msg.error { color: var(--error-color); }
 
+        .mobile-toggle {
+            display: none;
+            background: transparent; border: 1px solid var(--border-color); color: var(--text-body);
+            padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-toggle { display: block; }
+            .sidebar {
+                position: absolute;
+                left: -300px;
+                top: 45px;
+                bottom: 30px;
+                z-index: 100;
+                transition: left 0.3s ease;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            }
+            .sidebar.open {
+                left: 0;
+            }
+        }
+
     </style>
 </head>
 <body>
 
     <header>
-        <h2>Model Manager</h2>
+        <div style="display:flex; align-items:center; gap: 10px;">
+            <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+            <h2>Model Manager</h2>
+        </div>
+        <div>
+            <button onclick="toggleFavorites()" style="font-size: 14px;">★</button>
+        </div>
     </header>
 
     <div class="main-container">
         <!-- LEFT: LIST -->
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
             <div class="list-header">
                 <span>INSTALLED MODELS</span>
                 <button onclick="fetchList()" style="padding:2px 6px; font-size:10px;">↻</button>
@@ -214,6 +268,22 @@
             </div>
 
         </div>
+
+        <!-- FAVORITES PANEL -->
+        <div class="favorites-panel" id="favorites-panel">
+            <div class="list-header">
+                <span>FAVORITE MODELS</span>
+                <button onclick="toggleFavorites()" style="padding:2px 6px; font-size:10px;">X</button>
+            </div>
+            <ul id="favorites-list" class="model-list" style="flex:1; overflow-y:auto;">
+                <!-- Favorite Items -->
+            </ul>
+            <div style="padding: 10px; border-top: 1px solid var(--border-color);">
+                <input type="text" id="fav-url" placeholder="Add via HuggingFace URL..." style="margin-bottom: 5px;"/>
+                <button onclick="addFavorite()" style="width: 100%;">Add to Favorites</button>
+            </div>
+        </div>
+
     </div>
 
     <div class="status-bar">
@@ -223,7 +293,7 @@
 
 
     <script>
-        let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8000';
+        let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8080';
         let authToken = localStorage.getItem('lyrn_admin_token') || '';
         let selectedModel = null;
         let models = [];
@@ -275,12 +345,97 @@
             if(type === 'normal') els.status.style.color = 'var(--text-dim)';
         }
 
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
             const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function toggleFavorites() {
+            const panel = document.getElementById('favorites-panel');
+            panel.classList.toggle('open');
+            if(panel.classList.contains('open')) {
+                fetchFavorites();
+            }
+        }
+
+        async function fetchFavorites() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/models/favorites`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                if(!res.ok) throw new Error("Failed to fetch favorites");
+                const data = await res.json();
+                renderFavorites(data.favorites || []);
+            } catch (e) {
+                setStatus(e.message, 'error');
+            }
+        }
+
+        function renderFavorites(favs) {
+            const list = document.getElementById('favorites-list');
+            list.innerHTML = '';
+            favs.forEach(f => {
+                const li = document.createElement('li');
+                li.className = 'favorite-card';
+
+                li.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:var(--text-head); font-weight:500;">${f.id}</span>
+                        <button onclick="downloadFavorite(event, '${f.url}', '${f.filename}')" style="padding: 2px 6px; font-size:14px; font-weight:bold; color:var(--brand-purple); border-color:var(--brand-purple); border-radius:12px;">+</button>
+                    </div>
+                    <div class="favorite-meta">
+                        <div>Model: ${f.model || '--'}</div>
+                        <div>Format: ${f.format || '--'}</div>
+                        <div>Quant: ${f.quant || '--'}</div>
+                        <div>Size: ${f.size || '--'}</div>
+                        <div>Filename: <span style="color:var(--brand-purple); word-break:break-all;">${f.filename}</span></div>
+                    </div>
+                `;
+                li.onclick = (e) => {
+                    if(e.target.tagName !== 'BUTTON') {
+                        li.classList.toggle('expanded');
+                    }
+                };
+                list.appendChild(li);
+            });
+        }
+
+        function downloadFavorite(e, url, filename) {
+            e.stopPropagation();
+            document.getElementById('inp-url').value = url;
+            document.getElementById('inp-filename').value = filename;
+            document.getElementById('inp-sha256').value = '';
+            startDownload();
+        }
+
+        async function addFavorite() {
+            const urlInput = document.getElementById('fav-url');
+            const url = urlInput.value.trim();
+            if(!url) return;
+
+            setStatus("Adding favorite...");
+            try {
+                const res = await fetch(`${coreUrl}/api/models/favorites`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ url: url })
+                });
+                if(!res.ok) throw new Error("Failed to add favorite");
+
+                urlInput.value = '';
+                fetchFavorites();
+                setStatus("Favorite added successfully");
+            } catch (e) {
+                setStatus(e.message, 'error');
+            }
         }
 
         async function fetchList() {

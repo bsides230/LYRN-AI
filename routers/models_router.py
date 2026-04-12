@@ -186,6 +186,65 @@ async def get_active_downloads():
 
     return state.active_downloads
 
+@router.get("/favorites", dependencies=[Depends(verify_token)])
+async def get_favorites():
+    """Gets the list of favorite models from model_favorites.json"""
+    favorites_path = Path("model_favorites.json")
+    if not favorites_path.exists():
+        return {"favorites": []}
+
+    import json
+    try:
+        with open(favorites_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return {"favorites": []}
+
+@router.post("/favorites", dependencies=[Depends(verify_token)])
+async def add_favorite(request: dict):
+    """Adds a new favorite model from a HuggingFace URL"""
+    url = request.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    # Try to parse HF URL
+    # format: https://huggingface.co/{user}/{repo}/resolve/main/{filename}
+    filename = request.get("filename")
+    if not filename:
+        filename = url.split("/")[-1]
+
+    new_favorite = {
+        "id": filename.split(".")[0],
+        "family": "custom",
+        "series": "custom",
+        "model": filename.split(".")[0],
+        "size": None,
+        "variant": None,
+        "quant": None,
+        "format": filename.split(".")[-1] if "." in filename else "gguf",
+        "filename": filename,
+        "url": url
+    }
+
+    favorites_path = Path("model_favorites.json")
+    favorites = {"favorites": []}
+    import json
+
+    if favorites_path.exists():
+        try:
+            with open(favorites_path, "r", encoding="utf-8") as f:
+                favorites = json.load(f)
+        except Exception:
+            pass
+
+    favorites["favorites"].append(new_favorite)
+
+    with open(favorites_path, "w", encoding="utf-8") as f:
+        json.dump(favorites, f, indent=2)
+
+    return {"success": True, "favorite": new_favorite}
+
+
 @router.get("/list", dependencies=[Depends(verify_token)])
 async def list_models():
     """Lists available models in the models/ directory."""
