@@ -78,6 +78,16 @@ async def health_check():
     # Merge with extended stats from memory
     llm_stats.update(state.extended_llm_stats)
 
+    from core.registry import settings_manager
+    if not settings_manager.settings:
+        settings_manager.load_or_detect_first_boot()
+    active_config = settings_manager.settings.get("active", {})
+    model_path = active_config.get("model_path", "")
+    if model_path:
+        llm_stats["model_name"] = os.path.basename(model_path)
+    else:
+        llm_stats["model_name"] = "None"
+
     return {
         "status": "ok",
         "cpu": cpu,
@@ -120,3 +130,20 @@ async def stop_claude_proxy():
 @router.get("/api/system/proxy_status", dependencies=[Depends(verify_token)])
 async def get_proxy_status():
     return proxy_controller.get_status()
+
+@router.post("/api/system/clear_stats", dependencies=[Depends(verify_token)])
+async def clear_stats():
+    # Reset memory stats
+    for key in state.extended_llm_stats:
+        if isinstance(state.extended_llm_stats[key], (int, float)):
+            state.extended_llm_stats[key] = 0
+
+    # Clear json file
+    stats_path = Path("global_flags/llm_stats.json")
+    if stats_path.exists():
+        try:
+            stats_path.unlink()
+        except Exception:
+            pass
+
+    return {"success": True}
