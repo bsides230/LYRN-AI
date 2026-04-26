@@ -38,3 +38,7 @@ C:*
 # Test artifacts
 .test_venv/
 jobs/
+
+# Job Loop Injection
+global_flags/job_context.txt
+runtime/

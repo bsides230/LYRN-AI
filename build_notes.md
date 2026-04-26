@@ -1,5 +1,28 @@
 # Build Notes
 
+## v6.0.5 - Basic Job Loop Injection System
+This update implements a simple, file-based execution rail for automated jobs, aligning with the existing trigger system and RWI.
+
+- **Storage & Registry Layer**
+  - Added `runtime/jobs/categories/` directory to store CSV-based job registries.
+  - Created `services/job_registry.py` for reading/writing job properties (`job_id`, `job_name`, `trigger_name`, `instruction_layer`, `enabled`).
+- **API & UI Layer**
+  - Added `routers/job_router.py` (registered in `start_lyrn.py`) for basic CRUD operations on jobs and categories.
+  - Built `LYRN_v6/modules/JobManager.html` UI (registered in `LYRN_v6/dashboard.html`) to manage job entries visually.
+- **Injection & Execution Layer**
+  - Added `scripts/inject_job.py` which extracts job logic, writes instructions to `global_flags/job_context.txt`, and generates a tiny `chat_trigger.txt` sequence.
+  - Modified `model_runner.py` to consume, inject, and delete `job_context.txt` explicitly right after the Delta prompt layer.
+  - Logging of executions writes sequentially to `runtime/jobs/job_runs.jsonl`.
+- **Documentation**
+  - Added `lyrn_docs/JOB_LOOP_INJECTION_SYSTEM.md` outlining the architecture, flow, and usage.
+
+## Security Updates
+- Protected `/api/jobs` endpoints with standard `verify_token` middleware.
+- Sanitized category names in `job_registry.py` prior to resolving local file paths to prevent directory traversal.
+
+## Logging Updates
+- `scripts/inject_job.py` strictly logs metadata (`timestamp`, `job_name`, `category`, `status`, `error`) to `runtime/jobs/job_runs.jsonl`.
+
 ## v6.0.4 - Claude-Scoped Quick Status Panel + Dashboard Cleanup
 
 This update moves the quick status surface into the Claude Code module (where it is needed during Claude operations) and removes the dashboard-level quick panel experiment.

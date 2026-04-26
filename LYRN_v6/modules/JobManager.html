@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Manager</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --surface: #2a2a3c;
+            --text-primary: #cdd6f4;
+            --border-color: #45475a;
+            --accent: #89b4fa;
+            --success: #a6e3a1;
+            --danger: #f38ba8;
+            --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+            gap: 20px;
+        }
+
+        h2, h3 {
+            margin-top: 0;
+            color: var(--accent);
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .panel {
+            background-color: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"], select, textarea {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        input[type="text"], select {
+            flex: 1;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 150px;
+        }
+
+        button {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+            border: 1px solid var(--accent);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent);
+            color: var(--bg-color);
+        }
+
+        .primary-btn {
+            background-color: var(--accent);
+            color: var(--bg-color);
+        }
+        .primary-btn:hover {
+            background-color: #b4befe;
+        }
+
+        .job-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .job-card {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .job-card.disabled {
+            opacity: 0.6;
+        }
+
+        .job-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .job-name {
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .job-trigger {
+            font-size: 0.8em;
+            color: #a6adc8;
+        }
+
+        .job-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .run-btn {
+            background-color: var(--success);
+            color: var(--bg-color);
+            border: none;
+        }
+        .run-btn:hover {
+            background-color: #94e2d5;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h2>Job Loop Injection Manager</h2>
+
+    <div class="container">
+        <!-- Edit Form -->
+        <div class="panel">
+            <h3>Job Editor</h3>
+
+            <div class="form-group">
+                <label>Category</label>
+                <div class="input-row">
+                    <select id="categorySelect" onchange="loadJobs()">
+                        <option value="">-- Select Category --</option>
+                    </select>
+                    <button onclick="createCategory()">+ New</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Job Name</label>
+                <input type="text" id="jobName" placeholder="e.g., extract_keywords">
+            </div>
+
+            <div class="form-group">
+                <label>Trigger Name (Minimal input to fire model)</label>
+                <input type="text" id="triggerName" placeholder="e.g., run, execute">
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+                <label>Instruction Layer</label>
+                <textarea id="instructionLayer" placeholder="Enter full job instructions here..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Notes (Optional)</label>
+                <input type="text" id="notes" placeholder="Optional notes...">
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="jobEnabled" checked> Enabled
+                </label>
+            </div>
+
+            <div class="input-row">
+                <button class="primary-btn" onclick="saveJob()">Save Job</button>
+                <button onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+
+        <!-- Job List -->
+        <div class="panel">
+            <h3>Jobs in Category</h3>
+            <div class="job-list" id="jobList">
+                <!-- Populated by JS -->
+                <div style="color: #a6adc8; font-style: italic;">Select a category to view jobs.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use local token logic
+        function getToken() {
+            return localStorage.getItem('lyrn_admin_token') || 'lyrn';
+        }
+
+        const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+            ? window.location.origin
+            : ''; // Adjust if needed
+
+        let currentJobs = [];
+        let editingJobId = null;
+
+        async function fetchAPI(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const headers = {
+                'X-Token': getToken(),
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+
+            const response = await fetch(url, { ...options, headers });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`API Error: ${response.status} - ${text}`);
+            }
+            return response.json();
+        }
+
+        async function loadCategories() {
+            try {
+                const data = await fetchAPI('/api/jobs/categories');
+                const select = document.getElementById('categorySelect');
+                const currentVal = select.value;
+
+                select.innerHTML = '<option value="">-- Select Category --</option>';
+                data.categories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    opt.textContent = cat;
+                    select.appendChild(opt);
+                });
+
+                if (currentVal && data.categories.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            } catch (e) {
+                console.error("Failed to load categories:", e);
+                alert("Failed to load categories: " + e.message);
+            }
+        }
+
+        async function createCategory() {
+            const name = prompt("Enter new category name:");
+            if (!name) return;
+
+            try {
+                await fetchAPI('/api/jobs/categories', {
+                    method: 'POST',
+                    body: JSON.stringify({ category: name })
+                });
+                await loadCategories();
+                document.getElementById('categorySelect').value = name;
+                loadJobs();
+            } catch (e) {
+                console.error("Failed to create category:", e);
+                alert("Failed to create category: " + e.message);
+            }
+        }
+
+        async function loadJobs() {
+            const category = document.getElementById('categorySelect').value;
+            const listDiv = document.getElementById('jobList');
+
+            if (!category) {
+                listDiv.innerHTML = '<div style="color: #a6adc8; font-style: italic;">Select a category to view jobs.</div>';
+                currentJobs = [];
+                return;
+            }
+
+            try {
+                const data = await fetchAPI(`/api/jobs/${category}`);
+                currentJobs = data.jobs || [];
+                renderJobs();
+            } catch (e) {
+                console.error("Failed to load jobs:", e);
+                listDiv.innerHTML = `<div style="color: var(--danger);">Error loading jobs.</div>`;
+            }
+        }
+
+        function renderJobs() {
+            const listDiv = document.getElementById('jobList');
+            listDiv.innerHTML = '';
+
+            if (currentJobs.length === 0) {
+                listDiv.innerHTML = '<div style="color: #a6adc8; font-style: italic;">No jobs in this category.</div>';
+                return;
+            }
+
+            currentJobs.forEach(job => {
+                const card = document.createElement('div');
+                card.className = `job-card ${job.enabled ? '' : 'disabled'}`;
+
+                card.innerHTML = `
+                    <div class="job-info">
+                        <span class="job-name">${job.job_name}</span>
+                        <span class="job-trigger">Trigger: ${job.trigger_name}</span>
+                    </div>
+                    <div class="job-actions">
+                        <button onclick="editJob('${job.job_id}')">Edit</button>
+                        <button class="run-btn" onclick="runJob('${job.job_name}')" ${job.enabled ? '' : 'disabled title="Job is disabled"'}>Run</button>
+                    </div>
+                `;
+                listDiv.appendChild(card);
+            });
+        }
+
+        function editJob(jobId) {
+            const job = currentJobs.find(j => j.job_id === jobId);
+            if (!job) return;
+
+            editingJobId = job.job_id;
+            document.getElementById('jobName').value = job.job_name;
+            document.getElementById('triggerName').value = job.trigger_name;
+            document.getElementById('instructionLayer').value = job.instruction_layer;
+            document.getElementById('notes').value = job.notes || '';
+            document.getElementById('jobEnabled').checked = job.enabled;
+        }
+
+        function clearForm() {
+            editingJobId = null;
+            document.getElementById('jobName').value = '';
+            document.getElementById('triggerName').value = '';
+            document.getElementById('instructionLayer').value = '';
+            document.getElementById('notes').value = '';
+            document.getElementById('jobEnabled').checked = true;
+        }
+
+        async function saveJob() {
+            const category = document.getElementById('categorySelect').value;
+            if (!category) {
+                alert("Please select or create a category first.");
+                return;
+            }
+
+            const jobName = document.getElementById('jobName').value.trim();
+            const triggerName = document.getElementById('triggerName').value.trim();
+            const instructionLayer = document.getElementById('instructionLayer').value.trim();
+
+            if (!jobName || !triggerName || !instructionLayer) {
+                alert("Job Name, Trigger Name, and Instruction Layer are required.");
+                return;
+            }
+
+            const jobData = {
+                job_id: editingJobId, // will be null if creating
+                job_name: jobName,
+                trigger_name: triggerName,
+                instruction_layer: instructionLayer,
+                notes: document.getElementById('notes').value.trim(),
+                enabled: document.getElementById('jobEnabled').checked
+            };
+
+            try {
+                if (editingJobId) {
+                    await fetchAPI(`/api/jobs/${category}/${editingJobId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(jobData)
+                    });
+                } else {
+                    await fetchAPI(`/api/jobs/${category}`, {
+                        method: 'POST',
+                        body: JSON.stringify(jobData)
+                    });
+                }
+
+                clearForm();
+                loadJobs(); // refresh list
+            } catch (e) {
+                console.error("Failed to save job:", e);
+                alert("Failed to save job: " + e.message);
+            }
+        }
+
+        async function runJob(jobName) {
+            const category = document.getElementById('categorySelect').value;
+            if(!category) return;
+
+            if(!confirm(`Inject job '${jobName}' into model?`)) return;
+
+            try {
+                const res = await fetchAPI('/api/jobs/inject/run', {
+                    method: 'POST',
+                    body: JSON.stringify({ category, job_name: jobName })
+                });
+                alert("Injection triggered. " + (res.output || ""));
+            } catch (e) {
+                console.error("Failed to run job:", e);
+                alert("Failed to inject job: " + e.message);
+            }
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', loadCategories);
+    </script>
+</body>
+</html>

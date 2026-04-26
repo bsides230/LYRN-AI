@@ -273,6 +273,18 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             if delta_content:
                 messages.append({"role": "system", "content": delta_content})
 
+            # Job Loop Injection System (Injected after deltas)
+            job_context_path = Path("global_flags/job_context.txt")
+            if job_context_path.exists():
+                try:
+                    job_content = job_context_path.read_text(encoding='utf-8')
+                    if job_content.strip():
+                        messages.append({"role": "system", "content": f"JOB INSTRUCTIONS:\n{job_content}"})
+                    # Clear it so it only runs once per injection
+                    job_context_path.unlink()
+                except Exception as e:
+                    print(f"Error reading job context: {e}")
+
             # Append current user message
             # Merge if last was user (alternating roles logic)
             if messages and messages[-1].get("role") == "user":
