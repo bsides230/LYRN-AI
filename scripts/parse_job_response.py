@@ -1,35 +1,24 @@
 import argparse
 import sys
 import os
-import json
+import re
 import uuid
 import datetime
+import subprocess
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from services import job_registry
 
-def extract_json_from_text(text: str) -> dict:
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        start_idx = text.find('{')
-        end_idx = text.rfind('}')
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            try:
-                return json.loads(text[start_idx:end_idx+1])
-            except json.JSONDecodeError:
-                pass
-    return None
-
-def log_parse(run_id: str, status: str, result_data: dict, file_path: str):
+def log_parse(run_id: str, status: str, parsed_result: str, file_path: str):
     log_entry = {
         "run_id": run_id,
         "timestamp": datetime.datetime.now().isoformat(),
         "status": status,
         "file_path": file_path,
-        "parsed_result": result_data
+        "parsed_result": parsed_result
     }
     with open("runtime/jobs/job_parse_log.jsonl", "a", encoding="utf-8") as f:
+        import json
         f.write(json.dumps(log_entry) + "\n")
 
 def main():
@@ -50,77 +39,75 @@ def main():
         print(f"Error: Job '{args.job_name}' not found in category '{args.category}'.")
         sys.exit(1)
 
-    try:
-        affordances_allowed = json.loads(job.get("affordances_json", "[]"))
-    except:
-        affordances_allowed = ["continue", "retry", "flag_error"]
+    # The old logic read affordances_json, we now use the 'affordances' string.
+    affordances_str = job.get("affordances", "")
+    affordances_allowed = [a.strip() for a in affordances_str.split("|") if a.strip()]
 
     max_retries = int(job.get("max_retries", 1))
-    retry_error_message = job.get("retry_error_message", "Parser validation failed.")
 
     with open(args.response_file, "r", encoding="utf-8") as f:
         raw_text = f.read()
 
-    parsed_json = extract_json_from_text(raw_text)
+    # We look for ##AF: Category/JobName##
+    # The user format is `##AF: trigger##` meaning the model emits `##AF: Category/JobName##`
+    match = re.search(r"##AF:\s*(.*?)\s*##", raw_text)
 
+    is_valid = False
     errors = []
-    is_valid = True
+    trigger_found = None
+    next_category = None
+    next_job = None
 
-    if parsed_json is None:
-        is_valid = False
-        errors.append("Could not extract valid JSON from output.")
-    else:
-        if "status" not in parsed_json or parsed_json["status"] not in ["success", "retry", "failed"]:
-            is_valid = False
-            errors.append("Missing or invalid 'status'. Must be success, retry, or failed.")
-        if "result" not in parsed_json:
-            is_valid = False
-            errors.append("Missing 'result' field.")
-        if "available_affordances" not in parsed_json or not isinstance(parsed_json["available_affordances"], list):
-            is_valid = False
-            errors.append("Missing or invalid 'available_affordances'. Must be a list.")
+    if match:
+        trigger_found = match.group(1).strip()
+        # Verify it's in the allowed list
+        if not affordances_allowed or trigger_found in affordances_allowed:
+            is_valid = True
+            parts = trigger_found.split("/")
+            if len(parts) >= 2:
+                next_category = parts[0]
+                next_job = parts[1]
+            else:
+                is_valid = False
+                errors.append(f"Trigger '{trigger_found}' is not in 'Category/JobName' format.")
         else:
-            for aff in parsed_json["available_affordances"]:
-                if aff not in affordances_allowed:
-                    is_valid = False
-                    errors.append(f"Affordance '{aff}' is not allowed by job definition.")
-        if "errors" not in parsed_json or not isinstance(parsed_json["errors"], list):
-            is_valid = False
-            errors.append("Missing or invalid 'errors'. Must be a list.")
+            errors.append(f"Trigger '{trigger_found}' is not in allowed affordances list: {affordances_allowed}")
+    else:
+        errors.append("No ##AF: trigger## found in the output.")
 
     run_id = str(uuid.uuid4())
     os.makedirs("runtime/jobs/parsed_outputs", exist_ok=True)
-    out_file = f"runtime/jobs/parsed_outputs/{run_id}.json"
+    out_file = f"runtime/jobs/parsed_outputs/{run_id}.txt"
 
     if is_valid:
-        # Save valid parsed output
         with open(out_file, "w", encoding="utf-8") as f:
-            json.dump(parsed_json, f, indent=2)
-        log_parse(run_id, "success", parsed_json, out_file)
-        print(f"[Success] Valid output parsed and saved to {out_file}")
+            f.write(f"Parsed Trigger: {trigger_found}\n")
+
+        log_parse(run_id, "success", trigger_found, out_file)
+        print(f"[Success] Valid trigger '{trigger_found}' parsed. Triggering next job.")
+
+        # Call inject_job for the next job
+        inject_script = os.path.join(os.path.dirname(__file__), "inject_job.py")
+        subprocess.Popen([sys.executable, inject_script, "--category", next_category, "--job-name", next_job])
+
     else:
         if args.retry_count < max_retries:
             status = "retry"
-            final_errors = errors
         else:
             status = "failed"
-            final_errors = [retry_error_message] + errors
-
-        err_out = {
-            "status": status,
-            "result": {},
-            "available_affordances": ["flag_error"] if status == "failed" else ["retry"],
-            "selected_affordance": "flag_error" if status == "failed" else "retry",
-            "notes": "Parser validation failed.",
-            "errors": final_errors
-        }
 
         with open(out_file, "w", encoding="utf-8") as f:
-            json.dump(err_out, f, indent=2)
+            f.write(f"Status: {status}\nErrors: {errors}\n")
 
-        log_parse(run_id, status, err_out, out_file)
+        log_parse(run_id, status, str(errors), out_file)
         print(f"[{status.capitalize()}] Validation failed. Errors: {errors}")
-        print(f"Output saved to {out_file}")
+
+        # If it failed/retry, we might need to re-inject the current job
+        # For now, we will print it. A robust system would call inject_job.py again if retry is needed.
+        if status == "retry":
+             print("[System] Attempting retry. Re-injecting current job.")
+             inject_script = os.path.join(os.path.dirname(__file__), "inject_job.py")
+             subprocess.Popen([sys.executable, inject_script, "--category", args.category, "--job-name", args.job_name])
 
 if __name__ == "__main__":
     main()

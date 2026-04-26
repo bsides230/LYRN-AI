@@ -14,7 +14,8 @@ CSV_FIELDNAMES = [
     "job_name",
     "trigger_name",
     "instruction_layer",
-    "affordances_json",
+    "affordances",
+    "scripts",
     "max_retries",
     "retry_error_message",
     "enabled",
@@ -59,8 +60,10 @@ def get_jobs(category: str) -> List[Dict[str, Any]]:
             row["enabled"] = row["enabled"].lower() == "true"
 
             # Migrations / Defaults for new fields
-            if "affordances_json" not in row or not row["affordances_json"].strip():
-                row["affordances_json"] = json.dumps(["continue", "retry", "flag_error"])
+            if "affordances" not in row:
+                row["affordances"] = ""
+            if "scripts" not in row:
+                row["scripts"] = ""
             if "max_retries" not in row or not str(row["max_retries"]).strip():
                 row["max_retries"] = 1
             else:
@@ -111,7 +114,8 @@ def save_job(category: str, job_data: Dict[str, Any]) -> Dict[str, Any]:
         existing_job["job_name"] = job_data.get("job_name", existing_job["job_name"])
         existing_job["trigger_name"] = job_data.get("trigger_name", existing_job["trigger_name"])
         existing_job["instruction_layer"] = job_data.get("instruction_layer", existing_job["instruction_layer"])
-        existing_job["affordances_json"] = job_data.get("affordances_json", existing_job.get("affordances_json", json.dumps(["continue", "retry", "flag_error"])))
+        existing_job["affordances"] = job_data.get("affordances", existing_job.get("affordances", ""))
+        existing_job["scripts"] = job_data.get("scripts", existing_job.get("scripts", ""))
         existing_job["max_retries"] = job_data.get("max_retries", existing_job.get("max_retries", 1))
         existing_job["retry_error_message"] = job_data.get("retry_error_message", existing_job.get("retry_error_message", ""))
         existing_job["enabled"] = str(job_data.get("enabled", existing_job["enabled"])).lower() == "true"
@@ -126,7 +130,8 @@ def save_job(category: str, job_data: Dict[str, Any]) -> Dict[str, Any]:
             "job_name": job_data.get("job_name", ""),
             "trigger_name": job_data.get("trigger_name", ""),
             "instruction_layer": job_data.get("instruction_layer", ""),
-            "affordances_json": job_data.get("affordances_json", json.dumps(["continue", "retry", "flag_error"])),
+            "affordances": job_data.get("affordances", ""),
+            "scripts": job_data.get("scripts", ""),
             "max_retries": job_data.get("max_retries", 1),
             "retry_error_message": job_data.get("retry_error_message", ""),
             "enabled": str(job_data.get("enabled", True)).lower() == "true",

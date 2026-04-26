@@ -14,7 +14,8 @@ class JobData(BaseModel):
     job_name: str
     trigger_name: str
     instruction_layer: str
-    affordances_json: Optional[str] = None
+    affordances: Optional[str] = ""
+    scripts: Optional[str] = ""
     max_retries: Optional[int] = 1
     retry_error_message: Optional[str] = ""
     enabled: bool = True

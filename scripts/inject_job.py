@@ -46,23 +46,72 @@ def main():
         sys.exit(1)
 
     try:
-        # Write instruction layer
+        # 1. Write instruction and affordance layers
         os.makedirs("global_flags", exist_ok=True)
+        job_context = f"##JI:START##\n{job['instruction_layer']}\n##JI:END##\n"
+        job_context += f"##AF:START##\n{job.get('affordances', '')}\n##AF:END##\n"
+
         with open("global_flags/job_context.txt", "w", encoding="utf-8") as f:
-            f.write(job["instruction_layer"])
+            f.write(job_context)
 
         print("[System] Wrote global_flags/job_context.txt")
 
-        # Trigger model execution using existing system
-        # We need to write the tiny trigger to a chat file and then write to chat_trigger.txt
-        from utils.helpers import trigger_chat_generation
+        # 2. Clear old flags
+        flags_dir = "global_flags/job_flags"
+        if os.path.exists(flags_dir):
+            import shutil
+            shutil.rmtree(flags_dir)
+        os.makedirs(flags_dir, exist_ok=True)
 
-        # This writes the trigger_name as user message and triggers it
-        filepath, filename = trigger_chat_generation(job["trigger_name"])
-        print(f"[System] Triggered execution with file: {filepath}")
+        ready_flag = "global_flags/job_ready.flag"
+        if os.path.exists(ready_flag):
+            os.remove(ready_flag)
+
+        # 3. Handle Scripts
+        scripts_raw = job.get("scripts", "").strip()
+        scripts_list = [s.strip() for s in scripts_raw.split("|") if s.strip()]
+
+        if not scripts_list:
+            # No scripts to run, directly flip ready flag and trigger job
+            print("[System] No scripts to run, flipping ready flag and triggering job.")
+            with open(ready_flag, "w") as f:
+                f.write("1")
+
+            # Since there are no scripts, we trigger it immediately here
+            from utils.helpers import trigger_chat_generation
+            filepath, filename = trigger_chat_generation("##JOB_START##")
+            print(f"[System] Triggered execution with file: {filepath}")
+        else:
+            print(f"[System] Starting {len(scripts_list)} scripts...")
+            import subprocess
+
+            valid_scripts = []
+            # Start each script in the background
+            for script in scripts_list:
+                if os.path.exists(script):
+                    subprocess.Popen([sys.executable, script])
+                    print(f"  -> Started: {script}")
+                    valid_scripts.append(script)
+                else:
+                    print(f"  -> Script not found, skipping: {script}")
+
+            if not valid_scripts:
+                # Fallback if no scripts were actually found
+                print("[System] No valid scripts found to run, flipping ready flag and triggering job.")
+                with open(ready_flag, "w") as f:
+                    f.write("1")
+                from utils.helpers import trigger_chat_generation
+                filepath, filename = trigger_chat_generation("##JOB_START##")
+                print(f"[System] Triggered execution with file: {filepath}")
+            else:
+                # Start job_flag_helper in the background
+                helper_path = os.path.join(os.path.dirname(__file__), "job_flag_helper.py")
+                subprocess.Popen([sys.executable, helper_path] + valid_scripts)
+                print("[System] Started job_flag_helper.py to monitor script flags.")
 
         metadata = {
-            "affordances_json": job.get("affordances_json", "[]"),
+            "affordances": job.get("affordances", ""),
+            "scripts": job.get("scripts", ""),
             "max_retries": job.get("max_retries", 1)
         }
         log_run(args.category, args.job_name, job["trigger_name"], "success", metadata=metadata)
@@ -70,7 +119,8 @@ def main():
     except Exception as e:
         print(f"Error injecting job: {e}")
         metadata = {
-            "affordances_json": job.get("affordances_json", "[]"),
+            "affordances": job.get("affordances", ""),
+            "scripts": job.get("scripts", ""),
             "max_retries": job.get("max_retries", 1)
         }
         log_run(args.category, args.job_name, job.get("trigger_name", ""), "failed", str(e), metadata=metadata)

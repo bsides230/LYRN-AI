@@ -202,11 +202,11 @@
             <select id="categorySelect" onchange="loadJobs()">
                 <option value="">-- Category --</option>
             </select>
+            <button onclick="openNewCategoryPopup()">+ Cat</button>
             <select id="jobSelect" onchange="loadSelectedJob()">
                 <option value="">-- Job --</option>
             </select>
-            <button onclick="loadSelectedJob()">Load</button>
-            <button onclick="openNewJobPopup()">+ Add Job</button>
+            <button onclick="openNewJobPopup()">+ Job</button>
             <button onclick="deleteJob()" style="background-color: var(--danger); color: var(--bg-color); border: none;">Trash</button>
         </div>
         <div class="toolbar-right">
@@ -246,12 +246,18 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label>Affordances</label>
-                <div class="affordance-list" id="affordanceList">
-                    <!-- Populated by JS -->
+            <div class="input-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>Affordances (Trigger Responses)</label>
+                    <div id="affordanceList" class="job-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: 5px;"></div>
+                    <button onclick="openAffordancePopup()" style="align-self: flex-start; margin-top: 5px;">+ Add Affordance</button>
                 </div>
-                <button onclick="addAffordanceRow()" style="align-self: flex-start; margin-top: 5px;">+ Add Affordance</button>
+
+                <div class="form-group" style="flex: 1;">
+                    <label>Scripts (File paths)</label>
+                    <div id="scriptList" class="job-list" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: 5px;"></div>
+                    <button onclick="addScriptRow()" style="align-self: flex-start; margin-top: 5px;">+ Add Script</button>
+                </div>
             </div>
 
             <div class="form-group">
@@ -410,42 +416,85 @@
             document.getElementById('maxRetries').value = job.max_retries || 1;
             document.getElementById('retryErrorMessage').value = job.retry_error_message || '';
 
-            let affordances = ["continue", "retry", "flag_error"];
-            if (job.affordances_json) {
-                try {
-                    affordances = JSON.parse(job.affordances_json);
-                } catch(e) {}
+            let affordances = [];
+            if (job.affordances) {
+                affordances = job.affordances.split('|').filter(a => a.trim());
             }
-            renderAffordances(affordances);
+            renderList('affordanceList', affordances);
+
+            let scripts = [];
+            if (job.scripts) {
+                scripts = job.scripts.split('|').filter(s => s.trim());
+            }
+            renderList('scriptList', scripts);
         }
 
-        function renderAffordances(affordances) {
-            const list = document.getElementById('affordanceList');
+        function renderList(listId, items) {
+            const list = document.getElementById(listId);
             list.innerHTML = '';
-            affordances.forEach((aff) => {
-                addAffordanceRow(aff);
+            items.forEach((item) => {
+                addListRow(listId, item);
             });
         }
 
-        function addAffordanceRow(value = "") {
-            const list = document.getElementById('affordanceList');
+        function addListRow(listId, value = "") {
+            const list = document.getElementById(listId);
             const row = document.createElement('div');
             row.className = 'affordance-row';
+
+            const inputClass = listId === 'affordanceList' ? 'affordance-input' : 'script-input';
+            const placeholder = listId === 'affordanceList' ? 'Category/JobName' : 'scripts/my_script.py';
+
             row.innerHTML = `
-                <input type="text" class="affordance-input" value="${value}" placeholder="e.g., continue">
-                <button onclick="this.parentElement.remove()" style="color: var(--danger);">X</button>
+                <input type="text" class="${inputClass}" value="${value}" placeholder="${placeholder}" readonly onclick="highlightRow(this)">
+                <button type="button" class="del-btn" onclick="deleteRow(this)" disabled style="color: grey;">-</button>
             `;
             list.appendChild(row);
         }
 
-        function getAffordancesList() {
-            const inputs = document.querySelectorAll('.affordance-input');
-            const affordances = [];
+        function highlightRow(inputEl) {
+            const list = inputEl.closest('.job-list');
+            list.querySelectorAll('.affordance-row').forEach(row => {
+                row.style.backgroundColor = '';
+                const btn = row.querySelector('.del-btn');
+                btn.disabled = true;
+                btn.style.color = 'grey';
+            });
+
+            inputEl.closest('.affordance-row').style.backgroundColor = 'var(--border-color)';
+            const delBtn = inputEl.parentElement.querySelector('.del-btn');
+            delBtn.disabled = false;
+            delBtn.style.color = 'var(--danger)';
+        }
+
+        function deleteRow(btnEl) {
+            if (confirm("Remove this entry?")) {
+                btnEl.parentElement.remove();
+            }
+        }
+
+        async function openAffordancePopup() {
+            let cat = prompt("Enter Target Category:");
+            if (!cat) return;
+            let job = prompt("Enter Target Job Name:");
+            if (!job) return;
+            addListRow('affordanceList', `${cat}/${job}`);
+        }
+
+        function addScriptRow() {
+            let path = prompt("Enter host script path (e.g., scripts/myscript.py):");
+            if (!path) return;
+            addListRow('scriptList', path);
+        }
+
+        function getListValues(selector) {
+            const inputs = document.querySelectorAll(selector);
+            const values = [];
             inputs.forEach(input => {
                 const val = input.value.trim();
-                if (val) affordances.push(val);
+                if (val) values.push(val);
             });
-            return affordances;
+            return values.join('|');
         }
 
         function clearForm() {
@@ -457,28 +506,42 @@
             document.getElementById('maxRetries').value = '1';
             document.getElementById('retryErrorMessage').value = '';
             document.getElementById('jobEnabled').checked = true;
-            renderAffordances([]);
+            renderList('affordanceList', []);
+            renderList('scriptList', []);
         }
 
-        async function openNewJobPopup() {
-            const cat = prompt("Enter category (existing or new):", document.getElementById('categorySelect').value);
+        async function openNewCategoryPopup() {
+            const cat = prompt("Enter new Category name:");
             if (!cat) return;
-            const jobName = prompt("Enter new job name:");
-            if (!jobName) return;
-
             try {
-                // Ensure category exists
                 await fetchAPI('/api/jobs/categories', {
                     method: 'POST',
                     body: JSON.stringify({ category: cat })
-                }).catch(e => console.log("Category might already exist"));
+                });
+                await loadCategories();
+                document.getElementById('categorySelect').value = cat;
+                await loadJobs();
+            } catch (e) {
+                alert("Category might already exist or failed: " + e.message);
+            }
+        }
 
-                // Create minimal job
+        async function openNewJobPopup() {
+            const cat = document.getElementById('categorySelect').value;
+            if (!cat) {
+                alert("Please select a Category first.");
+                return;
+            }
+            const jobName = prompt("Enter new Job Name:");
+            if (!jobName) return;
+
+            try {
                 const jobData = {
                     job_name: jobName,
                     trigger_name: 'run',
                     instruction_layer: 'Job instructions here...',
-                    affordances_json: JSON.stringify(["continue", "retry", "flag_error"]),
+                    affordances: '',
+                    scripts: '',
                     max_retries: 1,
                     retry_error_message: "",
                     enabled: true
@@ -489,8 +552,6 @@
                     body: JSON.stringify(jobData)
                 });
 
-                await loadCategories();
-                document.getElementById('categorySelect').value = cat;
                 await loadJobs();
                 document.getElementById('jobSelect').value = res.job.job_id;
                 loadSelectedJob();
@@ -533,7 +594,8 @@
             const instructionLayer = document.getElementById('instructionLayer').value.trim();
             const maxRetries = parseInt(document.getElementById('maxRetries').value) || 0;
             const retryErrorMessage = document.getElementById('retryErrorMessage').value.trim();
-            const affordances = getAffordancesList();
+            const affordancesStr = getListValues('.affordance-input');
+            const scriptsStr = getListValues('.script-input');
 
             if (!jobName || !triggerName || !instructionLayer) {
                 alert("Job Name, Trigger Name, and Instruction Layer are required.");
@@ -545,7 +607,8 @@
                 job_name: jobName,
                 trigger_name: triggerName,
                 instruction_layer: instructionLayer,
-                affordances_json: JSON.stringify(affordances),
+                affordances: affordancesStr,
+                scripts: scriptsStr,
                 max_retries: maxRetries,
                 retry_error_message: retryErrorMessage,
                 notes: document.getElementById('notes').value.trim(),
