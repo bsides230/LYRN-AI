@@ -222,3 +222,9 @@ This update marks the official transition to the Dashboard v5 architecture and a
 - **Logging updates**
   - Added clearer backend-facing error messages for Claude binary discovery failures (includes actionable env guidance).
   - Preserved terminal connection/disconnection logs and now keep reconnect continuity visible through session reuse behavior.
+
+### Version 6.3 Update (Job Loop Injection System Enhancements)
+- **Feature**: Expanded Job schema in `services/job_registry.py` and `routers/job_router.py` to include `affordances_json`, `max_retries`, and `retry_error_message`.
+- **Feature**: Added `scripts/parse_job_response.py` to handle standard JSON parsing, structural validation, and retry logic (`max_retries`) of model output.
+- **UI**: Overhauled Job Editor in `LYRN_v6/modules/JobManager.html` to use a toolbar (load, add, save, refresh, delete) and added inputs for max retries and editable affordance lists.
+- **Docs**: Updated `lyrn_docs/JOB_LOOP_INJECTION_SYSTEM.md` to reflect new schema, standard output JSON format, usage of the parser, and explicitly confirmed why there is no separate loop builder.

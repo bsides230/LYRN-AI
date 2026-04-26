@@ -10,7 +10,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services import job_registry
 
-def log_run(category: str, job_name: str, trigger_name: str, status: str, error: str = ""):
+def log_run(category: str, job_name: str, trigger_name: str, status: str, error: str = "", metadata: dict = None):
+    if metadata is None:
+        metadata = {}
     log_entry = {
         "run_id": str(uuid.uuid4()),
         "timestamp": datetime.datetime.now().isoformat(),
@@ -18,7 +20,8 @@ def log_run(category: str, job_name: str, trigger_name: str, status: str, error:
         "job_name": job_name,
         "trigger_name": trigger_name,
         "status": status,
-        "error": error
+        "error": error,
+        "metadata": metadata
     }
     with open("runtime/jobs/job_runs.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry) + "\n")
@@ -58,11 +61,19 @@ def main():
         filepath, filename = trigger_chat_generation(job["trigger_name"])
         print(f"[System] Triggered execution with file: {filepath}")
 
-        log_run(args.category, args.job_name, job["trigger_name"], "success")
+        metadata = {
+            "affordances_json": job.get("affordances_json", "[]"),
+            "max_retries": job.get("max_retries", 1)
+        }
+        log_run(args.category, args.job_name, job["trigger_name"], "success", metadata=metadata)
 
     except Exception as e:
         print(f"Error injecting job: {e}")
-        log_run(args.category, args.job_name, job.get("trigger_name", ""), "failed", str(e))
+        metadata = {
+            "affordances_json": job.get("affordances_json", "[]"),
+            "max_retries": job.get("max_retries", 1)
+        }
+        log_run(args.category, args.job_name, job.get("trigger_name", ""), "failed", str(e), metadata=metadata)
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -14,6 +14,9 @@ class JobData(BaseModel):
     job_name: str
     trigger_name: str
     instruction_layer: str
+    affordances_json: Optional[str] = None
+    max_retries: Optional[int] = 1
+    retry_error_message: Optional[str] = ""
     enabled: bool = True
     notes: Optional[str] = ""
 
@@ -52,6 +55,13 @@ async def update_job(category: str, job_id: str, job: JobData):
     job_data["job_id"] = job_id
     saved_job = job_registry.save_job(category, job_data)
     return {"success": True, "job": saved_job}
+
+@router.delete("/{category}/{job_id}", dependencies=[Depends(verify_token)])
+async def delete_job(category: str, job_id: str):
+    success = job_registry.delete_job(category, job_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"success": True}
 
 @router.post("/inject/run", dependencies=[Depends(verify_token)])
 async def inject_job(req: InjectRequest):

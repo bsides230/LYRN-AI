@@ -1,6 +1,7 @@
 import os
 import csv
 import uuid
+import json
 import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -13,6 +14,9 @@ CSV_FIELDNAMES = [
     "job_name",
     "trigger_name",
     "instruction_layer",
+    "affordances_json",
+    "max_retries",
+    "retry_error_message",
     "enabled",
     "created_at",
     "updated_at",
@@ -53,6 +57,20 @@ def get_jobs(category: str) -> List[Dict[str, Any]]:
         for row in reader:
             # Parse boolean
             row["enabled"] = row["enabled"].lower() == "true"
+
+            # Migrations / Defaults for new fields
+            if "affordances_json" not in row or not row["affordances_json"].strip():
+                row["affordances_json"] = json.dumps(["continue", "retry", "flag_error"])
+            if "max_retries" not in row or not str(row["max_retries"]).strip():
+                row["max_retries"] = 1
+            else:
+                try:
+                    row["max_retries"] = int(row["max_retries"])
+                except ValueError:
+                    row["max_retries"] = 1
+            if "retry_error_message" not in row:
+                row["retry_error_message"] = ""
+
             jobs.append(row)
     return jobs
 
@@ -93,6 +111,9 @@ def save_job(category: str, job_data: Dict[str, Any]) -> Dict[str, Any]:
         existing_job["job_name"] = job_data.get("job_name", existing_job["job_name"])
         existing_job["trigger_name"] = job_data.get("trigger_name", existing_job["trigger_name"])
         existing_job["instruction_layer"] = job_data.get("instruction_layer", existing_job["instruction_layer"])
+        existing_job["affordances_json"] = job_data.get("affordances_json", existing_job.get("affordances_json", json.dumps(["continue", "retry", "flag_error"])))
+        existing_job["max_retries"] = job_data.get("max_retries", existing_job.get("max_retries", 1))
+        existing_job["retry_error_message"] = job_data.get("retry_error_message", existing_job.get("retry_error_message", ""))
         existing_job["enabled"] = str(job_data.get("enabled", existing_job["enabled"])).lower() == "true"
         existing_job["updated_at"] = now
         existing_job["notes"] = job_data.get("notes", existing_job.get("notes", ""))
@@ -105,6 +126,9 @@ def save_job(category: str, job_data: Dict[str, Any]) -> Dict[str, Any]:
             "job_name": job_data.get("job_name", ""),
             "trigger_name": job_data.get("trigger_name", ""),
             "instruction_layer": job_data.get("instruction_layer", ""),
+            "affordances_json": job_data.get("affordances_json", json.dumps(["continue", "retry", "flag_error"])),
+            "max_retries": job_data.get("max_retries", 1),
+            "retry_error_message": job_data.get("retry_error_message", ""),
             "enabled": str(job_data.get("enabled", True)).lower() == "true",
             "created_at": now,
             "updated_at": now,
@@ -124,3 +148,25 @@ def save_job(category: str, job_data: Dict[str, Any]) -> Dict[str, Any]:
             writer.writerow(row)
 
     return saved_job
+
+def delete_job(category: str, job_id: str) -> bool:
+    path = _get_category_path(category)
+    if not path.exists():
+        return False
+
+    jobs = get_jobs(category)
+    original_count = len(jobs)
+    jobs = [j for j in jobs if j["job_id"] != job_id]
+
+    if len(jobs) == original_count:
+        return False
+
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
+        writer.writeheader()
+        for j in jobs:
+            row = dict(j)
+            row["enabled"] = "true" if j["enabled"] else "false"
+            writer.writerow(row)
+
+    return True

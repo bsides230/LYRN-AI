@@ -22,10 +22,31 @@ Jobs are categorized and stored in simple CSV files. Each category is represente
 - `job_name`: Unique name within the category.
 - `trigger_name`: A tiny minimal input string (e.g., "run") to fire the model.
 - `instruction_layer`: The multiline heavy-lifting logic and prompt instructions.
+- `affordances_json`: A JSON list of allowed affordances (e.g., `["continue", "retry", "flag_error"]`).
+- `max_retries`: Integer indicating maximum allowed parsing failures.
+- `retry_error_message`: Custom error message injected on final failure.
 - `enabled`: Boolean to quickly toggle job execution.
 - `created_at`: Creation timestamp.
 - `updated_at`: Last updated timestamp.
 - `notes`: Optional user notes.
+
+## Standard Job Output Format
+
+Every job is expected to return a JSON block conforming to this shape:
+
+```json
+{
+  "status": "success",
+  "result": {},
+  "available_affordances": ["continue"],
+  "selected_affordance": "",
+  "notes": "",
+  "errors": []
+}
+```
+
+- `status` must be `success`, `retry`, or `failed`.
+- `available_affordances` must be a subset of the job's defined `affordances_json`.
 
 ## Job Injection Flow
 
@@ -46,6 +67,20 @@ Snapshot -> Repo Context -> History -> Deltas -> [ JOB INSTRUCTIONS ] -> New Inp
 
 The system safely reads and deletes `global_flags/job_context.txt` once it is loaded into the prompt to ensure it fires exactly once per run.
 
+## Output Parsing and Validation
+
+We supply a simple "dumb" script to validate job output against the standard schema. It does not decide logic or meaning, only structural correctness.
+
+**Parser Usage:**
+```bash
+python scripts/parse_job_response.py --category "keyword" --job-name "extract_keywords" --response-file "path/to/raw_output.txt"
+```
+
+**Retry Rules:**
+If the output fails validation:
+- If `retry_count < max_retries`, the parser returns `status: retry`.
+- If `retry_count >= max_retries`, the parser returns `status: failed` with the configured `retry_error_message` and forces the affordance to `flag_error`.
+
 ## Usage
 
 **Via Script:**
@@ -54,10 +89,15 @@ python scripts/inject_job.py --category "keyword" --job-name "extract_keywords"
 ```
 
 **Via UI:**
-Use the **Job Manager** in the LYRN Dashboard to graphically create, view, edit, and run jobs.
+Use the **Job Manager** in the LYRN Dashboard to graphically create, view, edit, run, and delete jobs. The UI includes a top toolbar for quick navigation, category/job selection, loading, saving, and an editable affordance list.
+
+## Why No Loop Builder?
+
+This system explicitly avoids hardcoded chains, drag-and-drop workflow editors, or a separate loop builder.
+
+A "loop" is not a fixed sequence. Instead, it emerges dynamically: the output of one job yields a list of `available_affordances`, and future systems (or agents) use those affordances to choose the next logical job or step. Each job describes its own execution scope and what can happen next.
 
 ## Limitations
 
-- This system contains **no intelligence** or orchestration logic. It only provides a mechanism for storing jobs and injecting them into the existing runner.
+- This system contains **no intelligence** or orchestration logic. It only provides a mechanism for storing jobs, validating output, and injecting them into the existing runner.
 - Advanced features like chaining, reflection loops, or conditional logic are **not** implemented here.
-- Deletion is not implemented directly via the UI; jobs should be disabled via the `enabled` toggle or manually deleted from the CSV file.
