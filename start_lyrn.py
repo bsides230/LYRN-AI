@@ -54,9 +54,11 @@ from routers.claude_router import router as claude_router
 from routers.fs_router import router as fs_router
 from routers.snapshot_router import router as snapshot_router
 from routers.terminal_router import router as terminal_router
+from routers.job_router import router as job_router
 
 app.include_router(logs_router)
 app.include_router(chat_router)
+app.include_router(job_router)
 app.include_router(models_router)
 app.include_router(config_router)
 app.include_router(system_router)

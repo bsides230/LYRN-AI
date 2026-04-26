@@ -1,5 +1,28 @@
 # Build Notes
 
+## v6.0.5 - Basic Job Loop Injection System
+This update implements a simple, file-based execution rail for automated jobs, aligning with the existing trigger system and RWI.
+
+- **Storage & Registry Layer**
+  - Added `runtime/jobs/categories/` directory to store CSV-based job registries.
+  - Created `services/job_registry.py` for reading/writing job properties (`job_id`, `job_name`, `trigger_name`, `instruction_layer`, `enabled`).
+- **API & UI Layer**
+  - Added `routers/job_router.py` (registered in `start_lyrn.py`) for basic CRUD operations on jobs and categories.
+  - Built `LYRN_v6/modules/JobManager.html` UI (registered in `LYRN_v6/dashboard.html`) to manage job entries visually.
+- **Injection & Execution Layer**
+  - Added `scripts/inject_job.py` which extracts job logic, writes instructions to `global_flags/job_context.txt`, and generates a tiny `chat_trigger.txt` sequence.
+  - Modified `model_runner.py` to consume, inject, and delete `job_context.txt` explicitly right after the Delta prompt layer.
+  - Logging of executions writes sequentially to `runtime/jobs/job_runs.jsonl`.
+- **Documentation**
+  - Added `lyrn_docs/JOB_LOOP_INJECTION_SYSTEM.md` outlining the architecture, flow, and usage.
+
+## Security Updates
+- Protected `/api/jobs` endpoints with standard `verify_token` middleware.
+- Sanitized category names in `job_registry.py` prior to resolving local file paths to prevent directory traversal.
+
+## Logging Updates
+- `scripts/inject_job.py` strictly logs metadata (`timestamp`, `job_name`, `category`, `status`, `error`) to `runtime/jobs/job_runs.jsonl`.
+
 ## v6.0.4 - Claude-Scoped Quick Status Panel + Dashboard Cleanup
 
 This update moves the quick status surface into the Claude Code module (where it is needed during Claude operations) and removes the dashboard-level quick panel experiment.
@@ -199,3 +222,9 @@ This update marks the official transition to the Dashboard v5 architecture and a
 - **Logging updates**
   - Added clearer backend-facing error messages for Claude binary discovery failures (includes actionable env guidance).
   - Preserved terminal connection/disconnection logs and now keep reconnect continuity visible through session reuse behavior.
+
+### Version 6.3 Update (Job Loop Injection System Enhancements)
+- **Feature**: Expanded Job schema in `services/job_registry.py` and `routers/job_router.py` to include `affordances_json`, `max_retries`, and `retry_error_message`.
+- **Feature**: Added `scripts/parse_job_response.py` to handle standard JSON parsing, structural validation, and retry logic (`max_retries`) of model output.
+- **UI**: Overhauled Job Editor in `LYRN_v6/modules/JobManager.html` to use a toolbar (load, add, save, refresh, delete) and added inputs for max retries and editable affordance lists.
+- **Docs**: Updated `lyrn_docs/JOB_LOOP_INJECTION_SYSTEM.md` to reflect new schema, standard output JSON format, usage of the parser, and explicitly confirmed why there is no separate loop builder.
