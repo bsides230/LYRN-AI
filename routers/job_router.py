@@ -24,9 +24,15 @@ class JobData(BaseModel):
 class CategoryData(BaseModel):
     category: str
 
+class RenameCategoryData(BaseModel):
+    new_category: str
+
 class InjectRequest(BaseModel):
     category: str
     job_name: str
+
+class TriggerTextData(BaseModel):
+    trigger_text: str
 
 @router.get("/categories", dependencies=[Depends(verify_token)])
 async def get_categories():
@@ -39,6 +45,36 @@ async def create_category(data: CategoryData):
     if not success:
         raise HTTPException(status_code=400, detail="Category already exists or invalid.")
     return {"success": True, "category": data.category}
+
+@router.put("/categories/{category}", dependencies=[Depends(verify_token)])
+async def rename_category(category: str, data: RenameCategoryData):
+    success = job_registry.rename_category(category, data.new_category)
+    if not success:
+        raise HTTPException(status_code=400, detail="Category not found or new category already exists.")
+    return {"success": True, "category": data.new_category}
+
+@router.delete("/categories/{category}", dependencies=[Depends(verify_token)])
+async def delete_category(category: str):
+    success = job_registry.delete_category(category)
+    if not success:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"success": True}
+
+@router.get("/config/trigger", dependencies=[Depends(verify_token)])
+async def get_trigger_text():
+    trigger_file = os.path.join("runtime", "jobs", "trigger.txt")
+    if os.path.exists(trigger_file):
+        with open(trigger_file, "r", encoding="utf-8") as f:
+            return {"trigger_text": f.read().strip()}
+    return {"trigger_text": "##JOB_START##"}
+
+@router.post("/config/trigger", dependencies=[Depends(verify_token)])
+async def set_trigger_text(data: TriggerTextData):
+    os.makedirs(os.path.join("runtime", "jobs"), exist_ok=True)
+    trigger_file = os.path.join("runtime", "jobs", "trigger.txt")
+    with open(trigger_file, "w", encoding="utf-8") as f:
+        f.write(data.trigger_text)
+    return {"success": True}
 
 @router.get("/{category}", dependencies=[Depends(verify_token)])
 async def get_jobs(category: str):
