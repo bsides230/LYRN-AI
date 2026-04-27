@@ -20,9 +20,10 @@ Jobs are categorized and stored in simple CSV files. Each category is represente
 **CSV Schema:**
 - `job_id`: Stable unique identifier (UUID).
 - `job_name`: Unique name within the category.
-- `trigger_name`: A tiny minimal input string (e.g., "run") to fire the model.
+- `trigger_name`: A tiny minimal input string (e.g., "run") associated with the job (though the actual execution trigger is hardcoded as `##JOB_START##`).
 - `instruction_layer`: The multiline heavy-lifting logic and prompt instructions.
-- `affordances_json`: A JSON list of allowed affordances (e.g., `["continue", "retry", "flag_error"]`).
+- `affordances`: A pipe-separated string (`|`) of allowed next steps (e.g., `Category/JobName`).
+- `scripts`: A pipe-separated string (`|`) of Python scripts to launch concurrently.
 - `max_retries`: Integer indicating maximum allowed parsing failures.
 - `retry_error_message`: Custom error message injected on final failure.
 - `enabled`: Boolean to quickly toggle job execution.
@@ -32,30 +33,24 @@ Jobs are categorized and stored in simple CSV files. Each category is represente
 
 ## Standard Job Output Format
 
-Every job is expected to return a JSON block conforming to this shape:
+Jobs in LYRN eschew rigid JSON structures in favor of simple, text-based marker extraction. To successfully navigate to the next job in the loop, the model **must** emit an affordance marker in its text output matching this shape:
 
-```json
-{
-  "status": "success",
-  "result": {},
-  "available_affordances": ["continue"],
-  "selected_affordance": "",
-  "notes": "",
-  "errors": []
-}
+```text
+##AF: Category/JobName ##
 ```
 
-- `status` must be `success`, `retry`, or `failed`.
-- `available_affordances` must be a subset of the job's defined `affordances_json`.
+- The system extracts this block using a Regex `r"##AF:\s*(.*?)\s*##"`.
+- The parsed `Category/JobName` string must be present in the job's allowed `affordances` list.
 
 ## Job Injection Flow
 
 1. The external script or API selects a job by its `category` and `job_name`.
 2. The system loads the corresponding CSV and finds the matching job (ensuring it is `enabled`).
-3. The `instruction_layer` is extracted and written to `global_flags/job_context.txt`.
-4. A standard chat file is created using the existing LYRN mechanism containing only the minimal `trigger_name` as the user input.
-5. The `chat_trigger.txt` file is written to kick off the existing LYRN `model_runner`.
-6. The job execution is logged to `runtime/jobs/job_runs.jsonl`.
+3. The `instruction_layer` and `affordances` are formatted with markers and written to `global_flags/job_context.txt`.
+4. The system executes any associated `scripts` in the background and waits for them to signal completion.
+5. A standard chat file is created using the existing LYRN mechanism containing the universal trigger `##JOB_START##` as the user input. This gives the snapshot a reliable target to begin execution.
+6. The `chat_trigger.txt` file is written to kick off the existing LYRN `model_runner`.
+7. The job execution is logged to `runtime/jobs/job_runs.jsonl`.
 
 ## Model Runner Injection Point
 
