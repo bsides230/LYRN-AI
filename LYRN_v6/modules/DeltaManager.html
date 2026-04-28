@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta Manager</title>
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --brand-purple: #7c5cff;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #222222;
+            --bg-input: #050505;
+            --error-color: #ff4444;
+            --success: #00cc66;
+
+            --bg-color: var(--bg-core);
+            --surface: var(--bg-panel);
+            --text-primary: var(--text-body);
+            --accent: var(--brand-purple);
+            --danger: var(--error-color);
+            --font-main: 'Inter', system-ui, sans-serif;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --brand-purple: #6a4ce0;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --bg-input: #ffffff;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            box-sizing: border-box;
+            gap: 20px;
+            transition: background-color 0.5s ease;
+        }
+
+        /* Layout */
+        .sidebar {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 300px;
+            max-width: 400px;
+        }
+
+        .main-content {
+            flex: 2;
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-head);
+            font-weight: 500;
+        }
+
+        /* List Styles */
+        .list-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background: var(--bg-input);
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .list-item:hover, .list-item.selected {
+            border-color: var(--accent);
+        }
+
+        .item-checkbox {
+            margin-right: 12px;
+        }
+
+        .item-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-name {
+            color: var(--text-head);
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .item-time {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .item-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 1.1rem;
+        }
+
+        .icon-btn:hover {
+            color: var(--text-head);
+        }
+
+        .icon-btn.delete:hover {
+            color: var(--danger);
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--surface);
+            color: var(--text-head);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--border-color);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: #6a4ce0;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--border-color);
+            transition: .4s;
+            border-radius: 20px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--success);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Flex helpers */
+        .d-flex { display: flex; }
+        .gap-2 { gap: 10px; }
+        .justify-between { justify-content: space-between; }
+        .align-center { align-items: center; }
+        .mt-4 { margin-top: 20px; }
+
+        #error-msg {
+            color: var(--danger);
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        #success-msg {
+            color: var(--success);
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar: Delta Manifest -->
+    <div class="sidebar">
+        <div class="header">
+            <h2>Delta Manifest</h2>
+            <div class="d-flex gap-2 align-center">
+                <input type="checkbox" id="chk-select-all" title="Select All">
+                <button class="btn" onclick="createNewDelta()">+ New</button>
+            </div>
+        </div>
+        <div class="list-container" id="delta-list">
+            <!-- Items injected here -->
+        </div>
+    </div>
+
+    <!-- Main Content: Delta Details -->
+    <div class="main-content">
+        <div class="header" style="padding: 0 0 15px 0; border-bottom: none;">
+            <h2 id="form-title">Delta</h2>
+        </div>
+
+        <div id="error-msg"></div>
+        <div id="success-msg"></div>
+
+        <input type="hidden" id="inp-delta-id">
+
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="inp-name" class="form-control" placeholder="Delta Name">
+        </div>
+
+        <div class="form-group">
+            <label>Script Sequence</label>
+            <textarea id="inp-script" class="form-control" placeholder="Script sequence to execute"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Trigger Level</label>
+            <select id="inp-trigger" class="form-control">
+                <option value="Passive">Passive</option>
+                <option value="Active">Active</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Update Time</label>
+            <input type="text" id="inp-update-time" class="form-control" placeholder="e.g. 5m, 1h, etc">
+        </div>
+
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea id="inp-notes" class="form-control" placeholder="Any additional notes" style="min-height: 60px;"></textarea>
+        </div>
+
+        <div class="d-flex justify-between mt-4">
+            <label class="d-flex align-center gap-2" style="color: var(--text-head); cursor:pointer;">
+                <span style="font-size: 0.9rem;">Enabled</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="inp-enabled" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </label>
+            <button class="btn btn-primary" onclick="saveDelta()">Save Delta</button>
+        </div>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8080';
+        let token = localStorage.getItem('lyrn_admin_token') || '';
+        let currentDeltas = [];
+
+        // Apply theme on load
+        function applyTheme() {
+            const theme = localStorage.getItem('lyrn_theme') || 'dark';
+            document.body.setAttribute('data-theme', theme);
+        }
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'THEME_UPDATE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+            } else if (e.data.type === 'TOKEN_UPDATE') {
+                token = e.data.token;
+                fetchDeltas();
+            }
+        });
+
+        async function fetchDeltas() {
+            try {
+                const res = await fetch(`${coreUrl}/api/deltas`, {
+                    headers: { 'X-Token': token }
+                });
+                if (!res.ok) throw new Error("Failed to fetch");
+                const data = await res.json();
+                currentDeltas = data.deltas;
+                renderList();
+            } catch (e) {
+                showError("Failed to load deltas: " + e.message);
+            }
+        }
+
+        function renderList() {
+            const list = document.getElementById('delta-list');
+            list.innerHTML = '';
+
+            const selectedId = document.getElementById('inp-delta-id').value;
+
+            currentDeltas.forEach(delta => {
+                const el = document.createElement('div');
+                el.className = `list-item ${delta.delta_id === selectedId ? 'selected' : ''}`;
+
+                el.innerHTML = `
+                    <input type="checkbox" class="item-checkbox" value="${delta.delta_id}">
+                    <div class="item-content" onclick="loadDelta('${delta.delta_id}')">
+                        <div class="item-name">${escapeHtml(delta.name || 'Unnamed')}</div>
+                        <div class="item-time">Update: ${escapeHtml(delta.update_time || 'N/A')}</div>
+                    </div>
+                    <div class="item-actions">
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${delta.enabled ? 'checked' : ''} onchange="toggleEnabled('${delta.delta_id}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <button class="icon-btn delete" onclick="deleteDelta('${delta.delta_id}')" title="Delete">🗑️</button>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        function loadDelta(id) {
+            const delta = currentDeltas.find(d => d.delta_id === id);
+            if(!delta) return;
+
+            document.getElementById('inp-delta-id').value = delta.delta_id;
+            document.getElementById('inp-name').value = delta.name || '';
+            document.getElementById('inp-script').value = delta.script_sequence || '';
+            document.getElementById('inp-trigger').value = delta.trigger_level || 'Passive';
+            document.getElementById('inp-update-time').value = delta.update_time || '';
+            document.getElementById('inp-notes').value = delta.notes || '';
+            document.getElementById('inp-enabled').checked = delta.enabled !== false;
+
+            document.getElementById('form-title').innerText = "Edit Delta";
+            clearMessages();
+            renderList(); // Update selected styling
+        }
+
+        function createNewDelta() {
+            document.getElementById('inp-delta-id').value = '';
+            document.getElementById('inp-name').value = '';
+            document.getElementById('inp-script').value = '';
+            document.getElementById('inp-trigger').value = 'Passive';
+            document.getElementById('inp-update-time').value = '';
+            document.getElementById('inp-notes').value = '';
+            document.getElementById('inp-enabled').checked = true;
+
+            document.getElementById('form-title').innerText = "New Delta";
+            clearMessages();
+            renderList(); // Clear selection
+        }
+
+        async function saveDelta() {
+            clearMessages();
+            const id = document.getElementById('inp-delta-id').value;
+
+            const payload = {
+                name: document.getElementById('inp-name').value.trim(),
+                script_sequence: document.getElementById('inp-script').value,
+                trigger_level: document.getElementById('inp-trigger').value,
+                update_time: document.getElementById('inp-update-time').value.trim(),
+                notes: document.getElementById('inp-notes').value,
+                enabled: document.getElementById('inp-enabled').checked
+            };
+
+            if(!payload.name) {
+                showError("Name is required");
+                return;
+            }
+
+            try {
+                let url = `${coreUrl}/api/deltas`;
+                let method = 'POST';
+                if(id) {
+                    url += `/${id}`;
+                    method = 'PUT';
+                }
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'X-Token': token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if(!res.ok) throw new Error(await res.text());
+
+                showSuccess("Saved successfully");
+
+                const data = await res.json();
+                if(!id && data.delta && data.delta.delta_id) {
+                    document.getElementById('inp-delta-id').value = data.delta.delta_id;
+                    document.getElementById('form-title').innerText = "Edit Delta";
+                }
+
+                fetchDeltas();
+            } catch(e) {
+                showError("Save failed: " + e.message);
+            }
+        }
+
+        async function deleteDelta(id) {
+            if(!confirm("Delete this delta?")) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/deltas/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Token': token }
+                });
+                if(!res.ok) throw new Error("Failed to delete");
+
+                if(document.getElementById('inp-delta-id').value === id) {
+                    createNewDelta();
+                }
+                fetchDeltas();
+            } catch(e) {
+                showError("Delete failed: " + e.message);
+            }
+        }
+
+        async function toggleEnabled(id, isEnabled) {
+            const delta = currentDeltas.find(d => d.delta_id === id);
+            if(!delta) return;
+
+            // Optimistic update
+            delta.enabled = isEnabled;
+            if(document.getElementById('inp-delta-id').value === id) {
+                document.getElementById('inp-enabled').checked = isEnabled;
+            }
+
+            try {
+                const res = await fetch(`${coreUrl}/api/deltas/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'X-Token': token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: delta.name,
+                        script_sequence: delta.script_sequence,
+                        trigger_level: delta.trigger_level,
+                        update_time: delta.update_time,
+                        notes: delta.notes,
+                        enabled: isEnabled
+                    })
+                });
+                if(!res.ok) throw new Error("Failed to toggle");
+                fetchDeltas();
+            } catch(e) {
+                showError("Toggle failed: " + e.message);
+                fetchDeltas(); // Revert
+            }
+        }
+
+        document.getElementById('chk-select-all').addEventListener('change', (e) => {
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            checkboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+
+        function showError(msg) { document.getElementById('error-msg').innerText = msg; }
+        function showSuccess(msg) { document.getElementById('success-msg').innerText = msg; }
+        function clearMessages() {
+            document.getElementById('error-msg').innerText = '';
+            document.getElementById('success-msg').innerText = '';
+        }
+        function escapeHtml(unsafe) {
+            return (unsafe || '').toString()
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        applyTheme();
+        fetchDeltas();
+    </script>
+</body>
+</html>

@@ -21,7 +21,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from llama_cpp import Llama
 from settings_manager import SettingsManager
 from snapshot_loader import SnapshotLoader
-from delta_manager import DeltaManager
 from chat_manager import ChatManager
 
 # Global flag for clean shutdown
@@ -115,7 +114,6 @@ def main():
     settings = settings_manager.settings
 
     snapshot_loader = SnapshotLoader(settings_manager)
-    delta_manager = DeltaManager()
 
     role_mappings = {
         "assistant": "final_output",
@@ -195,7 +193,7 @@ def main():
                 except OSError: pass
 
                 if chat_file_path_str:
-                    process_request(llm, chat_file_path_str, snapshot_loader, delta_manager, chat_manager, settings_manager)
+                    process_request(llm, chat_file_path_str, snapshot_loader, chat_manager, settings_manager)
 
             except Exception as e:
                 print(f"Error processing trigger: {e}")
@@ -206,7 +204,7 @@ def main():
     print("Runner stopped.")
     set_llm_status("stopped")
 
-def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager, chat_manager, settings_manager):
+def process_request(llm, chat_file_path_str: str, snapshot_loader, chat_manager, settings_manager):
     with model_lock:
         set_llm_status("busy")
 
@@ -245,11 +243,6 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             # Master Prompt
             system_prompt = snapshot_loader.load_base_prompt()
 
-            # Deltas
-            delta_content = ""
-            if settings_manager.get_setting("enable_deltas", True):
-                delta_content = delta_manager.get_delta_content()
-
             # Construct Messages
             # Order: Snapshot -> Repo Context -> History -> Deltas -> New Input
             messages = [{"role": "system", "content": system_prompt}]
@@ -268,10 +261,6 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, delta_manager
             # IMPORTANT: Exclude the current chat file so we don't duplicate it or treat it as history yet
             history = chat_manager.get_chat_history_messages(exclude_paths=[str(chat_file_path.resolve())])
             messages.extend(history)
-
-            # Deltas (Injected after history, before new input)
-            if delta_content:
-                messages.append({"role": "system", "content": delta_content})
 
             # Job Loop Injection System (Injected after deltas)
             job_context_path = Path("global_flags/job_context.txt")

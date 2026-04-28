@@ -52,3 +52,12 @@ class SnapshotSaveModel(BaseModel):
 
 class SnapshotLoadModel(BaseModel):
     filename: str
+
+class DeltaDataModel(BaseModel):
+    delta_id: Optional[str] = None
+    name: str
+    script_sequence: Optional[str] = ""
+    trigger_level: Optional[str] = "Passive"
+    update_time: Optional[str] = ""
+    notes: Optional[str] = ""
+    enabled: bool = True
