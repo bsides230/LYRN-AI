@@ -6,14 +6,34 @@
     <title>Job Manager</title>
     <style>
         :root {
-            --bg-color: #1e1e2e;
-            --surface: #2a2a3c;
-            --text-primary: #cdd6f4;
-            --border-color: #45475a;
-            --accent: #89b4fa;
-            --success: #a6e3a1;
-            --danger: #f38ba8;
-            --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --brand-purple: #7c5cff;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #222222;
+            --bg-input: #050505;
+            --error-color: #ff4444;
+            --success: #00cc66;
+
+            --bg-color: var(--bg-core);
+            --surface: var(--bg-panel);
+            --text-primary: var(--text-body);
+            --accent: var(--brand-purple);
+            --danger: var(--error-color);
+            --font-main: 'Inter', system-ui, sans-serif;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --brand-purple: #6a4ce0;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --bg-input: #ffffff;
         }
 
         body {
@@ -27,6 +47,7 @@
             height: 100vh;
             box-sizing: border-box;
             gap: 20px;
+            transition: background-color 0.5s ease;
         }
 
         h2, h3 {
@@ -167,6 +188,106 @@
 <body>
 
     <style>
+        /* Modals and Overlays */
+        .db-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color);
+            display: none;
+            flex-direction: column;
+            z-index: 500;
+            overflow: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .db-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .db-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .db-card {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .db-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .db-card-title {
+            font-weight: bold;
+            flex: 1;
+            text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .db-card-input {
+            width: 100%;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            border: 1px solid var(--accent);
+            padding: 5px;
+            border-radius: 4px;
+            display: none;
+            flex: 1;
+        }
+
+        .db-card.editing .db-card-title { display: none; }
+        .db-card.editing .db-card-input { display: block; }
+
+        .db-action-btn {
+            background: none;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            display: none;
+            padding: 5px;
+            margin-left: 10px;
+        }
+
+        .db-card.editing .db-action-btn { display: block; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            width: 400px;
+            max-width: 90%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
         /* Toolbar styles added dynamically */
         .toolbar {
             display: flex;
@@ -199,6 +320,7 @@
 
     <div class="toolbar">
         <div class="toolbar-left">
+            <button onclick="openDatabaseOverlay()" class="primary-btn" style="margin-right: 10px;">Database</button>
             <select id="categorySelect" onchange="loadJobs()">
                 <option value="">-- Category --</option>
             </select>
@@ -210,6 +332,8 @@
             <button onclick="deleteJob()" style="background-color: var(--danger); color: var(--bg-color); border: none;">Trash</button>
         </div>
         <div class="toolbar-right">
+            <button onclick="openSettingsPopup()">Settings</button>
+            <button onclick="testTrigger()">Test</button>
             <button onclick="refreshJob()">Refresh</button>
             <button class="primary-btn" onclick="saveJob()">Save</button>
         </div>
@@ -273,7 +397,38 @@
         </div>
     </div>
 
-    <!-- Modals injected via JS or simple prompts -->
+    <!-- Database Overlay -->
+    <div id="dbOverlay" class="db-overlay">
+        <div class="db-header">
+            <h2 id="dbTitle">Job Database</h2>
+            <div>
+                <button id="dbEditBtn" onclick="toggleDbEditMode()" style="margin-right: 10px;">Edit</button>
+                <button onclick="closeDatabaseOverlay()">Close</button>
+            </div>
+        </div>
+        <div id="dbBreadcrumbs" style="margin-bottom: 20px; color: var(--accent); cursor: pointer;">
+            <span onclick="renderDbCategories()">Categories</span>
+        </div>
+        <div id="dbContent" class="db-grid">
+            <!-- Populated dynamically -->
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Job Settings</h3>
+            <div class="form-group">
+                <label>Global Job Trigger Text</label>
+                <input type="text" id="settingTriggerText" placeholder="e.g. ##JOB_START##">
+                <small style="color: var(--text-dim); margin-top: 5px;">This text is written to trigger.txt and read by scripts to trigger job execution.</small>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button onclick="closeSettingsPopup()">Cancel</button>
+                <button class="primary-btn" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Use local token logic
@@ -287,6 +442,11 @@
 
         let currentJobs = [];
         let editingJobId = null;
+
+        let dbMode = false; // Is DB overlay open?
+        let dbEditMode = false; // Is DB in edit mode?
+        let dbCurrentView = 'categories'; // 'categories' or 'jobs'
+        let dbCurrentCategory = null;
 
         async function fetchAPI(endpoint, options = {}) {
             const url = `${API_BASE}${endpoint}`;
@@ -632,6 +792,14 @@
                 alert("Job saved successfully.");
                 await loadJobs(); // refresh list
                 document.getElementById('jobSelect').value = editingJobId;
+
+                if (dbMode && dbEditMode) {
+                    // Return to DB list if we were editing inside DB
+                    openDatabaseOverlay();
+                    if (dbCurrentCategory) {
+                        renderDbJobs(dbCurrentCategory);
+                    }
+                }
             } catch (e) {
                 console.error("Failed to save job:", e);
                 alert("Failed to save job: " + e.message);
@@ -653,6 +821,236 @@
             } catch (e) {
                 console.error("Failed to run job:", e);
                 alert("Failed to inject job: " + e.message);
+            }
+        }
+
+        // Theme and message handling
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+            } else if (e.data.type === 'FONT_CHANGE') {
+                document.body.style.fontSize = e.data.fontSize + 'px';
+            } else if (e.data.type === 'CORE_URL_CHANGE') {
+                // Adjust API base if needed, not heavily relying on this yet in JM
+            }
+        });
+
+        async function openSettingsPopup() {
+            try {
+                const triggerRes = await fetchAPI('/api/jobs/config/trigger');
+                document.getElementById('settingTriggerText').value = triggerRes.trigger_text;
+                document.getElementById('settingsModal').style.display = 'flex';
+            } catch (e) {
+                alert("Failed to load settings: " + e.message);
+            }
+        }
+
+        function closeSettingsPopup() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        async function saveSettings() {
+            const triggerText = document.getElementById('settingTriggerText').value.trim();
+            if (!triggerText) {
+                alert("Trigger text cannot be empty.");
+                return;
+            }
+
+            try {
+                await fetchAPI('/api/jobs/config/trigger', {
+                    method: 'POST',
+                    body: JSON.stringify({ trigger_text: triggerText })
+                });
+                closeSettingsPopup();
+            } catch (e) {
+                alert("Failed to save settings: " + e.message);
+            }
+        }
+
+        async function testTrigger() {
+            try {
+                // Fetch the trigger text
+                const triggerRes = await fetchAPI('/api/jobs/config/trigger');
+                const triggerText = triggerRes.trigger_text;
+
+                // Send it to chat endpoint
+                const res = await fetchAPI('/api/chat', {
+                    method: 'POST',
+                    body: JSON.stringify({ message: triggerText })
+                });
+
+                // Read the first stream event to confirm it started
+                alert(`Test triggered successfully with text: ${triggerText}`);
+            } catch (e) {
+                console.error("Test trigger failed:", e);
+                alert("Failed to send test trigger: " + e.message);
+            }
+        }
+
+        /* --- Database Overlay Functions --- */
+
+        async function openDatabaseOverlay() {
+            dbMode = true;
+            document.getElementById('dbOverlay').style.display = 'flex';
+            if (dbCurrentView === 'categories') {
+                await renderDbCategories();
+            } else if (dbCurrentCategory) {
+                await renderDbJobs(dbCurrentCategory);
+            }
+        }
+
+        function closeDatabaseOverlay() {
+            dbMode = false;
+            dbEditMode = false;
+            updateDbEditButton();
+            document.getElementById('dbOverlay').style.display = 'none';
+        }
+
+        function toggleDbEditMode() {
+            dbEditMode = !dbEditMode;
+            updateDbEditButton();
+
+            // Toggle classes on cards
+            const cards = document.querySelectorAll('.db-card');
+            cards.forEach(card => {
+                if (dbEditMode) {
+                    card.classList.add('editing');
+                } else {
+                    card.classList.remove('editing');
+                }
+            });
+        }
+
+        function updateDbEditButton() {
+            const btn = document.getElementById('dbEditBtn');
+            btn.textContent = dbEditMode ? 'Done' : 'Edit';
+            btn.className = dbEditMode ? 'primary-btn' : '';
+        }
+
+        async function renderDbCategories() {
+            dbCurrentView = 'categories';
+            dbCurrentCategory = null;
+            document.getElementById('dbBreadcrumbs').innerHTML = `<span>Categories</span>`;
+
+            try {
+                const data = await fetchAPI('/api/jobs/categories');
+                const container = document.getElementById('dbContent');
+                container.innerHTML = '';
+
+                data.categories.forEach(cat => {
+                    const card = document.createElement('div');
+                    card.className = 'db-card';
+                    if (dbEditMode) card.classList.add('editing');
+
+                    card.innerHTML = `
+                        <span class="db-card-title">${cat}</span>
+                        <input type="text" class="db-card-input" value="${cat}" onclick="event.stopPropagation()">
+                        <button class="db-action-btn" onclick="event.stopPropagation(); renameDbCategory('${cat}', this.previousElementSibling.value)">💾</button>
+                        <button class="db-action-btn" onclick="event.stopPropagation(); deleteDbCategory('${cat}')">🗑</button>
+                    `;
+
+                    card.onclick = () => {
+                        if (!dbEditMode) renderDbJobs(cat);
+                    };
+
+                    container.appendChild(card);
+                });
+            } catch (e) {
+                alert("Failed to load categories for DB: " + e.message);
+            }
+        }
+
+        async function renameDbCategory(oldName, newName) {
+            if (!newName || newName === oldName) return;
+            try {
+                await fetchAPI(`/api/jobs/categories/${oldName}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ new_category: newName })
+                });
+                await loadCategories(); // Update main dropdowns
+                await renderDbCategories();
+            } catch (e) {
+                alert("Failed to rename category: " + e.message);
+            }
+        }
+
+        async function deleteDbCategory(cat) {
+            if (!confirm("Are you sure you want to delete this category and all its jobs?")) return;
+            try {
+                await fetchAPI(`/api/jobs/categories/${cat}`, {
+                    method: 'DELETE'
+                });
+                await loadCategories(); // Update main dropdowns
+                await renderDbCategories();
+            } catch (e) {
+                alert("Failed to delete category: " + e.message);
+            }
+        }
+
+        async function renderDbJobs(category) {
+            dbCurrentView = 'jobs';
+            dbCurrentCategory = category;
+            document.getElementById('dbBreadcrumbs').innerHTML = `
+                <span onclick="renderDbCategories()">Categories</span> > <span>${category}</span>
+            `;
+
+            try {
+                const data = await fetchAPI(`/api/jobs/${category}`);
+                const container = document.getElementById('dbContent');
+                container.innerHTML = '';
+
+                data.jobs.forEach(job => {
+                    const card = document.createElement('div');
+                    card.className = 'db-card';
+                    if (dbEditMode) card.classList.add('editing');
+
+                    card.innerHTML = `
+                        <span class="db-card-title">${job.job_name}</span>
+                        <button class="db-action-btn" onclick="event.stopPropagation(); editJobInDb('${job.job_id}')" style="color: var(--accent);">&#9998;</button>
+                        <button class="db-action-btn" onclick="event.stopPropagation(); deleteDbJob('${job.job_id}')">🗑</button>
+                    `;
+
+                    card.onclick = () => {
+                        if (!dbEditMode) {
+                            // Load it in the main view and close overlay
+                            document.getElementById('categorySelect').value = category;
+                            loadJobs().then(() => {
+                                document.getElementById('jobSelect').value = job.job_id;
+                                loadSelectedJob();
+                                closeDatabaseOverlay();
+                            });
+                        }
+                    };
+
+                    container.appendChild(card);
+                });
+            } catch (e) {
+                alert("Failed to load jobs for DB: " + e.message);
+            }
+        }
+
+        async function editJobInDb(jobId) {
+            // Load job into main editor
+            document.getElementById('categorySelect').value = dbCurrentCategory;
+            await loadJobs();
+            document.getElementById('jobSelect').value = jobId;
+            loadSelectedJob();
+
+            // Close overlay temporarily to edit
+            document.getElementById('dbOverlay').style.display = 'none';
+            // Note: DB mode is still 'true', so saving will reopen it.
+        }
+
+        async function deleteDbJob(jobId) {
+            if (!confirm("Are you sure you want to delete this job?")) return;
+            try {
+                await fetchAPI(`/api/jobs/${dbCurrentCategory}/${jobId}`, {
+                    method: 'DELETE'
+                });
+                await renderDbJobs(dbCurrentCategory);
+                await loadJobs(); // Refresh main view
+            } catch (e) {
+                alert("Failed to delete job: " + e.message);
             }
         }
 

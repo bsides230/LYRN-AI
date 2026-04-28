@@ -42,9 +42,31 @@ def create_category(category: str) -> bool:
     if path.exists():
         return False
 
+    # Ensure the parent directory exists
+    path.parent.mkdir(parents=True, exist_ok=True)
+
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
         writer.writeheader()
+    return True
+
+def rename_category(old_category: str, new_category: str) -> bool:
+    old_path = _get_category_path(old_category)
+    new_path = _get_category_path(new_category)
+
+    if not old_path.exists():
+        return False
+    if new_path.exists():
+        return False
+
+    old_path.rename(new_path)
+    return True
+
+def delete_category(category: str) -> bool:
+    path = _get_category_path(category)
+    if not path.exists():
+        return False
+    path.unlink()
     return True
 
 def get_jobs(category: str) -> List[Dict[str, Any]]:

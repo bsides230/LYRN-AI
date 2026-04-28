@@ -71,6 +71,15 @@ def main():
         scripts_raw = job.get("scripts", "").strip()
         scripts_list = [s.strip() for s in scripts_raw.split("|") if s.strip()]
 
+        def get_trigger_text():
+            trigger_file = os.path.join("runtime", "jobs", "trigger.txt")
+            if os.path.exists(trigger_file):
+                with open(trigger_file, "r", encoding="utf-8") as f:
+                    return f.read().strip() or "##JOB_START##"
+            return "##JOB_START##"
+
+        trigger_text = get_trigger_text()
+
         if not scripts_list:
             # No scripts to run, directly flip ready flag and trigger job
             print("[System] No scripts to run, flipping ready flag and triggering job.")
@@ -79,7 +88,7 @@ def main():
 
             # Since there are no scripts, we trigger it immediately here
             from utils.helpers import trigger_chat_generation
-            filepath, filename = trigger_chat_generation("##JOB_START##")
+            filepath, filename = trigger_chat_generation(trigger_text)
             print(f"[System] Triggered execution with file: {filepath}")
         else:
             print(f"[System] Starting {len(scripts_list)} scripts...")
@@ -101,7 +110,7 @@ def main():
                 with open(ready_flag, "w") as f:
                     f.write("1")
                 from utils.helpers import trigger_chat_generation
-                filepath, filename = trigger_chat_generation("##JOB_START##")
+                filepath, filename = trigger_chat_generation(trigger_text)
                 print(f"[System] Triggered execution with file: {filepath}")
             else:
                 # Start job_flag_helper in the background

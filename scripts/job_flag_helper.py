@@ -59,10 +59,17 @@ def main():
     with open(ready_flag, "w", encoding="utf-8") as f:
         f.write("1")
 
+    # Get the trigger text
+    trigger_text = "##JOB_START##"
+    trigger_file = os.path.join("runtime", "jobs", "trigger.txt")
+    if os.path.exists(trigger_file):
+        with open(trigger_file, "r", encoding="utf-8") as f:
+            trigger_text = f.read().strip() or "##JOB_START##"
+
     # The user said the trigger sender should just inject a chat_trigger.txt like the system expects.
-    # So we call trigger_chat_generation("##JOB_START##") here when everything is ready.
+    # So we call trigger_chat_generation here when everything is ready.
     print("[Helper] Scripts finished, triggering job start.")
-    filepath, filename = trigger_chat_generation("##JOB_START##")
+    filepath, filename = trigger_chat_generation(trigger_text)
     print(f"[Helper] Triggered execution with file: {filepath}")
 
     print(f"[Helper] Done. Exiting.")
