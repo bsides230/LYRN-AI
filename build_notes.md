@@ -228,3 +228,11 @@ This update marks the official transition to the Dashboard v5 architecture and a
 - **Feature**: Added `scripts/parse_job_response.py` to handle standard JSON parsing, structural validation, and retry logic (`max_retries`) of model output.
 - **UI**: Overhauled Job Editor in `LYRN_v6/modules/JobManager.html` to use a toolbar (load, add, save, refresh, delete) and added inputs for max retries and editable affordance lists.
 - **Docs**: Updated `lyrn_docs/JOB_LOOP_INJECTION_SYSTEM.md` to reflect new schema, standard output JSON format, usage of the parser, and explicitly confirmed why there is no separate loop builder.
+
+### Verbatim Memory Module Integration
+- Built "Verbatim Memory Module" prioritizing deterministic, inspectable file-based (CSV/JSON) storage over DB layers.
+- Created `services/verbatim_memory.py` core logic restricting block files to max 50 pairs and dynamically updating `convo_meta.json`.
+- Implemented core REST API in `routers/verbatim_router.py` covering creation, updating strings (including new `Summary` functionality), listing (views), and granular/bulk deletion operations matching requested schema constraints.
+- Integrated `verbatim_router` into `start_lyrn.py`.
+- Enforced required `ID, Timestamp_Start, Timestamp_End, Input, Output, Summary` formatting and UTC dates as per Parser Contract.
+- Installed/Resolved implicit missing fastAPI/AIO dependencies ensuring clean boot.

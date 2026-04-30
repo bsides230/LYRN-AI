@@ -56,6 +56,7 @@ from routers.snapshot_router import router as snapshot_router
 from routers.terminal_router import router as terminal_router
 from routers.job_router import router as job_router
 from routers.delta_router import router as delta_router
+from routers.verbatim_router import router as verbatim_router
 
 app.include_router(logs_router)
 app.include_router(chat_router)
@@ -68,6 +69,7 @@ app.include_router(fs_router)
 app.include_router(snapshot_router)
 app.include_router(terminal_router)
 app.include_router(delta_router)
+app.include_router(verbatim_router)
 
 # Serve dashboard at root
 
