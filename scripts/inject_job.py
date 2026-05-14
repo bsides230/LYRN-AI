@@ -30,6 +30,7 @@ def main():
     parser = argparse.ArgumentParser(description="Inject a job into the LYRN model runner.")
     parser.add_argument("--category", required=True, help="Job category")
     parser.add_argument("--job-name", required=True, help="Job name")
+    parser.add_argument("--retry-count", type=int, default=0, help="Current retry count")
 
     args = parser.parse_args()
 
@@ -46,6 +47,26 @@ def main():
         sys.exit(1)
 
     try:
+        # Pre-compile delta manifest before injection
+        compiler_script = os.path.join(os.path.dirname(__file__), "..", "watchers", "compile_deltas.py")
+        if os.path.exists(compiler_script):
+            try:
+                import subprocess
+                subprocess.run([sys.executable, compiler_script], check=True)
+                print("[System] Compiled delta manifest successfully.")
+            except Exception as e:
+                print(f"[System] Warning: Failed to compile delta manifest: {e}")
+
+        # Start the generic job output watcher in the background
+        watcher_script = os.path.join(os.path.dirname(__file__), "..", "watchers", "job_output_watcher.py")
+        if os.path.exists(watcher_script):
+            job_trigger_name = f"{args.category}/{args.job_name}"
+            retry_count = str(args.retry_count) if hasattr(args, "retry_count") and args.retry_count else "0"
+            print(f"[System] Starting job output watcher for '{job_trigger_name}' with retry_count={retry_count}...")
+            # Run in background without blocking
+            import subprocess
+            subprocess.Popen([sys.executable, watcher_script, "--job", job_trigger_name, "--retry-count", retry_count])
+
         # 1. Write instruction and affordance layers
         os.makedirs("global_flags", exist_ok=True)
         job_context = f"##JI:START##\n{job['instruction_layer']}\n##JI:END##\n"
