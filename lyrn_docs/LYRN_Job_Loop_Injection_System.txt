@@ -1,0 +1,301 @@
+LYRN Job Loop Injection System
+A Deterministic, Affordance-Driven Execution Architecture for Stateful Cognitive Systems
+
+Abstract
+
+This paper presents the Job Loop Injection System used within LYRN, a deterministic execution framework that enables sequential, affordance-driven interaction without reliance on orchestration engines, hidden state, or complex runtime abstractions.
+
+The system replaces traditional workflow graphs and agent orchestration with a minimal, file-based execution protocol using plain text triggers, structured prompt injection blocks, and explicit job definitions stored in CSV files. Each job represents a single atomic action, and all system behavior emerges from sequential job execution driven by affordance selection.
+
+This approach enables fully inspectable, modular, and extensible cognition loops while maintaining strict control over execution flow and system state.
+
+1. System Overview
+
+The Job Loop Injection System defines a universal execution rail for all actions within LYRN.
+
+Every operation—whether cognitive (e.g., keyword extraction), physical (e.g., interacting with an object), or reflective (e.g., updating memory)—is expressed as a job.
+
+The system operates as a sequential loop:
+
+inject job
+→ gather context (scripts)
+→ signal readiness (flags)
+→ execute model
+→ parse output
+→ select next job (affordance)
+→ repeat
+
+No job runs in parallel. No branching graphs exist. Execution is strictly linear and state is externally managed through files.
+
+2. Core Design Principles
+
+2.1 Deterministic Execution
+All behavior is driven by explicit triggers and file-based signals. No hidden logic or in-memory orchestration exists.
+
+2.2 Plain Text Architecture
+All system definitions are human-readable and stored in CSV or text files. No JSON is used within prompt construction.
+
+2.3 Stateless Job Execution
+Each job replaces the previous prompt injection blocks, ensuring no accumulation of context or drift.
+
+2.4 Sequential Affordance Flow
+The system executes one job at a time. The next job is determined by an affordance selected by the model.
+
+2.5 Separation of Concerns
+Each subsystem has a single responsibility:
+- Jobs define actions
+- Scripts generate reality/context
+- Flags synchronize execution
+- Parser routes control flow
+- Model performs reasoning
+
+3. Job Definition System
+
+3.1 Storage Structure
+
+Jobs are stored in category-specific CSV files:
+
+runtime/jobs/categories/{category}.csv
+
+Each CSV represents a logical grouping of jobs.
+
+3.2 Job Schema
+
+Each job is defined by the following columns:
+
+Name
+Trigger
+Instructions
+Affordances
+Scripts
+Retry Logic
+
+Field Descriptions
+
+Name  
+Unique job identifier within the category.
+
+Trigger  
+The affordance trigger format:
+##AF: category/job_name##
+
+Instructions  
+Plain text instruction layer injected into the model.
+
+Affordances  
+Pipe-separated list of available next actions:
+category/job1|category/job2|category/job3
+
+Scripts  
+Pipe-separated list of host-executable scripts:
+scripts/a.py|scripts/b.py
+
+Retry Logic  
+Plain text rules interpreted by parser logic.
+
+4. Prompt Injection Protocol
+
+4.1 Instruction Block
+
+Each job injects its instructions using:
+
+##JI:START##
+<job instruction text>
+##JI:END##
+
+4.2 Affordance Block
+
+Available actions are exposed using:
+
+##AF:START##
+category/job1|category/job2|category/job3
+##AF:END##
+
+4.3 Job Execution Trigger
+
+Execution is initiated with:
+
+##JOB_START##
+
+4.4 Replacement Rule
+
+Each job completely replaces:
+- Previous instruction block
+- Previous affordance block
+- Previous flags
+
+This ensures:
+single active job
+no context accumulation
+fully deterministic prompt state
+
+5. Execution Pipeline
+
+5.1 Job Injection
+
+inject_job.py
+→ writes ##JI## block
+→ writes ##AF## block
+→ clears previous flags
+→ launches scripts (if any)
+
+5.2 Script Execution
+
+Scripts perform external data collection:
+
+run script
+→ generate data
+→ write flag file
+→ exit
+
+Each script writes:
+runtime/jobs/flags/{script_name}.flag
+
+5.3 Flag Synchronization
+
+job_flag_helper.py
+→ monitors script flags
+→ when all exist:
+   → writes job_ready.flag
+   → cleans script flags
+
+Important constraint:
+helper does NOT trigger execution
+
+5.4 Execution Trigger
+
+A watcher system detects:
+job_ready.flag
+→ fires ##JOB_START##
+→ deletes flag
+
+5.5 Model Execution
+
+The model processes:
+instructions
++ current context
++ affordances
+
+And outputs:
+##AF: category/job_name##
+
+5.6 Parsing and Routing
+
+parse_job_response.py
+→ reads output
+→ extracts ##AF: trigger##
+→ resolves category/job
+→ calls inject_job.py
+
+6. Affordance System
+
+Affordances define the set of valid next actions.
+
+They are:
+explicit
+finite
+job-backed
+
+The model selects one affordance:
+##AF: category/job##
+
+This becomes the next job.
+
+6.1 Base Affordance Model
+
+All actions are reduced to base affordance jobs:
+look
+inspect
+open
+close
+pick_up
+use
+eat
+read
+write
+search
+
+Complex interactions emerge from combining these primitives with targets.
+
+7. Script and Reality Layer
+
+Scripts represent external truth and data.
+
+They:
+run independently
+generate context
+signal completion via flags
+
+They are invisible to the model.
+
+8. Sequential Execution Model
+
+The system enforces:
+one job at a time
+no branching
+no parallel execution
+
+Control flow is:
+job → affordance → job → affordance → job
+
+9. System Boundaries
+
+The Job Loop Injection System does NOT:
+- store memory
+- manage world state
+- perform reasoning
+- decide actions
+- orchestrate workflows
+
+It ONLY provides:
+execution rail
+trigger system
+job injection mechanism
+
+10. Integration with LYRN
+
+The system integrates with:
+
+Ontology Layer
+Defines entity structure and affordances.
+
+Status/Delta Layer
+Provides internal pressure and state changes.
+
+Index System (Memory)
+Stores learned meaning from job outcomes.
+
+Reflection Layer
+Updates long-term understanding outside the real-time loop.
+
+11. Advantages
+
+11.1 Fully Inspectable
+All state and execution are visible as files.
+
+11.2 Deterministic
+No hidden behavior or runtime ambiguity.
+
+11.3 Modular
+Every subsystem is expressed as jobs.
+
+11.4 Extensible
+New capabilities require only new jobs and scripts.
+
+11.5 Stable Under Scale
+No graph complexity or orchestration explosion.
+
+12. Limitations
+
+- Sequential execution limits throughput
+- No built-in planning or optimization
+- Requires disciplined job design
+- Parser must remain strict to avoid drift
+
+13. Conclusion
+
+The LYRN Job Loop Injection System provides a minimal, deterministic execution architecture for building complex, stateful AI systems through simple, composable primitives.
+
+By reducing all behavior to sequential job execution driven by explicit affordances, the system avoids the pitfalls of traditional agent orchestration while enabling emergent, experience-driven behavior.
+
+This approach transforms system design from building complex pipelines into defining a structured vocabulary of actions, enabling scalable and inspectable cognition.
