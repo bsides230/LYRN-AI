@@ -7,8 +7,8 @@ MANIFEST_OUT = os.path.join(PROJECT_ROOT, "deltas", "compiled_manifest.txt")
 
 def main():
     if not os.path.exists(DELTAS_LIVE_DIR):
-        print(f"[DeltaCompiler] Directory not found: {DELTAS_LIVE_DIR}")
-        return
+        print(f"[DeltaCompiler] Directory not found: {DELTAS_LIVE_DIR}. Creating it...")
+        os.makedirs(DELTAS_LIVE_DIR, exist_ok=True)
 
     delta_files = [f for f in os.listdir(DELTAS_LIVE_DIR) if f.endswith('.txt')]
     delta_files.sort()  # Ensures DEL01 is at the top, then DEL02, etc.

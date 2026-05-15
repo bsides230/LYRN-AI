@@ -102,8 +102,15 @@ def main():
     max_retries = int(contract['retry_count'])
 
     def handle_success(payload):
+        output_file = contract.get('output_file', '').strip()
+
+        # If output_file is missing, empty, or 'NONE', do not create handoff file
+        if not output_file or output_file.upper() == 'NONE':
+            print(f"[Watcher] Validation successful. No handoff file required for job '{args.job}'. Exiting.")
+            os._exit(0)
+
         os.makedirs(HANDOFF_DIR, exist_ok=True)
-        output_file_path = os.path.join(HANDOFF_DIR, contract['output_file'])
+        output_file_path = os.path.join(HANDOFF_DIR, output_file)
         timestamp = datetime.datetime.now().isoformat()
 
         with open(output_file_path, 'w', encoding='utf-8') as f:

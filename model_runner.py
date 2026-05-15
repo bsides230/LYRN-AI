@@ -262,6 +262,16 @@ def process_request(llm, chat_file_path_str: str, snapshot_loader, chat_manager,
             history = chat_manager.get_chat_history_messages(exclude_paths=[str(chat_file_path.resolve())])
             messages.extend(history)
 
+            # Deltas (Injected after history, before job instructions)
+            compiled_manifest_path = Path("deltas/compiled_manifest.txt")
+            if compiled_manifest_path.exists():
+                try:
+                    delta_content = compiled_manifest_path.read_text(encoding='utf-8')
+                    if delta_content.strip():
+                        messages.append({"role": "system", "content": delta_content})
+                except Exception as e:
+                    print(f"Error reading compiled delta manifest: {e}")
+
             # Job Loop Injection System (Injected after deltas)
             job_context_path = Path("global_flags/job_context.txt")
             if job_context_path.exists():
