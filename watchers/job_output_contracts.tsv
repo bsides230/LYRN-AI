@@ -1,0 +1,2 @@
+job_trigger	start_marker	end_marker	field_count	delimiter	retry_count	output_file
+summary/overall	##O-SUM:START##	##O-SUM:END##	7	|	3	summary_overall.txt
