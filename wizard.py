@@ -53,6 +53,23 @@ def setup_token():
         print(f"Error generating token: {e}")
     input("Press Enter to continue...")
 
+def setup_directories():
+    print("\n--- Setting Up Directories ---")
+    dirs_to_create = [
+        "deltas/live",
+        "watchers/handoff",
+        "logs/summary_logs",
+        "chat",
+        "global_flags/job_flags"
+    ]
+    for d in dirs_to_create:
+        try:
+            os.makedirs(d, exist_ok=True)
+            print(f"Created/Verified directory: {d}")
+        except Exception as e:
+            print(f"Error creating directory {d}: {e}")
+    input("Press Enter to continue...")
+
 def setup_port():
     print("\n--- Port Setup ---")
     current_port = "8000"
@@ -82,7 +99,8 @@ def main():
         print("2. Install Tailscale")
         print("3. Setup Admin Token")
         print("4. Setup Port")
-        print("5. Start LYRN Server")
+        print("5. Setup Directories")
+        print("6. Start LYRN Server")
         print("Q. Quit")
         print()
 
@@ -97,6 +115,8 @@ def main():
         elif choice == '4':
             setup_port()
         elif choice == '5':
+            setup_directories()
+        elif choice == '6':
             # Start Server
             print("\nStarting Server...")
             try:
