@@ -1,3 +1,0 @@
-Name,Trigger,Sequence,Description,Meta,Category
-summary_job,,,"Create a concise, factual summary of the provided text.",,default
-keyword_job,,,Extract the main keywords.,,default
