@@ -11,6 +11,7 @@
 
     <!-- Load Theme Stylsheets -->
     <link rel="stylesheet" href="themes/corporate-terminal.css" />
+    <link rel="stylesheet" href="themes/corporate-2049.css" />
 
     <style>
         /* =========================================
@@ -688,6 +689,7 @@
                         <option value="dark">Dark (Default)</option>
                         <option value="light">Light</option>
                         <option value="corporate-terminal">Corporate Terminal</option>
+                        <option value="corporate-2049">Corporate 2049</option>
                     </select>
                 </div>
                 <div class="settings-row">
@@ -811,7 +813,7 @@
             // Set Theme Dropdown
             const themeSelect = document.getElementById('setting-theme');
             if(themeSelect) {
-                if(appSettings.theme === 'dark' || appSettings.theme === 'light' || appSettings.theme === 'corporate-terminal') {
+                if(appSettings.theme === 'dark' || appSettings.theme === 'light' || appSettings.theme === 'corporate-terminal' || appSettings.theme === 'corporate-2049') {
                     themeSelect.value = appSettings.theme;
                 } else {
                     themeSelect.value = 'dark';
