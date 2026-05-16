@@ -1,0 +1,448 @@
+/* =========================================
+   CORPORATE TERMINAL THEME
+   Retro-futurist corporate sci-fi terminal aesthetic:
+   dark industrial, amber/gold monochrome UI glow, dense panels,
+   grid overlays, thin technical borders, subtle scanlines,
+   command-console typography, and high-contrast styling.
+   ========================================= */
+
+body[data-theme="corporate-terminal"] {
+    --bg-core: #050503;
+    --bg-panel: #0a0905;
+    --brand-primary: #ffaa00; /* Amber/Gold */
+    --brand-primary-dim: rgba(255, 170, 0, 0.1);
+    --brand-primary-glow: rgba(255, 170, 0, 0.4);
+
+    --text-head: #ffcc66;
+    --text-body: #ffaa00;
+    --text-dim: #996600;
+
+    --border-color: #332200;
+    --border-highlight: #664400;
+
+    --dock-bg: rgba(10, 9, 5, 0.85);
+    --dock-border: #ffaa00;
+
+    --bg-input: #020201;
+    --error-color: #ff3300;
+
+    /* Typography Overrides */
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-body);
+    background-color: var(--bg-core);
+
+    /* Subtle Scanline Overlay on body */
+    background-image:
+        linear-gradient(rgba(255, 170, 0, 0.03) 50%, rgba(0, 0, 0, 0.1) 50%),
+        linear-gradient(90deg, rgba(255, 170, 0, 0.02) 1px, transparent 1px),
+        linear-gradient(rgba(255, 170, 0, 0.02) 1px, transparent 1px);
+    background-size: 100% 4px, 40px 40px, 40px 40px;
+    background-attachment: fixed;
+}
+
+/* Base Fallbacks for Modules & Dashboard elements */
+body[data-theme="corporate-terminal"] * {
+    scrollbar-color: var(--brand-primary) var(--bg-core);
+}
+body[data-theme="corporate-terminal"] ::-webkit-scrollbar-thumb {
+    background: var(--text-dim);
+    border-radius: 0;
+    border: 1px solid var(--bg-core);
+}
+body[data-theme="corporate-terminal"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--brand-primary);
+}
+
+/* Top System Bar */
+body[data-theme="corporate-terminal"] #top-system-bar {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.8), 0 1px 0 var(--border-highlight);
+    border-top: 2px solid var(--brand-primary);
+}
+body[data-theme="corporate-terminal"] .system-text {
+    color: var(--text-body);
+    text-shadow: 0 0 5px var(--brand-primary-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+}
+body[data-theme="corporate-terminal"] #sys-cpu {
+    color: var(--text-head);
+}
+body[data-theme="corporate-terminal"] .bar-btn {
+    color: var(--text-body);
+    border: 1px solid transparent;
+    border-radius: 0;
+}
+body[data-theme="corporate-terminal"] .bar-btn:hover {
+    background: var(--brand-primary-dim);
+    color: var(--text-head);
+    border: 1px solid var(--border-highlight);
+    box-shadow: inset 0 0 5px var(--brand-primary-glow);
+}
+
+/* Windows */
+body[data-theme="corporate-terminal"] .lyrn-window {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 0;
+    box-shadow: 10px 10px 0px rgba(0,0,0,0.8), 0 0 0 1px var(--border-highlight) inset;
+}
+body[data-theme="corporate-terminal"] .lyrn-window.active {
+    border-color: var(--brand-primary);
+    box-shadow: 15px 15px 0px rgba(0,0,0,0.9), 0 0 0 1px var(--brand-primary) inset, 0 0 20px var(--brand-primary-dim);
+}
+body[data-theme="corporate-terminal"] .window-header {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+body[data-theme="corporate-terminal"] .window-header::after {
+    content: '';
+    position: absolute;
+    bottom: -2px; left: 0; right: 0;
+    height: 1px;
+    background: var(--border-highlight);
+}
+body[data-theme="corporate-terminal"] .window-title {
+    color: var(--text-head);
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px var(--brand-primary-glow);
+}
+body[data-theme="corporate-terminal"] .win-btn {
+    border-radius: 0;
+    color: var(--text-body);
+}
+body[data-theme="corporate-terminal"] .win-btn:hover {
+    background: var(--brand-primary);
+    color: var(--bg-core);
+}
+body[data-theme="corporate-terminal"] .resize-handle::after {
+    border-right: 3px solid var(--text-dim);
+    border-bottom: 3px solid var(--text-dim);
+    border-radius: 0;
+}
+body[data-theme="corporate-terminal"] .lyrn-window.active .resize-handle::after {
+    border-color: var(--brand-primary);
+}
+
+/* Floating Dock */
+body[data-theme="corporate-terminal"] #dock-content {
+    background: var(--dock-bg);
+    border: 1px solid var(--dock-border);
+    border-radius: 0;
+    box-shadow: 5px 5px 0 rgba(0,0,0,0.9), inset 0 0 10px rgba(255, 170, 0, 0.1);
+}
+body[data-theme="corporate-terminal"] .dock-btn {
+    border-radius: 0 !important;
+    color: var(--text-body);
+    font-family: 'JetBrains Mono', monospace;
+}
+body[data-theme="corporate-terminal"] .dock-btn:hover {
+    background: var(--brand-primary-dim);
+    color: var(--text-head);
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 8px var(--brand-primary-glow);
+}
+body[data-theme="corporate-terminal"] #dock-handle {
+    background: var(--bg-panel);
+    border: 1px solid var(--dock-border);
+    border-radius: 0;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.9);
+}
+body[data-theme="corporate-terminal"] .handle-bar {
+    background-color: var(--text-dim);
+    box-shadow: none;
+    border-radius: 0;
+}
+body[data-theme="corporate-terminal"] #floating-dock:hover .handle-bar {
+    background-color: var(--brand-primary);
+    box-shadow: 0 0 8px var(--brand-primary), 0 0 16px var(--brand-primary);
+}
+body[data-theme="corporate-terminal"] .active-dot {
+    background-color: var(--brand-primary);
+    box-shadow: 0 0 6px var(--brand-primary);
+    border-radius: 0;
+    width: 6px;
+    height: 2px;
+    bottom: 0;
+}
+
+/* Popups & Settings */
+body[data-theme="corporate-terminal"] #settings-popup,
+body[data-theme="corporate-terminal"] #welcome-popup,
+body[data-theme="corporate-terminal"] #connection-popup,
+body[data-theme="corporate-terminal"] #auth-overlay > div {
+    background: var(--bg-panel);
+    border: 1px solid var(--brand-primary);
+    border-radius: 0;
+    box-shadow: 10px 10px 0 rgba(0,0,0,0.9), inset 0 0 20px var(--brand-primary-dim);
+}
+body[data-theme="corporate-terminal"] .settings-tabs {
+    background: var(--bg-core);
+    border-bottom: 2px solid var(--border-color);
+}
+body[data-theme="corporate-terminal"] .tab-btn {
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+}
+body[data-theme="corporate-terminal"] .tab-btn.active {
+    color: var(--text-head);
+    border-bottom-color: var(--brand-primary);
+    background: var(--brand-primary-dim);
+}
+body[data-theme="corporate-terminal"] .settings-header {
+    color: var(--text-head);
+    border-bottom: 1px dashed var(--border-highlight);
+    text-shadow: 0 0 5px var(--brand-primary-dim);
+}
+body[data-theme="corporate-terminal"] .btn-full-width,
+body[data-theme="corporate-terminal"] .cta-btn,
+body[data-theme="corporate-terminal"] .btn-icon {
+    background: var(--bg-core);
+    border: 1px solid var(--border-highlight);
+    color: var(--text-body);
+    border-radius: 0;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+}
+body[data-theme="corporate-terminal"] .btn-full-width:hover,
+body[data-theme="corporate-terminal"] .cta-btn:hover,
+body[data-theme="corporate-terminal"] .btn-icon:hover {
+    background: var(--brand-primary);
+    color: var(--bg-core);
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 10px var(--brand-primary-glow);
+}
+body[data-theme="corporate-terminal"] input[type="text"],
+body[data-theme="corporate-terminal"] input[type="password"],
+body[data-theme="corporate-terminal"] textarea,
+body[data-theme="corporate-terminal"] select {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-highlight) !important;
+    color: var(--text-head) !important;
+    border-radius: 0 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+body[data-theme="corporate-terminal"] input[type="text"]:focus,
+body[data-theme="corporate-terminal"] input[type="password"]:focus,
+body[data-theme="corporate-terminal"] textarea:focus,
+body[data-theme="corporate-terminal"] select:focus {
+    border-color: var(--brand-primary) !important;
+    outline: none !important;
+    box-shadow: inset 0 0 5px var(--brand-primary-glow) !important;
+}
+
+/* Toggle Switch Overrides */
+body[data-theme="corporate-terminal"] .toggle-slider {
+    border-radius: 0;
+    border: 1px solid var(--border-highlight);
+    background-color: var(--bg-core);
+}
+body[data-theme="corporate-terminal"] .toggle-slider:before {
+    border-radius: 0;
+    background-color: var(--text-dim);
+}
+body[data-theme="corporate-terminal"] input:checked + .toggle-slider {
+    background-color: var(--brand-primary-dim);
+    border-color: var(--brand-primary);
+}
+body[data-theme="corporate-terminal"] input:checked + .toggle-slider:before {
+    background-color: var(--brand-primary);
+    box-shadow: 0 0 5px var(--brand-primary);
+}
+
+/* Range Slider */
+body[data-theme="corporate-terminal"] input[type="range"] {
+    background: var(--border-color);
+    border-radius: 0;
+}
+body[data-theme="corporate-terminal"] input[type="range"]::-webkit-slider-thumb {
+    border-radius: 0;
+    background: var(--brand-primary);
+    width: 8px; height: 16px;
+}
+body[data-theme="corporate-terminal"] input[type="range"]::-moz-range-thumb {
+    border-radius: 0;
+    background: var(--brand-primary);
+    width: 8px; height: 16px;
+}
+
+/* Status Lights - more mechanical/digital */
+body[data-theme="corporate-terminal"] .status-light {
+    border-radius: 0;
+    border: 1px solid rgba(0,0,0,0.5);
+}
+body[data-theme="corporate-terminal"] .status-light.blue { background-color: var(--brand-primary); box-shadow: 0 0 10px var(--brand-primary); } /* Replace purple with amber */
+
+/* Edit Mode Banner */
+body[data-theme="corporate-terminal"] #edit-mode-banner {
+    background: var(--bg-panel);
+    border: 1px solid var(--brand-primary);
+    color: var(--brand-primary);
+    border-radius: 0;
+    box-shadow: 5px 5px 0 rgba(0,0,0,0.9);
+}
+body[data-theme="corporate-terminal"] #edit-mode-banner button {
+    border: 1px solid var(--brand-primary);
+    border-radius: 0;
+    color: var(--text-head);
+}
+body[data-theme="corporate-terminal"] #edit-mode-banner button:hover {
+    background: var(--brand-primary);
+    color: var(--bg-core);
+}
+
+
+/* =========================================
+   REUSABLE UI CLASSES (.corp-*)
+   For future module rebuilds.
+   ========================================= */
+
+.corp-shell {
+    background-color: #050503;
+    color: #ffaa00;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.corp-topbar {
+    background: #0a0905;
+    border-bottom: 1px solid #332200;
+    border-top: 2px solid #ffaa00;
+}
+
+.corp-taskbar {
+    background: rgba(10, 9, 5, 0.85);
+    border: 1px solid #ffaa00;
+}
+
+.corp-dock {
+    background: rgba(10, 9, 5, 0.85);
+    border: 1px solid #ffaa00;
+    box-shadow: 5px 5px 0 rgba(0,0,0,0.9);
+}
+
+.corp-panel {
+    background: #0a0905;
+    border: 1px solid #332200;
+    padding: 15px;
+}
+
+.corp-card {
+    background: #020201;
+    border: 1px solid #664400;
+    padding: 10px;
+}
+
+.corp-button {
+    background: #050503;
+    border: 1px solid #664400;
+    color: #ffaa00;
+    padding: 8px 12px;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+}
+.corp-button:hover {
+    background: #ffaa00;
+    color: #050503;
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
+}
+
+.corp-input {
+    background: #020201;
+    border: 1px solid #664400;
+    color: #ffcc66;
+    padding: 8px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.corp-input:focus {
+    border-color: #ffaa00;
+    outline: none;
+    box-shadow: inset 0 0 5px rgba(255, 170, 0, 0.4);
+}
+
+.corp-status {
+    color: #ffaa00;
+    font-size: 10px;
+    text-transform: uppercase;
+}
+.corp-status.active {
+    color: #00cc66; /* Green terminal override */
+}
+.corp-status.error {
+    color: #ff3300;
+}
+
+.corp-log {
+    background: #020201;
+    color: #ffaa00;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 10px;
+    border: 1px solid #332200;
+    overflow-y: auto;
+}
+
+.corp-window {
+    background: #0a0905;
+    border: 1px solid #ffaa00;
+    box-shadow: 10px 10px 0px rgba(0,0,0,0.8);
+}
+
+.corp-module-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #050503;
+}
+
+/* =========================================
+   FALLBACKS FOR MODULE CONTENTS
+   (Since modules apply data-theme="corporate-terminal" to their own body)
+   ========================================= */
+
+/* General module background */
+body[data-theme="corporate-terminal"] {
+    background-color: var(--bg-core, #050503);
+    color: var(--text-body, #ffaa00);
+}
+
+/* Module buttons fallback */
+body[data-theme="corporate-terminal"] button {
+    border-radius: 0;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Module inputs fallback */
+body[data-theme="corporate-terminal"] input,
+body[data-theme="corporate-terminal"] textarea,
+body[data-theme="corporate-terminal"] select {
+    border-radius: 0;
+    font-family: 'JetBrains Mono', monospace;
+    background-color: var(--bg-input, #020201);
+    color: var(--text-head, #ffcc66);
+    border: 1px solid var(--border-highlight, #664400);
+}
+
+body[data-theme="corporate-terminal"] .header,
+body[data-theme="corporate-terminal"] .panel,
+body[data-theme="corporate-terminal"] .toolbar {
+    background: var(--bg-panel, #0a0905) !important;
+    border-color: var(--border-color, #332200) !important;
+}
+
+/* Specific Chat & Claude overrides fallback */
+body[data-theme="corporate-terminal"] .message.user {
+    background: rgba(255, 170, 0, 0.1);
+    border-left: 2px solid var(--brand-primary, #ffaa00);
+    border-radius: 0;
+}
+body[data-theme="corporate-terminal"] .message.ai {
+    background: #0a0905;
+    border: 1px solid var(--border-color, #332200);
+    border-radius: 0;
+}
