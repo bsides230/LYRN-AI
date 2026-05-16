@@ -1,0 +1,372 @@
+/*
+   LYRN Command Center (Sci-Fi Monitoring) Theme
+   Strict color palettes: Berry, Plum, Lemon, Lime, Tangerine, Light Grey, Dark Grey
+*/
+
+:root {
+    /* Default Base Colors */
+    --bg-dark: #050505;
+    --bg-panel: rgba(10, 10, 15, 0.7);
+    --bg-glass: rgba(15, 15, 20, 0.4);
+
+    /* Default Theme (Berry/Cyan) */
+    --theme-primary: #00d2ff;
+    --theme-glow: rgba(0, 210, 255, 0.4);
+    --theme-dim: rgba(0, 210, 255, 0.1);
+
+    --text-main: #e0e0e0;
+    --text-dim: #888888;
+
+    /* Global Angles */
+    --chamfer: 15px;
+    --border-width: 1px;
+}
+
+/* THEMES */
+body[data-theme="berry"] {
+    --theme-primary: #00d2ff;
+    --theme-glow: rgba(0, 210, 255, 0.5);
+    --theme-dim: rgba(0, 210, 255, 0.15);
+}
+
+body[data-theme="plum"] {
+    --theme-primary: #b829ea;
+    --theme-glow: rgba(184, 41, 234, 0.5);
+    --theme-dim: rgba(184, 41, 234, 0.15);
+}
+
+body[data-theme="lemon"] {
+    --theme-primary: #ffee00;
+    --theme-glow: rgba(255, 238, 0, 0.5);
+    --theme-dim: rgba(255, 238, 0, 0.15);
+}
+
+body[data-theme="lime"] {
+    --theme-primary: #39ff14;
+    --theme-glow: rgba(57, 255, 20, 0.5);
+    --theme-dim: rgba(57, 255, 20, 0.15);
+}
+
+body[data-theme="tangerine"] {
+    --theme-primary: #ff7300;
+    --theme-glow: rgba(255, 115, 0, 0.5);
+    --theme-dim: rgba(255, 115, 0, 0.15);
+}
+
+body[data-theme="light-grey"] {
+    --theme-primary: #cccccc;
+    --theme-glow: rgba(204, 204, 204, 0.5);
+    --theme-dim: rgba(204, 204, 204, 0.15);
+}
+
+body[data-theme="dark-grey"] {
+    --theme-primary: #555555;
+    --theme-glow: rgba(85, 85, 85, 0.5);
+    --theme-dim: rgba(85, 85, 85, 0.15);
+}
+
+/* CORE BODY */
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: 'JetBrains Mono', monospace; /* More technical font for everything */
+    background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: center center;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+/* SCI-FI PANELS */
+.sf-panel {
+    background: var(--bg-panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: var(--border-width) solid var(--theme-dim);
+    position: relative;
+    /* Basic Chamfer */
+    clip-path: polygon(
+        0 var(--chamfer),
+        var(--chamfer) 0,
+        100% 0,
+        100% calc(100% - var(--chamfer)),
+        calc(100% - var(--chamfer)) 100%,
+        0 100%
+    );
+    padding: 15px;
+    box-shadow: inset 0 0 20px var(--theme-dim);
+}
+
+/* Glowing Border Accent Overlay */
+.sf-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    border: 2px solid var(--theme-primary);
+    clip-path: polygon(
+        0 var(--chamfer),
+        var(--chamfer) 0,
+        20% 0, 20% 2px, var(--chamfer) 2px, 2px var(--chamfer),
+        2px calc(100% - 2px),
+        100% calc(100% - 2px), 100% 100%, 0 100% /* partial border mock */
+    );
+    opacity: 0.8;
+    box-shadow: 0 0 10px var(--theme-glow);
+}
+
+/* DECORATIVE ELEMENTS */
+.sf-accent-line {
+    height: 2px;
+    background: var(--theme-primary);
+    box-shadow: 0 0 8px var(--theme-glow);
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.sf-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--theme-primary);
+    text-shadow: 0 0 5px var(--theme-glow);
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sf-title::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--theme-primary);
+    box-shadow: 0 0 5px var(--theme-glow);
+}
+
+/* FLOATING WINDOWS (Overriding default styles for the new theme) */
+.lyrn-window {
+    background: rgba(10, 10, 12, 0.85) !important;
+    backdrop-filter: blur(15px);
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: 0 15px 50px rgba(0,0,0,0.8), 0 0 20px var(--theme-dim) !important;
+    clip-path: polygon(
+        0 20px,
+        20px 0,
+        100% 0,
+        100% calc(100% - 20px),
+        calc(100% - 20px) 100%,
+        0 100%
+    );
+}
+
+/* Pseudo-element for complex glowing borders on windows */
+.lyrn-window::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    border: 1px solid var(--theme-primary);
+    clip-path: inherit;
+    box-shadow: inset 0 0 15px var(--theme-glow);
+    z-index: 50; /* Make sure it's on top of iframe */
+}
+
+.lyrn-window.active::after {
+    border-width: 2px;
+    box-shadow: inset 0 0 25px var(--theme-glow), 0 0 15px var(--theme-glow);
+}
+
+.window-header {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border-bottom: 1px solid var(--theme-primary) !important;
+    height: 40px !important;
+    padding-left: 25px !important; /* Offset for chamfer */
+}
+
+.window-title {
+    color: var(--theme-primary) !important;
+    text-shadow: 0 0 5px var(--theme-glow);
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.win-btn {
+    color: var(--theme-primary) !important;
+    border-radius: 0 !important;
+    clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+    border: 1px solid transparent;
+}
+
+.win-btn:hover {
+    background: var(--theme-dim) !important;
+    border-color: var(--theme-primary);
+    box-shadow: inset 0 0 8px var(--theme-glow);
+}
+
+/* MODAL APP TRAY */
+#sf-app-tray {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    width: 600px;
+    background: var(--bg-panel);
+    backdrop-filter: blur(20px);
+    z-index: 100000;
+    padding: 30px;
+    clip-path: polygon(
+        0 30px,
+        30px 0,
+        100% 0,
+        100% calc(100% - 30px),
+        calc(100% - 30px) 100%,
+        0 100%
+    );
+    border: 1px solid var(--theme-primary);
+    box-shadow: 0 0 50px rgba(0,0,0,0.9), 0 0 30px var(--theme-dim), inset 0 0 20px var(--theme-glow);
+    display: none;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#sf-app-tray.open {
+    display: block;
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.tray-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.tray-item {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--theme-dim);
+    padding: 15px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transition: all 0.2s;
+}
+
+.tray-item:hover {
+    border-color: var(--theme-primary);
+    background: var(--theme-dim);
+    box-shadow: 0 0 15px var(--theme-glow);
+    transform: translateY(-2px);
+}
+
+.tray-icon {
+    font-size: 24px;
+}
+
+.tray-name {
+    font-size: 11px;
+    text-align: center;
+    color: var(--text-main);
+}
+
+/* BACKGROUND SPREAD LAYOUT */
+#sf-background-layer {
+    position: fixed;
+    top: 50px; /* Below top bar */
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    z-index: 0;
+    pointer-events: none; /* Let clicks pass through to windows if needed, or handle per panel */
+    display: grid;
+    grid-template-columns: 300px 1fr 350px;
+    grid-template-rows: 200px 1fr 200px;
+    gap: 20px;
+}
+
+/* Make specific panels interactive if they have buttons */
+.sf-panel {
+    pointer-events: auto;
+}
+
+/* Layout Placements */
+#sys-status-panel { grid-column: 1; grid-row: 1; }
+#model-status-panel { grid-column: 3; grid-row: 1; }
+#log-stream-panel { grid-column: 1; grid-row: 2 / 4; }
+#job-queue-panel { grid-column: 3; grid-row: 2 / 4; }
+#center-visual-panel {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Optional: Some cool sci-fi circular graphic or LYRN logo */
+}
+
+/* DATA TYPOGRAPHY */
+.data-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+.data-label { color: var(--text-dim); }
+.data-value {
+    color: var(--theme-primary);
+    font-weight: bold;
+    text-shadow: 0 0 5px var(--theme-glow);
+}
+
+.log-entry {
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: var(--text-main);
+    border-left: 2px solid var(--theme-dim);
+    padding-left: 5px;
+}
+.log-entry.error { border-color: #ff4444; color: #ff4444; }
+
+/* TOP BAR OVERRIDES */
+#top-system-bar {
+    background: rgba(5, 5, 5, 0.8) !important;
+    border-bottom: 1px solid var(--theme-primary) !important;
+    box-shadow: 0 2px 15px var(--theme-glow);
+}
+.system-text { color: var(--theme-primary) !important; text-shadow: 0 0 5px var(--theme-glow); }
+
+/* TRAY BUTTON */
+#sf-app-tray-btn {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-glass);
+    border: 1px solid var(--theme-primary);
+    color: var(--theme-primary);
+    padding: 15px 40px;
+    font-size: 16px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    z-index: 99999;
+    text-shadow: 0 0 5px var(--theme-primary);
+    box-shadow: 0 0 15px var(--theme-dim);
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    transition: all 0.2s ease;
+}
+
+#sf-app-tray-btn:hover {
+    background: var(--theme-dim);
+    box-shadow: 0 0 25px var(--theme-glow);
+    transform: translateX(-50%) scale(1.05);
+}
