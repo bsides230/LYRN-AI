@@ -9,6 +9,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="manifest" href="manifest.json" />
 
+    <!-- Load Theme Stylsheets -->
+    <link rel="stylesheet" href="themes/corporate-terminal.css" />
+
     <style>
         /* =========================================
            1. CORE VARIABLES & THEME
@@ -680,11 +683,12 @@
             <div id="tab-general" class="tab-pane active">
                 <div class="settings-header">Appearance</div>
                 <div class="settings-row">
-                    <span>Dark Mode</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
-                        <span class="toggle-slider"></span>
-                    </label>
+                    <span>Theme</span>
+                    <select id="setting-theme" onchange="toggleTheme(this.value)" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); padding:4px; border-radius:4px; font-family:'JetBrains Mono'; font-size:11px;">
+                        <option value="dark">Dark (Default)</option>
+                        <option value="light">Light</option>
+                        <option value="corporate-terminal">Corporate Terminal</option>
+                    </select>
                 </div>
                 <div class="settings-row">
                     <span>Pin Dock Open</span>
@@ -803,7 +807,16 @@
             checkConnection();
 
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
-            document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
+
+            // Set Theme Dropdown
+            const themeSelect = document.getElementById('setting-theme');
+            if(themeSelect) {
+                if(appSettings.theme === 'dark' || appSettings.theme === 'light' || appSettings.theme === 'corporate-terminal') {
+                    themeSelect.value = appSettings.theme;
+                } else {
+                    themeSelect.value = 'dark';
+                }
+            }
 
             // Initialize Font Size Slider
             document.getElementById('setting-font-size').value = appSettings.fontSize;
@@ -1635,15 +1648,14 @@
             dock.classList.remove('dock-collapsed');
             saveSettings();
         }
-        function toggleTheme(isDark) {
-            const theme = isDark ? 'dark' : 'light';
-            document.body.setAttribute('data-theme', theme);
-            appSettings.theme = theme;
+        function toggleTheme(themeValue) {
+            document.body.setAttribute('data-theme', themeValue);
+            appSettings.theme = themeValue;
             saveSettings();
 
             // Broadcast
             document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
+                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: themeValue }, '*');
             });
         }
 
