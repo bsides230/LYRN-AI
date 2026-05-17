@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LYRN Monitoring Surface — 2049 Mode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&family=Orbitron:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060708;
+  --bg2:#0a0b0d;
+  --panel:rgba(15,13,10,.78);
+  --panel2:rgba(22,18,13,.72);
+  --panel3:rgba(14,20,22,.40);
+  --ink:#ffe7cc;
+  --text:#f8d7af;
+  --muted:#b89a78;
+  --dim:#6f5a43;
+  --line:rgba(255,173,88,.18);
+  --line2:rgba(97,212,255,.12);
+  --amber:#ffb35f;
+  --amber2:#ff8c3a;
+  --cyan:#68ddff;
+  --bad:#ff6b5b;
+  --good:#7af5c4;
+  --warn:#ffd36d;
+  --shadow:0 24px 70px rgba(0,0,0,.72);
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{
+  background:
+    radial-gradient(circle at 50% 120%, rgba(255,127,55,.18), transparent 36%),
+    radial-gradient(circle at 18% 14%, rgba(255,171,93,.08), transparent 18%),
+    radial-gradient(circle at 82% 32%, rgba(85,199,255,.06), transparent 16%),
+    linear-gradient(180deg,#080707 0%, #0a0908 28%, #070809 62%, #050607 100%);
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.42;mix-blend-mode:screen;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(255,169,78,.08) 22%, rgba(255,169,78,.18) 34%, rgba(255,169,78,.08) 44%, transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.015) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 74% 36%, rgba(255,255,255,.55) 0 1px, transparent 2px),
+    radial-gradient(circle at 25% 68%, rgba(255,210,160,.45) 0 1px, transparent 2px);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;
+  background:
+    linear-gradient(0deg, rgba(255,146,62,.03), rgba(255,146,62,.07) 34%, transparent 60%),
+    radial-gradient(circle at 50% 72%, rgba(255,128,45,.18), transparent 28%);
+  filter:blur(10px);
+}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer;color:inherit}
+#machine{
+  position:fixed;inset:10px;overflow:hidden;border-radius:18px;
+  background:linear-gradient(180deg, rgba(255,255,255,.018), rgba(0,0,0,.18) 20%, rgba(0,0,0,.36) 100%), rgba(7,8,9,.92);
+  border:1px solid rgba(255,176,96,.16);
+  box-shadow:0 32px 90px rgba(0,0,0,.82), inset 0 0 120px rgba(255,140,58,.04);
+}
+#machine::before{
+  content:"";position:absolute;inset:10px;pointer-events:none;
+  border:1px solid rgba(255,177,97,.16);
+  clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px);
+  box-shadow:inset 0 0 32px rgba(255,176,96,.06), 0 0 18px rgba(255,176,96,.04);
+}
+.chrome{
+  position:relative;
+  background:
+    linear-gradient(180deg, rgba(255,196,129,.07), rgba(255,144,65,.02) 10%, rgba(0,0,0,.24) 35%, rgba(0,0,0,.54) 100%),
+    linear-gradient(90deg, rgba(255,255,255,.015), transparent 12%, transparent 88%, rgba(255,255,255,.015)),
+    rgba(14,12,10,.74);
+  border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 rgba(255,235,209,.06), inset 0 0 32px rgba(255,159,79,.05), 0 16px 28px rgba(0,0,0,.42);
+  clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% calc(100% - 16px),calc(100% - 16px) 100%,16px 100%,0 calc(100% - 16px),0 16px);
+}
+.chrome::before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.38;
+  background:linear-gradient(112deg, transparent 0%, rgba(255,255,255,.08) 8%, transparent 14%, transparent 82%, rgba(255,182,104,.05) 92%, transparent 100%);
+}
+.label{font:700 10px JetBrains Mono,monospace;letter-spacing:.18em;text-transform:uppercase;color:#ffd9b2}
+.micro{font:700 10px/1.35 JetBrains Mono,monospace;letter-spacing:.08em;color:var(--muted)}
+.value{font-family:Orbitron,JetBrains Mono,monospace;letter-spacing:.06em;color:#fff0df}
+.ok{color:var(--good)!important}.warn{color:var(--warn)!important}.bad{color:var(--bad)!important}
+#identity{position:absolute;left:16px;top:16px;bottom:16px;width:196px;padding:16px;display:flex;flex-direction:column;gap:14px;z-index:4}
+.brand{display:flex;align-items:center;gap:12px}.mark{width:42px;height:42px;display:grid;place-items:center;border:1px solid rgba(255,177,98,.22);color:var(--amber);font:800 18px Orbitron,sans-serif;background:rgba(255,177,98,.06);box-shadow:inset 0 0 18px rgba(255,177,98,.06),0 0 18px rgba(255,177,98,.05)}.brand h1{margin:0;font:800 28px/1 Orbitron,sans-serif;letter-spacing:.14em}.brand .sub{font:700 9px JetBrains Mono,monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.idblock{padding-top:12px;border-top:1px solid rgba(255,177,98,.10);display:grid;gap:10px}.idrow{display:grid;gap:3px}.idrow .val{font:700 11px/1.35 JetBrains Mono,monospace;color:#ffe7ce}.spacer{flex:1}.dots{display:flex;gap:5px}.dots i{width:5px;height:5px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px rgba(255,179,100,.8)}.bars{display:flex;gap:4px;align-items:end;height:30px}.bars i{width:7px;background:linear-gradient(180deg,#ffd0a1,rgba(255,140,58,.32));box-shadow:0 0 10px rgba(255,140,58,.28)}.bars i:nth-child(1){height:9px}.bars i:nth-child(2){height:14px}.bars i:nth-child(3){height:19px}.bars i:nth-child(4){height:24px}.bars i:nth-child(5){height:29px}
+#topbar{position:absolute;left:228px;right:16px;top:16px;height:68px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;z-index:5}
+#ticker{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.tick{font:700 9px JetBrains Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:#d2b593}.tick b{color:#ffb96b}
+.control-set{display:flex;gap:8px}.ctrl{min-width:76px;height:30px;border:1px solid rgba(255,177,98,.16);background:rgba(0,0,0,.24);font:700 10px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#f5d3af}.ctrl.primary{border-color:rgba(255,177,98,.32);background:rgba(255,177,98,.12);color:#ffcb8f}.ctrl:hover{background:rgba(255,177,98,.06);box-shadow:0 0 14px rgba(255,177,98,.08)}
+#workspace{position:absolute;left:228px;right:16px;top:96px;bottom:16px;display:grid;gap:12px;grid-template-columns:170px 1fr 1fr 280px;grid-template-rows:304px 1fr 58px;z-index:2}
+#workspace::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.36;background:repeating-linear-gradient(90deg, rgba(255,167,82,.10) 0 1px, transparent 1px 54px), repeating-linear-gradient(0deg, rgba(255,167,82,.08) 0 1px, transparent 1px 46px)}
+#toolRail{grid-column:1;grid-row:1 / span 2;padding:14px;display:flex;flex-direction:column;gap:12px}#viewportA,#viewportB,#coreMap,#dependencyPanel,#footerBar{padding:12px}
+#viewportA{grid-column:2;grid-row:1}#viewportB{grid-column:3;grid-row:1}#dependencyPanel{grid-column:4;grid-row:1 / span 2}#coreMap{grid-column:2 / span 2;grid-row:2}#footerBar{grid-column:1 / -1;grid-row:3;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.railTitle,.panelHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.panelHead{margin-bottom:10px}.panelTitle{font:800 12px Orbitron,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#ffddb5}.panelSub{font:700 9px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#c48f56}
+.buttonGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toolBtn,.actionBtn,.footBtn,.miniBtn,.nodeChip,.pill{
+  position:relative;border:1px solid rgba(255,177,98,.14);background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,158,72,.02) 14%, rgba(0,0,0,.22) 42%, rgba(0,0,0,.34));
+  font:700 10px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#f3d4b0;padding:10px 8px;text-align:left
+}
+.toolBtn.active,.actionBtn.active{border-color:rgba(255,177,98,.32);background:linear-gradient(180deg, rgba(255,177,98,.18), rgba(255,177,98,.08) 16%, rgba(0,0,0,.26));color:#ffd5a3;box-shadow:inset 0 0 18px rgba(255,177,98,.08)}
+.toolBtn:hover,.actionBtn:hover,.footBtn:hover,.miniBtn:hover,.nodeChip:hover,.pill:hover{box-shadow:0 0 14px rgba(255,177,98,.08), inset 0 0 14px rgba(255,177,98,.05)}
+#scriptPanel{margin-top:auto;padding-top:10px;border-top:1px solid rgba(255,177,98,.10);display:grid;gap:10px}.scriptMeter{display:grid;gap:5px}.meterRow{display:flex;align-items:center;gap:8px}.meterRow span{width:32px;font:700 9px JetBrains Mono,monospace;color:var(--muted)}.meterBar{flex:1;height:6px;background:rgba(75,52,33,.42);position:relative}.meterBar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--cyan),var(--amber));box-shadow:0 0 10px rgba(255,177,98,.18)}
+.viewportBox{position:relative;height:calc(100% - 32px);border:1px solid rgba(255,177,98,.14);padding:12px;background:linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.30));overflow:hidden}
+.viewportGrid{position:absolute;inset:0;opacity:.30;background:repeating-linear-gradient(90deg, rgba(255,168,84,.10) 0 1px, transparent 1px 42px), repeating-linear-gradient(0deg, rgba(255,168,84,.08) 0 1px, transparent 1px 38px)}
+.viewportContent{position:relative;z-index:1;height:100%;display:grid;grid-template-columns:1.08fr .92fr;gap:10px}
+.previewFigure{position:relative;border:1px solid rgba(255,177,98,.14);overflow:hidden;background:radial-gradient(circle at 50% 50%, rgba(255,135,50,.12), transparent 30%), rgba(0,0,0,.12)}
+.previewFigure::before{content:"";position:absolute;inset:-8%;background:conic-gradient(from 90deg, transparent 0 18%, rgba(255,177,98,.05) 25%, transparent 44%, rgba(104,221,255,.06) 56%, transparent 100%);filter:blur(6px)}
+.previewFigure .centerOrb{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:86px;height:86px;border-radius:50%;border:1px solid rgba(255,195,136,.34);box-shadow:0 0 26px rgba(255,177,98,.12), inset 0 0 20px rgba(255,177,98,.10);background:radial-gradient(circle, rgba(255,248,239,.92) 0 4px, rgba(255,175,90,.70) 8px, rgba(0,0,0,.16) 34px, transparent 35px)}
+.previewFigure .ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,189,128,.22);border-radius:50%}.previewFigure .r1{width:180px;height:92px}.previewFigure .r2{width:144px;height:144px;transform:translate(-50%,-50%) rotate(42deg)}.previewFigure .r3{width:116px;height:188px;transform:translate(-50%,-50%) rotate(-30deg)}
+.previewInfo{display:grid;align-content:start;gap:10px}.previewInfo .hero{font:800 22px/1.1 Orbitron,sans-serif;letter-spacing:.06em;color:#fff4e6}.previewInfo .desc{font:12px/1.45 JetBrains Mono,monospace;color:#d3b18a}.metaTable{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font:700 10px/1.35 JetBrains Mono,monospace;color:#cda26f}.metaTable b{color:#ffe0ba}.actionStrip{display:flex;flex-wrap:wrap;gap:8px}
+#dependencyList,#assetList,#logMini{display:grid;gap:6px;align-content:start}.depItem,.assetItem,.miniLog{display:grid;grid-template-columns:1fr auto;gap:10px;padding:4px 0;border-bottom:1px solid rgba(255,177,98,.08);font:700 10px/1.35 JetBrains Mono,monospace}.depItem span:first-child,.assetItem span:first-child{color:#d8b186}.depItem span:last-child,.assetItem span:last-child{color:#ffbb72}
+#coreMapCanvas{position:relative;height:100%;min-height:350px;border:1px solid rgba(255,177,98,.14);overflow:hidden;background:radial-gradient(circle at 50% 62%, rgba(255,130,52,.12), transparent 22%), linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.34))}
+#coreMapCanvas .grid{position:absolute;inset:0;opacity:.38;background:repeating-linear-gradient(90deg, rgba(255,167,82,.11) 0 1px, transparent 1px 52px), repeating-linear-gradient(0deg, rgba(255,167,82,.09) 0 1px, transparent 1px 48px)}
+#mapSvg{position:absolute;inset:0;width:100%;height:100%}.centerCore{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);width:138px;height:138px;border-radius:50%;background:radial-gradient(circle, rgba(255,249,240,.94) 0 10px, rgba(255,199,131,.82) 12px, rgba(255,146,62,.70) 36px, rgba(25,18,15,.94) 60px, rgba(0,0,0,.92) 66px);box-shadow:0 0 34px rgba(255,146,62,.18), 0 0 100px rgba(255,146,62,.08)}.centerCore::before,.centerCore::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,188,126,.18);border-radius:50%}.centerCore::before{width:230px;height:230px}.centerCore::after{width:330px;height:330px}
+.nodeChip{position:absolute;min-width:110px;padding:8px 10px;transform:translate(-50%,-50%)}.nodeChip small{display:block;margin-top:4px;color:#cca376;font-size:9px;letter-spacing:.08em;text-transform:none}.nodeChip.active{border-color:rgba(255,177,98,.32);color:#ffd6a6}
+#statsBand{position:absolute;left:16px;right:16px;bottom:16px;display:grid;grid-template-columns:1.1fr 1.4fr .9fr;gap:12px;z-index:2}.statBox{padding:10px;border:1px solid rgba(255,177,98,.12);background:rgba(0,0,0,.20)}.statBox .row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:2px 0;font:700 10px JetBrains Mono,monospace;color:#cfa16e}.statBox .row b{color:#ffe1c1}
+.footSet{display:flex;gap:8px;flex-wrap:wrap}.footBtn{min-width:110px;padding:9px 12px;text-align:center}.footerNote{font:700 9px JetBrains Mono,monospace;letter-spacing:.16em;color:#b68958;text-transform:uppercase}
+.window{position:absolute;z-index:40;min-width:360px;min-height:240px;width:760px;height:500px;display:flex;flex-direction:column;opacity:0;transform:scale(.93);transition:.16s opacity,.16s transform}.window.live{opacity:1;transform:scale(1)}.window.focused{z-index:400!important;box-shadow:0 0 28px rgba(255,177,98,.08), 0 24px 70px rgba(0,0,0,.86), inset 0 0 26px rgba(255,140,58,.06)}
+.winbar{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 14px;border-bottom:1px solid rgba(255,177,98,.12);cursor:move}.winTitle{font:800 11px JetBrains Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:#fbe1c2}.winTools{display:flex;gap:6px}.winBtn{width:26px;height:24px;border:1px solid rgba(255,177,98,.14);background:rgba(0,0,0,.28);color:#c9a37b}.winbody{position:relative;flex:1;background:rgba(0,0,0,.34)}iframe{width:100%;height:100%;border:0;background:#090909}.resize-handle{position:absolute}.resize-handle.e{top:0;right:-3px;bottom:0;width:8px;cursor:ew-resize}.resize-handle.s{left:0;right:0;bottom:-3px;height:8px;cursor:ns-resize}.resize-handle.se{right:-3px;bottom:-3px;width:14px;height:14px;cursor:nwse-resize}
+.modal{position:absolute;inset:0;display:none;place-items:center;z-index:900;background:rgba(0,0,0,.72);backdrop-filter:blur(14px)}.modal.show{display:grid}.dialog{width:min(760px,92vw);max-height:86vh;overflow:auto;padding:18px}.dialog h2{margin:0 0 14px;font:800 22px Orbitron,sans-serif;letter-spacing:.12em}.formgrid{display:grid;gap:12px}.formrow{display:grid;gap:6px}.formrow label{font:700 10px JetBrains Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}.field,textarea,select{background:rgba(0,0,0,.28);border:1px solid rgba(255,177,98,.16);color:#ffe2c2;padding:10px 12px;min-height:40px}.field:focus,textarea:focus,select:focus{outline:none;border-color:rgba(255,177,98,.30)}textarea{min-height:120px;resize:vertical}.btnrow{display:flex;gap:10px;flex-wrap:wrap}.pill{padding:10px 12px}.pill.danger{border-color:rgba(255,100,110,.22);color:#ff9a89}
+@media (max-width:1400px){#workspace{grid-template-columns:170px 1fr 1fr;grid-template-rows:280px 280px 1fr 58px}#dependencyPanel{grid-column:1 / -1;grid-row:3}#coreMap{grid-column:2 / span 2;grid-row:2}}
+</style>
+</head>
+<body>
+<div id="machine">
+  <aside id="identity" class="chrome">
+    <div class="brand"><div class="mark">△</div><div><h1>LYRN</h1><div class="sub">Replicant Surface Mode</div></div></div>
+    <div class="idblock">
+      <div class="idrow"><div class="label">System ID</div><div class="val">LYRN-OS-74222</div></div>
+      <div class="idrow"><div class="label">Core URL</div><div id="coreUrlLabel" class="val">--</div></div>
+      <div class="idrow"><div class="label">Uptime</div><div id="uptimeLabel" class="val">00:00:00</div></div>
+      <div class="idrow"><div class="label">Auth</div><div id="authLabel" class="val">Not authenticated</div></div>
+    </div>
+    <div class="idblock"><div class="label">Control Node</div><div class="dots"><i></i><i></i><i></i><i></i></div></div>
+    <div class="spacer"></div>
+    <div class="idblock">
+      <div class="idrow"><div class="label">Link</div><div id="linkLabel" class="val bad">OFFLINE</div></div>
+      <div class="idrow"><div class="label">Sync</div><div id="syncLabel" class="val">--</div></div>
+      <div class="idrow"><div class="label">Mode</div><div class="val">Nominal</div><div class="bars"><i></i><i></i><i></i><i></i><i></i></div></div>
+    </div>
+  </aside>
+
+  <header id="topbar" class="chrome">
+    <div id="ticker"></div>
+    <div class="control-set">
+      <button class="ctrl" onclick="pollHealth(true)">Validate</button>
+      <button class="ctrl" onclick="saveLayout()">Export</button>
+      <button class="ctrl" onclick="restoreLayout()">Clone</button>
+      <button class="ctrl" onclick="cascadeWindows()">Diff</button>
+      <button class="ctrl" onclick="launch(findModule('logs'))">Log</button>
+      <button class="ctrl" onclick="openConnection()">Connect</button>
+      <button class="ctrl" onclick="toggleFullScreen()">Simulate</button>
+      <button class="ctrl" onclick="openSettings()">Cache</button>
+      <button class="ctrl primary" onclick="openSettings()">Function</button>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <section id="toolRail" class="chrome">
+      <div class="railTitle"><span class="panelTitle">System Components</span><span class="panelSub">affordance rack</span></div>
+      <div id="toolButtons" class="buttonGrid"></div>
+      <div class="railTitle"><span class="panelTitle">Actions</span><span class="panelSub">control</span></div>
+      <div class="buttonGrid">
+        <button class="actionBtn" onclick="pollHealth(true)">Refresh</button>
+        <button class="actionBtn" onclick="openConnection()">Connect</button>
+        <button class="actionBtn" onclick="checkAuth()">Validate</button>
+        <button class="actionBtn" onclick="openSettings()">Config</button>
+        <button class="actionBtn" onclick="saveLayout()">Save</button>
+        <button class="actionBtn" onclick="restoreLayout()">Restore</button>
+        <button class="actionBtn" onclick="cascadeWindows()">Cascade</button>
+        <button class="actionBtn" onclick="toggleFullScreen()">Full</button>
+      </div>
+      <div id="scriptPanel">
+        <div class="railTitle"><span class="panelTitle">Active Script</span><button class="miniBtn" onclick="launch(findModule('jobs'))">Run</button></div>
+        <div class="micro" id="scriptName">surface_orchestrator.kst</div>
+        <div class="scriptMeter">
+          <div class="meterRow"><span>STEP</span><div class="meterBar"><i style="width:78%"></i></div></div>
+          <div class="meterRow"><span>CALL</span><div class="meterBar"><i style="width:58%"></i></div></div>
+          <div class="meterRow"><span>WAIT</span><div class="meterBar"><i style="width:22%"></i></div></div>
+        </div>
+        <div class="micro" id="scriptInfo">Open windows: 0 / API hooks ready</div>
+      </div>
+    </section>
+
+    <section id="viewportA" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle" id="vpATitle">Comm Bay</div><div class="panelSub">holographic relay chamber</div></div><button class="miniBtn" onclick="launch(findModule(state.focusA))">Open</button></div>
+      <div class="viewportBox"><div class="viewportGrid"></div><div class="viewportContent"><div class="previewFigure"><div class="centerOrb"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div><div class="previewInfo"><div class="hero" id="vpAHero">COMM BAY</div><div class="desc" id="vpADesc">Conversational interface and live instruction chamber.</div><div class="metaTable" id="vpAMeta"></div><div class="actionStrip"><button class="miniBtn" onclick="launch(findModule(state.focusA))">Launch</button><button class="miniBtn" onclick="swapFocus('A')">Rotate</button></div></div></div></div>
+    </section>
+
+    <section id="viewportB" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle" id="vpBTitle">Archive Core</div><div class="panelSub">memory lattice projection</div></div><button class="miniBtn" onclick="launch(findModule(state.focusB))">Open</button></div>
+      <div class="viewportBox"><div class="viewportGrid"></div><div class="viewportContent"><div class="previewFigure"><div class="centerOrb"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div><div class="previewInfo"><div class="hero" id="vpBHero">ARCHIVE CORE</div><div class="desc" id="vpBDesc">Vector store, index access, and recall surface.</div><div class="metaTable" id="vpBMeta"></div><div class="actionStrip"><button class="miniBtn" onclick="launch(findModule(state.focusB))">Launch</button><button class="miniBtn" onclick="swapFocus('B')">Rotate</button></div></div></div></div>
+    </section>
+
+    <aside id="dependencyPanel" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle">Dependency Chain</div><div class="panelSub">runtime stack</div></div><div class="micro" id="depScore">12 active</div></div>
+      <div id="dependencyList"></div>
+      <div class="panelHead" style="margin-top:14px"><div><div class="panelTitle">Asset Configuration</div><div class="panelSub">visible modules</div></div><div class="micro" id="assetMode">Nominal</div></div>
+      <div id="assetList"></div>
+      <div class="panelHead" style="margin-top:14px"><div><div class="panelTitle">Recent Logs</div><div class="panelSub">surface events</div></div></div>
+      <div id="logMini"></div>
+    </aside>
+
+    <section id="coreMap" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle">Module Integration Matrix</div><div class="panelSub">projection mesh / command surface</div></div><div class="micro" id="mapHint">Select a node or use the tool rail</div></div>
+      <div id="coreMapCanvas">
+        <div class="grid"></div>
+        <svg id="mapSvg" viewBox="0 0 1000 520" preserveAspectRatio="none"></svg>
+        <div class="centerCore"></div>
+        <div id="nodeLayer"></div>
+        <div id="statsBand">
+          <div class="statBox"><div class="label">Connection Matrix</div><div class="row"><span>Core URL</span><b id="matrixUrl">--</b></div><div class="row"><span>Auth</span><b id="matrixAuth">No token</b></div><div class="row"><span>Open Windows</span><b id="matrixWindows">0</b></div></div>
+          <div class="statBox"><div class="label">Surface Telemetry</div><div class="row"><span>Visible Modules</span><b id="matrixVisible">0</b></div><div class="row"><span>Focus A / B</span><b id="matrixFocus">-- / --</b></div><div class="row"><span>System Status</span><b id="matrixStatus">OFFLINE</b></div></div>
+          <div class="statBox"><div class="label">Health</div><div class="row"><span>Core</span><b id="healthCore">OFFLINE</b></div><div class="row"><span>LLM</span><b id="healthLLM">UNKNOWN</b></div><div class="row"><span>Store</span><b id="healthStore">UNKNOWN</b></div></div>
+        </div>
+      </div>
+    </section>
+
+    <footer id="footerBar" class="chrome">
+      <div class="footSet">
+        <button class="footBtn" onclick="pollHealth(true)">Scan Hardware</button>
+        <button class="footBtn" onclick="broadcastAll({type:'PING'})">Update Proxies</button>
+        <button class="footBtn" onclick="closeAllWindows()">Delete Seq</button>
+        <button class="footBtn" onclick="pollHealth(true)">Refresh</button>
+        <button class="footBtn" onclick="checkAuth()">Validate</button>
+      </div>
+      <div class="footSet">
+        <div class="footerNote" id="decisionLabel">surface lock pending</div>
+        <button class="footBtn" onclick="addLog('System','Manual reject flag')">Reject</button>
+        <button class="footBtn" onclick="addLog('System','Inspection flag applied')">Flag</button>
+        <button class="footBtn" onclick="addLog('System','Pass state acknowledged')">Pass</button>
+        <button class="footBtn" onclick="openSettings()">Display Options</button>
+        <button class="footBtn" onclick="toggleFullScreen()">Exit UI Mode</button>
+      </div>
+    </footer>
+  </main>
+
+  <div id="settingsModal" class="modal"><div class="dialog chrome"><h2>System Settings</h2><div class="formgrid"><div class="formrow"><label>Visible Modules</label><div id="moduleToggles" class="btnrow"></div></div><div class="formrow"><label>API Map / Overrides</label><textarea id="apiMapEditor"></textarea></div><div class="btnrow"><button class="pill" onclick="saveApiMap()">Save API Map</button><button class="pill" onclick="saveLayout()">Save Layout</button><button class="pill" onclick="restoreLayout()">Restore Layout</button><button class="pill danger" onclick="closeSettings()">Close</button></div></div></div></div>
+  <div id="connectionModal" class="modal"><div class="dialog chrome"><h2>Core Connection</h2><div class="formgrid"><div class="formrow"><label>Core URL</label><input class="field" id="coreUrlInput" placeholder="http://localhost:8000"></div><div class="formrow"><label>Admin Token</label><input class="field" id="tokenInput" type="password" placeholder="Paste token or load admin_token.txt"><input class="field" type="file" accept=".txt" onchange="handleTokenFile(this)"></div><div class="btnrow"><button class="pill" onclick="testConnection()">Test / Connect</button><button class="pill" onclick="submitToken()">Verify Token</button><button class="pill" onclick="checkAuth()">Auth Status</button><button class="pill danger" onclick="closeConnection()">Close</button></div><div id="connMsg" class="micro"></div></div></div></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const MODULES=[
+{id:'chat',file:'Chat Interface.html',name:'Comm Bay',glyph:'COMM',desc:'Conversational interface',group:'simulate'},
+{id:'snapshot',file:'Snapshot Builder.html',name:'Snap Core',glyph:'SNAP',desc:'Capture system state',group:'simulate'},
+{id:'jobs',file:'JobManager.html',name:'Ops Board',glyph:'JOB',desc:'Execute and monitor jobs',group:'ops'},
+{id:'delta',file:'DeltaManager.html',name:'Delta Lattice',glyph:'Δ',desc:'Track and apply changes',group:'ops'},
+{id:'memory',file:'MemoryIndexes.html',name:'Archive Core',glyph:'MEM',desc:'Vector store and indexing',group:'graph'},
+{id:'logs',file:'LogViewer.html',name:'Blackbox',glyph:'LOG',desc:'System logs and audit',group:'graph'},
+{id:'models',file:'ModelController.html',name:'Model Bay',glyph:'MODEL',desc:'Model registry and status',group:'telem'},
+{id:'filetree',file:'FileTreeViewer.html',name:'File Vault',glyph:'TREE',desc:'Filesystem explorer',group:'telem'},
+{id:'claude',file:'ClaudeCode.html',name:'Code Chamber',glyph:'AI',desc:'Code assistant sandbox',group:'align'},
+{id:'registry',file:'ModelManager.html',name:'Registry',glyph:'REG',desc:'Model files and registry',group:'align'},
+{id:'status',file:'ServerStatus.html',name:'Core Status',glyph:'STAT',desc:'Backend telemetry',group:'split'},
+{id:'settings',file:'settings',name:'Settings',glyph:'SYS',desc:'Connection and modules',group:'split'}
+];
+let state={coreUrl:location.protocol.startsWith('http')?location.origin:'http://localhost:8000',token:localStorage.getItem('lyrn_auth_token')||'',apiMap:{},visible:MODULES.map(m=>m.id),focusA:'chat',focusB:'memory',online:false,health:{core:'OFFLINE',llm:'UNKNOWN',store:'UNKNOWN',files:'UNKNOWN'}};
+let z=100,startTime=Date.now();
+const actionLabels=['SIMULATE','FORM','GRAPH','TELEM','ALIGN','ROTATE','SPLIT','EXPORT'];
+function loadState(){try{state={...state,...JSON.parse(localStorage.getItem('lyrn_monitor_surface_v4_2049')||'{}')}}catch(e){}}
+function saveState(){localStorage.setItem('lyrn_monitor_surface_v4_2049',JSON.stringify(state))}
+function findModule(id){return MODULES.find(m=>m.id===id)}
+function moduleUrl(m){return state.apiMap[m.id]||state.apiMap[m.file]||m.file}
+function init(){loadState();applyState();renderToolButtons();renderViewports();renderDependencyPanel();renderNodeMap();renderModuleToggles();renderTicker();seedLogs();updateClock();setInterval(updateClock,1000);pollHealth(false);setInterval(()=>pollHealth(false),15000)}
+function applyState(){ $('#coreUrlLabel').textContent=state.coreUrl; $('#coreUrlInput').value=state.coreUrl; $('#apiMapEditor').value=JSON.stringify(state.apiMap,null,2); $('#matrixUrl').textContent=state.coreUrl.replace(/^https?:\/\//,''); $('#matrixAuth').textContent=state.token?'Token loaded':'No token'; $('#matrixVisible').textContent=state.visible.length; $('#matrixFocus').textContent=`${findModule(state.focusA)?.name||'--'} / ${findModule(state.focusB)?.name||'--'}`; $('#assetMode').textContent=state.online?'Connected':'Nominal'; renderToolButtons(); renderViewports(); renderDependencyPanel(); renderNodeMap(); renderTicker(); updateScriptInfo(); }
+function renderTicker(){const open=$$('.window').length; const items=[['T',new Date().toTimeString().slice(0,8)],['SEQ',String(Date.now()).slice(-4)],['GRID','49-A3'],['BUF',String(state.visible.length).padStart(2,'0')],['NODE',state.focusA.toUpperCase()],['CYCLE',open],['PKT',state.token?'0101':'0000'],['BR',state.online?'254.0 MB/S':'0.0 MB/S'],['CRC',state.online?'OK':'--'],['IDX',state.visible.length]]; $('#ticker').innerHTML=items.map(i=>`<span class="tick">${i[0]} <b>${i[1]}</b></span>`).join('');}
+function renderToolButtons(){const box=$('#toolButtons'); box.innerHTML=''; MODULES.filter(m=>state.visible.includes(m.id)).slice(0,8).forEach((m,idx)=>{const b=document.createElement('button'); b.className='toolBtn'+((m.id===state.focusA||m.id===state.focusB)?' active':''); b.innerHTML=`${m.glyph}<br><span class="micro">${m.name}</span>`; b.onclick=()=>{if(idx%2===0){state.focusA=m.id}else{state.focusB=m.id} saveState(); applyState(); addLog('Module',`${m.name} focused`)}; box.appendChild(b)}); actionLabels.forEach((name,i)=>{const b=document.createElement('button'); b.className='toolBtn'+(i%3===0?' active':''); b.innerHTML=`${name}<br><span class="micro">${i<4?'slot':'aux'}-${i+1}</span>`; b.onclick=()=>addLog('Action',`${name} queued`); box.appendChild(b)});}
+function fillMeta(el,m){const open=$$('.window').filter(w=>w.dataset.mod===m.id).length; el.innerHTML=`<span>module</span><b>${m.id}</b><span>file</span><b>${m.file}</b><span>state</span><b>${open?'open':'standby'}</b><span>route</span><b>${moduleUrl(m)}</b>`;}
+function renderViewports(){const a=findModule(state.focusA)||MODULES[0], b=findModule(state.focusB)||MODULES[1]; $('#vpATitle').textContent=a.name; $('#vpAHero').textContent=a.glyph; $('#vpADesc').textContent=a.desc; fillMeta($('#vpAMeta'),a); $('#vpBTitle').textContent=b.name; $('#vpBHero').textContent=b.glyph; $('#vpBDesc').textContent=b.desc; fillMeta($('#vpBMeta'),b);} 
+function swapFocus(which){const vis=MODULES.filter(m=>state.visible.includes(m.id)); const key=which==='A'?'focusA':'focusB'; const cur=vis.findIndex(m=>m.id===state[key]); state[key]=vis[(cur+1)%vis.length].id; saveState(); applyState();}
+function renderDependencyPanel(){const dep=$('#dependencyList'), assets=$('#assetList'); dep.innerHTML=''; assets.innerHTML=''; const openCount=$$('.window').length; $('#depScore').textContent=`${state.visible.length} active / ${openCount} live`; MODULES.filter(m=>state.visible.includes(m.id)).forEach((m,i)=>{const d=document.createElement('div'); d.className='depItem'; d.innerHTML=`<span>C-${String(i+1).padStart(2,'0')} · ${m.name}</span><span>${($$('.window').some(w=>w.dataset.mod===m.id)?'OPEN':'0.'+(80-i).toString().padStart(2,'0'))}</span>`; dep.appendChild(d); const a=document.createElement('div'); a.className='assetItem'; a.innerHTML=`<span>ASSET TRACK · ${m.glyph}</span><span>${$$('.window').some(w=>w.dataset.mod===m.id)?'LIVE':'NOMINAL'}</span>`; assets.appendChild(a);});}
+function renderNodeMap(){const layer=$('#nodeLayer'); layer.innerHTML=''; const svg=$('#mapSvg'); const nodes=MODULES.filter(m=>state.visible.includes(m.id)); const coords=[[20,18],[50,10],[79,18],[16,44],[34,32],[65,33],[84,45],[28,67],[50,56],[72,68],[39,84],[61,84]]; const cx=500,cy=280; const lines=nodes.map((m,i)=>{const c=coords[i%coords.length]; const x=c[0]*10,y=c[1]*5; return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(255,185,118,.20)" stroke-width="1" />`;}).join('') + `<ellipse cx="${cx}" cy="${cy}" rx="220" ry="94" fill="none" stroke="rgba(255,185,118,.18)" stroke-width="1"/><ellipse cx="${cx}" cy="${cy}" rx="150" ry="150" fill="none" stroke="rgba(255,185,118,.14)" stroke-width="1"/><ellipse cx="${cx}" cy="${cy}" rx="110" ry="190" fill="none" stroke="rgba(104,221,255,.14)" stroke-width="1" transform="rotate(38 ${cx} ${cy})"/>`; svg.innerHTML=lines; nodes.forEach((m,i)=>{const c=coords[i%coords.length]; const chip=document.createElement('button'); chip.className='nodeChip'+((m.id===state.focusA||m.id===state.focusB)?' active':''); chip.style.left=c[0]+'%'; chip.style.top=c[1]+'%'; chip.innerHTML=`${m.glyph}<small>${m.name}</small>`; chip.onclick=()=>launch(m,chip); layer.appendChild(chip);}); $('#matrixVisible').textContent=state.visible.length; $('#matrixFocus').textContent=`${findModule(state.focusA)?.glyph||'--'} / ${findModule(state.focusB)?.glyph||'--'}`; $('#matrixWindows').textContent=$$('.window').length;}
+function updateClock(){let s=Math.floor((Date.now()-startTime)/1000); let h=String(Math.floor(s/3600)).padStart(2,'0'),m=String(Math.floor(s%3600/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0'); $('#uptimeLabel').textContent=`${h}:${m}:${sec}`; renderTicker();}
+function updateScriptInfo(){ $('#scriptInfo').textContent=`Open windows: ${$$('.window').length} / API hooks ready`; $('#matrixWindows').textContent=$$('.window').length; }
+function renderModuleToggles(){const c=$('#moduleToggles'); c.innerHTML=''; MODULES.forEach(m=>{const b=document.createElement('button'); b.className='pill'+(state.visible.includes(m.id)?' ok':''); b.textContent=m.name; b.onclick=()=>{state.visible=state.visible.includes(m.id)?state.visible.filter(x=>x!==m.id):[...state.visible,m.id]; saveState(); applyState(); renderModuleToggles();}; c.appendChild(b)})}
+function launch(m,source){if(!m)return; if(m.file==='settings'){openSettings();return;} let existing=$('#win_'+m.id); if(existing){existing.style.display='flex'; focusWin(existing); return;} const w=document.createElement('div'); w.className='window chrome'; w.id='win_'+m.id; w.dataset.mod=m.id; const wr=$('#workspace').getBoundingClientRect(); const sr=(source||$('#coreMap')).getBoundingClientRect(); let left=Math.max(wr.left+24, Math.min(sr.left+22, wr.right-780)); let top=Math.max(wr.top+24, Math.min(sr.top+22, wr.bottom-520)); Object.assign(w.style,{left:left+'px',top:top+'px',width:'760px',height:'500px'}); w.innerHTML=`<div class="winbar"><div class="winTitle">${m.name}</div><div class="winTools"><button class="winBtn" onclick="pinWin(event,this)">◎</button><button class="winBtn" onclick="maxWin(event,this)">▣</button><button class="winBtn" onclick="minWin(event,this)">—</button><button class="winBtn" onclick="closeWin(event,this)">✕</button></div></div><div class="winbody"><iframe src="${moduleUrl(m)}"></iframe></div><div class="resize-handle e"></div><div class="resize-handle s"></div><div class="resize-handle se"></div>`; $('#machine').appendChild(w); requestAnimationFrame(()=>w.classList.add('live')); wireWindow(w); broadcastTo(w); focusWin(w); addLog('Launch',`${m.name} opened`); renderDependencyPanel(); renderNodeMap(); updateScriptInfo();}
+function focusWin(w){$$('.window').forEach(x=>x.classList.remove('focused')); w.classList.add('focused'); w.style.zIndex=++z;}
+function wireWindow(w){w.addEventListener('mousedown',()=>focusWin(w)); const bar=w.querySelector('.winbar'); bar.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return; focusWin(w); let sx=e.clientX,sy=e.clientY,l=parseFloat(w.style.left),t=parseFloat(w.style.top); bar.setPointerCapture(e.pointerId); bar.onpointermove=ev=>{w.style.left=l+ev.clientX-sx+'px'; w.style.top=t+ev.clientY-sy+'px'}; bar.onpointerup=()=>{bar.onpointermove=null; bar.onpointerup=null;};}); w.querySelectorAll('.resize-handle').forEach(h=>h.addEventListener('pointerdown',e=>resizeStart(e,w,h)));}
+function resizeStart(e,w,h){e.preventDefault(); focusWin(w); let sx=e.clientX,sy=e.clientY,ww=w.offsetWidth,hh=w.offsetHeight,c=h.className; h.setPointerCapture(e.pointerId); h.onpointermove=ev=>{let dx=ev.clientX-sx,dy=ev.clientY-sy,nw=ww,nh=hh; if(c.includes('e'))nw=ww+dx; if(c.includes('s'))nh=hh+dy; if(c.includes('se')){nw=ww+dx; nh=hh+dy;} if(nw>360)w.style.width=nw+'px'; if(nh>240)w.style.height=nh+'px';}; h.onpointerup=()=>{h.onpointermove=null; h.onpointerup=null;};}
+function closeWin(e,b){e.stopPropagation(); const w=b.closest('.window'); addLog('Close',`${w.dataset.mod} closed`); w.remove(); renderDependencyPanel(); renderNodeMap(); updateScriptInfo();}
+function minWin(e,b){e.stopPropagation(); b.closest('.window').style.display='none'; renderDependencyPanel(); updateScriptInfo();}
+function pinWin(e,b){e.stopPropagation(); b.classList.toggle('ok');}
+function maxWin(e,b){e.stopPropagation(); const w=b.closest('.window'), r=$('#workspace').getBoundingClientRect(); if(w.dataset.max==='1'){Object.assign(w.style,JSON.parse(w.dataset.prev)); w.dataset.max='0';} else {w.dataset.prev=JSON.stringify({left:w.style.left,top:w.style.top,width:w.style.width,height:w.style.height}); Object.assign(w.style,{left:(r.left+12)+'px',top:(r.top+12)+'px',width:(r.width-24)+'px',height:(r.height-24)+'px'}); w.dataset.max='1';} focusWin(w);}
+function cascadeWindows(){const r=$('#workspace').getBoundingClientRect(); $$('.window').forEach((w,i)=>{w.style.display='flex'; w.style.left=r.left+24+i*28+'px'; w.style.top=r.top+24+i*24+'px'; w.style.width='720px'; w.style.height='470px'; focusWin(w);}); updateScriptInfo();}
+function closeAllWindows(){ $$('.window').forEach(w=>w.remove()); addLog('System','All windows cleared'); renderDependencyPanel(); renderNodeMap(); updateScriptInfo(); }
+function toggleFullScreen(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+function openSettings(){$('#apiMapEditor').value=JSON.stringify(state.apiMap,null,2); $('#settingsModal').classList.add('show');}
+function closeSettings(){$('#settingsModal').classList.remove('show');}
+function openConnection(){$('#connectionModal').classList.add('show');}
+function closeConnection(){$('#connectionModal').classList.remove('show');}
+function saveApiMap(){try{state.apiMap=JSON.parse($('#apiMapEditor').value||'{}'); saveState(); applyState(); addLog('System','API map saved');}catch(e){alert('Invalid JSON');}}
+function authHeaders(){let h={}; if(state.token)h.Authorization='Bearer '+state.token; return h;}
+async function testConnection(){state.coreUrl=$('#coreUrlInput').value.trim()||state.coreUrl; saveState(); applyState(); broadcastAll({type:'CORE_URL_CHANGE',coreUrl:state.coreUrl}); await pollHealth(true);}
+async function pollHealth(verbose=false){try{const res=await fetch(state.coreUrl.replace(/\/$/,'')+'/health',{headers:authHeaders()}); if(!res.ok)throw new Error(res.status); let data={}; try{data=await res.json()}catch(e){} setOnline(data); if(verbose)$('#connMsg').textContent='Connected to /health';}catch(e){setOffline(); if(verbose)$('#connMsg').textContent='Connection failed: '+e.message;}}
+function setOnline(data={}){state.online=true; state.health={core:'ONLINE',llm:data.llm||data.model||'ONLINE',store:data.store||'ONLINE',files:data.files||'ONLINE'}; $('#linkLabel').textContent='ONLINE'; $('#linkLabel').className='val ok'; $('#syncLabel').textContent='LOCKED'; $('#authLabel').textContent=state.token?'Authenticated':'Connected'; $('#decisionLabel').textContent='surface lock acquired'; $('#matrixStatus').textContent='ONLINE'; $('#matrixStatus').className='ok'; $('#healthCore').textContent='ONLINE'; $('#healthCore').className='ok'; $('#healthLLM').textContent=state.health.llm; $('#healthLLM').className='ok'; $('#healthStore').textContent=state.health.store; $('#healthStore').className='ok'; addLog('Core','Health feed online'); applyState();}
+function setOffline(){state.online=false; state.health={core:'OFFLINE',llm:'UNKNOWN',store:'UNKNOWN',files:'UNKNOWN'}; $('#linkLabel').textContent='OFFLINE'; $('#linkLabel').className='val bad'; $('#syncLabel').textContent='--'; $('#matrixStatus').textContent='OFFLINE'; $('#matrixStatus').className='bad'; $('#healthCore').textContent='OFFLINE'; $('#healthCore').className='bad'; $('#healthLLM').textContent='UNKNOWN'; $('#healthLLM').className='warn'; $('#healthStore').textContent='UNKNOWN'; $('#healthStore').className='warn'; applyState();}
+async function submitToken(){state.token=$('#tokenInput').value.trim(); localStorage.setItem('lyrn_auth_token',state.token); saveState(); broadcastAll({type:'TOKEN_UPDATE',token:state.token}); await checkAuth(); applyState();}
+async function checkAuth(){try{const r=await fetch(state.coreUrl.replace(/\/$/,'')+'/auth/status',{headers:authHeaders()}); if(r.ok){$('#authLabel').textContent='Authenticated'; $('#authLabel').className='val ok'; $('#connMsg').textContent='Token accepted'; addLog('Auth','Token verified'); return;}}catch(e){} $('#authLabel').textContent=state.token?'Token saved / unverified':'Not authenticated'; $('#authLabel').className='val warn'; addLog('Auth','Verification unavailable');}
+function handleTokenFile(inp){const f=inp.files?.[0]; if(!f)return; const reader=new FileReader(); reader.onload=()=>{$('#tokenInput').value=String(reader.result).trim(); submitToken();}; reader.readAsText(f);}
+function addLog(src,msg){const t=new Date().toTimeString().slice(0,8); const box=document.getElementById('logMini'); const line=document.createElement('div'); line.className='miniLog'; line.innerHTML=`<span>${t} · ${src}</span><span>${msg}</span>`; box.prepend(line); while(box.children.length>8)box.lastChild.remove();}
+function seedLogs(){addLog('System','2049 surface initialized'); addLog('Core','Health feed offline');}
+function broadcastTo(w){const frame=w.querySelector('iframe'); frame.addEventListener('load',()=>{try{frame.contentWindow.postMessage({type:'CORE_URL_CHANGE',coreUrl:state.coreUrl},'*'); if(state.token)frame.contentWindow.postMessage({type:'TOKEN_UPDATE',token:state.token},'*');}catch(e){}});}
+function broadcastAll(msg){$$('iframe').forEach(f=>{try{f.contentWindow.postMessage(msg,'*')}catch(e){}})}
+window.addEventListener('message',e=>{if(e.data?.type==='OPEN_WIDGET'){const mod=MODULES.find(m=>m.id===e.data.id||m.name===e.data.name||m.file===e.data.file); if(mod)launch(mod,$('#coreMap'));}})
+function saveLayout(){const layout=$$('.window').map(w=>({id:w.dataset.mod,left:w.style.left,top:w.style.top,width:w.style.width,height:w.style.height,display:w.style.display})); localStorage.setItem('lyrn_monitor_layout_v4_2049',JSON.stringify(layout)); addLog('System','Layout saved');}
+function restoreLayout(){try{const layout=JSON.parse(localStorage.getItem('lyrn_monitor_layout_v4_2049')||'[]'); closeAllWindows(); layout.forEach((x,i)=>{const m=findModule(x.id); if(!m)return; launch(m,$('#coreMap')); setTimeout(()=>{const w=$('#win_'+x.id); if(w)Object.assign(w.style,x);},60+i*30)}); addLog('System','Layout restored');}catch(e){addLog('System','No layout found');}}
+init();
+</script>
+</body>
+</html>
