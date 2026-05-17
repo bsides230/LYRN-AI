@@ -1,2111 +1,313 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYRN Dashboard v0.62 (Center Dock)</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="manifest" href="manifest.json" />
-
-    <!-- Load Theme Stylsheets -->
-    <link rel="stylesheet" href="themes/corporate-terminal.css" />
-    <link rel="stylesheet" href="themes/corporate-2049.css" />
-
-    <style>
-        /* =========================================
-           1. CORE VARIABLES & THEME
-           ========================================= */
-        :root {
-            --bg-core: #050505;
-            --bg-panel: #0a0a0a;
-            --brand-purple: #7c5cff;
-            --brand-purple-dim: rgba(124, 92, 255, 0.1);
-            --brand-purple-glow: rgba(124, 92, 255, 0.4);
-            --text-head: #ffffff;
-            --text-body: #b0b0b0;
-            --text-dim: #666666;
-            --border-color: #222222;
-
-            --dock-bg: rgba(20, 20, 20, 0.6);
-            --dock-border: rgba(255, 255, 255, 0.1);
-            --dock-blur: 20px;
-
-            --font-size-base: 12px;
-
-            --bg-input: #050505;
-            --error-color: #ff4444;
-        }
-
-        body[data-theme="light"] {
-            --bg-core: #eef0f4;
-            --bg-panel: #ffffff;
-            --brand-purple: #6a4ce0;
-            --brand-purple-dim: rgba(106, 76, 224, 0.1);
-            --brand-purple-glow: rgba(106, 76, 224, 0.3);
-            --text-head: #111111;
-            --text-body: #333333;
-            --text-dim: #555555;
-            --border-color: #d1d5db;
-            --dock-bg: rgba(255, 255, 255, 0.6);
-            --dock-border: rgba(0, 0, 0, 0.1);
-            --bg-input: #ffffff;
-        }
-
-        * { box-sizing: border-box; }
-
-        /* Themed scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 6px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--brand-purple); }
-
-
-        body {
-            margin: 0; padding: 0; width: 100vw;
-            min-height: 100vh; overflow: hidden;
-            background-color: var(--bg-core);
-            font-family: 'Inter', system-ui, sans-serif;
-            color: var(--text-body);
-            transition: background-color 0.5s ease;
-            background-image:
-                repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(124, 92, 255, 0.03) 10px, rgba(124, 92, 255, 0.03) 11px),
-                radial-gradient(circle at 50% 0%, rgba(124, 92, 255, 0.15) 0%, transparent 60%);
-            background-size: auto, 100% 100%;
-            background-attachment: fixed;
-            font-size: var(--font-size-base);
-        }
-
-        body.no-select * {
-            user-select: none !important;
-            -webkit-user-select: none !important;
-        }
-
-        /* =========================================
-           TOP SYSTEM BAR
-           ========================================= */
-        #top-system-bar {
-            position: fixed; top: 0; left: 0; right: 0;
-            height: 32px;
-            background: rgba(10, 10, 10, 0.6);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border-color);
-            z-index: 10000;
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0 15px;
-            user-select: none;
-        }
-
-        .bar-section { display: flex; align-items: center; gap: 15px; }
-        .system-text {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px; color: var(--text-head);
-            letter-spacing: 0.05em; cursor: help;
-        }
-        #sys-cpu { color: #7c5cff; }
-        .bar-btn {
-            background: transparent; border: none; color: var(--text-dim);
-            cursor: pointer; font-family: 'JetBrains Mono'; font-size: 14px;
-            padding: 4px; display: flex; align-items: center; justify-content: center;
-            transition: color 0.2s;
-        }
-        .bar-btn:hover { color: var(--text-head); }
-        .bar-btn.close-iframe-btn { color: #ff4444; margin-left: 10px; }
-        #btn-close-iframe { display: none; }
-
-        /* STATUS LIGHT */
-        .status-light {
-            width: 12px; height: 12px; border-radius: 50%;
-            background-color: #ff4444; /* Default Red */
-            margin-right: 12px;
-            box-shadow: 0 0 5px rgba(255, 68, 68, 0.4);
-            cursor: pointer;
-            transition: all 0.3s;
-            flex-shrink: 0;
-        }
-        .status-light.green { background-color: #00cc66; box-shadow: 0 0 8px rgba(0, 204, 102, 0.6); }
-        .status-light.yellow { background-color: #ffbb33; box-shadow: 0 0 8px rgba(255, 187, 51, 0.6); }
-        .status-light.blue { background-color: #7c5cff; box-shadow: 0 0 10px #7c5cff; }
-        .status-light.orange { background-color: #ff8800; box-shadow: 0 0 8px #ff8800; }
-
-        .status-light.pulse { animation: lightPulse 1.5s infinite ease-in-out; }
-        @keyframes lightPulse { 0% { opacity: 1; transform:scale(1); } 50% { opacity: 0.6; transform:scale(0.9); } 100% { opacity: 1; transform:scale(1); } }
-
-        .status-light:hover { transform: scale(1.2); }
-
-        /* =========================================
-           WINDOW SYSTEM
-           ========================================= */
-        #desktop-area { position: absolute; top: 32px; left: 0; right: 0; bottom: 0; z-index: 1; pointer-events: none; }
-
-        .lyrn-window {
-            pointer-events: auto;
-            position: absolute; background: var(--bg-panel); border: 1px solid var(--border-color);
-            display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            border-radius: 8px; width: 800px; height: 600px;
-            min-width: 300px; min-height: 200px;
-            transition: box-shadow 0.2s, opacity 0.2s, transform 0.2s;
-            opacity: 0; transform: scale(0.95);
-            animation: openWin 0.2s forwards ease-out;
-        }
-        @keyframes openWin { to { opacity: 1; transform: scale(1); } }
-
-        .lyrn-window.active { border-color: var(--brand-purple); box-shadow: 0 25px 70px rgba(0,0,0,0.7), 0 0 15px var(--brand-purple-dim); }
-        .lyrn-window.always-on-top { z-index: 9999 !important; border: 1px solid var(--brand-purple); box-shadow: 0 0 0 1px var(--brand-purple); }
-        .lyrn-window.maximized { transition: width 0.2s, height 0.2s, left 0.2s, top 0.2s; }
-
-        .window-header {
-            height: 36px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
-            display: flex; justify-content: space-between; align-items: center; padding: 0 8px 0 12px;
-            cursor: grab; user-select: none; flex-shrink: 0;
-        }
-        .window-header:active { cursor: grabbing; }
-        .window-title { font-family: 'JetBrains Mono', monospace; font-size: calc(var(--font-size-base) - 1px); text-transform: uppercase; color: var(--text-dim); }
-
-        .win-controls { display: flex; align-items: center; gap: 6px; }
-        .win-btn {
-            background: transparent; border: none; color: var(--text-dim);
-            width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; font-size: var(--font-size-base);
-            transition: all 0.2s;
-        }
-        .win-btn:hover { background: var(--brand-purple-dim); color: var(--text-head); }
-
-        .win-btn.pinned {
-            background: var(--brand-purple-dim);
-            color: var(--brand-purple);
-            /* Visual indication of "pinned" state */
-            box-shadow: inset 0 0 0 1px var(--brand-purple);
-        }
-
-        .window-content { flex: 1; position: relative; background: var(--bg-core); overflow: hidden; }
-        iframe { width: 100%; height: 100%; border: none; }
-        .iframe-shield { position: absolute; top:0; left:0; width:100%; height:100%; z-index:10; display:none; }
-        .lyrn-window.is-dragging .iframe-shield, .lyrn-window.is-resizing .iframe-shield { display: block; }
-
-        .resize-handle {
-            position: absolute; bottom: 0; right: 0; width: 25px; height: 25px;
-            z-index: 20; opacity: 0; cursor: nwse-resize;
-            transition: opacity 0.2s;
-        }
-        .resize-handle::after {
-            content:''; position: absolute; bottom: 4px; right: 4px;
-            width: 8px; height: 8px; border-right: 2px solid var(--brand-purple); border-bottom: 2px solid var(--brand-purple);
-            border-radius: 0 0 2px 0;
-        }
-        .lyrn-window:hover .resize-handle { opacity: 1; }
-
-        /* New Mobile Resize Handle */
-        .mobile-resize-handle {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 24px;
-            z-index: 20; display: none; align-items: center; justify-content: center;
-            cursor: ns-resize; padding-top: 4px;
-        }
-        .mobile-resize-handle::after {
-            content: ''; width: 40px; height: 4px; background: var(--border-color); border-radius: 2px;
-            transition: background 0.2s;
-        }
-        .mobile-resize-handle:active::after { background: var(--brand-purple); }
-
-        /* =========================================
-           FLOATING DOCK (WEBSITE STYLE)
-           ========================================= */
-
-        /* The main container - Acts as the Anchor */
-        #floating-dock {
-            position: fixed;
-            /* Default position (will be overridden by JS) */
-            bottom: 30px;
-            right: 30px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-end; /* Align to bottom so handle stays put */
-
-            background: transparent; /* Main container is transparent */
-            border: none;
-            box-shadow: none;
-            z-index: 20000;
-
-            /* Allow buttons to pop UP outside the container */
-            overflow: visible;
-            width: 50px;
-            height: 30px; /* Base height matches handle height */
-
-            /* Disable Selection on Dock */
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: none;
-
-            /* Transition for snapping */
-            transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-
-        #floating-dock.is-dragging {
-            transition: none !important;
-            cursor: grabbing;
-        }
-
-        /* The content area - Absolute positioned ABOVE the handle */
-        #dock-content {
-            position: absolute;
-            bottom: 100%; /* Push upwards above handle */
-            left: 0;
-            width: 100%;
-
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding: 8px;
-            padding-bottom: 12px; /* Visual gap above handle */
-            background: var(--bg-panel);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            margin-bottom: 5px;
-
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            transform-origin: bottom center;
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy pop */
-            pointer-events: auto;
-        }
-
-        /* Collapsed State */
-        #floating-dock.dock-collapsed #dock-content {
-            opacity: 0;
-            transform: translateY(10px) scale(0.8);
-            pointer-events: none;
-        }
-
-        /* Buttons styling */
-        .dock-btn {
-            width: 32px !important;
-            height: 32px !important;
-            border-radius: 6px !important;
-            background: transparent;
-            border: 1px solid transparent;
-            color: var(--text-dim);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            padding: 0 !important;
-            transition: all 0.2s;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .dock-btn:hover {
-            background: var(--brand-purple-dim);
-            color: var(--brand-purple);
-            border-color: var(--brand-purple);
-        }
-
-        /* The Handle Container */
-        #dock-handle {
-            width: 50px; /* Matches container width */
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: grab;
-
-            background: var(--bg-panel);
-            border: 1px solid var(--border-color);
-            border-radius: 15px; /* Pill shape */
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            transition: background 0.2s, transform 0.2s;
-            flex-shrink: 0;
-        }
-
-        #dock-handle:active {
-            cursor: grabbing;
-            transform: scale(0.95);
-        }
-
-        /* The Glowing LED Bar */
-        .handle-bar {
-            width: 20px;
-            height: 4px;
-            background-color: #ffffff; /* Hot center */
-            border-radius: 2px;
-            opacity: 1;
-            /* Purple LED Glow Effect */
-            box-shadow: 0 0 6px var(--brand-purple), 0 0 12px var(--brand-purple);
-            transition: all 0.3s;
-        }
-
-        #floating-dock:hover .handle-bar {
-            background-color: #fff;
-            box-shadow: 0 0 8px var(--brand-purple), 0 0 16px var(--brand-purple), 0 0 24px var(--brand-purple);
-        }
-
-        /* WIGGLE ANIMATION (Edit Mode) */
-        @keyframes wiggle {
-            0% { transform: rotate(0deg); }
-            25% { transform: rotate(-3deg); }
-            50% { transform: rotate(0deg); }
-            75% { transform: rotate(3deg); }
-            100% { transform: rotate(0deg); }
-        }
-        .dock-btn.wiggle {
-            animation: wiggle 0.3s ease-in-out infinite;
-            background: rgba(255,50,50,0.15);
-            border: 1px solid rgba(255,50,50,0.5);
-            color: #ffcccc;
-            transition: none;
-        }
-        .dock-btn.wiggle:hover { transform: scale(1.05); }
-
-        .active-dot {
-            position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
-            width: 3px; height: 3px; border-radius: 50%;
-            background-color: var(--brand-purple);
-            box-shadow: 0 0 6px var(--brand-purple); display: none;
-        }
-        .dock-btn.is-running .active-dot { display: block; }
-        .active-dot.minimized-dot { background-color: #ff8800; box-shadow: 0 0 6px #ff8800; }
-
-        /* =========================================
-           POPUPS & SETTINGS
-           ========================================= */
-        #settings-popup {
-            position: fixed;
-            width: 350px;
-            max-height: 80vh;
-            background: var(--bg-panel);
-            border: 1px solid var(--dock-border); border-radius: 12px;
-            padding: 0; color: var(--text-body);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            display: none; flex-direction: column;
-            z-index: 20001;
-            overflow: hidden;
-        }
-        #settings-popup.show { display: flex; animation: fadeUp 0.2s; }
-        @keyframes fadeUp { from{opacity:0; transform:scale(0.95);} to{opacity:1; transform:scale(1);} }
-
-        /* TABS */
-        .settings-tabs {
-            display: flex; border-bottom: 1px solid var(--border-color);
-            background: rgba(0,0,0,0.1);
-        }
-        .tab-btn {
-            flex: 1; padding: 10px; background: transparent; border: none;
-            color: var(--text-dim); font-family: 'JetBrains Mono'; font-size: 11px;
-            cursor: pointer; border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-        }
-        .tab-btn:hover { color: var(--text-head); }
-        .tab-btn.active { color: var(--brand-purple); border-bottom-color: var(--brand-purple); font-weight: bold; }
-
-        .settings-content {
-            padding: 15px; overflow-y: auto; flex: 1;
-            display: flex; flex-direction: column; gap: 12px;
-        }
-        .tab-pane { display: none; flex-direction: column; gap: 12px; }
-        .tab-pane.active { display: flex; }
-
-        .settings-header {
-            font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim);
-            text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; margin-top: 5px;
-        }
-        .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
-
-        .btn-full-width {
-            width: 100%; background: var(--bg-core); border: 1px solid var(--border-color);
-            color: var(--text-head); padding: 8px; border-radius: 6px; cursor: pointer;
-            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-            transition: all 0.2s;
-        }
-        .btn-full-width:hover { background: var(--brand-purple); border-color: var(--brand-purple); }
-
-        .btn-icon { background: transparent; border: 1px solid var(--border-color); color: var(--text-dim); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
-        .btn-icon:hover { color: var(--brand-purple); border-color: var(--brand-purple); }
-
-        /* LAYOUT LIST */
-        .layout-item {
-            display: flex; justify-content: space-between; align-items: center;
-            background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);
-        }
-        .layout-name { font-size: 12px; color: var(--text-head); }
-        .layout-actions { display: flex; gap: 6px; }
-
-        /* SLIDER STYLES */
-        input[type="range"] {
-            -webkit-appearance: none; width: 100px; height: 4px; background: var(--border-color);
-            border-radius: 2px; outline: none; opacity: 0.7; transition: opacity .2s;
-        }
-        input[type="range"]:hover { opacity: 1; }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%;
-            background: var(--brand-purple); cursor: pointer;
-        }
-        input[type="range"]::-moz-range-thumb {
-            width: 12px; height: 12px; border-radius: 50%; background: var(--brand-purple); cursor: pointer;
-        }
-
-        /* WELCOME POPUP & CONNECTION POPUP */
-        #welcome-popup, #connection-popup {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 320px; background: var(--bg-panel);
-            border: 1px solid var(--brand-purple);
-            box-shadow: 0 0 30px rgba(124, 92, 255, 0.2);
-            border-radius: 12px; z-index: 22000;
-            display: none; flex-direction: column;
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes popIn { from { opacity: 0; transform: translate(-50%, -45%) scale(0.95); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-
-        .welcome-content { padding: 20px; color: var(--text-body); font-size: 13px; line-height: 1.5; }
-        .welcome-footer { padding: 10px 20px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-dim); }
-        .welcome-title { font-family: 'JetBrains Mono'; color: var(--text-head); font-size: 14px; margin-bottom: 10px; display: block; text-transform: uppercase; letter-spacing: 1px; }
-
-        .cta-btn {
-            background: var(--brand-purple); color: #fff; border: none;
-            padding: 6px 12px; border-radius: 4px;
-            font-family: 'JetBrains Mono'; font-size: 11px;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
-            transition: all 0.2s;
-        }
-        .cta-btn:hover { background: #fff; color: var(--brand-purple); box-shadow: 0 0 10px var(--brand-purple-glow); }
-
-
-        /* EDIT POPUP */
-        .edit-popup {
-            position: fixed;
-            background: #000; border: 1px solid #333; border-radius: 50px;
-            padding: 8px; display: flex; align-items: center; gap: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.9); z-index: 20002;
-            animation: fadeUp 0.15s ease-out;
-            pointer-events: auto;
-        }
-        .edit-popup-btn {
-            background: #1a1a1a; border: none; color: #fff;
-            width: 36px; height: 36px; border-radius: 50%;
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 16px; transition: background 0.2s;
-        }
-        .edit-popup-btn:hover { background: #333; }
-        .edit-popup-btn.danger { color: #ff5555; }
-        .edit-popup-btn.danger:hover { background: #500; color: #fff; }
-        .edit-popup-sep { width: 1px; height: 20px; background: #333; }
-
-        /* EDIT MODE BANNER */
-        #edit-mode-banner {
-            position: fixed; top: 40px; left: 50%; transform: translateX(-50%);
-            background: var(--brand-purple); color: #fff;
-            padding: 8px 16px; border-radius: 30px;
-            font-family: 'JetBrains Mono', monospace; font-size: 12px;
-            display: none; align-items: center; gap: 10px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.5); z-index: 21000;
-        }
-        #edit-mode-banner button {
-            background: rgba(0,0,0,0.2); border: none; color: white;
-            padding: 4px 8px; border-radius: 4px; cursor: pointer;
-            font-family: inherit; font-size: 10px; text-transform: uppercase;
-        }
-        #edit-mode-banner button:hover { background: rgba(0,0,0,0.4); }
-
-        /* Toggle Switch */
-        .toggle-switch { position: relative; width: 32px; height: 18px; display: inline-block; }
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 18px; }
-        .toggle-slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: var(--text-dim); transition: .4s; border-radius: 50%; }
-        input:checked + .toggle-slider { background-color: var(--brand-purple); }
-        input:checked + .toggle-slider:before { transform: translateX(14px); background-color: white; }
-
-
-        /* =========================================
-           MEDIA QUERIES
-           ========================================= */
-        @media (max-width: 600px) {
-            /* STACKED CARD LAYOUT FOR MOBILE */
-            #desktop-area {
-                display: flex;
-                flex-direction: column;
-                justify-content: flex-start;
-                padding: 15px;
-                padding-top: 10px;
-                padding-bottom: 120px; /* Clearance for floating dock */
-                gap: 20px;
-                overflow-y: auto;
-                pointer-events: auto; /* Enable scroll interaction */
-                background: rgba(0,0,0,0.2);
-            }
-
-            .lyrn-window {
-                /* Force Relative Stack Behavior */
-                position: relative !important;
-                top: auto !important;
-                left: auto !important;
-
-                /* Card Dimensions */
-                width: 100% !important;
-                height: 65vh; /* Open height - Removed !important for resizing */
-                min-height: 200px;
-
-                /* Visual Style */
-                margin: 0 !important;
-                border-radius: 16px !important;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
-
-                /* Disable Desktop Animations/Logic */
-                transform: none !important;
-                opacity: 1 !important;
-                flex-shrink: 0;
-
-                /* Smooth entry */
-                animation: slideUp 0.3s ease-out forwards !important;
-            }
-
-            @keyframes slideUp {
-                from { opacity: 0; transform: translateY(20px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-
-            /* Hide Resize/Drag UI */
-            .resize-handle { display: none !important; }
-            .mobile-resize-handle { display: flex; } /* Show mobile handle */
-
-            .window-header { cursor: default !important; }
-            .win-controls .win-btn:first-child { display: none; } /* Hide Maximize */
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LYRN Dashboard v0.62 — 2049 Mode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&family=Orbitron:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060708;
+  --bg2:#0a0b0d;
+  --panel:rgba(15,13,10,.78);
+  --panel2:rgba(22,18,13,.72);
+  --panel3:rgba(14,20,22,.40);
+  --ink:#ffe7cc;
+  --text:#f8d7af;
+  --muted:#b89a78;
+  --dim:#6f5a43;
+  --line:rgba(255,173,88,.18);
+  --line2:rgba(97,212,255,.12);
+  --amber:#ffb35f;
+  --amber2:#ff8c3a;
+  --cyan:#68ddff;
+  --bad:#ff6b5b;
+  --good:#7af5c4;
+  --warn:#ffd36d;
+  --shadow:0 24px 70px rgba(0,0,0,.72);
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{
+  background:
+    radial-gradient(circle at 50% 120%, rgba(255,127,55,.18), transparent 36%),
+    radial-gradient(circle at 18% 14%, rgba(255,171,93,.08), transparent 18%),
+    radial-gradient(circle at 82% 32%, rgba(85,199,255,.06), transparent 16%),
+    linear-gradient(180deg,#080707 0%, #0a0908 28%, #070809 62%, #050607 100%);
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.42;mix-blend-mode:screen;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(255,169,78,.08) 22%, rgba(255,169,78,.18) 34%, rgba(255,169,78,.08) 44%, transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.015) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 74% 36%, rgba(255,255,255,.55) 0 1px, transparent 2px),
+    radial-gradient(circle at 25% 68%, rgba(255,210,160,.45) 0 1px, transparent 2px);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;
+  background:
+    linear-gradient(0deg, rgba(255,146,62,.03), rgba(255,146,62,.07) 34%, transparent 60%),
+    radial-gradient(circle at 50% 72%, rgba(255,128,45,.18), transparent 28%);
+  filter:blur(10px);
+}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer;color:inherit}
+#machine{
+  position:fixed;inset:10px;overflow:hidden;border-radius:18px;
+  background:linear-gradient(180deg, rgba(255,255,255,.018), rgba(0,0,0,.18) 20%, rgba(0,0,0,.36) 100%), rgba(7,8,9,.92);
+  border:1px solid rgba(255,176,96,.16);
+  box-shadow:0 32px 90px rgba(0,0,0,.82), inset 0 0 120px rgba(255,140,58,.04);
+}
+#machine::before{
+  content:"";position:absolute;inset:10px;pointer-events:none;
+  border:1px solid rgba(255,177,97,.16);
+  clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px);
+  box-shadow:inset 0 0 32px rgba(255,176,96,.06), 0 0 18px rgba(255,176,96,.04);
+}
+.chrome{
+  position:relative;
+  background:
+    linear-gradient(180deg, rgba(255,196,129,.07), rgba(255,144,65,.02) 10%, rgba(0,0,0,.24) 35%, rgba(0,0,0,.54) 100%),
+    linear-gradient(90deg, rgba(255,255,255,.015), transparent 12%, transparent 88%, rgba(255,255,255,.015)),
+    rgba(14,12,10,.74);
+  border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 rgba(255,235,209,.06), inset 0 0 32px rgba(255,159,79,.05), 0 16px 28px rgba(0,0,0,.42);
+  clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% calc(100% - 16px),calc(100% - 16px) 100%,16px 100%,0 calc(100% - 16px),0 16px);
+}
+.chrome::before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.38;
+  background:linear-gradient(112deg, transparent 0%, rgba(255,255,255,.08) 8%, transparent 14%, transparent 82%, rgba(255,182,104,.05) 92%, transparent 100%);
+}
+.label{font:700 10px JetBrains Mono,monospace;letter-spacing:.18em;text-transform:uppercase;color:#ffd9b2}
+.micro{font:700 10px/1.35 JetBrains Mono,monospace;letter-spacing:.08em;color:var(--muted)}
+.value{font-family:Orbitron,JetBrains Mono,monospace;letter-spacing:.06em;color:#fff0df}
+.ok{color:var(--good)!important}.warn{color:var(--warn)!important}.bad{color:var(--bad)!important}
+#identity{position:absolute;left:16px;top:16px;bottom:16px;width:196px;padding:16px;display:flex;flex-direction:column;gap:14px;z-index:4}
+.brand{display:flex;align-items:center;gap:12px}.mark{width:42px;height:42px;display:grid;place-items:center;border:1px solid rgba(255,177,98,.22);color:var(--amber);font:800 18px Orbitron,sans-serif;background:rgba(255,177,98,.06);box-shadow:inset 0 0 18px rgba(255,177,98,.06),0 0 18px rgba(255,177,98,.05)}.brand h1{margin:0;font:800 28px/1 Orbitron,sans-serif;letter-spacing:.14em}.brand .sub{font:700 9px JetBrains Mono,monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.idblock{padding-top:12px;border-top:1px solid rgba(255,177,98,.10);display:grid;gap:10px}.idrow{display:grid;gap:3px}.idrow .val{font:700 11px/1.35 JetBrains Mono,monospace;color:#ffe7ce}.spacer{flex:1}.dots{display:flex;gap:5px}.dots i{width:5px;height:5px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px rgba(255,179,100,.8)}.bars{display:flex;gap:4px;align-items:end;height:30px}.bars i{width:7px;background:linear-gradient(180deg,#ffd0a1,rgba(255,140,58,.32));box-shadow:0 0 10px rgba(255,140,58,.28)}.bars i:nth-child(1){height:9px}.bars i:nth-child(2){height:14px}.bars i:nth-child(3){height:19px}.bars i:nth-child(4){height:24px}.bars i:nth-child(5){height:29px}
+#topbar{position:absolute;left:228px;right:16px;top:16px;height:68px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;z-index:5}
+#ticker{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.tick{font:700 9px JetBrains Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:#d2b593}.tick b{color:#ffb96b}
+.control-set{display:flex;gap:8px}.ctrl{min-width:76px;height:30px;border:1px solid rgba(255,177,98,.16);background:rgba(0,0,0,.24);font:700 10px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#f5d3af}.ctrl.primary{border-color:rgba(255,177,98,.32);background:rgba(255,177,98,.12);color:#ffcb8f}.ctrl:hover{background:rgba(255,177,98,.06);box-shadow:0 0 14px rgba(255,177,98,.08)}
+#workspace{position:absolute;left:228px;right:16px;top:96px;bottom:16px;display:grid;gap:12px;grid-template-columns:170px 1fr 1fr 280px;grid-template-rows:304px 1fr 58px;z-index:2}
+#workspace::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.36;background:repeating-linear-gradient(90deg, rgba(255,167,82,.10) 0 1px, transparent 1px 54px), repeating-linear-gradient(0deg, rgba(255,167,82,.08) 0 1px, transparent 1px 46px)}
+#toolRail{grid-column:1;grid-row:1 / span 2;padding:14px;display:flex;flex-direction:column;gap:12px}#viewportA,#viewportB,#coreMap,#dependencyPanel,#footerBar{padding:12px}
+#viewportA{grid-column:2;grid-row:1}#viewportB{grid-column:3;grid-row:1}#dependencyPanel{grid-column:4;grid-row:1 / span 2}#coreMap{grid-column:2 / span 2;grid-row:2}#footerBar{grid-column:1 / -1;grid-row:3;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.railTitle,.panelHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.panelHead{margin-bottom:10px}.panelTitle{font:800 12px Orbitron,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#ffddb5}.panelSub{font:700 9px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#c48f56}
+.buttonGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toolBtn,.actionBtn,.footBtn,.miniBtn,.nodeChip,.pill{
+  position:relative;border:1px solid rgba(255,177,98,.14);background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,158,72,.02) 14%, rgba(0,0,0,.22) 42%, rgba(0,0,0,.34));
+  font:700 10px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#f3d4b0;padding:10px 8px;text-align:left
+}
+.toolBtn.active,.actionBtn.active{border-color:rgba(255,177,98,.32);background:linear-gradient(180deg, rgba(255,177,98,.18), rgba(255,177,98,.08) 16%, rgba(0,0,0,.26));color:#ffd5a3;box-shadow:inset 0 0 18px rgba(255,177,98,.08)}
+.toolBtn:hover,.actionBtn:hover,.footBtn:hover,.miniBtn:hover,.nodeChip:hover,.pill:hover{box-shadow:0 0 14px rgba(255,177,98,.08), inset 0 0 14px rgba(255,177,98,.05)}
+#scriptPanel{margin-top:auto;padding-top:10px;border-top:1px solid rgba(255,177,98,.10);display:grid;gap:10px}.scriptMeter{display:grid;gap:5px}.meterRow{display:flex;align-items:center;gap:8px}.meterRow span{width:32px;font:700 9px JetBrains Mono,monospace;color:var(--muted)}.meterBar{flex:1;height:6px;background:rgba(75,52,33,.42);position:relative}.meterBar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--cyan),var(--amber));box-shadow:0 0 10px rgba(255,177,98,.18)}
+.viewportBox{position:relative;height:calc(100% - 32px);border:1px solid rgba(255,177,98,.14);padding:12px;background:linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.30));overflow:hidden}
+.viewportGrid{position:absolute;inset:0;opacity:.30;background:repeating-linear-gradient(90deg, rgba(255,168,84,.10) 0 1px, transparent 1px 42px), repeating-linear-gradient(0deg, rgba(255,168,84,.08) 0 1px, transparent 1px 38px)}
+.viewportContent{position:relative;z-index:1;height:100%;display:grid;grid-template-columns:1.08fr .92fr;gap:10px}
+.previewFigure{position:relative;border:1px solid rgba(255,177,98,.14);overflow:hidden;background:radial-gradient(circle at 50% 50%, rgba(255,135,50,.12), transparent 30%), rgba(0,0,0,.12)}
+.previewFigure::before{content:"";position:absolute;inset:-8%;background:conic-gradient(from 90deg, transparent 0 18%, rgba(255,177,98,.05) 25%, transparent 44%, rgba(104,221,255,.06) 56%, transparent 100%);filter:blur(6px)}
+.previewFigure .centerOrb{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:86px;height:86px;border-radius:50%;border:1px solid rgba(255,195,136,.34);box-shadow:0 0 26px rgba(255,177,98,.12), inset 0 0 20px rgba(255,177,98,.10);background:radial-gradient(circle, rgba(255,248,239,.92) 0 4px, rgba(255,175,90,.70) 8px, rgba(0,0,0,.16) 34px, transparent 35px)}
+.previewFigure .ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,189,128,.22);border-radius:50%}.previewFigure .r1{width:180px;height:92px}.previewFigure .r2{width:144px;height:144px;transform:translate(-50%,-50%) rotate(42deg)}.previewFigure .r3{width:116px;height:188px;transform:translate(-50%,-50%) rotate(-30deg)}
+.previewInfo{display:grid;align-content:start;gap:10px}.previewInfo .hero{font:800 22px/1.1 Orbitron,sans-serif;letter-spacing:.06em;color:#fff4e6}.previewInfo .desc{font:12px/1.45 JetBrains Mono,monospace;color:#d3b18a}.metaTable{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font:700 10px/1.35 JetBrains Mono,monospace;color:#cda26f}.metaTable b{color:#ffe0ba}.actionStrip{display:flex;flex-wrap:wrap;gap:8px}
+#dependencyList,#assetList,#logMini{display:grid;gap:6px;align-content:start}.depItem,.assetItem,.miniLog{display:grid;grid-template-columns:1fr auto;gap:10px;padding:4px 0;border-bottom:1px solid rgba(255,177,98,.08);font:700 10px/1.35 JetBrains Mono,monospace}.depItem span:first-child,.assetItem span:first-child{color:#d8b186}.depItem span:last-child,.assetItem span:last-child{color:#ffbb72}
+#coreMapCanvas{position:relative;height:100%;min-height:350px;border:1px solid rgba(255,177,98,.14);overflow:hidden;background:radial-gradient(circle at 50% 62%, rgba(255,130,52,.12), transparent 22%), linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.34))}
+#coreMapCanvas .grid{position:absolute;inset:0;opacity:.38;background:repeating-linear-gradient(90deg, rgba(255,167,82,.11) 0 1px, transparent 1px 52px), repeating-linear-gradient(0deg, rgba(255,167,82,.09) 0 1px, transparent 1px 48px)}
+#mapSvg{position:absolute;inset:0;width:100%;height:100%}.centerCore{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);width:138px;height:138px;border-radius:50%;background:radial-gradient(circle, rgba(255,249,240,.94) 0 10px, rgba(255,199,131,.82) 12px, rgba(255,146,62,.70) 36px, rgba(25,18,15,.94) 60px, rgba(0,0,0,.92) 66px);box-shadow:0 0 34px rgba(255,146,62,.18), 0 0 100px rgba(255,146,62,.08)}.centerCore::before,.centerCore::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,188,126,.18);border-radius:50%}.centerCore::before{width:230px;height:230px}.centerCore::after{width:330px;height:330px}
+.nodeChip{position:absolute;min-width:110px;padding:8px 10px;transform:translate(-50%,-50%)}.nodeChip small{display:block;margin-top:4px;color:#cca376;font-size:9px;letter-spacing:.08em;text-transform:none}.nodeChip.active{border-color:rgba(255,177,98,.32);color:#ffd6a6}
+#statsBand{position:absolute;left:16px;right:16px;bottom:16px;display:grid;grid-template-columns:1.1fr 1.4fr .9fr;gap:12px;z-index:2}.statBox{padding:10px;border:1px solid rgba(255,177,98,.12);background:rgba(0,0,0,.20)}.statBox .row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:2px 0;font:700 10px JetBrains Mono,monospace;color:#cfa16e}.statBox .row b{color:#ffe1c1}
+.footSet{display:flex;gap:8px;flex-wrap:wrap}.footBtn{min-width:110px;padding:9px 12px;text-align:center}.footerNote{font:700 9px JetBrains Mono,monospace;letter-spacing:.16em;color:#b68958;text-transform:uppercase}
+.window{position:absolute;z-index:40;min-width:360px;min-height:240px;width:760px;height:500px;display:flex;flex-direction:column;opacity:0;transform:scale(.93);transition:.16s opacity,.16s transform}.window.live{opacity:1;transform:scale(1)}.window.focused{z-index:400!important;box-shadow:0 0 28px rgba(255,177,98,.08), 0 24px 70px rgba(0,0,0,.86), inset 0 0 26px rgba(255,140,58,.06)}
+.winbar{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 14px;border-bottom:1px solid rgba(255,177,98,.12);cursor:move}.winTitle{font:800 11px JetBrains Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:#fbe1c2}.winTools{display:flex;gap:6px}.winBtn{width:26px;height:24px;border:1px solid rgba(255,177,98,.14);background:rgba(0,0,0,.28);color:#c9a37b}.winbody{position:relative;flex:1;background:rgba(0,0,0,.34)}iframe{width:100%;height:100%;border:0;background:#090909}.resize-handle{position:absolute}.resize-handle.e{top:0;right:-3px;bottom:0;width:8px;cursor:ew-resize}.resize-handle.s{left:0;right:0;bottom:-3px;height:8px;cursor:ns-resize}.resize-handle.se{right:-3px;bottom:-3px;width:14px;height:14px;cursor:nwse-resize}
+.modal{position:absolute;inset:0;display:none;place-items:center;z-index:900;background:rgba(0,0,0,.72);backdrop-filter:blur(14px)}.modal.show{display:grid}.dialog{width:min(760px,92vw);max-height:86vh;overflow:auto;padding:18px}.dialog h2{margin:0 0 14px;font:800 22px Orbitron,sans-serif;letter-spacing:.12em}.formgrid{display:grid;gap:12px}.formrow{display:grid;gap:6px}.formrow label{font:700 10px JetBrains Mono,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}.field,textarea,select{background:rgba(0,0,0,.28);border:1px solid rgba(255,177,98,.16);color:#ffe2c2;padding:10px 12px;min-height:40px}.field:focus,textarea:focus,select:focus{outline:none;border-color:rgba(255,177,98,.30)}textarea{min-height:120px;resize:vertical}.btnrow{display:flex;gap:10px;flex-wrap:wrap}.pill{padding:10px 12px}.pill.danger{border-color:rgba(255,100,110,.22);color:#ff9a89}
+@media (max-width:1400px){#workspace{grid-template-columns:170px 1fr 1fr;grid-template-rows:280px 280px 1fr 58px}#dependencyPanel{grid-column:1 / -1;grid-row:3}#coreMap{grid-column:2 / span 2;grid-row:2}}
+</style>
 </head>
-<body data-theme="dark">
-
-    <div id="top-system-bar">
-        <div class="bar-section">
-            <div id="sys-status-server" class="status-light" title="Server Status: Disconnected" onclick="openConnectionPopup()"></div>
-            <div id="sys-status-llm" class="status-light" title="LLM Status: Unknown" style="display:none"></div>
-            <span class="system-text" id="sys-cpu"></span>
-            <span class="system-text" id="sys-date">...</span>
-            <span class="system-text" id="sys-clock">...</span>
-            <span class="system-text" id="sys-battery"></span>
-        </div>
-        <div class="bar-section">
-            <button class="bar-btn" title="Help" onclick="openWelcome()">?</button>
-            <button class="bar-btn" title="Reset Dock" onclick="resetDock()">⚓</button>
-            <button class="bar-btn" title="Fullscreen" onclick="toggleDashboardFullscreen()">⛶</button>
-            <button class="bar-btn close-iframe-btn" id="btn-close-iframe" onclick="closeDashboard()">✕</button>
-        </div>
+<body>
+<div id="machine">
+  <aside id="identity" class="chrome">
+    <div class="brand"><div class="mark">△</div><div><h1>LYRN</h1><div class="sub">Replicant Surface Mode</div></div></div>
+    <div class="idblock">
+      <div class="idrow"><div class="label">System ID</div><div class="val">LYRN-OS-74222</div></div>
+      <div class="idrow"><div class="label">Core URL</div><div id="coreUrlLabel" class="val">--</div></div>
+      <div class="idrow"><div class="label">Uptime</div><div id="uptimeLabel" class="val">00:00:00</div></div>
+      <div class="idrow"><div class="label">Auth</div><div id="authLabel" class="val">Not authenticated</div></div>
     </div>
-
-    <div id="auth-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); backdrop-filter:blur(15px); z-index:30000; align-items:center; justify-content:center; flex-direction:column;">
-        <div style="background:var(--bg-panel); border:1px solid var(--brand-purple); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
-            <h2 style="margin:0 0 20px 0; color:var(--text-head); font-family:'JetBrains Mono'; text-transform:uppercase; font-size:16px;">Authentication Required</h2>
-            <p style="font-size:12px; color:var(--text-body); margin-bottom:20px; line-height:1.4;">Please enter your Admin Token to access the system.</p>
-            <div style="margin-bottom: 15px; text-align: center;">
-                 <input type="file" id="inp-token-file" accept=".txt" style="display:none" onchange="handleTokenFile(this)">
-                 <button class="cta-btn" onclick="document.getElementById('inp-token-file').click()" style="width:100%; padding:10px; background:transparent; border:1px solid var(--brand-purple);">
-                    📂 Upload Token File
-                 </button>
-                 <p style="font-size:10px; color:var(--text-dim); margin-top:5px; margin-bottom:0;">Select admin_token.txt</p>
-            </div>
-
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
-                <div style="flex:1; height:1px; background:var(--border-color);"></div>
-                <span style="font-size:10px; color:var(--text-dim);">OR</span>
-                <div style="flex:1; height:1px; background:var(--border-color);"></div>
-            </div>
-
-            <input type="password" id="inp-auth-token" placeholder="Paste Token String Here..." style="width:100%; padding:10px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; margin-bottom:15px; border-radius:4px;">
-
-            <label style="display:flex; align-items:start; gap:10px; font-size:11px; color:var(--text-dim); text-align:left; margin-bottom:20px; cursor:pointer;">
-                <input type="checkbox" id="chk-save-token">
-                <span>Save token to this device?<br><span style="color:#ffaa00;">Warning: Only do this on private devices.</span></span>
-            </label>
-
-            <button class="cta-btn" style="width:100%; padding:10px;" onclick="submitAuthToken()">AUTHENTICATE</button>
-            <div id="auth-error" style="color:var(--error-color); font-size:11px; margin-top:10px; min-height:15px;"></div>
-        </div>
+    <div class="idblock"><div class="label">Control Node</div><div class="dots"><i></i><i></i><i></i><i></i></div></div>
+    <div class="spacer"></div>
+    <div class="idblock">
+      <div class="idrow"><div class="label">Link</div><div id="linkLabel" class="val bad">OFFLINE</div></div>
+      <div class="idrow"><div class="label">Sync</div><div id="syncLabel" class="val">--</div></div>
+      <div class="idrow"><div class="label">Mode</div><div class="val">Nominal</div><div class="bars"><i></i><i></i><i></i><i></i><i></i></div></div>
     </div>
+  </aside>
 
-    <div id="edit-mode-banner">
-        <span>EDIT MODE ACTIVE</span>
-        <button onclick="disableEditMode()">DONE</button>
+  <header id="topbar" class="chrome">
+    <div id="ticker"></div>
+    <div class="control-set">
+      <button class="ctrl" onclick="pollHealth(true)">Validate</button>
+      <button class="ctrl" onclick="saveLayout()">Export</button>
+      <button class="ctrl" onclick="restoreLayout()">Clone</button>
+      <button class="ctrl" onclick="cascadeWindows()">Diff</button>
+      <button class="ctrl" onclick="launch(findModule('logs'))">Log</button>
+      <button class="ctrl" onclick="openConnection()">Connect</button>
+      <button class="ctrl" onclick="toggleFullScreen()">Simulate</button>
+      <button class="ctrl" onclick="openSettings()">Cache</button>
+      <button class="ctrl primary" onclick="openSettings()">Function</button>
     </div>
+  </header>
 
-    <div id="desktop-area"></div>
-
-    <div id="welcome-popup">
-        <div class="window-header">
-            <span class="window-title">System Welcome</span>
-            <button class="win-btn" onclick="closeWelcome()">✕</button>
+  <main id="workspace">
+    <section id="toolRail" class="chrome">
+      <div class="railTitle"><span class="panelTitle">System Components</span><span class="panelSub">affordance rack</span></div>
+      <div id="toolButtons" class="buttonGrid"></div>
+      <div class="railTitle"><span class="panelTitle">Actions</span><span class="panelSub">control</span></div>
+      <div class="buttonGrid">
+        <button class="actionBtn" onclick="pollHealth(true)">Refresh</button>
+        <button class="actionBtn" onclick="openConnection()">Connect</button>
+        <button class="actionBtn" onclick="checkAuth()">Validate</button>
+        <button class="actionBtn" onclick="openSettings()">Config</button>
+        <button class="actionBtn" onclick="saveLayout()">Save</button>
+        <button class="actionBtn" onclick="restoreLayout()">Restore</button>
+        <button class="actionBtn" onclick="cascadeWindows()">Cascade</button>
+        <button class="actionBtn" onclick="toggleFullScreen()">Full</button>
+      </div>
+      <div id="scriptPanel">
+        <div class="railTitle"><span class="panelTitle">Active Script</span><button class="miniBtn" onclick="launch(findModule('jobs'))">Run</button></div>
+        <div class="micro" id="scriptName">surface_orchestrator.kst</div>
+        <div class="scriptMeter">
+          <div class="meterRow"><span>STEP</span><div class="meterBar"><i style="width:78%"></i></div></div>
+          <div class="meterRow"><span>CALL</span><div class="meterBar"><i style="width:58%"></i></div></div>
+          <div class="meterRow"><span>WAIT</span><div class="meterBar"><i style="width:22%"></i></div></div>
         </div>
-        <div class="welcome-content">
-            <span class="welcome-title">LYRN Dock System</span>
-            <p>The floating dock is your main navigation tool. You can drag the glowing handle to move it anywhere on the screen. Click the handle to toggle collapse.</p>
-            <p><strong>Lost the dock?</strong> Click the anchor (⚓) icon in the top system bar to reset its position to the center.</p>
+        <div class="micro" id="scriptInfo">Open windows: 0 / API hooks ready</div>
+      </div>
+    </section>
+
+    <section id="viewportA" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle" id="vpATitle">Comm Bay</div><div class="panelSub">holographic relay chamber</div></div><button class="miniBtn" onclick="launch(findModule(state.focusA))">Open</button></div>
+      <div class="viewportBox"><div class="viewportGrid"></div><div class="viewportContent"><div class="previewFigure"><div class="centerOrb"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div><div class="previewInfo"><div class="hero" id="vpAHero">COMM BAY</div><div class="desc" id="vpADesc">Conversational interface and live instruction chamber.</div><div class="metaTable" id="vpAMeta"></div><div class="actionStrip"><button class="miniBtn" onclick="launch(findModule(state.focusA))">Launch</button><button class="miniBtn" onclick="swapFocus('A')">Rotate</button></div></div></div></div>
+    </section>
+
+    <section id="viewportB" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle" id="vpBTitle">Archive Core</div><div class="panelSub">memory lattice projection</div></div><button class="miniBtn" onclick="launch(findModule(state.focusB))">Open</button></div>
+      <div class="viewportBox"><div class="viewportGrid"></div><div class="viewportContent"><div class="previewFigure"><div class="centerOrb"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div><div class="previewInfo"><div class="hero" id="vpBHero">ARCHIVE CORE</div><div class="desc" id="vpBDesc">Vector store, index access, and recall surface.</div><div class="metaTable" id="vpBMeta"></div><div class="actionStrip"><button class="miniBtn" onclick="launch(findModule(state.focusB))">Launch</button><button class="miniBtn" onclick="swapFocus('B')">Rotate</button></div></div></div></div>
+    </section>
+
+    <aside id="dependencyPanel" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle">Dependency Chain</div><div class="panelSub">runtime stack</div></div><div class="micro" id="depScore">12 active</div></div>
+      <div id="dependencyList"></div>
+      <div class="panelHead" style="margin-top:14px"><div><div class="panelTitle">Asset Configuration</div><div class="panelSub">visible modules</div></div><div class="micro" id="assetMode">Nominal</div></div>
+      <div id="assetList"></div>
+      <div class="panelHead" style="margin-top:14px"><div><div class="panelTitle">Recent Logs</div><div class="panelSub">surface events</div></div></div>
+      <div id="logMini"></div>
+    </aside>
+
+    <section id="coreMap" class="chrome">
+      <div class="panelHead"><div><div class="panelTitle">Module Integration Matrix</div><div class="panelSub">projection mesh / command surface</div></div><div class="micro" id="mapHint">Select a node or use the tool rail</div></div>
+      <div id="coreMapCanvas">
+        <div class="grid"></div>
+        <svg id="mapSvg" viewBox="0 0 1000 520" preserveAspectRatio="none"></svg>
+        <div class="centerCore"></div>
+        <div id="nodeLayer"></div>
+        <div id="statsBand">
+          <div class="statBox"><div class="label">Connection Matrix</div><div class="row"><span>Core URL</span><b id="matrixUrl">--</b></div><div class="row"><span>Auth</span><b id="matrixAuth">No token</b></div><div class="row"><span>Open Windows</span><b id="matrixWindows">0</b></div></div>
+          <div class="statBox"><div class="label">Surface Telemetry</div><div class="row"><span>Visible Modules</span><b id="matrixVisible">0</b></div><div class="row"><span>Focus A / B</span><b id="matrixFocus">-- / --</b></div><div class="row"><span>System Status</span><b id="matrixStatus">OFFLINE</b></div></div>
+          <div class="statBox"><div class="label">Health</div><div class="row"><span>Core</span><b id="healthCore">OFFLINE</b></div><div class="row"><span>LLM</span><b id="healthLLM">UNKNOWN</b></div><div class="row"><span>Store</span><b id="healthStore">UNKNOWN</b></div></div>
         </div>
-        <div class="welcome-footer">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                <input type="checkbox" id="chk-hide-welcome" onchange="toggleHideWelcome(this.checked)">
-                Don't show on startup
-            </label>
-            <button class="cta-btn" onclick="closeWelcome()">INITIALIZE</button>
-        </div>
-    </div>
-
-    <div id="connection-popup">
-        <div class="window-header">
-            <span class="window-title">Core Connection</span>
-            <button class="win-btn" onclick="skipConnection()">✕</button>
-        </div>
-        <div class="welcome-content">
-            <span class="welcome-title">Backend Configuration</span>
-            <p>Please enter the URL of the Python Core backend.</p>
-            <input type="text" id="inp-core-url" placeholder="http://localhost:8000" style="width:100%; padding:8px; margin-top:10px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); font-family:'JetBrains Mono';">
-            <div id="conn-status" style="margin-top:10px; font-size:11px; color:var(--text-dim);"></div>
-        </div>
-        <div class="welcome-footer">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                <input type="checkbox" id="chk-no-startup-conn" onchange="toggleStartupConn(this.checked)">
-                Don't show on startup
-            </label>
-            <div style="display:flex; gap:10px;">
-                <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="skipConnection()">SKIP</button>
-                <button class="cta-btn" onclick="testAndSaveConnection()">CONNECT</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="settings-popup">
-        <div class="settings-tabs">
-            <button class="tab-btn active" onclick="switchTab('tab-general')">General</button>
-            <button class="tab-btn" onclick="switchTab('tab-layouts')">Layouts</button>
-            <button class="tab-btn" onclick="switchTab('tab-advanced')">Advanced</button>
-        </div>
-
-        <div class="settings-content">
-            <!-- GENERAL TAB -->
-            <div id="tab-general" class="tab-pane active">
-                <div class="settings-header">Appearance</div>
-                <div class="settings-row">
-                    <span>Theme</span>
-                    <select id="setting-theme" onchange="toggleTheme(this.value)" style="background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); padding:4px; border-radius:4px; font-family:'JetBrains Mono'; font-size:11px;">
-                        <option value="dark">Dark (Default)</option>
-                        <option value="light">Light</option>
-                        <option value="corporate-terminal">Corporate Terminal</option>
-                        <option value="corporate-2049">Corporate 2049</option>
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <span>Pin Dock Open</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="setting-dock-pin" checked onchange="toggleDockPin(this.checked)">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-                <div class="settings-row">
-                    <span>Font Size: <b id="font-size-display">12</b>px</span>
-                    <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
-                </div>
-
-                <div class="settings-row">
-                    <span>Tab Tag</span>
-                    <div style="display: flex; gap: 4px;">
-                        <input type="text" id="setting-tab-tag" style="padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); border-radius:4px; width:100px;" value="LYRN" onchange="updateTabTag(this.value, document.getElementById('setting-tab-suffix').value)">
-                        <input type="text" id="setting-tab-suffix" style="padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); border-radius:4px; width:100px;" value="LYRN-AI" onchange="updateTabTag(document.getElementById('setting-tab-tag').value, this.value)">
-                    </div>
-                </div>
-
-                <div class="settings-header">Connection</div>
-                <button class="btn-full-width" onclick="openConnectionPopup()">Configure Connection</button>
-
-                <div class="settings-header">Modules</div>
-                <button class="btn-full-width" onclick="enableEditMode()" style="margin-bottom:8px;">Edit Dock Order</button>
-                <div id="module-list-container"></div>
-            </div>
-
-            <!-- LAYOUTS TAB -->
-            <div id="tab-layouts" class="tab-pane">
-                <div class="settings-header">Current Layout</div>
-                <div style="display:flex; gap:6px;">
-                    <input type="text" id="inp-layout-name" placeholder="Layout Name" style="flex:1; padding:6px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); border-radius:4px;">
-                    <button class="btn-icon" onclick="saveCurrentLayout()">Save</button>
-                </div>
-
-                <div class="settings-header">Saved Layouts</div>
-                <div id="layout-list" style="display:flex; flex-direction:column; gap:6px;">
-                    <!-- JS Injected -->
-                </div>
-            </div>
-
-            <!-- ADVANCED TAB -->
-            <div id="tab-advanced" class="tab-pane">
-                <div class="settings-header">System Config (Server)</div>
-                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                    <button class="btn-full-width" onclick="fetchSystemConfig()">Load Config</button>
-                    <button class="btn-full-width" onclick="saveSystemConfig()">Save Config</button>
-                </div>
-                <textarea id="sys-config-editor" style="width:100%; height:150px; font-family:'JetBrains Mono'; font-size:10px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); padding:8px; resize:vertical;"></textarea>
-
-                <div class="settings-header">API Endpoints (Local)</div>
-                <textarea id="api-config-editor" placeholder="{ 'Chat': 'http://...' }" style="width:100%; height:80px; font-family:'JetBrains Mono'; font-size:10px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); padding:8px; resize:vertical;"></textarea>
-                <button class="btn-full-width" onclick="saveApiConfig()">Save API Map</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="floating-dock">
-        <div id="dock-content"></div>
-
-        <div id="dock-handle" title="Drag to Move | Click to Toggle">
-            <div class="handle-bar"></div>
-        </div>
-    </div>
-
-    <script>
-        /* =========================================================================
-           CONFIG & STATE
-           ========================================================================= */
-        const MODULE_REGISTRY = [
-            { id: "mod_chat", file: "Chat Interface.html", name: "Chat", icon: "💬" },
-            { id: "mod_claude_code", file: "ClaudeCode.html", name: "Claude Code", icon: "🤖" },
-            { id: "mod_builder", file: "Snapshot Builder.html", name: "Snapshot Builder", icon: "🛠️" },
-            { id: "mod_file_tree", file: "FileTreeViewer.html", name: "File Tree Viewer", icon: "📁" },
-            { id: "mod_models", file: "ModelController.html", name: "Model Controller", icon: "🧠" },
-            { id: "mod_model_manager", file: "ModelManager.html", name: "Model Manager", icon: "📦" },
-            { id: "mod_logs", file: "LogViewer.html", name: "System Logs", icon: "📜" },
-            { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
-            { id: "mod_job_mgr", file: "JobManager.html", name: "Job Manager", icon: "🦺" },
-            { id: "mod_delta_mgr", file: "DeltaManager.html", name: "Delta Manager", icon: "Δ" },
-        ];
-
-        let appSettings = {
-            activeModules: ['mod_chat', 'mod_claude_code', 'mod_builder', 'mod_file_tree', 'mod_models', 'mod_model_manager', 'mod_logs', 'mod_server_status'],
-            dockPinned: true,
-            dockPos: null, // Initial null to trigger center calculation
-            theme: 'dark',
-            fontSize: 12,
-            tabTag: 'LYRN',
-            tabSuffix: 'LYRN-AI'
-        };
-
-        let zIndexCounter = 100;
-        let activeWindows = new Set();
-        let isEditMode = false;
-
-        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-
-        let coreUrl = "http://localhost:8000";
-        if(window.location.protocol.startsWith('http')) {
-             coreUrl = window.location.origin;
-        }
-        let authToken = null;
-
-        document.addEventListener('DOMContentLoaded', () => {
-            loadSettings();
-            renderDock();
-            initDockDrag();
-            startClock();
-            // startCpuMonitor();
-            initSystemMonitor();
-            checkIfIframe();
-            checkWelcome();
-            checkConnection();
-
-            document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
-
-            // Set Theme Dropdown
-            const themeSelect = document.getElementById('setting-theme');
-            if(themeSelect) {
-                if(appSettings.theme === 'dark' || appSettings.theme === 'light' || appSettings.theme === 'corporate-terminal' || appSettings.theme === 'corporate-2049') {
-                    themeSelect.value = appSettings.theme;
-                } else {
-                    themeSelect.value = 'dark';
-                }
-            }
-
-            // Initialize Font Size Slider
-            document.getElementById('setting-font-size').value = appSettings.fontSize;
-            updateFontSize(appSettings.fontSize, false); // False = don't save yet, just apply
-
-            // Handle clicking outside
-            document.addEventListener('click', (e) => {
-                // Settings Popup
-                const setPop = document.getElementById('settings-popup');
-                if(setPop.classList.contains('show') && !e.target.closest('#settings-popup') && !e.target.closest('#btn_settings')) {
-                    setPop.classList.remove('show');
-                }
-
-                // Edit Mode - Exit if clicking outside dock/popups
-                if(isEditMode && !e.target.closest('#floating-dock') && !e.target.closest('.edit-popup') && !e.target.closest('#edit-mode-banner') && !e.target.closest('#settings-popup')) {
-                    disableEditMode();
-                }
-            });
-
-            // Handle Window Resize (Keep windows on screen)
-            window.addEventListener('resize', () => { constrainWindows(); });
-
-            // Init Layouts
-            loadLayoutsAndCheckDefault();
-        });
-
-        /* =========================================
-           TABS & LAYOUTS & ADVANCED
-           ========================================= */
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-
-            // Find button that triggered this
-            const btns = document.querySelectorAll('.tab-btn');
-            if(tabId === 'tab-general') btns[0].classList.add('active');
-            if(tabId === 'tab-layouts') btns[1].classList.add('active');
-            if(tabId === 'tab-advanced') btns[2].classList.add('active');
-        }
-
-        /* --- LAYOUTS --- */
-        let savedLayouts = {};
-
-        function loadLayoutsAndCheckDefault() {
-            try {
-                const s = localStorage.getItem('lyrn_layouts');
-                if(s) savedLayouts = JSON.parse(s);
-            } catch(e) { console.error(e); }
-
-            // Check Default
-            const defName = localStorage.getItem('lyrn_default_layout');
-            if(defName && savedLayouts[defName]) {
-                console.log("Loading default layout:", defName);
-                applyLayout(savedLayouts[defName]);
-            }
-        }
-
-        function renderLayoutList() {
-            const list = document.getElementById('layout-list');
-            list.innerHTML = '';
-
-            const defName = localStorage.getItem('lyrn_default_layout');
-
-            Object.keys(savedLayouts).forEach(name => {
-                const isDef = (name === defName);
-                const item = document.createElement('div');
-                item.className = 'layout-item';
-
-                // Name Span
-                const span = document.createElement('span');
-                span.className = 'layout-name';
-                span.textContent = name + (isDef ? ' (Default)' : '');
-
-                // Actions Container
-                const actions = document.createElement('div');
-                actions.className = 'layout-actions';
-
-                // Load Button
-                const btnLoad = document.createElement('button');
-                btnLoad.className = 'btn-icon';
-                btnLoad.title = 'Load';
-                btnLoad.textContent = '📂';
-                btnLoad.onclick = () => loadLayout(name);
-
-                // Default Button
-                const btnDef = document.createElement('button');
-                btnDef.className = 'btn-icon';
-                btnDef.title = 'Set Default';
-                btnDef.textContent = '★';
-                if(isDef) btnDef.style.color = 'var(--brand-purple)';
-                btnDef.onclick = () => setDefaultLayout(name);
-
-                // Delete Button
-                const btnDel = document.createElement('button');
-                btnDel.className = 'btn-icon';
-                btnDel.title = 'Delete';
-                btnDel.textContent = '✕';
-                btnDel.style.color = 'var(--error-color)';
-                btnDel.onclick = () => deleteLayout(name);
-
-                actions.appendChild(btnLoad);
-                actions.appendChild(btnDef);
-                actions.appendChild(btnDel);
-
-                item.appendChild(span);
-                item.appendChild(actions);
-                list.appendChild(item);
-            });
-        }
-
-        function saveCurrentLayout() {
-            const name = document.getElementById('inp-layout-name').value.trim();
-            if(!name) return alert("Please enter a layout name.");
-
-            const wins = [];
-            document.querySelectorAll('.lyrn-window').forEach(win => {
-                const id = win.id.replace('win_', '');
-                const rect = win.getBoundingClientRect();
-                wins.push({
-                    id: id,
-                    left: rect.left,
-                    top: rect.top,
-                    width: win.style.width,
-                    height: win.style.height,
-                    pinned: win.classList.contains('always-on-top'),
-                    maximized: win.classList.contains('maximized'),
-                    zIndex: win.style.zIndex
-                });
-            });
-
-            // Also save Active Modules list
-            const layout = {
-                windows: wins,
-                activeModules: [...appSettings.activeModules],
-                timestamp: Date.now()
-            };
-
-            savedLayouts[name] = layout;
-            localStorage.setItem('lyrn_layouts', JSON.stringify(savedLayouts));
-            renderLayoutList();
-            document.getElementById('inp-layout-name').value = '';
-        }
-
-        function loadLayout(name) {
-            const layout = savedLayouts[name];
-            if(!layout) return;
-
-            if(confirm('Load layout "' + name + '"? This will close current windows.')) {
-                applyLayout(layout);
-            }
-        }
-
-        function applyLayout(layout) {
-            // 1. Close all windows
-            activeWindows.forEach(id => closeWindow(id));
-
-            // 2. Update active modules if saved
-            if(layout.activeModules) {
-                appSettings.activeModules = layout.activeModules;
-                saveSettings();
-                renderDock();
-            }
-
-            // 3. Restore windows
-            layout.windows.forEach(w => {
-                // Check if module exists in registry (might have been removed)
-                const mod = MODULE_REGISTRY.find(m => m.id === w.id);
-                if(!mod) return;
-
-                createWindow(mod);
-                const win = document.getElementById('win_' + w.id);
-                if(win) {
-                    win.style.left = w.left + 'px';
-                    win.style.top = w.top + 'px';
-                    win.style.width = w.width;
-                    win.style.height = w.height;
-                    win.style.zIndex = w.zIndex;
-
-                    if(w.pinned) {
-                         win.classList.add('always-on-top');
-                         const btn = win.querySelector('.pin-btn');
-                         if(btn) { btn.classList.add('pinned'); btn.innerHTML = '📍'; }
-                    }
-                    if(w.maximized) {
-                        win.classList.add('maximized');
-                        win.style.left = '0'; win.style.top = '32px';
-                        win.style.width = '100%'; win.style.height = 'calc(100% - 32px)';
-                    }
-                }
-            });
-        }
-
-        function deleteLayout(name) {
-            if(confirm('Delete layout "' + name + '"?')) {
-                delete savedLayouts[name];
-                localStorage.setItem('lyrn_layouts', JSON.stringify(savedLayouts));
-
-                if(localStorage.getItem('lyrn_default_layout') === name) {
-                    localStorage.removeItem('lyrn_default_layout');
-                }
-                renderLayoutList();
-            }
-        }
-
-        function setDefaultLayout(name) {
-            localStorage.setItem('lyrn_default_layout', name);
-            renderLayoutList();
-        }
-
-        /* --- ADVANCED SETTINGS --- */
-        async function fetchSystemConfig() {
-            if(!authToken || !coreUrl) return alert("Not connected or authenticated.");
-            try {
-                const res = await fetch(coreUrl + '/api/config', {
-                    headers: { 'X-Token': authToken }
-                });
-                if(!res.ok) throw new Error("Fetch failed");
-                const json = await res.json();
-                document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
-            } catch(e) {
-                alert("Error: " + e.message);
-            }
-        }
-
-        async function saveSystemConfig() {
-            if(!authToken || !coreUrl) return alert("Not connected or authenticated.");
-            try {
-                const text = document.getElementById('sys-config-editor').value;
-                const json = JSON.parse(text);
-                const res = await fetch(coreUrl + '/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
-                    body: JSON.stringify(json)
-                });
-                if(!res.ok) throw new Error("Save failed");
-                alert("System Config Saved.");
-            } catch(e) {
-                alert("Error: " + e.message);
-            }
-        }
-
-        function loadApiConfig() {
-            const s = localStorage.getItem('lyrn_api_config');
-            if(s) {
-                 try {
-                     document.getElementById('api-config-editor').value = JSON.stringify(JSON.parse(s), null, 2);
-                 } catch(e) {
-                     console.error("Failed to parse API config", e);
-                     document.getElementById('api-config-editor').value = "{\n  \"Chat\": \"http://localhost:8000/api/chat\"\n}";
-                 }
-            } else {
-                 document.getElementById('api-config-editor').value = "{\n  \"Chat\": \"http://localhost:8000/api/chat\"\n}";
-            }
-        }
-
-        function saveApiConfig() {
-            try {
-                const text = document.getElementById('api-config-editor').value;
-                const json = JSON.parse(text);
-                localStorage.setItem('lyrn_api_config', JSON.stringify(json));
-                alert("API Map Saved.");
-            } catch(e) {
-                alert("Invalid JSON: " + e.message);
-            }
-        }
-
-        function constrainWindows() {
-            const wins = document.querySelectorAll('.lyrn-window');
-            const maxW = window.innerWidth;
-            const maxH = window.innerHeight;
-            const topBarH = 32;
-
-            wins.forEach(win => {
-                if(win.classList.contains('maximized')) return;
-
-                const rect = win.getBoundingClientRect();
-                let newLeft = rect.left;
-                let newTop = rect.top;
-                let moved = false;
-
-                // Right edge
-                if(rect.right > maxW) {
-                    newLeft = maxW - rect.width;
-                    if(newLeft < 0) newLeft = 0;
-                    moved = true;
-                }
-
-                // Bottom edge
-                if(rect.bottom > maxH) {
-                    newTop = maxH - rect.height;
-                    if(newTop < topBarH) newTop = topBarH;
-                    moved = true;
-                }
-
-                // Top edge
-                if(rect.top < topBarH) {
-                    newTop = topBarH;
-                    moved = true;
-                }
-
-                // Left edge
-                if(rect.left < 0) {
-                    newLeft = 0;
-                    moved = true;
-                }
-
-                if(moved) {
-                    win.style.left = newLeft + 'px';
-                    win.style.top = newTop + 'px';
-                }
-            });
-        }
-
-        /* =========================================
-           DOCK LOGIC
-           ========================================= */
-        function renderDock() {
-            const container = document.getElementById('dock-content');
-            const modContainer = document.getElementById('module-list-container');
-            container.innerHTML = '';
-            modContainer.innerHTML = '';
-
-            // 1. Module List (Settings) - Render from Registry (Fixed Order)
-            MODULE_REGISTRY.forEach(mod => {
-                const isActive = appSettings.activeModules.includes(mod.id);
-                const row = document.createElement('div');
-                row.className = 'settings-row';
-                row.innerHTML = `<span>${mod.name}</span><label class="toggle-switch"><input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleModuleActive('${mod.id}', this.checked)"><span class="toggle-slider"></span></label>`;
-                modContainer.appendChild(row);
-            });
-
-            // 2. Dock Icons - Render from ActiveModules (Dynamic Order)
-            appSettings.activeModules.forEach(modId => {
-                const mod = MODULE_REGISTRY.find(m => m.id === modId);
-                if (!mod) return; // Skip if ID invalid
-
-                const btn = document.createElement('button');
-                btn.className = 'dock-btn';
-                if(isEditMode) btn.classList.add('wiggle');
-
-                btn.id = 'btn_' + mod.id;
-                btn.innerHTML = `${mod.icon}<div class="active-dot"></div>`;
-
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    if(isEditMode) {
-                        openEditPopup(e, mod);
-                    } else {
-                        toggleWindow(mod);
-                    }
-                };
-                container.appendChild(btn);
-            });
-
-            // 3. Settings Button
-            const settingsBtn = document.createElement('button');
-            settingsBtn.className = 'dock-btn';
-            settingsBtn.innerHTML = '⚙️';
-            settingsBtn.id = 'btn_settings';
-
-            if(isEditMode) {
-                 settingsBtn.style.opacity = '0.3';
-                 settingsBtn.style.pointerEvents = 'none';
-            }
-
-            settingsBtn.onclick = (e) => {
-                e.stopPropagation();
-                if(isEditMode) return;
-                const popup = document.getElementById('settings-popup');
-
-                if(!popup.classList.contains('show')) {
-                    // Position Logic
-                    const dockRect = document.getElementById('floating-dock').getBoundingClientRect();
-                    const popupW = 350;
-                    const popupH = 500; // Est max height
-                    const margin = 20;
-
-                    let left = dockRect.left - popupW - margin;
-                    let top = dockRect.top - popupH + margin; // Try to align bottom-ish
-
-                    // If dock is on left side
-                    if (dockRect.left < window.innerWidth / 2) {
-                        left = dockRect.right + margin;
-                    }
-
-                    // Check boundaries
-                    if (left < margin) left = margin;
-                    if (left + popupW > window.innerWidth - margin) left = window.innerWidth - popupW - margin;
-
-                    // Vertical alignment
-                    if (top < margin + 32) top = margin + 32;
-                    if (top + popupH > window.innerHeight - margin) top = window.innerHeight - popupH - margin;
-
-                    popup.style.left = left + 'px';
-                    popup.style.top = top + 'px';
-
-                    // Init logic when opening
-                    renderLayoutList();
-                    loadApiConfig();
-                }
-
-                popup.classList.toggle('show');
-            };
-            container.appendChild(settingsBtn);
-
-            updateDockIndicators();
-        }
-
-        /* =========================================
-           WEBSITE STYLE DRAG (GRID SNAP)
-           ========================================= */
-        function initDockDrag() {
-            const dock = document.getElementById('floating-dock');
-            const handle = document.getElementById('dock-handle');
-
-            // Apply saved position OR CENTER DEFAULT
-            if (appSettings.dockPos) {
-                 dock.style.bottom = 'auto';
-                 dock.style.right = 'auto';
-                 dock.style.left = appSettings.dockPos.left + 'px';
-                 dock.style.top = appSettings.dockPos.top + 'px';
-            } else {
-                 // Calculate Center
-                 const startLeft = (window.innerWidth / 2) - 25; // 50px width / 2
-                 const startTop = (window.innerHeight / 2) - 15; // 30px height / 2
-
-                 dock.style.bottom = 'auto';
-                 dock.style.right = 'auto';
-                 dock.style.left = startLeft + 'px';
-                 dock.style.top = startTop + 'px';
-            }
-
-            if(!appSettings.dockPinned) {
-                dock.classList.add('dock-collapsed');
-            }
-
-            let isDragging = false;
-            let startX, startY, initialLeft, initialTop;
-            let hasMoved = false;
-
-            // 1. Drag Functionality
-            handle.addEventListener('mousedown', startDrag);
-            handle.addEventListener('touchstart', startDrag, {passive: false});
-
-            function startDrag(e) {
-                if(e.type === 'touchstart') e.preventDefault();
-
-                isDragging = true;
-                hasMoved = false;
-                dock.classList.add('is-dragging');
-
-                const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-                const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-
-                startX = clientX;
-                startY = clientY;
-
-                const rect = dock.getBoundingClientRect();
-                initialLeft = rect.left;
-                initialTop = rect.top;
-
-                // Ensure absolute positioning
-                dock.style.bottom = 'auto';
-                dock.style.right = 'auto';
-                dock.style.left = `${initialLeft}px`;
-                dock.style.top = `${initialTop}px`;
-
-                document.addEventListener('mousemove', onDrag);
-                document.addEventListener('mouseup', stopDrag);
-                document.addEventListener('touchmove', onDrag, {passive: false});
-                document.addEventListener('touchend', stopDrag);
-            }
-
-            function onDrag(e) {
-                if (!isDragging) return;
-                if(e.cancelable) e.preventDefault();
-
-                const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-                const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-
-                const dx = clientX - startX;
-                const dy = clientY - startY;
-
-                if (Math.abs(dx) + Math.abs(dy) > 5) hasMoved = true;
-
-                let newLeft = initialLeft + dx;
-                let newTop = initialTop + dy;
-
-                const maxLeft = window.innerWidth - dock.offsetWidth;
-                const maxTop = window.innerHeight - dock.offsetHeight;
-
-                if (newLeft < 0) newLeft = 0;
-                if (newLeft > maxLeft) newLeft = maxLeft;
-                if (newTop < 32) newTop = 32; // Respect top bar
-                if (newTop > maxTop) newTop = maxTop;
-
-                dock.style.left = `${newLeft}px`;
-                dock.style.top = `${newTop}px`;
-            }
-
-            function stopDrag() {
-                isDragging = false;
-                dock.classList.remove('is-dragging');
-
-                document.removeEventListener('mousemove', onDrag);
-                document.removeEventListener('mouseup', stopDrag);
-                document.removeEventListener('touchmove', onDrag);
-                document.removeEventListener('touchend', stopDrag);
-
-                if (hasMoved) {
-                    // Snap to Grid
-                    const rect = dock.getBoundingClientRect();
-                    const gridSize = 40;
-                    const safeMargin = 20;
-
-                    let currentLeft = rect.left;
-                    let currentTop = rect.top;
-
-                    let finalLeft = Math.round(currentLeft / gridSize) * gridSize;
-                    let finalTop = Math.round(currentTop / gridSize) * gridSize;
-
-                    const maxLeft = window.innerWidth - rect.width - safeMargin;
-                    const maxTop = window.innerHeight - rect.height - safeMargin;
-
-                    if (finalLeft < safeMargin) finalLeft = safeMargin;
-                    if (finalLeft > maxLeft) finalLeft = maxLeft;
-                    if (finalTop < 32 + safeMargin) finalTop = 32 + safeMargin;
-                    if (finalTop > maxTop) finalTop = maxTop;
-
-                    dock.style.left = `${finalLeft}px`;
-                    dock.style.top = `${finalTop}px`;
-
-                    appSettings.dockPos = { left: finalLeft, top: finalTop };
-                    saveSettings();
-                } else {
-                    // It was a click, not a drag
-                    dock.classList.toggle('dock-collapsed');
-                }
-            }
-        }
-
-        /* =========================================
-           EDIT MODE
-           ========================================= */
-        function enableEditMode() {
-            isEditMode = true;
-            document.getElementById('settings-popup').classList.remove('show');
-            document.getElementById('edit-mode-banner').style.display = 'flex';
-            document.getElementById('floating-dock').classList.remove('dock-collapsed');
-            renderDock();
-        }
-
-        function disableEditMode() {
-            isEditMode = false;
-            document.getElementById('edit-mode-banner').style.display = 'none';
-            document.querySelectorAll('.edit-popup').forEach(p => p.remove());
-
-            if(!appSettings.dockPinned) {
-                document.getElementById('floating-dock').classList.add('dock-collapsed');
-            }
-            renderDock();
-        }
-
-        function openEditPopup(e, mod) {
-            document.querySelectorAll('.edit-popup').forEach(p => p.remove());
-            const popup = document.createElement('div');
-            popup.className = 'edit-popup';
-
-            // Vertical Stack logic
-            const prev = '↑';
-            const next = '↓';
-
-            popup.innerHTML = `
-                <button class="edit-popup-btn" onclick="moveApp('${mod.id}', -1)">${prev}</button>
-                <button class="edit-popup-btn" onclick="moveApp('${mod.id}', 1)">${next}</button>
-                <div class="edit-popup-sep"></div>
-                <button class="edit-popup-btn danger" onclick="confirmRemoveApp('${mod.id}')">🗑</button>
-            `;
-
-            document.body.appendChild(popup);
-
-            const btnRect = e.currentTarget.getBoundingClientRect();
-            let top = btnRect.top;
-            let left = btnRect.left - 160;
-
-            if (left < 10) left = btnRect.right + 10;
-
-            popup.style.top = top + 'px';
-            popup.style.left = left + 'px';
-
-            e.stopPropagation();
-        }
-
-        function moveApp(modId, dir) {
-            const idx = appSettings.activeModules.indexOf(modId);
-            if (idx === -1) return;
-
-            const newIdx = idx + dir;
-            if (newIdx >= 0 && newIdx < appSettings.activeModules.length) {
-                const temp = appSettings.activeModules[idx];
-                appSettings.activeModules[idx] = appSettings.activeModules[newIdx];
-                appSettings.activeModules[newIdx] = temp;
-                saveSettings(); renderDock();
-                document.querySelectorAll('.edit-popup').forEach(p => p.remove());
-            }
-        }
-
-        function confirmRemoveApp(modId) {
-            if(confirm('Are you sure you want to remove this app from the dock?')) {
-                toggleModuleActive(modId, false);
-                document.querySelectorAll('.edit-popup').forEach(p => p.remove());
-            }
-        }
-
-        /* =========================================
-           HELPERS
-           ========================================= */
-        function toggleWindow(mod) {
-            const id = 'win_' + mod.id;
-            const el = document.getElementById(id);
-            if(el) {
-                if(el.style.display === 'none') {
-                    el.style.display = 'flex'; el.style.zIndex = ++zIndexCounter;
-                    el.classList.remove('minimized');
-                } else {
-                    el.style.display = 'none';
-                }
-            } else {
-                createWindow(mod);
-            }
-            updateDockIndicators();
-        }
-
-        function createWindow(mod) {
-            const id = 'win_' + mod.id;
-            const area = document.getElementById('desktop-area');
-            const win = document.createElement('div');
-            win.className = 'lyrn-window active';
-            win.id = id;
-            win.style.zIndex = ++zIndexCounter;
-
-            const isMobileWidth = window.innerWidth <= 600;
-            const startW = isMobileWidth ? '100%' : (isTouch ? '90%' : '800px');
-            const startH = isMobileWidth ? '65vh' : (isTouch ? '80%' : '600px');
-
-            win.style.width = startW;
-            win.style.height = startH;
-
-            const offset = (activeWindows.size * 30) + 50;
-            if(!isMobileWidth) {
-                 win.style.left = isTouch ? '5%' : offset + 'px';
-                 win.style.top = isTouch ? '10%' : offset + 'px';
-            }
-
-            win.innerHTML = `
-                <div class="window-header">
-                    <span class="window-title">${mod.name}</span>
-                    <div class="win-controls">
-                         <button class="win-btn pin-btn" title="Pin Always on Top" onclick="togglePin('${mod.id}', this)">📌</button>
-                         <button class="win-btn" onclick="minimizeWindow('${mod.id}')">_</button>
-                         <button class="win-btn" onclick="toggleMaximize(this)">☐</button>
-                         <button class="win-btn close-btn" onclick="closeWindow('${mod.id}')">✕</button>
-                    </div>
-                </div>
-                <div class="window-content">
-                    <div class="iframe-shield"></div>
-                    <iframe src="modules/${mod.file}"></iframe>
-                </div>
-                <div class="resize-handle"></div>
-                <div class="mobile-resize-handle"></div>
-            `;
-
-            const iframe = win.querySelector('iframe');
-            // Inject Font Size on Load
-            iframe.onload = () => {
-                iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
-                iframe.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
-                iframe.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: coreUrl }, '*');
-                if(authToken) iframe.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
-            };
-
-            setupWindowDrag(win);
-            setupWindowResize(win);
-            setupMobileResize(win);
-            win.onmousedown = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
-            win.ontouchstart = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
-            area.appendChild(win);
-            activeWindows.add(mod.id);
-            updateDockIndicators();
-        }
-
-        function closeWindow(modId) {
-            const win = document.getElementById('win_' + modId);
-            if(win) win.remove();
-            activeWindows.delete(modId);
-            updateDockIndicators();
-        }
-
-        function minimizeWindow(modId) {
-            const win = document.getElementById('win_' + modId);
-            if(win) win.style.display = 'none';
-            updateDockIndicators();
-        }
-
-        function setupWindowResize(win) {
-            const handle = win.querySelector('.resize-handle');
-            const startResize = (e) => {
-                e.preventDefault(); e.stopPropagation();
-                const startX = e.touches ? e.touches[0].clientX : e.clientX;
-                const startY = e.touches ? e.touches[0].clientY : e.clientY;
-                const startW = win.offsetWidth; const startH = win.offsetHeight;
-                win.classList.add('is-resizing');
-                const doResize = (ev) => {
-                    const curX = ev.touches ? ev.touches[0].clientX : ev.clientX;
-                    const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-                    const newW = startW + (curX - startX); const newH = startH + (curY - startY);
-                    if(newW > 250) win.style.width = newW + 'px';
-                    if(newH > 150) win.style.height = newH + 'px';
-                };
-                const stopResize = () => {
-                    win.classList.remove('is-resizing');
-                    window.removeEventListener('mousemove', doResize); window.removeEventListener('mouseup', stopResize);
-                    window.removeEventListener('touchmove', doResize); window.removeEventListener('touchend', stopResize);
-                };
-                window.addEventListener('mousemove', doResize); window.addEventListener('mouseup', stopResize);
-                window.addEventListener('touchmove', doResize, {passive:false}); window.addEventListener('touchend', stopResize);
-            };
-            handle.addEventListener('mousedown', startResize); handle.addEventListener('touchstart', startResize, {passive:false});
-        }
-
-        function setupMobileResize(win) {
-            const handle = win.querySelector('.mobile-resize-handle');
-            if(!handle) return;
-
-            const startResize = (e) => {
-                e.preventDefault(); e.stopPropagation();
-                // For mobile touches use first touch, fallback to mouse for testing
-                const startY = e.touches ? e.touches[0].clientY : e.clientY;
-                const startH = win.offsetHeight;
-
-                win.classList.add('is-resizing');
-
-                const doResize = (ev) => {
-                    // Prevent page scroll
-                    if(ev.cancelable) ev.preventDefault();
-                    const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-                    const newH = startH + (curY - startY);
-
-                    if(newH > 150) win.style.height = newH + 'px';
-                };
-
-                const stopResize = () => {
-                    win.classList.remove('is-resizing');
-                    window.removeEventListener('touchmove', doResize); window.removeEventListener('touchend', stopResize);
-                    window.removeEventListener('mousemove', doResize); window.removeEventListener('mouseup', stopResize);
-                };
-
-                window.addEventListener('touchmove', doResize, {passive: false}); window.addEventListener('touchend', stopResize);
-                window.addEventListener('mousemove', doResize); window.addEventListener('mouseup', stopResize);
-            };
-
-            handle.addEventListener('touchstart', startResize, {passive: false});
-            handle.addEventListener('mousedown', startResize);
-        }
-
-        function setupWindowDrag(win) {
-            const header = win.querySelector('.window-header');
-            const startDrag = (e) => {
-                if(e.target.closest('button')) return;
-                if(win.classList.contains('maximized')) return;
-                const startX = e.touches ? e.touches[0].clientX : e.clientX;
-                const startY = e.touches ? e.touches[0].clientY : e.clientY;
-                const startLeft = win.offsetLeft; const startTop = win.offsetTop;
-                win.classList.add('is-dragging');
-                const doDrag = (ev) => {
-                    ev.preventDefault();
-                    const curX = ev.touches ? ev.touches[0].clientX : ev.clientX;
-                    const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-                    win.style.left = (startLeft + (curX - startX)) + 'px';
-                    win.style.top = (startTop + (curY - startY)) + 'px';
-                };
-                const stopDrag = () => {
-                    win.classList.remove('is-dragging');
-                    window.removeEventListener('mousemove', doDrag); window.removeEventListener('touchmove', doDrag);
-                };
-                window.addEventListener('mousemove', doDrag); window.addEventListener('mouseup', stopDrag);
-                window.addEventListener('touchmove', doDrag, {passive:false}); window.addEventListener('touchend', stopDrag);
-            };
-            header.addEventListener('mousedown', startDrag); header.addEventListener('touchstart', startDrag, {passive:false});
-        }
-
-        function updateDockIndicators() {
-            document.querySelectorAll('.dock-btn').forEach(btn => {
-                btn.classList.remove('is-running');
-                const dot = btn.querySelector('.active-dot');
-                if(dot) dot.classList.remove('minimized-dot');
-            });
-
-            activeWindows.forEach(id => {
-                const btn = document.getElementById('btn_' + id);
-                const win = document.getElementById('win_' + id);
-
-                if(btn && win) {
-                    btn.classList.add('is-running');
-                    const dot = btn.querySelector('.active-dot');
-                    if(dot && win.style.display === 'none') {
-                        dot.classList.add('minimized-dot');
-                    }
-                }
-            });
-        }
-
-        function resetDock() {
-            // Recalculate center
-            const startLeft = (window.innerWidth / 2) - 25;
-            const startTop = (window.innerHeight / 2) - 15;
-
-            appSettings.dockPos = { left: startLeft, top: startTop };
-            appSettings.dockPinned = true;
-            document.getElementById('setting-dock-pin').checked = true;
-
-            const dock = document.getElementById('floating-dock');
-            dock.style.bottom = 'auto';
-            dock.style.right = 'auto';
-            dock.style.left = startLeft + 'px';
-            dock.style.top = startTop + 'px';
-            dock.classList.remove('dock-collapsed');
-            saveSettings();
-        }
-        function toggleTheme(themeValue) {
-            document.body.setAttribute('data-theme', themeValue);
-            appSettings.theme = themeValue;
-            saveSettings();
-
-            // Broadcast
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: themeValue }, '*');
-            });
-        }
-
-        function updateFontSize(size, save = true) {
-            document.documentElement.style.setProperty('--font-size-base', size + 'px');
-            document.getElementById('font-size-display').innerText = size;
-
-            appSettings.fontSize = parseInt(size);
-            if(save) saveSettings();
-
-            // Broadcast to all active windows
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: size }, '*');
-            });
-        }
-
-        async function updateTabTag(tag, suffix) {
-            if(!tag) tag = "LYRN";
-            if(!suffix) suffix = "LYRN-AI";
-            appSettings.tabTag = tag;
-            appSettings.tabSuffix = suffix;
-            document.title = `${tag} | ${suffix}`;
-            saveSettings();
-
-            // Save to backend so it is persistent across all instances
-            if(authToken && coreUrl) {
-                try {
-                    await fetch(coreUrl + '/api/config', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
-                        body: JSON.stringify({ ui_settings: { tab_tag: tag, tab_suffix: suffix } })
-                    });
-                } catch(e) {
-                    console.error("Failed to save Tab Tag to backend:", e);
-                }
-            }
-        }
-
-        function toggleDockPin(pinned) {
-            appSettings.dockPinned = pinned;
-            const dock = document.getElementById('floating-dock');
-            pinned ? dock.classList.remove('dock-collapsed') : dock.classList.add('dock-collapsed');
-            saveSettings();
-        }
-
-        function togglePin(modId, btn) {
-            const win = document.getElementById('win_' + modId);
-            if(win) {
-                win.classList.toggle('always-on-top');
-                if(win.classList.contains('always-on-top')) {
-                    btn.classList.add('pinned');
-                    btn.innerHTML = '📍';
-                } else {
-                    btn.classList.remove('pinned');
-                    btn.innerHTML = '📌';
-                }
-            }
-        }
-
-        function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
-        function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '0'; win.style.left = '0'; win.style.width = '100%'; win.style.height = '100%'; } }
-        function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
-        function loadSettings() { const s = localStorage.getItem('lyrn-settings'); if(s) appSettings = { ...appSettings, ...JSON.parse(s) }; if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme); if(appSettings.tabTag || appSettings.tabSuffix) { const t = appSettings.tabTag || "LYRN"; const suf = appSettings.tabSuffix || "LYRN-AI"; document.title = `${t} | ${suf}`; document.getElementById('setting-tab-tag').value = t; document.getElementById('setting-tab-suffix').value = suf; } }
-
-        function startClock() {
-            const timeEl = document.getElementById('sys-clock');
-            const dateEl = document.getElementById('sys-date');
-
-            // Update immediately
-            updateTime();
-            setInterval(updateTime, 1000);
-
-            function updateTime() {
-                const n = new Date();
-                if(timeEl) timeEl.innerText = n.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                if(dateEl) dateEl.innerText = n.toLocaleDateString([], {month: 'short', day: 'numeric'});
-            }
-        }
-
-        function checkConnection() {
-            // Restore checkbox state
-            const hidden = localStorage.getItem('lyrn-conn-hidden');
-            document.getElementById('chk-no-startup-conn').checked = (hidden === 'true');
-
-            const stored = localStorage.getItem('lyrn_core_url');
-
-            // If we have a stored URL, try to use it regardless
-            if (stored) {
-                coreUrl = stored;
-                document.getElementById('inp-core-url').value = stored;
-            } else if (window.location.protocol.startsWith('http')) {
-                 document.getElementById('inp-core-url').value = window.location.origin;
-            }
-
-            // Always start monitoring (it handles failures gracefully)
-            initBackendMonitor();
-
-            // Only show popup if NO URL stored AND user hasn't hidden it
-            if (!stored && hidden !== 'true') {
-                document.getElementById('connection-popup').style.display = 'flex';
-            }
-        }
-
-        function openConnectionPopup() {
-            const stored = localStorage.getItem('lyrn_core_url');
-            if(stored) document.getElementById('inp-core-url').value = stored;
-            document.getElementById('connection-popup').style.display = 'flex';
-            document.getElementById('settings-popup').classList.remove('show');
-        }
-
-        function skipConnection() {
-            document.getElementById('connection-popup').style.display = 'none';
-        }
-
-        function toggleStartupConn(isChecked) {
-            localStorage.setItem('lyrn-conn-hidden', isChecked);
-        }
-
-        async function testAndSaveConnection() {
-            const inp = document.getElementById('inp-core-url');
-            let url = inp.value.replace(/\/$/, "");
-            if(!url) url = "http://localhost:8000";
-
-            const statusEl = document.getElementById('conn-status');
-            statusEl.innerText = "Testing...";
-            statusEl.style.color = "var(--text-dim)";
-
-            setLight('sys-status-server', 'yellow', 'Testing Connection...');
-
-            try {
-                const res = await fetch(url + '/health');
-                const data = await res.json();
-                if (data.status === 'ok') {
-                    localStorage.setItem('lyrn_core_url', url);
-                    coreUrl = url;
-                    document.getElementById('connection-popup').style.display = 'none';
-
-                    // Connected successfully, now check Auth
-                    initBackendMonitor();
-                    checkAuth();
-
-                    // Broadcast to modules
-                    document.querySelectorAll('iframe').forEach(f => {
-                        f.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: url }, '*');
-                    });
-
-                    setLight('sys-status-server', 'green', 'Connected to Core');
-                } else {
-                    throw new Error("Invalid response");
-                }
-            } catch (e) {
-                statusEl.innerText = "Connection Failed: " + e.message;
-                statusEl.style.color = "var(--error-color)";
-                setLight('sys-status-server', 'red', 'Connection Failed');
-            }
-        }
-
-        let hasCheckedAuth = false;
-        async function syncBackendSettings() {
-            if(!authToken || !coreUrl) return;
-            try {
-                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
-                if(res.ok) {
-                    const data = await res.json();
-                    if(data.ui_settings && (data.ui_settings.tab_tag || data.ui_settings.tab_suffix)) {
-                        appSettings.tabTag = data.ui_settings.tab_tag || "LYRN";
-                        appSettings.tabSuffix = data.ui_settings.tab_suffix || "LYRN-AI";
-                        document.title = `${appSettings.tabTag} | ${appSettings.tabSuffix}`;
-                        document.getElementById('setting-tab-tag').value = appSettings.tabTag;
-                        document.getElementById('setting-tab-suffix').value = appSettings.tabSuffix;
-                        saveSettings();
-                    }
-                }
-            } catch(e) { console.error("Failed to sync backend settings:", e); }
-        }
-
-        async function checkAuth() {
-            if(hasCheckedAuth) return;
-
-            // 1. Check Global Auth Status (Bypass if disabled)
-            try {
-                const res = await fetch(coreUrl + '/api/auth/status');
-                if(res.ok) {
-                    const status = await res.json();
-                    if(status.required === false) {
-                        authToken = "NO_AUTH";
-                        localStorage.setItem('lyrn_admin_token', authToken);
-                        broadcastToken();
-                        hasCheckedAuth = true;
-                        document.getElementById('auth-overlay').style.display = 'none';
-                        syncBackendSettings();
-                        return;
-                    }
-                }
-            } catch(e) { console.error("Failed to check auth status", e); }
-
-            // 2. Check LocalStorage
-            const storedToken = localStorage.getItem('lyrn_admin_token');
-            if(storedToken) {
-                // Verify it
-                const valid = await verifyToken(storedToken);
-                if(valid) {
-                    authToken = storedToken;
-                    broadcastToken();
-                    hasCheckedAuth = true;
-                    syncBackendSettings();
-                    return;
-                }
-            }
-
-            // 3. Show Overlay
-            document.getElementById('auth-overlay').style.display = 'flex';
-        }
-
-        function handleTokenFile(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const text = e.target.result.trim();
-                    if(text) {
-                        document.getElementById('inp-auth-token').value = text;
-                        submitAuthToken();
-                    }
-                };
-                reader.readAsText(input.files[0]);
-            }
-        }
-
-        async function submitAuthToken() {
-            const inp = document.getElementById('inp-auth-token');
-            const err = document.getElementById('auth-error');
-            const save = document.getElementById('chk-save-token');
-            const token = inp.value.trim();
-
-            if(!token) {
-                err.innerText = "Token cannot be empty.";
-                return;
-            }
-
-            err.innerText = "Verifying...";
-
-            const valid = await verifyToken(token);
-            if(valid) {
-                authToken = token;
-                if(save.checked) {
-                    if(confirm("Are you sure you want to save this token? Only do this on a trusted device.")) {
-                        localStorage.setItem('lyrn_admin_token', token);
-                    }
-                }
-
-                document.getElementById('auth-overlay').style.display = 'none';
-                broadcastToken();
-                hasCheckedAuth = true;
-                syncBackendSettings();
-            } else {
-                err.innerText = "Invalid Token. Please check admin_token.txt";
-            }
-        }
-
-        async function verifyToken(token) {
-            try {
-                const res = await fetch(coreUrl + '/api/verify_token', {
-                    method: 'POST',
-                    headers: { 'X-Token': token }
-                });
-                if(res.ok) return true;
-                return false;
-            } catch(e) {
-                console.error("Auth check failed", e);
-                return false;
-            }
-        }
-
-        function broadcastToken() {
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
-            });
-        }
-
-        let monitorInterval = null;
-        function initBackendMonitor() {
-            if(monitorInterval) clearInterval(monitorInterval);
-            fetchStats();
-            monitorInterval = setInterval(fetchStats, 2000);
-        }
-
-        async function fetchStats() {
-            const srvLight = 'sys-status-server';
-            const llmLight = 'sys-status-llm';
-
-            if(!coreUrl) {
-                setLight(srvLight, 'red', 'No Connection Configured');
-                return;
-            }
-            try {
-                const res = await fetch(coreUrl + '/health');
-                const data = await res.json();
-
-                // Server OK
-                setLight(srvLight, 'green', 'Connected to Backend');
-
-                // Hide connection popup if visible
-                document.getElementById('connection-popup').style.display = 'none';
-
-                // Trigger Auth Check if connected and not done yet
-                if(!hasCheckedAuth) checkAuth();
-
-                const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
-                let finalText = ramText;
-                if(data.cpu !== null && data.cpu !== undefined) {
-                    finalText = `CPU: ${data.cpu}% | ${ramText}`;
-                }
-                document.getElementById('sys-cpu').innerText = finalText;
-
-                // LLM Status Logic
-                const llmEl = document.getElementById(llmLight);
-                llmEl.style.display = 'block';
-
-                let workerText = 'Status Unknown';
-                let workerTone = 'err';
-                let modelText = 'Unknown';
-                let modelTone = 'err';
-
-                if (data.worker) {
-                    if (!data.worker.running) {
-                        setLight(llmLight, 'orange', 'Worker Stopped');
-                        workerText = 'Stopped';
-                        workerTone = 'warn';
-                        modelText = 'Not loaded';
-                        modelTone = 'warn';
-                    } else {
-                        const s = data.worker.llm_status;
-                        if (s === 'busy') {
-                            setLight(llmLight, 'blue pulse', 'LLM Generating...');
-                            workerText = 'Running';
-                            workerTone = 'ok';
-                            modelText = 'Generating';
-                            modelTone = 'warn';
-                        } else if (s === 'loading') {
-                            setLight(llmLight, 'yellow pulse', 'Loading Model...');
-                            workerText = 'Running';
-                            workerTone = 'ok';
-                            modelText = 'Loading';
-                            modelTone = 'warn';
-                        } else if (s === 'error') {
-                            setLight(llmLight, 'red pulse', 'Model Error');
-                            workerText = 'Running';
-                            workerTone = 'warn';
-                            modelText = 'Error';
-                            modelTone = 'err';
-                        } else {
-                            setLight(llmLight, 'green', 'Worker Idle / Ready');
-                            workerText = 'Running';
-                            workerTone = 'ok';
-                            modelText = 'Ready';
-                            modelTone = 'ok';
-                        }
-                    }
-                } else {
-                    setLight(llmLight, 'red', 'Worker Status Unknown');
-                }
-
-            } catch (e) {
-                document.getElementById('sys-cpu').innerText = "";
-                setLight(srvLight, 'red', 'Disconnected / Offline');
-                document.getElementById(llmLight).style.display = 'none';
-            }
-        }
-
-        function setLight(id, status, title) {
-            const el = document.getElementById(id);
-            if(el) {
-                el.className = 'status-light ' + status;
-                el.title = title || status;
-            }
-        }
-
-
-        function initSystemMonitor() {
-            if('getBattery' in navigator) {
-                navigator.getBattery().then(b => {
-                    const update = () => {
-                        const icon = b.charging ? '⚡' : '';
-                        document.getElementById('sys-battery').innerText = icon + Math.round(b.level*100) + '%';
-                    };
-                    update();
-                    b.addEventListener('levelchange', update);
-                    b.addEventListener('chargingchange', update);
-                });
-            }
-        }
-        function toggleDashboardFullscreen() { !document.fullscreenElement ? document.documentElement.requestFullscreen() : document.exitFullscreen(); }
-        function checkIfIframe() { if(window.self !== window.top) document.getElementById('btn-close-iframe').style.display = 'flex'; }
-        function closeDashboard() { window.parent.postMessage({ type: 'CLOSE_DASHBOARD' }, '*'); }
-
-        window.addEventListener('message', (e) => {
-            if(e.data.type === 'OPEN_WIDGET') {
-                // Check if widget already exists
-                const existing = document.getElementById('win_' + e.data.id);
-                if(existing) {
-                    // Bring to front
-                    existing.style.display = 'flex';
-                    existing.style.zIndex = ++zIndexCounter;
-                    return;
-                }
-
-                // Create synthetic module
-                const mod = {
-                    id: e.data.id,
-                    name: e.data.name,
-                    file: e.data.file
-                };
-                createWindow(mod);
-
-                // Customize for widget (smaller size default)
-                const win = document.getElementById('win_' + mod.id);
-                if(win) {
-                    win.style.width = '300px';
-                    win.style.height = '200px';
-                    // Center it
-                    win.style.left = (window.innerWidth/2 - 150) + 'px';
-                    win.style.top = (window.innerHeight/2 - 100) + 'px';
-                }
-            }
-        });
-
-        /* Welcome Popup Logic */
-        function checkWelcome() {
-            const hidden = localStorage.getItem('lyrn-welcome-hidden');
-            document.getElementById('chk-hide-welcome').checked = (hidden === 'true');
-            if(hidden !== 'true') openWelcome();
-        }
-        function openWelcome() {
-            document.getElementById('welcome-popup').style.display = 'flex';
-        }
-        function closeWelcome() {
-            document.getElementById('welcome-popup').style.display = 'none';
-        }
-        function toggleHideWelcome(isChecked) {
-            localStorage.setItem('lyrn-welcome-hidden', isChecked);
-        }
-
-        // Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('Service Worker Registered', reg))
-                .catch(err => console.log('Service Worker Error', err));
-        }
-    </script>
+      </div>
+    </section>
+
+    <footer id="footerBar" class="chrome">
+      <div class="footSet">
+        <button class="footBtn" onclick="pollHealth(true)">Scan Hardware</button>
+        <button class="footBtn" onclick="broadcastAll({type:'PING'})">Update Proxies</button>
+        <button class="footBtn" onclick="closeAllWindows()">Delete Seq</button>
+        <button class="footBtn" onclick="pollHealth(true)">Refresh</button>
+        <button class="footBtn" onclick="checkAuth()">Validate</button>
+      </div>
+      <div class="footSet">
+        <div class="footerNote" id="decisionLabel">surface lock pending</div>
+        <button class="footBtn" onclick="addLog('System','Manual reject flag')">Reject</button>
+        <button class="footBtn" onclick="addLog('System','Inspection flag applied')">Flag</button>
+        <button class="footBtn" onclick="addLog('System','Pass state acknowledged')">Pass</button>
+        <button class="footBtn" onclick="openSettings()">Display Options</button>
+        <button class="footBtn" onclick="toggleFullScreen()">Exit UI Mode</button>
+      </div>
+    </footer>
+  </main>
+
+  <div id="settingsModal" class="modal"><div class="dialog chrome"><h2>System Settings</h2><div class="formgrid"><div class="formrow"><label>Visible Modules</label><div id="moduleToggles" class="btnrow"></div></div><div class="formrow"><label>API Map / Overrides</label><textarea id="apiMapEditor"></textarea></div><div class="btnrow"><button class="pill" onclick="saveApiMap()">Save API Map</button><button class="pill" onclick="saveLayout()">Save Layout</button><button class="pill" onclick="restoreLayout()">Restore Layout</button><button class="pill danger" onclick="closeSettings()">Close</button></div></div></div></div>
+  <div id="connectionModal" class="modal"><div class="dialog chrome"><h2>Core Connection</h2><div class="formgrid"><div class="formrow"><label>Core URL</label><input class="field" id="coreUrlInput" placeholder="http://localhost:8000"></div><div class="formrow"><label>Admin Token</label><input class="field" id="tokenInput" type="password" placeholder="Paste token or load admin_token.txt"><input class="field" type="file" accept=".txt" onchange="handleTokenFile(this)"></div><div class="btnrow"><button class="pill" onclick="testConnection()">Test / Connect</button><button class="pill" onclick="submitToken()">Verify Token</button><button class="pill" onclick="checkAuth()">Auth Status</button><button class="pill danger" onclick="closeConnection()">Close</button></div><div id="connMsg" class="micro"></div></div></div></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const MODULES=[
+{id:'mod_chat',file:'Chat Interface.html',name:'Comm Bay',glyph:'COMM',desc:'Conversational interface',group:'simulate'},
+{id:'mod_claude_code',file:'ClaudeCode.html',name:'Code Chamber',glyph:'AI',desc:'Code assistant sandbox',group:'align'},
+{id:'mod_builder',file:'Snapshot Builder.html',name:'Snap Core',glyph:'SNAP',desc:'Capture system state',group:'simulate'},
+{id:'mod_file_tree',file:'FileTreeViewer.html',name:'File Vault',glyph:'TREE',desc:'Filesystem explorer',group:'telem'},
+{id:'mod_models',file:'ModelController.html',name:'Model Bay',glyph:'MODEL',desc:'Model registry and status',group:'telem'},
+{id:'mod_model_manager',file:'ModelManager.html',name:'Registry',glyph:'REG',desc:'Model files and registry',group:'align'},
+{id:'mod_logs',file:'LogViewer.html',name:'Blackbox',glyph:'LOG',desc:'System logs and audit',group:'graph'},
+{id:'mod_server_status',file:'ServerStatus.html',name:'Core Status',glyph:'STAT',desc:'Backend telemetry',group:'split'},
+{id:'mod_job_mgr',file:'JobManager.html',name:'Ops Board',glyph:'JOB',desc:'Execute and monitor jobs',group:'ops'},
+{id:'mod_delta_mgr',file:'DeltaManager.html',name:'Delta Lattice',glyph:'Δ',desc:'Track and apply changes',group:'ops'},
+{id:'settings',file:'settings',name:'Settings',glyph:'SYS',desc:'Connection and modules',group:'split'}
+];
+let state={coreUrl:location.protocol.startsWith('http')?location.origin:'http://localhost:8000',token:localStorage.getItem('lyrn_admin_token')||'',apiMap:{},visible:MODULES.map(m=>m.id),focusA:'mod_chat',focusB:'mod_logs',online:false,health:{core:'OFFLINE',llm:'UNKNOWN',store:'UNKNOWN',files:'UNKNOWN'}};
+let z=100,startTime=Date.now();
+const actionLabels=['SIMULATE','FORM','GRAPH','TELEM','ALIGN','ROTATE','SPLIT','EXPORT'];
+function loadState(){try{state={...state,...JSON.parse(localStorage.getItem('lyrn_monitor_surface_v4_2049')||'{}')}}catch(e){}}
+function saveState(){localStorage.setItem('lyrn_monitor_surface_v4_2049',JSON.stringify(state))}
+function findModule(id){return MODULES.find(m=>m.id===id)}
+function moduleUrl(m){return state.apiMap[m.id]||state.apiMap[m.file]||(m.file.startsWith('http')?m.file:'modules/'+m.file)}
+function init(){loadState();applyState();renderToolButtons();renderViewports();renderDependencyPanel();renderNodeMap();renderModuleToggles();renderTicker();seedLogs();updateClock();setInterval(updateClock,1000);pollHealth(false);setInterval(()=>pollHealth(false),15000); checkAuth();}
+function applyState(){ $('#coreUrlLabel').textContent=state.coreUrl; $('#coreUrlInput').value=state.coreUrl; $('#apiMapEditor').value=JSON.stringify(state.apiMap,null,2); $('#matrixUrl').textContent=state.coreUrl.replace(/^https?:\/\//,''); $('#matrixAuth').textContent=state.token?'Token loaded':'No token'; $('#matrixVisible').textContent=state.visible.length; $('#matrixFocus').textContent=`${findModule(state.focusA)?.name||'--'} / ${findModule(state.focusB)?.name||'--'}`; $('#assetMode').textContent=state.online?'Connected':'Nominal'; renderToolButtons(); renderViewports(); renderDependencyPanel(); renderNodeMap(); renderTicker(); updateScriptInfo(); }
+function renderTicker(){const open=$$('.window').length; const items=[['T',new Date().toTimeString().slice(0,8)],['SEQ',String(Date.now()).slice(-4)],['GRID','49-A3'],['BUF',String(state.visible.length).padStart(2,'0')],['NODE',state.focusA.toUpperCase()],['CYCLE',open],['PKT',state.token?'0101':'0000'],['BR',state.online?'254.0 MB/S':'0.0 MB/S'],['CRC',state.online?'OK':'--'],['IDX',state.visible.length]]; $('#ticker').innerHTML=items.map(i=>`<span class="tick">${i[0]} <b>${i[1]}</b></span>`).join('');}
+function renderToolButtons(){const box=$('#toolButtons'); box.innerHTML=''; MODULES.filter(m=>state.visible.includes(m.id)).slice(0,8).forEach((m,idx)=>{const b=document.createElement('button'); b.className='toolBtn'+((m.id===state.focusA||m.id===state.focusB)?' active':''); b.innerHTML=`${m.glyph}<br><span class="micro">${m.name}</span>`; b.onclick=()=>{if(idx%2===0){state.focusA=m.id}else{state.focusB=m.id} saveState(); applyState(); addLog('Module',`${m.name} focused`)}; box.appendChild(b)}); actionLabels.forEach((name,i)=>{const b=document.createElement('button'); b.className='toolBtn'+(i%3===0?' active':''); b.innerHTML=`${name}<br><span class="micro">${i<4?'slot':'aux'}-${i+1}</span>`; b.onclick=()=>addLog('Action',`${name} queued`); box.appendChild(b)});}
+function fillMeta(el,m){const open=$$('.window').filter(w=>w.dataset.mod===m.id).length; el.innerHTML=`<span>module</span><b>${m.id}</b><span>file</span><b>${m.file}</b><span>state</span><b>${open?'open':'standby'}</b><span>route</span><b>${moduleUrl(m)}</b>`;}
+function renderViewports(){const a=findModule(state.focusA)||MODULES[0], b=findModule(state.focusB)||MODULES[1]; $('#vpATitle').textContent=a.name; $('#vpAHero').textContent=a.glyph; $('#vpADesc').textContent=a.desc; fillMeta($('#vpAMeta'),a); $('#vpBTitle').textContent=b.name; $('#vpBHero').textContent=b.glyph; $('#vpBDesc').textContent=b.desc; fillMeta($('#vpBMeta'),b);}
+function swapFocus(which){const vis=MODULES.filter(m=>state.visible.includes(m.id)); const key=which==='A'?'focusA':'focusB'; const cur=vis.findIndex(m=>m.id===state[key]); state[key]=vis[(cur+1)%vis.length].id; saveState(); applyState();}
+function renderDependencyPanel(){const dep=$('#dependencyList'), assets=$('#assetList'); dep.innerHTML=''; assets.innerHTML=''; const openCount=$$('.window').length; $('#depScore').textContent=`${state.visible.length} active / ${openCount} live`; MODULES.filter(m=>state.visible.includes(m.id)).forEach((m,i)=>{const d=document.createElement('div'); d.className='depItem'; d.innerHTML=`<span>C-${String(i+1).padStart(2,'0')} · ${m.name}</span><span>${($$('.window').some(w=>w.dataset.mod===m.id)?'OPEN':'0.'+(80-i).toString().padStart(2,'0'))}</span>`; dep.appendChild(d); const a=document.createElement('div'); a.className='assetItem'; a.innerHTML=`<span>ASSET TRACK · ${m.glyph}</span><span>${$$('.window').some(w=>w.dataset.mod===m.id)?'LIVE':'NOMINAL'}</span>`; assets.appendChild(a);});}
+function renderNodeMap(){const layer=$('#nodeLayer'); layer.innerHTML=''; const svg=$('#mapSvg'); const nodes=MODULES.filter(m=>state.visible.includes(m.id)); const coords=[[20,18],[50,10],[79,18],[16,44],[34,32],[65,33],[84,45],[28,67],[50,56],[72,68],[39,84],[61,84]]; const cx=500,cy=280; const lines=nodes.map((m,i)=>{const c=coords[i%coords.length]; const x=c[0]*10,y=c[1]*5; return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(255,185,118,.20)" stroke-width="1" />`;}).join('') + `<ellipse cx="${cx}" cy="${cy}" rx="220" ry="94" fill="none" stroke="rgba(255,185,118,.18)" stroke-width="1"/><ellipse cx="${cx}" cy="${cy}" rx="150" ry="150" fill="none" stroke="rgba(255,185,118,.14)" stroke-width="1"/><ellipse cx="${cx}" cy="${cy}" rx="110" ry="190" fill="none" stroke="rgba(104,221,255,.14)" stroke-width="1" transform="rotate(38 ${cx} ${cy})"/>`; svg.innerHTML=lines; nodes.forEach((m,i)=>{const c=coords[i%coords.length]; const chip=document.createElement('button'); chip.className='nodeChip'+((m.id===state.focusA||m.id===state.focusB)?' active':''); chip.style.left=c[0]+'%'; chip.style.top=c[1]+'%'; chip.innerHTML=`${m.glyph}<small>${m.name}</small>`; chip.onclick=()=>launch(m,chip); layer.appendChild(chip);}); $('#matrixVisible').textContent=state.visible.length; $('#matrixFocus').textContent=`${findModule(state.focusA)?.glyph||'--'} / ${findModule(state.focusB)?.glyph||'--'}`; $('#matrixWindows').textContent=$$('.window').length;}
+function updateClock(){let s=Math.floor((Date.now()-startTime)/1000); let h=String(Math.floor(s/3600)).padStart(2,'0'),m=String(Math.floor(s%3600/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0'); $('#uptimeLabel').textContent=`${h}:${m}:${sec}`; renderTicker();}
+function updateScriptInfo(){ $('#scriptInfo').textContent=`Open windows: ${$$('.window').length} / API hooks ready`; $('#matrixWindows').textContent=$$('.window').length; }
+function renderModuleToggles(){const c=$('#moduleToggles'); c.innerHTML=''; MODULES.forEach(m=>{const b=document.createElement('button'); b.className='pill'+(state.visible.includes(m.id)?' ok':''); b.textContent=m.name; b.onclick=()=>{state.visible=state.visible.includes(m.id)?state.visible.filter(x=>x!==m.id):[...state.visible,m.id]; saveState(); applyState(); renderModuleToggles();}; c.appendChild(b)})}
+function launch(m,source){if(!m)return; if(m.file==='settings'){openSettings();return;} let existing=$('#win_'+m.id); if(existing){existing.style.display='flex'; focusWin(existing); return;} const w=document.createElement('div'); w.className='window chrome'; w.id='win_'+m.id; w.dataset.mod=m.id; const wr=$('#workspace').getBoundingClientRect(); const sr=(source||$('#coreMap')).getBoundingClientRect(); let left=Math.max(wr.left+24, Math.min(sr.left+22, wr.right-780)); let top=Math.max(wr.top+24, Math.min(sr.top+22, wr.bottom-520)); Object.assign(w.style,{left:left+'px',top:top+'px',width:'760px',height:'500px'}); w.innerHTML=`<div class="winbar"><div class="winTitle">${m.name}</div><div class="winTools"><button class="winBtn" onclick="pinWin(event,this)">◎</button><button class="winBtn" onclick="maxWin(event,this)">▣</button><button class="winBtn" onclick="minWin(event,this)">—</button><button class="winBtn" onclick="closeWin(event,this)">✕</button></div></div><div class="winbody"><iframe src="${moduleUrl(m)}"></iframe></div><div class="resize-handle e"></div><div class="resize-handle s"></div><div class="resize-handle se"></div>`; $('#machine').appendChild(w); requestAnimationFrame(()=>w.classList.add('live')); wireWindow(w); broadcastTo(w); focusWin(w); addLog('Launch',`${m.name} opened`); renderDependencyPanel(); renderNodeMap(); updateScriptInfo();}
+function focusWin(w){$$('.window').forEach(x=>x.classList.remove('focused')); w.classList.add('focused'); w.style.zIndex=++z;}
+function wireWindow(w){w.addEventListener('mousedown',()=>focusWin(w)); const bar=w.querySelector('.winbar'); bar.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return; focusWin(w); let sx=e.clientX,sy=e.clientY,l=parseFloat(w.style.left),t=parseFloat(w.style.top); bar.setPointerCapture(e.pointerId); bar.onpointermove=ev=>{w.style.left=l+ev.clientX-sx+'px'; w.style.top=t+ev.clientY-sy+'px'}; bar.onpointerup=()=>{bar.onpointermove=null; bar.onpointerup=null;};}); w.querySelectorAll('.resize-handle').forEach(h=>h.addEventListener('pointerdown',e=>resizeStart(e,w,h)));}
+function resizeStart(e,w,h){e.preventDefault(); focusWin(w); let sx=e.clientX,sy=e.clientY,ww=w.offsetWidth,hh=w.offsetHeight,c=h.className; h.setPointerCapture(e.pointerId); h.onpointermove=ev=>{let dx=ev.clientX-sx,dy=ev.clientY-sy,nw=ww,nh=hh; if(c.includes('e'))nw=ww+dx; if(c.includes('s'))nh=hh+dy; if(c.includes('se')){nw=ww+dx; nh=hh+dy;} if(nw>360)w.style.width=nw+'px'; if(nh>240)w.style.height=nh+'px';}; h.onpointerup=()=>{h.onpointermove=null; h.onpointerup=null;};}
+function closeWin(e,b){e.stopPropagation(); const w=b.closest('.window'); addLog('Close',`${w.dataset.mod} closed`); w.remove(); renderDependencyPanel(); renderNodeMap(); updateScriptInfo();}
+function minWin(e,b){e.stopPropagation(); b.closest('.window').style.display='none'; renderDependencyPanel(); updateScriptInfo();}
+function pinWin(e,b){e.stopPropagation(); b.classList.toggle('ok');}
+function maxWin(e,b){e.stopPropagation(); const w=b.closest('.window'), r=$('#workspace').getBoundingClientRect(); if(w.dataset.max==='1'){Object.assign(w.style,JSON.parse(w.dataset.prev)); w.dataset.max='0';} else {w.dataset.prev=JSON.stringify({left:w.style.left,top:w.style.top,width:w.style.width,height:w.style.height}); Object.assign(w.style,{left:(r.left+12)+'px',top:(r.top+12)+'px',width:(r.width-24)+'px',height:(r.height-24)+'px'}); w.dataset.max='1';} focusWin(w);}
+function cascadeWindows(){const r=$('#workspace').getBoundingClientRect(); $$('.window').forEach((w,i)=>{w.style.display='flex'; w.style.left=r.left+24+i*28+'px'; w.style.top=r.top+24+i*24+'px'; w.style.width='720px'; w.style.height='470px'; focusWin(w);}); updateScriptInfo();}
+function closeAllWindows(){ $$('.window').forEach(w=>w.remove()); addLog('System','All windows cleared'); renderDependencyPanel(); renderNodeMap(); updateScriptInfo(); }
+function toggleFullScreen(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+function openSettings(){$('#apiMapEditor').value=JSON.stringify(state.apiMap,null,2); $('#settingsModal').classList.add('show');}
+function closeSettings(){$('#settingsModal').classList.remove('show');}
+function openConnection(){$('#connectionModal').classList.add('show');}
+function closeConnection(){$('#connectionModal').classList.remove('show');}
+function saveApiMap(){try{state.apiMap=JSON.parse($('#apiMapEditor').value||'{}'); saveState(); applyState(); addLog('System','API map saved');}catch(e){alert('Invalid JSON');}}
+function authHeaders(){let h={}; if(state.token)h['X-Token']=state.token; return h;}
+async function testConnection(){state.coreUrl=$('#coreUrlInput').value.trim()||state.coreUrl; saveState(); applyState(); broadcastAll({type:'CORE_URL_CHANGE',url:state.coreUrl}); await pollHealth(true);}
+async function pollHealth(verbose=false){try{const res=await fetch(state.coreUrl.replace(/\/$/,'')+'/health',{headers:authHeaders()}); if(!res.ok)throw new Error(res.status); let data={}; try{data=await res.json()}catch(e){} setOnline(data); if(verbose)$('#connMsg').textContent='Connected to /api/status';}catch(e){setOffline(); if(verbose)$('#connMsg').textContent='Connection failed: '+e.message;}}
+function setOnline(data={}){state.online=true; state.health={core:data.status==='running'?'ONLINE':'ERROR',llm:data.worker?data.worker.llm_status:'UNKNOWN',store:data.ram?data.ram.percent+'% RAM':'UNKNOWN',files:data.cpu?data.cpu+'% CPU':'UNKNOWN'}; $('#linkLabel').textContent='ONLINE'; $('#linkLabel').className='val ok'; $('#syncLabel').textContent='LOCKED'; $('#authLabel').textContent=state.token?'Authenticated':'Connected'; $('#decisionLabel').textContent='surface lock acquired'; $('#matrixStatus').textContent='ONLINE'; $('#matrixStatus').className='ok'; $('#healthCore').textContent='ONLINE'; $('#healthCore').className='ok'; $('#healthLLM').textContent=state.health.llm; $('#healthLLM').className='ok'; $('#healthStore').textContent=state.health.store; $('#healthStore').className='ok'; addLog('Core','Health feed online'); applyState();}
+function setOffline(){state.online=false; state.health={core:'OFFLINE',llm:'UNKNOWN',store:'UNKNOWN',files:'UNKNOWN'}; $('#linkLabel').textContent='OFFLINE'; $('#linkLabel').className='val bad'; $('#syncLabel').textContent='--'; $('#matrixStatus').textContent='OFFLINE'; $('#matrixStatus').className='bad'; $('#healthCore').textContent='OFFLINE'; $('#healthCore').className='bad'; $('#healthLLM').textContent='UNKNOWN'; $('#healthLLM').className='warn'; $('#healthStore').textContent='UNKNOWN'; $('#healthStore').className='warn'; applyState();}
+async function submitToken(){state.token=$('#tokenInput').value.trim(); localStorage.setItem('lyrn_admin_token',state.token); saveState(); broadcastAll({type:'TOKEN_UPDATE',token:state.token}); await checkAuth(); applyState();}
+async function checkAuth(){try{const r=await fetch(state.coreUrl.replace(/\/$/,'')+'/api/verify_token',{method:'POST',headers:authHeaders()}); if(r.ok){$('#authLabel').textContent='Authenticated'; $('#authLabel').className='val ok'; $('#connMsg').textContent='Token accepted'; addLog('Auth','Token verified'); return;}}catch(e){} $('#authLabel').textContent=state.token?'Token saved / unverified':'Not authenticated'; $('#authLabel').className='val warn'; addLog('Auth','Verification unavailable');}
+function handleTokenFile(inp){const f=inp.files?.[0]; if(!f)return; const reader=new FileReader(); reader.onload=()=>{$('#tokenInput').value=String(reader.result).trim(); submitToken();}; reader.readAsText(f);}
+function addLog(src,msg){const t=new Date().toTimeString().slice(0,8); const box=document.getElementById('logMini'); const line=document.createElement('div'); line.className='miniLog'; line.innerHTML=`<span>${t} · ${src}</span><span>${msg}</span>`; box.prepend(line); while(box.children.length>8)box.lastChild.remove();}
+function seedLogs(){addLog('System','2049 surface initialized'); addLog('Core','Health feed offline');}
+function broadcastTo(w){const frame=w.querySelector('iframe'); frame.addEventListener('load',()=>{try{frame.contentWindow.postMessage({type:'CORE_URL_CHANGE',url:state.coreUrl},'*'); if(state.token)frame.contentWindow.postMessage({type:'TOKEN_UPDATE',token:state.token},'*');}catch(e){}});}
+function broadcastAll(msg){$$('iframe').forEach(f=>{try{f.contentWindow.postMessage(msg,'*')}catch(e){}})}
+window.addEventListener('message',e=>{if(e.data?.type==='OPEN_WIDGET'){const mod=MODULES.find(m=>m.id===e.data.id||m.name===e.data.name||m.file===e.data.file); if(mod)launch(mod,$('#coreMap'));}})
+function saveLayout(){const layout=$$('.window').map(w=>({id:w.dataset.mod,left:w.style.left,top:w.style.top,width:w.style.width,height:w.style.height,display:w.style.display})); localStorage.setItem('lyrn_monitor_layout_v4_2049',JSON.stringify(layout)); addLog('System','Layout saved');}
+function restoreLayout(){try{const layout=JSON.parse(localStorage.getItem('lyrn_monitor_layout_v4_2049')||'[]'); closeAllWindows(); layout.forEach((x,i)=>{const m=findModule(x.id); if(!m)return; launch(m,$('#coreMap')); setTimeout(()=>{const w=$('#win_'+x.id); if(w)Object.assign(w.style,x);},60+i*30)}); addLog('System','Layout restored');}catch(e){addLog('System','No layout found');}}
+init();
+</script>
 </body>
 </html>
