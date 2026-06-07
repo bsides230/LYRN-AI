@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Index Settings</title>
+    <!-- We link to global themes but assume functional cinema style -->
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0d1b2a;
+            color: #e0e1dd;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #1b263b;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #415a77;
+            margin-top: 0;
+            font-size: 1.5rem;
+            border-bottom: 1px solid #415a77;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #778da9;
+            font-weight: bold;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            background-color: #0d1b2a;
+            border: 1px solid #415a77;
+            color: #e0e1dd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #778da9;
+        }
+
+        button {
+            background-color: #415a77;
+            color: #e0e1dd;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #778da9;
+            color: #1b263b;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status.success {
+            display: block;
+            background-color: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+
+        .status.error {
+            display: block;
+            background-color: rgba(220, 53, 69, 0.2);
+            border: 1px solid #dc3545;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Index Recall Settings</h1>
+
+    <div class="form-group">
+        <label for="recall-limit">Default Number of Logs to Recall:</label>
+        <input type="number" id="recall-limit" min="1" max="100" placeholder="e.g., 5">
+        <small style="color: #778da9; display: block; margin-top: 5px;">This determines how many recent CSV rows and Markdown entries are added to the context string.</small>
+    </div>
+
+    <button id="save-btn">Save Settings</button>
+
+    <div id="status-msg" class="status"></div>
+</div>
+
+<script>
+    const token = localStorage.getItem('lyrn_admin_token');
+    // Function to show status messages
+    function showStatus(message, isError = false) {
+        const statusEl = document.getElementById('status-msg');
+        statusEl.textContent = message;
+        statusEl.className = 'status ' + (isError ? 'error' : 'success');
+        setTimeout(() => {
+            statusEl.style.display = 'none';
+            statusEl.className = 'status';
+        }, 3000);
+    }
+
+    // Load initial settings
+    async function loadSettings() {
+        try {
+            const response = await fetch('/api/indexes/settings', {
+                headers: {
+                    'X-Token': token
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('recall-limit').value = data.default_recall_limit || 5;
+            } else {
+                showStatus('Failed to load settings', true);
+            }
+        } catch (error) {
+            showStatus('Error loading settings', true);
+            console.error(error);
+        }
+    }
+
+    // Save settings
+    async function saveSettings() {
+        const limitVal = parseInt(document.getElementById('recall-limit').value, 10);
+        if (isNaN(limitVal) || limitVal < 1) {
+            showStatus('Please enter a valid number greater than 0', true);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/indexes/settings', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Token': token
+                },
+                body: JSON.stringify({ default_recall_limit: limitVal })
+            });
+
+            if (response.ok) {
+                showStatus('Settings saved successfully!');
+            } else {
+                showStatus('Failed to save settings', true);
+            }
+        } catch (error) {
+            showStatus('Error saving settings', true);
+            console.error(error);
+        }
+    }
+
+    document.getElementById('save-btn').addEventListener('click', saveSettings);
+
+    // Initial load
+    loadSettings();
+</script>
+
+</body>
+</html>
