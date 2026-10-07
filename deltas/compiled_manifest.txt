@@ -1,0 +1,32 @@
+###DELTAS_START###
+###DELTA_RWI_START###
+Delta Relational Web Index (RWI): Dynamic operational state framework.
+
+Deltas represent transient, mutable working memory (Layer 2) that updates per turn without invalidating the immutable Layer 1 KV cache prefix.
+
+================================================================================
+OPERATIONAL DIRECTIVE:
+================================================================================
+Whenever new user interaction or event data enters input_delta (or arrives in working memory), the agent reads the context and executes the active job instructions or emits the appropriate affordance trigger.
+
+================================================================================
+SECTION EXPLANATIONS:
+================================================================================
+
+1. INPUT DELTA (###INPUT_DELTA_START### ... ###INPUT_DELTA_END###):
+   - Definition & Purpose: Active incoming operational payload containing the immediate prompt, question, or text requiring processing.
+   - Volatility: High (updated per interaction turn).
+   - Agent Usage: Ground reasoning in the provided input payload and follow active Job Instructions (Layer 3).
+
+Active Delta Modules:
+- input_delta: [###INPUT_DELTA_START###]...[###INPUT_DELTA_END###] Active incoming operational payload.
+###DELTA_RWI_END###
+
+###INPUT_DELTA_START###
+##INPUT_DELTA:START##
+TYPE: chat_input
+CONTENT:
+Hello! Can you give me an overview of how the LYRN cognitive architecture works?
+##INPUT_DELTA:END##
+###INPUT_DELTA_END###
+###DELTAS_END###

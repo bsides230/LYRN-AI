@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Model Controller</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="../themes/corporate-terminal.css" />
+    <link rel="stylesheet" href="../themes/corporate-2049.css" />
+    <link rel="stylesheet" href="../themes/cyber-dark.css" />
+    <style>
+        /* =========================================
+           CORE VARIABLES (Matches Snapshot Builder)
+           ========================================= */
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --bg-input: #1a1a1a;
+            --brand-purple: #7c5cff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.1);
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #333333;
+            --input-focus-bg: #111111;
+            --font-size-base: 12px;
+
+            --status-loaded: #10B981;
+            --status-loading: #F59E0B;
+            --status-error: #EF4444;
+            --status-stopped: #666;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --bg-input: #ffffff;
+            --brand-purple: #6a4ce0;
+            --brand-purple-dim: rgba(106, 76, 224, 0.1);
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --input-focus-bg: #f9fafb;
+        }
+
+        /* --- THEMED SCROLLBARS --- */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 20px;
+            font-size: var(--font-size-base, 12px);
+            overflow-y: auto;
+        }
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 16px;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section { margin-bottom: 25px; }
+        .label { font-weight: 600; display: block; margin-bottom: 8px; color: var(--text-head); font-size: 12px; }
+        .sub-label { font-size: 11px; color: var(--text-dim); margin-bottom: 5px; }
+
+        /* Form Elements */
+        select, input[type="text"], input[type="number"] {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        select:focus, input:focus { outline: none; border-color: var(--brand-purple); background: var(--input-focus-bg); }
+
+        /* Grid Layout for Params */
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .param-item { display: flex; flex-direction: column; }
+        .param-item label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+
+        /* Buttons */
+        button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        button.primary { background: var(--brand-purple); color: white; width: 100%; }
+        button.primary:hover { background: #6b4cdb; box-shadow: 0 0 10px rgba(124, 92, 255, 0.3); }
+
+        button.danger { background: #2a1111; color: #ff6666; border: 1px solid #552222; width: 100%; }
+        button.danger:hover { background: #441111; border-color: #ff4444; }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        /* Presets */
+        .presets-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .preset-btn:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+        .preset-btn.active { background: var(--brand-purple); color: white; border-color: var(--brand-purple); }
+
+        .save-preset-btn { width: auto; padding: 0 15px; }
+        .default-preset-btn { width: auto; padding: 0 10px; font-size: 10px; letter-spacing: 0.5px; }
+
+        /* Tooltip for Presets */
+        .preset-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            border: 1px solid #444;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            color: #ccc;
+            white-space: pre;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            min-width: 150px;
+            text-align: left;
+        }
+        .preset-btn:hover .preset-tooltip { opacity: 1; }
+
+        /* Status Bar */
+        .status-bar {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'JetBrains Mono';
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
+        .dot.running { background: var(--status-loaded); box-shadow: 0 0 8px var(--status-loaded); }
+        .dot.loading { background: var(--status-loading); animation: pulse 1s infinite; }
+        .dot.stopped { background: var(--status-stopped); }
+        .dot.error { background: var(--status-error); }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        /* Control Group */
+        .control-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+
+        #error-msg {
+            color: var(--status-error);
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 4px;
+        }
+
+        /* =========================================
+           BENCHMARK WIDGET MODAL STYLES
+           ========================================= */
+        .header-bench-btn {
+            background: linear-gradient(135deg, rgba(124, 92, 255, 0.2), rgba(0, 210, 255, 0.2));
+            border: 1px solid var(--brand-purple);
+            color: var(--text-head);
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+        .header-bench-btn:hover {
+            background: var(--brand-purple);
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(124, 92, 255, 0.5);
+        }
+
+        .bench-trigger-btn {
+            background: linear-gradient(135deg, rgba(124, 92, 255, 0.15), rgba(0, 210, 255, 0.15));
+            border: 1px solid var(--brand-purple);
+            color: #00d2ff;
+            width: 100%;
+        }
+        .bench-trigger-btn:hover {
+            background: rgba(124, 92, 255, 0.3);
+            border-color: #00d2ff;
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 99999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal-overlay.show { display: flex; }
+
+        .bench-window {
+            background: var(--bg-panel);
+            border: 1px solid var(--brand-purple);
+            border-radius: 8px;
+            width: 95%;
+            max-width: 960px;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 30px rgba(124, 92, 255, 0.2);
+            overflow: hidden;
+            animation: benchPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes benchPop {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .bench-win-header {
+            padding: 12px 16px;
+            background: var(--bg-core);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .bench-win-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-head);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .bench-model-tag {
+            font-size: 11px;
+            font-weight: normal;
+            background: var(--brand-purple-dim);
+            color: var(--brand-purple);
+            border: 1px solid var(--brand-purple);
+            padding: 2px 8px;
+            border-radius: 4px;
+            max-width: 350px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .bench-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+        .bench-close-btn:hover {
+            color: #ff5555;
+            background: rgba(255, 85, 85, 0.1);
+        }
+
+        .bench-body {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .bench-quick-prompts {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .quick-pill {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-pill:hover {
+            border-color: var(--brand-purple);
+            color: var(--text-head);
+            background: var(--brand-purple-dim);
+        }
+
+        .bench-input-area {
+            position: relative;
+        }
+        .bench-textarea {
+            width: 100%;
+            height: 75px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .bench-textarea:focus {
+            outline: none;
+            border-color: var(--brand-purple);
+        }
+
+        .bench-actions-rail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .bench-actions-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-bench-run {
+            background: var(--brand-purple);
+            color: white;
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-bench-run:hover:not(:disabled) {
+            background: #6a4ce0;
+            box-shadow: 0 0 12px rgba(124, 92, 255, 0.4);
+        }
+        .btn-bench-stop {
+            background: #2a1111;
+            color: #ff6666;
+            border: 1px solid #552222;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .btn-bench-stop:hover:not(:disabled) {
+            background: #441111;
+            border-color: #ff4444;
+        }
+
+        .bench-status-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: #222;
+            color: var(--text-dim);
+            border: 1px solid var(--border-color);
+            text-transform: uppercase;
+        }
+        .bench-status-badge.generating {
+            background: rgba(0, 210, 255, 0.15);
+            border-color: #00d2ff;
+            color: #00d2ff;
+            animation: pulse 1s infinite;
+        }
+        .bench-status-badge.complete {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: #10b981;
+            color: #10b981;
+        }
+        .bench-status-badge.error {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .bench-terminal-wrap {
+            position: relative;
+            background: var(--bg-core);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .bench-terminal-head {
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .bench-terminal-copy {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-dim);
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .bench-terminal-copy:hover {
+            color: var(--text-head);
+            border-color: var(--brand-purple);
+        }
+        .bench-output-view {
+            height: 120px;
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.45;
+            color: var(--text-head);
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+            background: transparent;
+        }
+
+        /* STATS GRID */
+        .bench-stats-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .bench-stats-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-head);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .bench-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+        }
+        .bench-card {
+            background: var(--bg-core);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            transition: border-color 0.2s;
+        }
+        .bench-card:hover {
+            border-color: var(--brand-purple);
+        }
+        .bench-card-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .bench-card-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-head);
+        }
+        .bench-card-val.highlight-in { color: #00d2ff; }
+        .bench-card-val.highlight-out { color: #10b981; }
+        .bench-card-val.highlight-vram { color: #f59e0b; }
+        .bench-card-val.highlight-time { color: #7c5cff; }
+        .bench-card-sub {
+            font-size: 9px;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Run History Table */
+        .bench-history-wrap {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-core);
+            overflow-x: auto;
+            max-height: 100px;
+        }
+        .bench-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            text-align: left;
+        }
+        .bench-table th {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-dim);
+            padding: 5px 8px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        .bench-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-body);
+            white-space: nowrap;
+        }
+        .bench-table tr:hover td {
+            background: rgba(124, 92, 255, 0.05);
+            color: var(--text-head);
+        }
+    </style>
+</head>
+<body>
+
+    <h2>
+        <span>Model Configuration <span style="font-size:10px; color:var(--text-dim); font-weight:400;">v5.0</span></span>
+        <button id="btn-header-benchmark" class="header-bench-btn" onclick="openBenchModal()" title="Open Model Speed & Inference Benchmark">⚡ SPEED TEST</button>
+    </h2>
+
+    <!-- Status -->
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div id="status-dot" class="dot stopped"></div>
+            <span id="status-text">STOPPED</span>
+        </div>
+        <div style="font-size:11px; color:var(--text-dim);" id="pid-text">PID: -</div>
+    </div>
+
+    <div id="error-msg"></div>
+
+    <!-- Presets -->
+    <div class="section">
+        <div class="label">Presets</div>
+        <div class="presets-container" id="presets-list">
+            <!-- Generated via JS -->
+            <button class="preset-btn">1</button>
+            <button class="preset-btn">2</button>
+            <button class="preset-btn save-preset-btn">SAVE</button>
+        </div>
+    </div>
+
+    <!-- Main Config -->
+    <div class="section">
+        <div class="label">Model File</div>
+        <select id="inp-model">
+            <option value="">Select a model...</option>
+        </select>
+    </div>
+
+    <div class="section">
+        <div class="label">Parameters</div>
+        <div class="param-grid">
+            <div class="param-item">
+                <label>Context Size (n_ctx)</label>
+                <input type="number" id="inp-n_ctx" value="2048">
+            </div>
+            <div class="param-item">
+                <label>Threads (n_threads)</label>
+                <input type="number" id="inp-n_threads" value="8">
+            </div>
+            <div class="param-item">
+                <label>GPU Layers</label>
+                <input type="number" id="inp-n_gpu_layers" value="0">
+            </div>
+            <div class="param-item">
+                <label>Max Tokens</label>
+                <input type="number" id="inp-max_tokens" value="2048">
+            </div>
+            <div class="param-item">
+                <label>Temperature</label>
+                <input type="number" id="inp-temperature" value="0.7" step="0.1">
+            </div>
+            <div class="param-item">
+                <label>Top P</label>
+                <input type="number" id="inp-top_p" value="0.95" step="0.01">
+            </div>
+            <div class="param-item">
+                <label>Top K</label>
+                <input type="number" id="inp-top_k" value="40">
+            </div>
+            <div class="param-item">
+                <label>Batch Size</label>
+                <input type="number" id="inp-n_batch" value="512">
+            </div>
+             <div class="param-item">
+                <label>Chat Format</label>
+                <input type="text" id="inp-chat_format" placeholder="(Optional)">
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="control-group">
+        <button id="btn-load" class="primary">Start System</button>
+        <button id="btn-stop" class="danger">Stop System</button>
+        <button id="btn-benchmark" class="bench-trigger-btn" onclick="openBenchModal()">⚡ SPEED TEST & PROFILER</button>
+    </div>
+
+    <!-- BENCHMARK MODAL WIDGET -->
+    <div id="bench-modal" class="modal-overlay" onclick="handleModalOverlayClick(event)">
+        <div class="bench-window" onclick="event.stopPropagation()">
+            <div class="bench-win-header">
+                <div class="bench-win-title">
+                    <span>⚡ MODEL SPEED & INFERENCE BENCHMARK</span>
+                    <span id="bench-model-tag" class="bench-model-tag">No model selected</span>
+                </div>
+                <button class="bench-close-btn" onclick="closeBenchModal()" title="Close Benchmark (Esc)">✕</button>
+            </div>
+
+            <div class="bench-body">
+                <!-- Presets & Input -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                        <span class="label" style="margin:0;">Test Prompt / Question</span>
+                        <div class="bench-quick-prompts">
+                            <span style="font-size:10px; color:var(--text-dim);">Quick Tests:</span>
+                            <button type="button" class="quick-pill" onclick="setBenchPreset('burst')">⚡ Rapid Burst</button>
+                            <button type="button" class="quick-pill" onclick="setBenchPreset('reasoning')">🧠 Reasoning</button>
+                            <button type="button" class="quick-pill" onclick="setBenchPreset('code')">💻 Code Gen</button>
+                            <button type="button" class="quick-pill" onclick="setBenchPreset('clear')">Clear</button>
+                        </div>
+                    </div>
+                    <div class="bench-input-area">
+                        <textarea id="bench-prompt" class="bench-textarea" placeholder="Enter a prompt to measure prompt eval time, output speed, token counts, and system utilization..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Actions & Status Rail -->
+                <div class="bench-actions-rail">
+                    <div class="bench-actions-left">
+                        <button type="button" id="btn-bench-run" class="btn-bench-run" onclick="runBenchmark()">
+                            <span>▶ RUN BENCHMARK</span>
+                        </button>
+                        <button type="button" id="btn-bench-stop" class="btn-bench-stop" onclick="stopBenchmark()" disabled>
+                            <span>■ STOP</span>
+                        </button>
+                    </div>
+                    <div id="bench-status-badge" class="bench-status-badge">READY</div>
+                </div>
+
+                <!-- Live Output Stream -->
+                <div class="bench-terminal-wrap">
+                    <div class="bench-terminal-head">
+                        <span>GENERATION OUTPUT STREAM</span>
+                        <button type="button" class="bench-terminal-copy" onclick="copyBenchOutput()">Copy Output</button>
+                    </div>
+                    <pre id="bench-output" class="bench-output-view">Output will stream here once benchmark runs...</pre>
+                </div>
+
+                <!-- Comprehensive Stats Grid -->
+                <div class="bench-stats-container">
+                    <div class="bench-stats-title">
+                        <span>INFERENCE METRICS & SYSTEM TELEMETRY</span>
+                        <span id="bench-hw-tag" style="font-size:10px; color:var(--text-dim); font-weight:normal;"></span>
+                    </div>
+                    <div class="bench-grid">
+                        <div class="bench-card">
+                            <span class="bench-card-label">Input / Eval Speed</span>
+                            <span id="stat-prompt-speed" class="bench-card-val highlight-in">-- t/s</span>
+                            <span id="stat-prompt-toks-sub" class="bench-card-sub">0 prompt tokens</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">Output / Gen Speed</span>
+                            <span id="stat-gen-speed" class="bench-card-val highlight-out">-- t/s</span>
+                            <span id="stat-gen-toks-sub" class="bench-card-sub">0 eval tokens</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">Total Time</span>
+                            <span id="stat-total-time" class="bench-card-val highlight-time">-- s</span>
+                            <span id="stat-total-toks-sub" class="bench-card-sub">0 total tokens</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">Overall Throughput</span>
+                            <span id="stat-throughput" class="bench-card-val">-- t/s</span>
+                            <span class="bench-card-sub">Total tokens / Total time</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">Prompt Latency</span>
+                            <span id="stat-prompt-ms" class="bench-card-val">-- ms</span>
+                            <span class="bench-card-sub">Tokenization & prompt eval</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">Gen Latency</span>
+                            <span id="stat-gen-ms" class="bench-card-val">-- ms</span>
+                            <span class="bench-card-sub">Token evaluation time</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">KV Cache Hits</span>
+                            <span id="stat-kv-hits" class="bench-card-val">--</span>
+                            <span class="bench-card-sub">Prefix-match reused tokens</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">Load / Model Time</span>
+                            <span id="stat-load-ms" class="bench-card-val">-- ms</span>
+                            <span class="bench-card-sub">Model / sample load</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">VRAM Usage</span>
+                            <span id="stat-vram" class="bench-card-val highlight-vram">--</span>
+                            <span id="stat-vram-sub" class="bench-card-sub">Dedicated GPU Memory</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">GPU Core Util</span>
+                            <span id="stat-gpu-util" class="bench-card-val">--%</span>
+                            <span id="stat-gpu-name" class="bench-card-sub">Core utilization</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">System RAM</span>
+                            <span id="stat-ram" class="bench-card-val">--%</span>
+                            <span id="stat-ram-sub" class="bench-card-sub">Host memory used</span>
+                        </div>
+                        <div class="bench-card">
+                            <span class="bench-card-label">System CPU</span>
+                            <span id="stat-cpu" class="bench-card-val">--%</span>
+                            <span class="bench-card-sub">Host processor load</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session History -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="label" style="margin:0; font-size:10px;">Session Benchmark History</span>
+                        <button type="button" class="quick-pill" onclick="clearBenchHistory()" style="font-size:9px; padding:2px 6px;">Clear History</button>
+                    </div>
+                    <div class="bench-history-wrap">
+                        <table class="bench-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Model</th>
+                                    <th>Input Speed</th>
+                                    <th>Output Speed</th>
+                                    <th>Tokens (In/Out)</th>
+                                    <th>Total Time</th>
+                                    <th>KV Hits</th>
+                                    <th>VRAM</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bench-history-tbody">
+                                <tr><td colspan="8" style="text-align:center; color:var(--text-dim); padding:10px;">No benchmarks run yet in this session.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        if (!coreUrl || (coreUrl.includes(":8000") && window.location.protocol.startsWith('http') && window.location.port !== "8000")) {
+            coreUrl = window.location.protocol.startsWith('http') ? window.location.origin : 'http://localhost:8080';
+        }
+        let authToken = localStorage.getItem('lyrn_admin_token') || null;
+        let pollInterval = null;
+        let isRunning = false;
+        let presets = {};
+
+        const els = {
+            statusDot: document.getElementById('status-dot'),
+            statusText: document.getElementById('status-text'),
+            pidText: document.getElementById('pid-text'),
+            modelSelect: document.getElementById('inp-model'),
+            btnLoad: document.getElementById('btn-load'),
+            btnStop: document.getElementById('btn-stop'),
+            errorMsg: document.getElementById('error-msg'),
+            presetsList: document.getElementById('presets-list')
+        };
+
+        const inputs = {
+            n_ctx: document.getElementById('inp-n_ctx'),
+            n_threads: document.getElementById('inp-n_threads'),
+            n_gpu_layers: document.getElementById('inp-n_gpu_layers'),
+            max_tokens: document.getElementById('inp-max_tokens'),
+            temperature: document.getElementById('inp-temperature'),
+            top_p: document.getElementById('inp-top_p'),
+            top_k: document.getElementById('inp-top_k'),
+            n_batch: document.getElementById('inp-n_batch'),
+            chat_format: document.getElementById('inp-chat_format'),
+            model_path: document.getElementById('inp-model') // Special case
+        };
+
+        // Listen for URL updates from dashboard
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = e.data.url;
+                init();
+            }
+            if (e.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
+                authToken = e.data.token;
+                if(wasNull) init();
+            }
+            if (e.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+            }
+            if (e.data.type === 'FONT_CHANGE') {
+                const fs = e.data.fontSize;
+                document.documentElement.style.setProperty('--font-size-base', fs + 'px');
+                document.body.style.setProperty('--font-size-base', fs + 'px');
+                document.body.style.fontSize = fs + 'px';
+            }
+        });
+
+        els.btnLoad.addEventListener('click', startWorker);
+        els.btnStop.addEventListener('click', stopWorker);
+
+        // Auto-refresh model list on click
+        els.modelSelect.addEventListener('mousedown', fetchModels);
+
+        async function init() {
+            if(!authToken) return;
+            await Promise.all([
+                fetchModels(),
+                fetchPresets(),
+                fetchActiveConfig()
+            ]);
+            startPolling();
+        }
+
+        async function fetchModels() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/models/list`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const data = await res.json();
+                els.modelSelect.innerHTML = '<option value="">Select a model...</option>';
+
+                // Compatibility check if data is array or object
+                const list = Array.isArray(data) ? data : (data.models || []);
+
+                list.forEach(item => {
+                    const name = typeof item === 'string' ? item : item.name;
+                    const opt = document.createElement('option');
+                    opt.value = `models/${name}`; // Assuming models dir is root relative
+                    opt.innerText = name;
+                    els.modelSelect.appendChild(opt);
+                });
+            } catch (e) {
+                showError("Failed to list models: " + e.message);
+            }
+        }
+
+        async function fetchPresets() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/config/presets`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                presets = await res.json();
+                renderPresets();
+            } catch (e) {
+                showError("Failed to fetch presets");
+            }
+        }
+
+        function renderPresets() {
+            els.presetsList.innerHTML = '';
+
+            // Render Default Slot
+            const defBtn = document.createElement('button');
+            defBtn.className = 'preset-btn default-preset-btn';
+            defBtn.innerText = 'DEFAULT';
+
+            const defData = presets["default"];
+            if(defData) {
+                const tip = document.createElement('div');
+                tip.className = 'preset-tooltip';
+                const name = defData.model_path ? defData.model_path.split('/').pop() : 'Unknown';
+                tip.innerText = `Model: ${name}\nCtx: ${defData.n_ctx}\nGPU: ${defData.n_gpu_layers}`;
+                defBtn.appendChild(tip);
+                defBtn.onclick = () => loadPreset("default");
+            } else {
+                defBtn.style.opacity = '0.5';
+                defBtn.onclick = () => alert("Default preset empty. Set params and click Save, then enter 'default'.");
+            }
+            els.presetsList.appendChild(defBtn);
+
+            // Render 1-5 slots
+            for(let i=1; i<=5; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'preset-btn';
+                btn.innerText = i;
+
+                const presetId = i.toString();
+                const pData = presets[presetId];
+
+                if(pData) {
+                    // Tooltip
+                    const tip = document.createElement('div');
+                    tip.className = 'preset-tooltip';
+                    const name = pData.model_path ? pData.model_path.split('/').pop() : 'Unknown';
+                    tip.innerText = `Model: ${name}\nCtx: ${pData.n_ctx}\nGPU: ${pData.n_gpu_layers}`;
+                    btn.appendChild(tip);
+
+                    btn.onclick = () => loadPreset(presetId);
+                } else {
+                    btn.style.opacity = '0.5';
+                    btn.onclick = () => alert("Preset empty. Set params and click Save.");
+                }
+
+                els.presetsList.appendChild(btn);
+            }
+
+            // Save Button
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'preset-btn save-preset-btn';
+            saveBtn.innerText = 'SAVE';
+            saveBtn.onclick = savePreset;
+            els.presetsList.appendChild(saveBtn);
+        }
+
+        function loadPreset(id) {
+            const data = presets[id];
+            if(!data) return;
+
+            // Populate fields
+            for(const [key, val] of Object.entries(data)) {
+                if(inputs[key]) {
+                    inputs[key].value = val;
+                }
+            }
+        }
+
+        async function savePreset() {
+            const input = prompt("Enter preset number (1-5) or 'default' to save:");
+            if(!input) return;
+
+            let id = input.trim().toLowerCase();
+
+            // Allow 'd' as shortcut for default
+            if(id === 'd') id = 'default';
+
+            const isNum = !isNaN(id);
+            if(isNum) {
+                if(id < 1 || id > 5) {
+                    alert("Please enter a number between 1 and 5.");
+                    return;
+                }
+            } else {
+                if(id !== 'default') {
+                    alert("Invalid input. Enter 1-5 or 'default'.");
+                    return;
+                }
+            }
+
+            const config = getConfigFromInputs();
+
+            try {
+                await fetch(`${coreUrl}/api/config/presets`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
+                    body: JSON.stringify({ preset_id: id, config: config })
+                });
+                await fetchPresets(); // Refresh
+            } catch(e) {
+                showError("Error saving preset");
+            }
+        }
+
+        async function fetchActiveConfig() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/config/active`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const config = await res.json();
+                if(config && Object.keys(config).length > 0) {
+                     for(const [key, val] of Object.entries(config)) {
+                        if(inputs[key]) inputs[key].value = val;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        function getConfigFromInputs() {
+            return {
+                model_path: inputs.model_path.value,
+                n_ctx: parseInt(inputs.n_ctx.value),
+                n_threads: parseInt(inputs.n_threads.value),
+                n_gpu_layers: parseInt(inputs.n_gpu_layers.value),
+                max_tokens: parseInt(inputs.max_tokens.value),
+                temperature: parseFloat(inputs.temperature.value),
+                top_p: parseFloat(inputs.top_p.value),
+                top_k: parseInt(inputs.top_k.value),
+                n_batch: parseInt(inputs.n_batch.value),
+                chat_format: inputs.chat_format.value || null
+            };
+        }
+
+        function startPolling() {
+            if(pollInterval) clearInterval(pollInterval);
+            pollStatus();
+            pollInterval = setInterval(pollStatus, 2000);
+        }
+
+        async function pollStatus() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/system/worker_status`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const data = await res.json();
+                updateUI(data);
+            } catch(e) {
+                els.statusText.innerText = "DISCONNECTED";
+                els.statusDot.className = "dot error";
+            }
+        }
+
+        function updateUI(data) {
+            isRunning = data.running;
+
+            // Status Text mapping
+            let label = "STOPPED";
+            let dotClass = "stopped";
+
+            if(data.running) {
+                if(data.llm_status === 'loading') {
+                    label = "LOADING MODEL...";
+                    dotClass = "loading";
+                } else if(data.llm_status === 'busy') {
+                    label = "GENERATING";
+                    dotClass = "running";
+                } else if(data.llm_status === 'error') {
+                    label = "MODEL ERROR";
+                    dotClass = "error";
+                } else {
+                    label = "RUNNING (IDLE)";
+                    dotClass = "running";
+                }
+            }
+
+            els.statusText.innerText = label;
+            els.statusDot.className = "dot " + dotClass;
+            els.pidText.innerText = data.pid ? `PID: ${data.pid}` : "PID: -";
+
+            els.btnLoad.disabled = data.running;
+            els.btnStop.disabled = !data.running;
+
+            // Error Message
+            if(data.llm_status === 'error' && data.error_message) {
+                showError("Error: " + data.error_message);
+            } else {
+                els.errorMsg.style.display = 'none';
+            }
+        }
+
+        async function startWorker() {
+            const config = getConfigFromInputs();
+            if(!config.model_path) {
+                alert("Please select a model first.");
+                return;
+            }
+
+            els.errorMsg.style.display = 'none';
+            els.btnLoad.disabled = true;
+
+            try {
+                // 1. Save Active Config
+                await fetch(`${coreUrl}/api/config/active`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
+                    body: JSON.stringify({ config: config })
+                });
+
+                // 2. Start Worker
+                const res = await fetch(`${coreUrl}/api/system/start_worker`, {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const json = await res.json();
+
+                if(!json.success) throw new Error(json.message);
+
+                // UI updates via polling
+            } catch(e) {
+                showError(e.message);
+                els.btnLoad.disabled = false;
+            }
+        }
+
+        async function stopWorker() {
+            els.btnStop.disabled = true;
+            try {
+                await fetch(`${coreUrl}/api/system/stop_worker`, {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+            } catch(e) {
+                showError(e.message);
+            }
+        }
+
+        function showError(msg) {
+            els.errorMsg.innerText = msg;
+            els.errorMsg.style.display = 'block';
+        }
+
+        /* =========================================================================
+           MODEL BENCHMARK & SPEED PROFILER LOGIC
+           ========================================================================= */
+        let benchPollingInterval = null;
+        let activeBenchId = null;
+        let benchStartTime = null;
+        let isBenchmarking = false;
+        let sessionBenchHistory = [];
+
+        const benchEls = {
+            modal: document.getElementById('bench-modal'),
+            modelTag: document.getElementById('bench-model-tag'),
+            prompt: document.getElementById('bench-prompt'),
+            btnRun: document.getElementById('btn-bench-run'),
+            btnStop: document.getElementById('btn-bench-stop'),
+            badge: document.getElementById('bench-status-badge'),
+            output: document.getElementById('bench-output'),
+            hwTag: document.getElementById('bench-hw-tag'),
+            historyTbody: document.getElementById('bench-history-tbody'),
+
+            // Metrics
+            promptSpeed: document.getElementById('stat-prompt-speed'),
+            promptToksSub: document.getElementById('stat-prompt-toks-sub'),
+            genSpeed: document.getElementById('stat-gen-speed'),
+            genToksSub: document.getElementById('stat-gen-toks-sub'),
+            totalTime: document.getElementById('stat-total-time'),
+            totalToksSub: document.getElementById('stat-total-toks-sub'),
+            throughput: document.getElementById('stat-throughput'),
+            promptMs: document.getElementById('stat-prompt-ms'),
+            genMs: document.getElementById('stat-gen-ms'),
+            kvHits: document.getElementById('stat-kv-hits'),
+            loadMs: document.getElementById('stat-load-ms'),
+            vram: document.getElementById('stat-vram'),
+            vramSub: document.getElementById('stat-vram-sub'),
+            gpuUtil: document.getElementById('stat-gpu-util'),
+            gpuName: document.getElementById('stat-gpu-name'),
+            ram: document.getElementById('stat-ram'),
+            ramSub: document.getElementById('stat-ram-sub'),
+            cpu: document.getElementById('stat-cpu')
+        };
+
+        function openBenchModal() {
+            updateBenchModalModelTag();
+            benchEls.modal.classList.add('show');
+            if (!benchEls.prompt.value.trim()) {
+                setBenchPreset('burst');
+            }
+            fetchInstantHwTelemetry();
+        }
+
+        function closeBenchModal() {
+            benchEls.modal.classList.remove('show');
+        }
+
+        function handleModalOverlayClick(e) {
+            if (e.target === benchEls.modal && !isBenchmarking) {
+                closeBenchModal();
+            }
+        }
+
+        // Close on Escape key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && benchEls.modal && benchEls.modal.classList.contains('show') && !isBenchmarking) {
+                closeBenchModal();
+            }
+        });
+
+        function updateBenchModalModelTag() {
+            const selectedVal = els.modelSelect.value;
+            const modelName = selectedVal ? selectedVal.split('/').pop() : "No model selected";
+            const ctx = inputs.n_ctx.value;
+            const threads = inputs.n_threads.value;
+            const gpuLayers = inputs.n_gpu_layers.value;
+            benchEls.modelTag.innerText = `${modelName} [Ctx:${ctx} | Thr:${threads} | GPU:${gpuLayers}]`;
+            benchEls.modelTag.title = `Model: ${modelName}\nContext Size: ${ctx}\nThreads: ${threads}\nGPU Layers: ${gpuLayers}`;
+        }
+
+        function setBenchPreset(type) {
+            if (type === 'burst') {
+                benchEls.prompt.value = "List numbers 1 to 20 with their squares, and briefly explain what causes gravity in physics.";
+            } else if (type === 'reasoning') {
+                benchEls.prompt.value = "Compare compiled versus interpreted languages. Contrast memory management, execution speed, portability, and provide a short snippet in C and Python.";
+            } else if (type === 'code') {
+                benchEls.prompt.value = "Write a complete Python function that performs exponential backoff retry on network exceptions, including type hints and docstrings.";
+            } else if (type === 'clear') {
+                benchEls.prompt.value = "";
+                benchEls.prompt.focus();
+            }
+        }
+
+        async function fetchInstantHwTelemetry() {
+            try {
+                const res = await fetch(`${coreUrl}/health`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.gpu && (data.gpu.primary || data.gpu.gpu_0)) {
+                    const g = data.gpu.primary || data.gpu.gpu_0;
+                    benchEls.vram.innerText = `${g.vram_used_gb} / ${g.vram_total_gb} GB (${Math.round(g.vram_percent)}%)`;
+                    benchEls.gpuUtil.innerText = `${Math.round(g.gpu_util_percent)}%`;
+                    benchEls.gpuName.innerText = g.name || "GPU Core";
+                }
+                if (data.ram) {
+                    benchEls.ram.innerText = `${Math.round(data.ram.percent)}%`;
+                    benchEls.ramSub.innerText = `${data.ram.used_gb.toFixed(1)} / ${data.ram.total_gb.toFixed(1)} GB`;
+                }
+                if (data.cpu !== null && data.cpu !== undefined) {
+                    benchEls.cpu.innerText = `${Math.round(data.cpu)}%`;
+                }
+            } catch(e) {}
+        }
+
+        async function runBenchmark() {
+            if (!isRunning) {
+                alert("Model runner is not running. Please click 'Start System' first to boot the model into memory.");
+                return;
+            }
+
+            const promptText = benchEls.prompt.value.trim();
+            if (!promptText) {
+                alert("Please enter a test prompt or choose a preset.");
+                return;
+            }
+
+            isBenchmarking = true;
+            benchEls.btnRun.disabled = true;
+            benchEls.btnStop.disabled = false;
+            benchEls.badge.innerText = "STARTING...";
+            benchEls.badge.className = "bench-status-badge generating";
+            benchEls.output.innerText = "Initializing benchmark job through deterministic injection tail...";
+
+            resetMetricsDisplay();
+            benchStartTime = performance.now();
+
+            try {
+                const res = await fetch(`${coreUrl}/api/models/test_benchmark`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
+                    body: JSON.stringify({ prompt: promptText })
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.detail || data.message || "Failed to launch benchmark");
+                }
+
+                activeBenchId = data.test_id;
+                benchEls.badge.innerText = "GENERATING...";
+
+                // Start active polling
+                if (benchPollingInterval) clearInterval(benchPollingInterval);
+                benchPollingInterval = setInterval(() => pollBenchStatus(activeBenchId), 350);
+
+            } catch (err) {
+                benchEls.badge.innerText = "ERROR";
+                benchEls.badge.className = "bench-status-badge error";
+                benchEls.output.innerText = `[Benchmark Error]: ${err.message}`;
+                finishBenchmark(false);
+            }
+        }
+
+        async function pollBenchStatus(testId) {
+            if (!testId) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/models/test_status/${testId}`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                // Update output stream text
+                if (data.output) {
+                    benchEls.output.innerText = data.output;
+                    benchEls.output.scrollTop = benchEls.output.scrollHeight;
+                }
+
+                const elapsedSec = (performance.now() - benchStartTime) / 1000;
+                benchEls.totalTime.innerText = `${elapsedSec.toFixed(2)} s`;
+
+                // Update intermediate or final stats
+                if (data.stats && Object.keys(data.stats).length > 0) {
+                    renderMetrics(data.stats, data.output, elapsedSec);
+                }
+
+                // Check completion
+                if (data.state === 'complete' || (data.state === 'idle' && data.output)) {
+                    benchEls.badge.innerText = "COMPLETE";
+                    benchEls.badge.className = "bench-status-badge complete";
+                    finishBenchmark(true, data.stats, data.output, elapsedSec);
+                } else if (data.state === 'error') {
+                    benchEls.badge.innerText = "ERROR";
+                    benchEls.badge.className = "bench-status-badge error";
+                    finishBenchmark(false);
+                } else if (data.state === 'stopped') {
+                    benchEls.badge.innerText = "STOPPED";
+                    benchEls.badge.className = "bench-status-badge";
+                    finishBenchmark(false);
+                }
+            } catch(e) {
+                console.error("Bench poll error:", e);
+            }
+        }
+
+        async function stopBenchmark() {
+            benchEls.btnStop.disabled = true;
+            benchEls.badge.innerText = "STOPPING...";
+            try {
+                await fetch(`${coreUrl}/api/models/test_stop`, {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+            } catch(e) {
+                console.error("Stop error:", e);
+            }
+        }
+
+        function finishBenchmark(success = true, stats = null, outputText = "", elapsedSec = 0) {
+            if (benchPollingInterval) {
+                clearInterval(benchPollingInterval);
+                benchPollingInterval = null;
+            }
+            isBenchmarking = false;
+            benchEls.btnRun.disabled = false;
+            benchEls.btnStop.disabled = true;
+
+            if (success && stats) {
+                logSessionBenchmark(stats, outputText, elapsedSec);
+            }
+        }
+
+        function resetMetricsDisplay() {
+            benchEls.promptSpeed.innerText = "-- t/s";
+            benchEls.promptToksSub.innerText = "0 prompt tokens";
+            benchEls.genSpeed.innerText = "-- t/s";
+            benchEls.genToksSub.innerText = "0 eval tokens";
+            benchEls.totalTime.innerText = "0.00 s";
+            benchEls.totalToksSub.innerText = "0 total tokens";
+            benchEls.throughput.innerText = "-- t/s";
+            benchEls.promptMs.innerText = "-- ms";
+            benchEls.genMs.innerText = "-- ms";
+            benchEls.kvHits.innerText = "--";
+            benchEls.loadMs.innerText = "-- ms";
+        }
+
+        function renderMetrics(stats, outputText, elapsedSec) {
+            // Prompt Evaluation Speed
+            if (stats.prompt_speed !== undefined) {
+                benchEls.promptSpeed.innerText = `${stats.prompt_speed.toFixed(2)} t/s`;
+            }
+            if (stats.prompt_tokens !== undefined) {
+                benchEls.promptToksSub.innerText = `${stats.prompt_tokens} prompt tokens`;
+            }
+            if (stats.tokenization_time_ms !== undefined) {
+                benchEls.promptMs.innerText = `${stats.tokenization_time_ms.toFixed(1)} ms`;
+            }
+
+            // Generation Speed
+            if (stats.eval_speed !== undefined) {
+                benchEls.genSpeed.innerText = `${stats.eval_speed.toFixed(2)} t/s`;
+            }
+            if (stats.eval_tokens !== undefined) {
+                benchEls.genToksSub.innerText = `${stats.eval_tokens} eval tokens`;
+            }
+            if (stats.generation_time_ms !== undefined) {
+                benchEls.genMs.innerText = `${stats.generation_time_ms.toFixed(1)} ms`;
+            }
+
+            // Total Time & Tokens
+            const timeVal = stats.total_time || elapsedSec;
+            if (timeVal) {
+                benchEls.totalTime.innerText = `${timeVal.toFixed(2)} s`;
+            }
+            if (stats.total_tokens) {
+                benchEls.totalToksSub.innerText = `${stats.total_tokens} total tokens`;
+            } else if (stats.prompt_tokens && stats.eval_tokens) {
+                benchEls.totalToksSub.innerText = `${stats.prompt_tokens + stats.eval_tokens} total tokens`;
+            }
+
+            // Throughput
+            const totTokens = stats.total_tokens || ((stats.prompt_tokens || 0) + (stats.eval_tokens || 0));
+            if (totTokens && timeVal > 0) {
+                benchEls.throughput.innerText = `${(totTokens / timeVal).toFixed(2)} t/s`;
+            }
+
+            // KV Cache hits
+            if (stats.kv_cache_reused !== undefined) {
+                const hits = stats.kv_cache_reused;
+                const pToks = stats.prompt_tokens || 1;
+                const pct = Math.min(100, Math.round((hits / pToks) * 100));
+                benchEls.kvHits.innerText = `${hits} (${pct}%)`;
+            }
+
+            // Load Time
+            if (stats.load_time !== undefined) {
+                benchEls.loadMs.innerText = `${stats.load_time.toFixed(1)} ms`;
+            }
+
+            // Hardware Telemetry
+            if (stats.hw_telemetry) {
+                const hw = stats.hw_telemetry;
+                if (hw.gpu && (hw.gpu.primary || hw.gpu.gpu_0)) {
+                    const g = hw.gpu.primary || hw.gpu.gpu_0;
+                    benchEls.vram.innerText = `${g.vram_used_gb} / ${g.vram_total_gb} GB (${Math.round(g.vram_percent)}%)`;
+                    benchEls.gpuUtil.innerText = `${Math.round(g.gpu_util_percent)}%`;
+                    benchEls.gpuName.innerText = g.name || "GPU Core";
+                }
+                if (hw.ram) {
+                    benchEls.ram.innerText = `${Math.round(hw.ram.percent)}%`;
+                    benchEls.ramSub.innerText = `${hw.ram.used_gb.toFixed(1)} / ${hw.ram.total_gb.toFixed(1)} GB`;
+                }
+                if (hw.cpu !== null && hw.cpu !== undefined) {
+                    benchEls.cpu.innerText = `${Math.round(hw.cpu)}%`;
+                }
+            }
+        }
+
+        function logSessionBenchmark(stats, outputText, elapsedSec) {
+            const timeStr = new Date().toLocaleTimeString();
+            const modelName = els.modelSelect.value ? els.modelSelect.value.split('/').pop() : "Current Model";
+            const inSpeed = stats.prompt_speed ? `${stats.prompt_speed.toFixed(1)} t/s` : "--";
+            const outSpeed = stats.eval_speed ? `${stats.eval_speed.toFixed(1)} t/s` : "--";
+            const pTok = stats.prompt_tokens || 0;
+            const eTok = stats.eval_tokens || 0;
+            const totalTime = (stats.total_time || elapsedSec || 0).toFixed(2) + "s";
+            const kvHits = stats.kv_cache_reused !== undefined ? stats.kv_cache_reused : "--";
+            const vramStr = benchEls.vram.innerText !== "--" ? benchEls.vram.innerText : "--";
+
+            const rowData = { timeStr, modelName, inSpeed, outSpeed, inTok: pTok, outTok: eTok, totalTime, kvHits, vramStr };
+            sessionBenchHistory.unshift(rowData);
+            renderBenchHistoryTable();
+        }
+
+        function renderBenchHistoryTable() {
+            if (sessionBenchHistory.length === 0) {
+                benchEls.historyTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-dim); padding:10px;">No benchmarks run yet in this session.</td></tr>';
+                return;
+            }
+            benchEls.historyTbody.innerHTML = sessionBenchHistory.map(row => `
+                <tr>
+                    <td>${row.timeStr}</td>
+                    <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis;" title="${row.modelName}">${row.modelName}</td>
+                    <td style="color:#00d2ff; font-weight:bold;">${row.inSpeed}</td>
+                    <td style="color:#10b981; font-weight:bold;">${row.outSpeed}</td>
+                    <td>${row.inTok} / ${row.outTok}</td>
+                    <td style="color:#7c5cff;">${row.totalTime}</td>
+                    <td>${row.kvHits}</td>
+                    <td>${row.vramStr}</td>
+                </tr>
+            `).join('');
+        }
+
+        function clearBenchHistory() {
+            sessionBenchHistory = [];
+            renderBenchHistoryTable();
+        }
+
+        function copyBenchOutput() {
+            const text = benchEls.output.innerText;
+            if (!text || text.startsWith("Output will stream")) return;
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Benchmark output copied to clipboard!");
+            }).catch(e => {
+                console.error("Clipboard copy failed:", e);
+            });
+        }
+
+        // Init
+        init();
+
+    </script>
+</body>
+</html>

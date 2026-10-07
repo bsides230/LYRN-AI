@@ -1,0 +1,15 @@
+Pillow
+psutil
+nvidia-ml-py
+
+pyautogui
+pygetwindow
+fastapi
+uvicorn
+python-multipart
+aiohttp
+aiofiles
+websockets
+uvicorn[standard]
+ptyprocess
+httpx

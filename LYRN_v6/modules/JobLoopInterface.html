@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Loop Studio</title>
+    <link rel="stylesheet" href="../themes/corporate-terminal.css" />
+    <link rel="stylesheet" href="../themes/corporate-2049.css" />
+    <link rel="stylesheet" href="../themes/cyber-dark.css" />
+    <style>
+        :root {
+            --font-size-base: 12px;
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --surface: #0e0e11;
+            --surface-hover: #16161b;
+            --brand-purple: #7c5cff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.15);
+            --brand-purple-glow: rgba(124, 92, 255, 0.35);
+            --text-head: #ffffff;
+            --text-body: #b8b8b8;
+            --text-dim: #686868;
+            --border-color: #222226;
+            --border-highlight: #3a3a44;
+            --bg-input: #08080a;
+            --error-color: #ff4444;
+            --error-dim: rgba(255, 68, 68, 0.15);
+            --success: #00cc66;
+            --success-dim: rgba(0, 204, 102, 0.15);
+            --warning: #ffbb33;
+            --warning-dim: rgba(255, 187, 51, 0.15);
+            --accent: var(--brand-purple);
+            --danger: var(--error-color);
+            --font-main: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --surface: #f4f5f8;
+            --surface-hover: #eaecee;
+            --brand-purple: #6a4ce0;
+            --brand-purple-dim: rgba(106, 76, 224, 0.12);
+            --brand-purple-glow: rgba(106, 76, 224, 0.25);
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #666666;
+            --border-color: #d1d5db;
+            --border-highlight: #9ca3af;
+            --bg-input: #ffffff;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            gap: 12px;
+            overflow: hidden;
+            font-size: var(--font-size-base, 12px);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        /* Typography & Header */
+        h1, h2, h3, h4 { margin: 0; color: var(--text-head); font-weight: 600; }
+        .text-mono { font-family: var(--font-mono); }
+        .text-dim { color: var(--text-dim); }
+        .text-accent { color: var(--accent); }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+
+        /* Badges & Pills */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            letter-spacing: 0.03em;
+        }
+        .badge-purple { background: var(--brand-purple-dim); color: var(--brand-purple); border: 1px solid rgba(124, 92, 255, 0.3); }
+        .badge-success { background: var(--success-dim); color: var(--success); border: 1px solid rgba(0, 204, 102, 0.3); }
+        .badge-warning { background: var(--warning-dim); color: var(--warning); border: 1px solid rgba(255, 187, 51, 0.3); }
+        .badge-danger { background: var(--error-dim); color: var(--error-color); border: 1px solid rgba(255, 68, 68, 0.3); }
+        .badge-dim { background: rgba(255, 255, 255, 0.05); color: var(--text-dim); border: 1px solid var(--border-color); }
+
+        /* Buttons */
+        button, .btn {
+            background: var(--surface);
+            color: var(--text-body);
+            border: 1px solid var(--border-color);
+            padding: 7px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        button:hover, .btn:hover {
+            border-color: var(--accent);
+            color: var(--text-head);
+            background: var(--surface-hover);
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: #ffffff;
+            border: 1px solid var(--accent);
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            background: #9479ff;
+            border-color: #9479ff;
+            color: #ffffff;
+            box-shadow: 0 0 12px var(--brand-purple-glow);
+        }
+        .btn-danger {
+            background: transparent;
+            color: var(--danger);
+            border-color: rgba(255, 68, 68, 0.3);
+        }
+        .btn-danger:hover {
+            background: var(--error-dim);
+            border-color: var(--danger);
+            color: #ffffff;
+        }
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+        }
+        .btn-group {
+            display: inline-flex;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .btn-group button {
+            border-radius: 0;
+            border-right-width: 0;
+        }
+        .btn-group button:last-child {
+            border-right-width: 1px;
+        }
+        .btn-group button.active {
+            background: var(--brand-purple-dim);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* Inputs */
+        input[type="text"], input[type="number"], select, textarea {
+            background-color: var(--bg-input);
+            color: var(--text-head);
+            border: 1px solid var(--border-color);
+            padding: 7px 10px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 16px;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .app-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-head);
+        }
+        .top-bar-center {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Main Workspace Layout */
+        .workspace {
+            display: flex;
+            gap: 12px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.01);
+        }
+        .panel-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .panel-body {
+            padding: 14px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Sidebar - Job List */
+        .sidebar {
+            width: 290px;
+            flex-shrink: 0;
+        }
+        .search-bar {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .search-bar input {
+            width: 100%;
+        }
+        .job-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 10px 14px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .job-card {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+        .job-card:hover {
+            border-color: var(--border-highlight);
+            background: var(--surface-hover);
+        }
+        .job-card.active {
+            border-color: var(--accent);
+            background: var(--brand-purple-dim);
+            box-shadow: 0 0 10px rgba(124, 92, 255, 0.1);
+        }
+        .job-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .job-card-name {
+            font-weight: 600;
+            color: var(--text-head);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .job-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        /* Center Column - Job Builder */
+        .builder-column {
+            flex: 1;
+            min-width: 440px;
+        }
+        .builder-body {
+            padding: 16px;
+            gap: 16px;
+        }
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .field-row {
+            display: flex;
+            gap: 12px;
+        }
+        .field-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .code-textarea {
+            width: 100%;
+            height: 180px;
+            resize: vertical;
+            line-height: 1.5;
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        /* Chips & Tags */
+        .chip-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 6px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            min-height: 40px;
+            align-items: center;
+        }
+        .chip {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-head);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chip .remove-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            padding: 0;
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1;
+        }
+        .chip .remove-btn:hover {
+            color: var(--danger);
+        }
+
+        /* Right Column - Runner & Telemetry */
+        .runner-column {
+            width: 380px;
+            flex-shrink: 0;
+        }
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .metric-card {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .metric-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+        .metric-value {
+            font-size: 16px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--text-head);
+        }
+
+        /* Terminal Output Console */
+        .console-box {
+            background: #000000;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: #d1d5db;
+            padding: 10px;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 180px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+
+        .highlight-affordance {
+            background: rgba(124, 92, 255, 0.25);
+            color: #a78bfa;
+            border: 1px solid #7c5cff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 700;
+        }
+
+        /* Status Light */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot-idle { background: var(--success); box-shadow: 0 0 6px rgba(0, 204, 102, 0.6); }
+        .dot-busy { background: var(--accent); box-shadow: 0 0 8px #7c5cff; animation: pulse 1.2s infinite; }
+        .dot-loading { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+        .dot-error { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* Spreadsheet / CSV Table View Modal */
+        #csvTableView {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            gap: 12px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px;
+            overflow: hidden;
+        }
+        .table-wrap {
+            flex: 1;
+            overflow: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+        th, td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: var(--surface);
+            color: var(--text-dim);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        tr:hover td {
+            background: var(--surface-hover);
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .modal-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-highlight);
+            border-radius: 8px;
+            width: 520px;
+            max-width: 90%;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-body {
+            padding: 18px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .modal-footer {
+            padding: 12px 18px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        /* Banner Notification */
+        #notificationBanner {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            display: none;
+            z-index: 10000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: fadeIn 0.2s;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <!-- TOP CONTROL BAR -->
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <div class="app-title">
+                <span style="color: var(--accent); font-size: 16px;">⚡</span>
+                <span>JOB LOOP STUDIO</span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label class="field-label" style="margin: 0;">CSV Category:</label>
+                <select id="categorySelect" onchange="onCategoryChanged()" style="min-width: 140px;">
+                    <option value="">Loading...</option>
+                </select>
+                <button class="btn-sm" onclick="openNewCategoryModal()" title="Create New Job Category">+ Cat</button>
+                <button class="btn-sm" onclick="openRenameCategoryModal()" title="Rename Category">Rename</button>
+                <button class="btn-sm btn-danger" onclick="deleteCurrentCategory()" title="Delete Category">✕</button>
+            </div>
+
+            <span id="csvPathBadge" class="badge badge-dim">runtime/jobs/categories/</span>
+        </div>
+
+        <div class="top-bar-center">
+            <div class="btn-group">
+                <button id="btnViewBuilder" class="active" onclick="switchViewMode('builder')">Visual Builder</button>
+                <button id="btnViewTable" onclick="switchViewMode('table')">CSV Table</button>
+                <button id="btnViewRaw" onclick="switchViewMode('raw')">Raw CSV</button>
+            </div>
+        </div>
+
+        <div class="top-bar-right">
+            <button onclick="openImportModal()">📥 Import</button>
+            <button onclick="exportCurrentCSV()">📤 Export</button>
+            <button onclick="openTriggerConfigModal()">⚙️ Settings</button>
+            <button onclick="refreshAll()">🔄 Refresh</button>
+        </div>
+    </div>
+
+    <!-- MAIN WORKSPACE: BUILDER VIEW -->
+    <div id="builderView" class="workspace">
+
+        <!-- COLUMN 1: JOBS EXPLORER -->
+        <div class="panel sidebar">
+            <div class="panel-header">
+                <span class="panel-title">Jobs List</span>
+                <span id="jobCountBadge" class="badge badge-purple">0 Jobs</span>
+            </div>
+
+            <div class="search-bar">
+                <input type="text" id="jobSearchInput" placeholder="Filter jobs..." oninput="filterJobsList()">
+            </div>
+
+            <div id="jobListContainer" class="job-list">
+                <!-- Injected via JavaScript -->
+            </div>
+
+            <div style="padding: 10px 14px; border-top: 1px solid var(--border-color);">
+                <button class="btn-primary" style="width: 100%; justify-content: center;" onclick="createNewJobTemplate()">
+                    + New Job Definition
+                </button>
+            </div>
+        </div>
+
+        <!-- COLUMN 2: JOB BUILDER & INSPECTOR -->
+        <div class="panel builder-column">
+            <div class="panel-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="panel-title">Job Specification</span>
+                    <span id="jobTriggerBadge" class="badge badge-purple">##AF: category/job##</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px;">
+                        <input type="checkbox" id="jobEnabledCheckbox" checked> Enabled
+                    </label>
+                </div>
+            </div>
+
+            <div class="panel-body builder-body">
+                <!-- Row 1: Name and Trigger -->
+                <div class="field-row">
+                    <div class="field-group" style="flex: 1;">
+                        <div class="field-label">Job Name (Identifier)</div>
+                        <input type="text" id="inpJobName" placeholder="e.g., inspect_object" oninput="updateTriggerBadge()">
+                    </div>
+                    <div class="field-group" style="flex: 1;">
+                        <div class="field-label">Trigger Name (Action)</div>
+                        <input type="text" id="inpTriggerName" placeholder="e.g., inspect">
+                    </div>
+                </div>
+
+                <!-- Row 2: Instructions -->
+                <div class="field-group">
+                    <div class="field-label">
+                        <span>Instruction Layer (<span class="text-mono">##JI##</span>)</span>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn-sm" type="button" onclick="insertInstructionSnippet('contract')">+ Output Contract</button>
+                            <button class="btn-sm" type="button" onclick="togglePromptPreview()">Toggle Raw Prompt</button>
+                        </div>
+                    </div>
+                    <textarea id="inpInstructionLayer" class="code-textarea" placeholder="Enter instructions injected between ##JI:START## and ##JI:END##..."></textarea>
+                    <div id="rawPromptPreview" style="display: none; background: #000; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; color: #a6adc8;"></div>
+                </div>
+
+                <!-- Row 3: Affordances -->
+                <div class="field-group">
+                    <div class="field-label">
+                        <span>Affordances (<span class="text-mono">##AF##</span> Valid Next Actions)</span>
+                        <button class="btn-sm" type="button" onclick="openAddAffordanceModal()">+ Add Affordance</button>
+                    </div>
+                    <div id="affordanceChips" class="chip-container">
+                        <!-- Chips injected dynamically -->
+                    </div>
+                    <small class="text-dim">Pipe-delimited actions presented to the model (e.g., <span class="text-mono">summary/overall | navigation/explore</span>).</small>
+                </div>
+
+                <!-- Row 4: Scripts -->
+                <div class="field-group">
+                    <div class="field-label">
+                        <span>Host Scripts (Reality Layer)</span>
+                        <button class="btn-sm" type="button" onclick="openAddScriptModal()">+ Add Script</button>
+                    </div>
+                    <div id="scriptChips" class="chip-container">
+                        <!-- Chips injected dynamically -->
+                    </div>
+                    <small class="text-dim">Scripts that execute before the model to gather context and signal completion via flags.</small>
+                </div>
+
+                <!-- Row 5: Retries & Notes -->
+                <div class="field-row">
+                    <div class="field-group" style="width: 120px;">
+                        <div class="field-label">Max Retries</div>
+                        <input type="number" id="inpMaxRetries" value="1" min="0">
+                    </div>
+                    <div class="field-group" style="flex: 1;">
+                        <div class="field-label">Retry Error Message</div>
+                        <input type="text" id="inpRetryErrorMessage" placeholder="Message provided if validation fails...">
+                    </div>
+                    <div class="field-group" style="flex: 1;">
+                        <div class="field-label">Notes (Optional)</div>
+                        <input type="text" id="inpNotes" placeholder="Context notes...">
+                    </div>
+                </div>
+
+                <!-- Actions Footer -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                    <button class="btn-danger" onclick="deleteCurrentJob()">Delete Job</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="duplicateCurrentJob()">Duplicate</button>
+                        <button class="btn-primary" onclick="saveCurrentJob()">Save to CSV</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLUMN 3: RUNNER & TELEMETRY -->
+        <div class="panel runner-column">
+            <div class="panel-header">
+                <span class="panel-title">Execution Rail & Output</span>
+                <div id="workerStatusBadge" class="badge badge-dim">
+                    <span class="status-dot dot-idle"></span>
+                    <span id="workerStatusText">Checking...</span>
+                </div>
+            </div>
+
+            <div class="panel-body" style="gap: 12px;">
+                <!-- Test Action Card -->
+                <div style="background: var(--surface); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: var(--text-head);">Live Job Execution</span>
+                        <button class="btn-sm btn-danger" onclick="sendStopTrigger()" title="Send stop_trigger.txt">Stop</button>
+                    </div>
+                    <button id="btnRunJob" class="btn-primary" style="width: 100%; justify-content: center; padding: 10px;" onclick="testRunActiveJob()">
+                        ⚡ INJECT & RUN CURRENT JOB
+                    </button>
+                </div>
+
+                <!-- Performance & KV Cache Telemetry -->
+                <div class="telemetry-grid">
+                    <div class="metric-card">
+                        <span class="metric-label">KV Cache Reused</span>
+                        <span id="metricKvCache" class="metric-value text-accent">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Generation Speed</span>
+                        <span id="metricGenSpeed" class="metric-value">0.0 <small style="font-size: 10px; color: var(--text-dim);">tok/s</small></span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Total Tokens</span>
+                        <span id="metricTotalTokens" class="metric-value">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Execution Time</span>
+                        <span id="metricTotalTime" class="metric-value">0.0 <small style="font-size: 10px; color: var(--text-dim);">s</small></span>
+                    </div>
+                </div>
+
+                <!-- Output File Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="field-label" style="margin: 0;">Raw Model Completion (<span class="text-mono">job_output/</span>)</span>
+                    <button class="btn-sm" onclick="loadLatestJobOutput()">Refresh Output</button>
+                </div>
+
+                <!-- Affordance Decision Card -->
+                <div id="affordanceDecisionBox" style="display: none; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--surface);">
+                    <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase;">Selected Next Affordance:</div>
+                    <div id="affordanceDecisionText" style="font-weight: bold; margin-top: 2px;"></div>
+                </div>
+
+                <!-- Raw Output Console -->
+                <div id="outputConsole" class="console-box">No output received yet. Click "Inject & Run Current Job" to execute.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEW 2: CSV SPREADSHEET TABLE VIEW -->
+    <div id="csvTableView">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h3 id="tableCategoryTitle" style="color: var(--text-head);">Category CSV Table</h3>
+                <small class="text-dim" id="tableCategoryPath"></small>
+            </div>
+            <button onclick="switchViewMode('builder')">← Return to Visual Builder</button>
+        </div>
+
+        <div class="table-wrap">
+            <table id="csvDataTable">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Status</th>
+                        <th>Job Name</th>
+                        <th>Trigger Name</th>
+                        <th>Affordances</th>
+                        <th>Scripts</th>
+                        <th>Retries</th>
+                        <th>Instructions (Excerpt)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="csvTableBody">
+                    <!-- Injected dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- VIEW 3: RAW CSV TEXT EDITOR -->
+    <div id="csvRawView" style="display: none; flex: 1; flex-direction: column; gap: 12px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h3>Direct CSV File Editor</h3>
+                <small class="text-dim">Inspect or modify the underlying category CSV directly.</small>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="loadRawCSV()">Reset</button>
+                <button class="btn-primary" onclick="saveRawCSV()">Save Raw CSV</button>
+                <button onclick="switchViewMode('builder')">← Back to Builder</button>
+            </div>
+        </div>
+        <textarea id="rawCsvTextarea" class="code-textarea" style="flex: 1; height: 100%;" placeholder="CSV content will load here..."></textarea>
+    </div>
+
+    <!-- MODAL: ADD AFFORDANCE -->
+    <div id="affordanceModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Add Next Action Affordance</h3>
+                <button class="btn-sm" onclick="closeModal('affordanceModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group">
+                    <label class="field-label">Select from Existing Jobs:</label>
+                    <select id="affordanceJobPicker" onchange="onAffordancePickerSelected()">
+                        <option value="">-- Choose Category/Job --</option>
+                    </select>
+                </div>
+                <div style="text-align: center; color: var(--text-dim); font-size: 11px;">— OR ENTER CUSTOM —</div>
+                <div class="field-group">
+                    <label class="field-label">Target Format: <span class="text-mono">Category/JobName</span></label>
+                    <input type="text" id="inpCustomAffordance" placeholder="e.g., summary/overall">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeModal('affordanceModal')">Cancel</button>
+                <button class="btn-primary" onclick="confirmAddAffordance()">Add Affordance</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD SCRIPT -->
+    <div id="scriptModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Add Reality Script</h3>
+                <button class="btn-sm" onclick="closeModal('scriptModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group">
+                    <label class="field-label">Script Path:</label>
+                    <input type="text" id="inpScriptPath" placeholder="scripts/my_collector.py">
+                    <small class="text-dim">Must be a relative or absolute Python script path executable on the host.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeModal('scriptModal')">Cancel</button>
+                <button class="btn-primary" onclick="confirmAddScript()">Add Script</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NEW CATEGORY -->
+    <div id="newCategoryModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Create New Job Category</h3>
+                <button class="btn-sm" onclick="closeModal('newCategoryModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group">
+                    <label class="field-label">Category Identifier:</label>
+                    <input type="text" id="inpNewCategoryName" placeholder="e.g., navigation, summary, interaction">
+                    <small class="text-dim">This will create <span class="text-mono">runtime/jobs/categories/{name}.csv</span>.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeModal('newCategoryModal')">Cancel</button>
+                <button class="btn-primary" onclick="confirmCreateCategory()">Create Category</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: RENAME CATEGORY -->
+    <div id="renameCategoryModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Rename Category</h3>
+                <button class="btn-sm" onclick="closeModal('renameCategoryModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group">
+                    <label class="field-label">New Category Identifier:</label>
+                    <input type="text" id="inpRenameCategoryName">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeModal('renameCategoryModal')">Cancel</button>
+                <button class="btn-primary" onclick="confirmRenameCategory()">Save Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TRIGGER CONFIG -->
+    <div id="triggerConfigModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Job Injection Trigger Configuration</h3>
+                <button class="btn-sm" onclick="closeModal('triggerConfigModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group">
+                    <label class="field-label">Global Job Start Trigger Text:</label>
+                    <input type="text" id="inpGlobalTriggerText" placeholder="##JOB_START##">
+                    <small class="text-dim">Stored in <span class="text-mono">runtime/jobs/trigger.txt</span>. Appended to the prompt to initiate deterministic completion.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeModal('triggerConfigModal')">Cancel</button>
+                <button class="btn-primary" onclick="saveTriggerConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: IMPORT CSV -->
+    <div id="importModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Import CSV into Current Category</h3>
+                <button class="btn-sm" onclick="closeModal('importModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group">
+                    <label class="field-label">Upload .csv file:</label>
+                    <input type="file" id="inpCsvFileUpload" accept=".csv" onchange="handleCsvFileSelected(this)">
+                </div>
+                <div style="text-align: center; color: var(--text-dim); font-size: 11px;">— OR PASTE CSV TEXT —</div>
+                <div class="field-group">
+                    <textarea id="inpPasteCsv" class="code-textarea" placeholder="Paste full CSV contents with headers here..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeModal('importModal')">Cancel</button>
+                <button class="btn-primary" onclick="confirmImportCSV()">Import & Overwrite</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION BANNER -->
+    <div id="notificationBanner"></div>
+
+    <script>
+        /* =========================================================================
+           STATE & CONFIG
+           ========================================================================= */
+        function getToken() {
+            return localStorage.getItem('lyrn_admin_token') || 'lyrn';
+        }
+
+        const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+            ? window.location.origin
+            : '';
+
+        let categories = [];
+        let currentCategory = '';
+        let currentJobs = [];
+        let activeJobId = null;
+        let currentAffordances = [];
+        let currentScripts = [];
+        let isPolling = false;
+        let lastOutputFilename = '';
+
+        /* =========================================================================
+           FETCH HELPER
+           ========================================================================= */
+        async function api(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const headers = {
+                'X-Token': getToken(),
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+
+            const response = await fetch(url, { ...options, headers });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`API ${response.status}: ${text}`);
+            }
+            return response.json();
+        }
+
+        function notify(message, type = 'success') {
+            const banner = document.getElementById('notificationBanner');
+            banner.textContent = message;
+            banner.className = type === 'success' ? 'badge-success' : 'badge-danger';
+            banner.style.display = 'block';
+            setTimeout(() => { banner.style.display = 'none'; }, 3500);
+        }
+
+        /* =========================================================================
+           INITIALIZATION & EVENT LISTENERS
+           ========================================================================= */
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadCategories();
+            startWorkerMonitor();
+        });
+
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+            } else if (e.data && e.data.type === 'FONT_CHANGE') {
+                const fs = e.data.fontSize;
+                document.documentElement.style.setProperty('--font-size-base', fs + 'px');
+                document.body.style.setProperty('--font-size-base', fs + 'px');
+                document.body.style.fontSize = fs + 'px';
+            }
+        });
+
+        /* =========================================================================
+           CATEGORY MANAGEMENT
+           ========================================================================= */
+        async function loadCategories() {
+            try {
+                const res = await api('/api/jobs/categories');
+                categories = res.categories || [];
+                const select = document.getElementById('categorySelect');
+                select.innerHTML = '';
+
+                if (categories.length === 0) {
+                    select.innerHTML = '<option value="">(No categories)</option>';
+                    currentCategory = '';
+                    currentJobs = [];
+                    renderJobsList();
+                    clearJobBuilder();
+                    return;
+                }
+
+                categories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    opt.textContent = cat;
+                    select.appendChild(opt);
+                });
+
+                if (!currentCategory || !categories.includes(currentCategory)) {
+                    currentCategory = categories[0];
+                }
+                select.value = currentCategory;
+                document.getElementById('csvPathBadge').textContent = `runtime/jobs/categories/${currentCategory}.csv`;
+
+                await loadJobsForCategory(currentCategory);
+            } catch (e) {
+                console.error("Failed to load categories:", e);
+                notify("Failed to load categories: " + e.message, "error");
+            }
+        }
+
+        async function onCategoryChanged() {
+            currentCategory = document.getElementById('categorySelect').value;
+            document.getElementById('csvPathBadge').textContent = `runtime/jobs/categories/${currentCategory}.csv`;
+            await loadJobsForCategory(currentCategory);
+        }
+
+        async function loadJobsForCategory(category) {
+            if (!category) return;
+            try {
+                const res = await api(`/api/jobs/${category}`);
+                currentJobs = res.jobs || [];
+                renderJobsList();
+                renderCSVTable();
+
+                if (currentJobs.length > 0) {
+                    selectJob(currentJobs[0].job_id);
+                } else {
+                    createNewJobTemplate();
+                }
+            } catch (e) {
+                console.error("Error loading jobs:", e);
+                notify("Error loading jobs: " + e.message, "error");
+            }
+        }
+
+        function openNewCategoryModal() {
+            document.getElementById('inpNewCategoryName').value = '';
+            document.getElementById('newCategoryModal').style.display = 'flex';
+        }
+
+        async function confirmCreateCategory() {
+            const name = document.getElementById('inpNewCategoryName').value.trim();
+            if (!name) return;
+            try {
+                await api('/api/jobs/categories', {
+                    method: 'POST',
+                    body: JSON.stringify({ category: name })
+                });
+                closeModal('newCategoryModal');
+                currentCategory = name;
+                await loadCategories();
+                notify(`Category '${name}' created.`);
+            } catch (e) {
+                alert("Failed to create category: " + e.message);
+            }
+        }
+
+        function openRenameCategoryModal() {
+            if (!currentCategory) return;
+            document.getElementById('inpRenameCategoryName').value = currentCategory;
+            document.getElementById('renameCategoryModal').style.display = 'flex';
+        }
+
+        async function confirmRenameCategory() {
+            const newName = document.getElementById('inpRenameCategoryName').value.trim();
+            if (!newName || newName === currentCategory) {
+                closeModal('renameCategoryModal');
+                return;
+            }
+            try {
+                await api(`/api/jobs/categories/${currentCategory}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ new_category: newName })
+                });
+                closeModal('renameCategoryModal');
+                currentCategory = newName;
+                await loadCategories();
+                notify(`Category renamed to '${newName}'.`);
+            } catch (e) {
+                alert("Failed to rename category: " + e.message);
+            }
+        }
+
+        async function deleteCurrentCategory() {
+            if (!currentCategory) return;
+            if (!confirm(`Permanently delete category '${currentCategory}' and its CSV file?`)) return;
+            try {
+                await api(`/api/jobs/categories/${currentCategory}`, { method: 'DELETE' });
+                notify(`Category '${currentCategory}' deleted.`);
+                currentCategory = '';
+                await loadCategories();
+            } catch (e) {
+                alert("Failed to delete category: " + e.message);
+            }
+        }
+
+        /* =========================================================================
+           JOBS EXPLORER LIST
+           ========================================================================= */
+        function renderJobsList() {
+            const container = document.getElementById('jobListContainer');
+            const filter = (document.getElementById('jobSearchInput').value || '').toLowerCase();
+            container.innerHTML = '';
+
+            const filtered = currentJobs.filter(j =>
+                (j.job_name || '').toLowerCase().includes(filter) ||
+                (j.trigger_name || '').toLowerCase().includes(filter) ||
+                (j.affordances || '').toLowerCase().includes(filter)
+            );
+
+            document.getElementById('jobCountBadge').textContent = `${filtered.length} Jobs`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-dim); font-size: 11px;">No jobs found in this category.</div>`;
+                return;
+            }
+
+            filtered.forEach(job => {
+                const card = document.createElement('div');
+                card.className = `job-card ${job.job_id === activeJobId ? 'active' : ''}`;
+                card.onclick = () => selectJob(job.job_id);
+
+                const affordanceCount = job.affordances ? job.affordances.split('|').filter(a => a.trim()).length : 0;
+                const statusBadge = job.enabled
+                    ? `<span class="badge badge-success">ENABLED</span>`
+                    : `<span class="badge badge-dim">DISABLED</span>`;
+
+                card.innerHTML = `
+                    <div class="job-card-header">
+                        <span class="job-card-name">${escapeHtml(job.job_name)}</span>
+                        ${statusBadge}
+                    </div>
+                    <div class="job-card-footer">
+                        <span>Trigger: <code>${escapeHtml(job.trigger_name || 'run')}</code></span>
+                        <span>${affordanceCount} AF</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function filterJobsList() {
+            renderJobsList();
+        }
+
+        /* =========================================================================
+           JOB BUILDER & FORM
+           ========================================================================= */
+        function selectJob(jobId) {
+            activeJobId = jobId;
+            const job = currentJobs.find(j => j.job_id === jobId);
+            if (!job) return;
+
+            document.getElementById('inpJobName').value = job.job_name || '';
+            document.getElementById('inpTriggerName').value = job.trigger_name || '';
+            document.getElementById('inpInstructionLayer').value = job.instruction_layer || '';
+            document.getElementById('inpMaxRetries').value = job.max_retries || 1;
+            document.getElementById('inpRetryErrorMessage').value = job.retry_error_message || '';
+            document.getElementById('inpNotes').value = job.notes || '';
+            document.getElementById('jobEnabledCheckbox').checked = !!job.enabled;
+
+            currentAffordances = job.affordances ? job.affordances.split('|').filter(a => a.trim()) : [];
+            renderAffordanceChips();
+
+            currentScripts = job.scripts ? job.scripts.split('|').filter(s => s.trim()) : [];
+            renderScriptChips();
+
+            updateTriggerBadge();
+            renderJobsList();
+            renderPromptPreview();
+        }
+
+        function createNewJobTemplate() {
+            activeJobId = null;
+            document.getElementById('inpJobName').value = 'new_job';
+            document.getElementById('inpTriggerName').value = 'run';
+            document.getElementById('inpInstructionLayer').value = 'Job instructions here...';
+            document.getElementById('inpMaxRetries').value = 1;
+            document.getElementById('inpRetryErrorMessage').value = '';
+            document.getElementById('inpNotes').value = '';
+            document.getElementById('jobEnabledCheckbox').checked = true;
+
+            currentAffordances = [];
+            currentScripts = [];
+            renderAffordanceChips();
+            renderScriptChips();
+            updateTriggerBadge();
+            renderJobsList();
+            renderPromptPreview();
+        }
+
+        function updateTriggerBadge() {
+            const jobName = document.getElementById('inpJobName').value.trim() || 'job_name';
+            document.getElementById('jobTriggerBadge').textContent = `##AF: ${currentCategory}/${jobName}##`;
+        }
+
+        function renderAffordanceChips() {
+            const container = document.getElementById('affordanceChips');
+            container.innerHTML = '';
+            if (currentAffordances.length === 0) {
+                container.innerHTML = `<span style="color: var(--text-dim); font-size: 11px; padding: 4px;">No affordances added yet. Click "+ Add Affordance"</span>`;
+                return;
+            }
+            currentAffordances.forEach((af, idx) => {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.innerHTML = `
+                    <span>${escapeHtml(af)}</span>
+                    <button type="button" class="remove-btn" onclick="removeAffordance(${idx})">✕</button>
+                `;
+                container.appendChild(chip);
+            });
+            renderPromptPreview();
+        }
+
+        function removeAffordance(index) {
+            currentAffordances.splice(index, 1);
+            renderAffordanceChips();
+        }
+
+        function renderScriptChips() {
+            const container = document.getElementById('scriptChips');
+            container.innerHTML = '';
+            if (currentScripts.length === 0) {
+                container.innerHTML = `<span style="color: var(--text-dim); font-size: 11px; padding: 4px;">No host scripts assigned.</span>`;
+                return;
+            }
+            currentScripts.forEach((sc, idx) => {
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.innerHTML = `
+                    <span>📜 ${escapeHtml(sc)}</span>
+                    <button type="button" class="remove-btn" onclick="removeScript(${idx})">✕</button>
+                `;
+                container.appendChild(chip);
+            });
+        }
+
+        function removeScript(index) {
+            currentScripts.splice(index, 1);
+            renderScriptChips();
+        }
+
+        function renderPromptPreview() {
+            const instructions = document.getElementById('inpInstructionLayer').value;
+            const affordances = currentAffordances.join('|');
+            const preview = `##JI:START##\n${instructions}\n##JI:END##\n##AF:START##\n${affordances}\n##AF:END##\n##JOB_START##`;
+            document.getElementById('rawPromptPreview').textContent = preview;
+        }
+
+        function togglePromptPreview() {
+            const el = document.getElementById('rawPromptPreview');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            renderPromptPreview();
+        }
+
+        function insertInstructionSnippet(type) {
+            const textarea = document.getElementById('inpInstructionLayer');
+            if (type === 'contract') {
+                const snippet = `\nPerform the requested analysis and conclude by selecting exactly ONE valid affordance in the format: ##AF: category/job_name##`;
+                textarea.value += snippet;
+            }
+            renderPromptPreview();
+        }
+
+        async function saveCurrentJob() {
+            if (!currentCategory) {
+                alert("Please select or create a category first.");
+                return;
+            }
+
+            const jobName = document.getElementById('inpJobName').value.trim();
+            const triggerName = document.getElementById('inpTriggerName').value.trim();
+            const instructions = document.getElementById('inpInstructionLayer').value.trim();
+
+            if (!jobName || !triggerName || !instructions) {
+                alert("Job Name, Trigger Name, and Instructions are required.");
+                return;
+            }
+
+            const payload = {
+                job_id: activeJobId,
+                job_name: jobName,
+                trigger_name: triggerName,
+                instruction_layer: instructions,
+                affordances: currentAffordances.join('|'),
+                scripts: currentScripts.join('|'),
+                max_retries: parseInt(document.getElementById('inpMaxRetries').value) || 1,
+                retry_error_message: document.getElementById('inpRetryErrorMessage').value.trim(),
+                notes: document.getElementById('inpNotes').value.trim(),
+                enabled: document.getElementById('jobEnabledCheckbox').checked
+            };
+
+            try {
+                if (activeJobId) {
+                    await api(`/api/jobs/${currentCategory}/${activeJobId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                    notify(`Job '${jobName}' updated.`);
+                } else {
+                    const res = await api(`/api/jobs/${currentCategory}`, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    activeJobId = res.job.job_id;
+                    notify(`Job '${jobName}' created.`);
+                }
+                await loadJobsForCategory(currentCategory);
+                selectJob(activeJobId);
+            } catch (e) {
+                console.error("Save error:", e);
+                alert("Failed to save job: " + e.message);
+            }
+        }
+
+        function duplicateCurrentJob() {
+            const origName = document.getElementById('inpJobName').value.trim();
+            activeJobId = null;
+            document.getElementById('inpJobName').value = origName + '_copy';
+            updateTriggerBadge();
+            notify("Duplicated into new job. Click 'Save to CSV' to persist.");
+        }
+
+        async function deleteCurrentJob() {
+            if (!activeJobId) return;
+            const jobName = document.getElementById('inpJobName').value;
+            if (!confirm(`Delete job '${jobName}' from ${currentCategory}.csv?`)) return;
+
+            try {
+                await api(`/api/jobs/${currentCategory}/${activeJobId}`, { method: 'DELETE' });
+                notify(`Job '${jobName}' deleted.`);
+                activeJobId = null;
+                await loadJobsForCategory(currentCategory);
+            } catch (e) {
+                alert("Failed to delete job: " + e.message);
+            }
+        }
+
+        /* =========================================================================
+           MODALS: AFFORDANCE & SCRIPTS
+           ========================================================================= */
+        async function openAddAffordanceModal() {
+            const picker = document.getElementById('affordanceJobPicker');
+            picker.innerHTML = '<option value="">-- Choose Category/Job --</option>';
+
+            // Populate all categories and their jobs
+            for (const cat of categories) {
+                try {
+                    const res = await api(`/api/jobs/${cat}`);
+                    if (res.jobs) {
+                        res.jobs.forEach(j => {
+                            const opt = document.createElement('option');
+                            opt.value = `${cat}/${j.job_name}`;
+                            opt.textContent = `${cat} / ${j.job_name}`;
+                            picker.appendChild(opt);
+                        });
+                    }
+                } catch(e) {}
+            }
+
+            document.getElementById('inpCustomAffordance').value = '';
+            document.getElementById('affordanceModal').style.display = 'flex';
+        }
+
+        function onAffordancePickerSelected() {
+            const val = document.getElementById('affordanceJobPicker').value;
+            if (val) {
+                document.getElementById('inpCustomAffordance').value = val;
+            }
+        }
+
+        function confirmAddAffordance() {
+            const val = document.getElementById('inpCustomAffordance').value.trim();
+            if (!val) return;
+            if (!currentAffordances.includes(val)) {
+                currentAffordances.push(val);
+                renderAffordanceChips();
+            }
+            closeModal('affordanceModal');
+        }
+
+        function openAddScriptModal() {
+            document.getElementById('inpScriptPath').value = '';
+            document.getElementById('scriptModal').style.display = 'flex';
+        }
+
+        function confirmAddScript() {
+            const val = document.getElementById('inpScriptPath').value.trim();
+            if (!val) return;
+            if (!currentScripts.includes(val)) {
+                currentScripts.push(val);
+                renderScriptChips();
+            }
+            closeModal('scriptModal');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        /* =========================================================================
+           TEST EXECUTION & LIVE OUTPUT RUNNER
+           ========================================================================= */
+        async function testRunActiveJob() {
+            const jobName = document.getElementById('inpJobName').value.trim();
+            if (!currentCategory || !jobName) {
+                alert("Please select a valid job first.");
+                return;
+            }
+
+            const btn = document.getElementById('btnRunJob');
+            btn.disabled = true;
+            btn.textContent = '⏳ INJECTING JOB...';
+
+            document.getElementById('outputConsole').textContent = `[System] Injecting job: ${currentCategory}/${jobName}...\nWaiting for model execution...`;
+            document.getElementById('affordanceDecisionBox').style.display = 'none';
+
+            try {
+                const res = await api('/api/jobs/inject/run', {
+                    method: 'POST',
+                    body: JSON.stringify({ category: currentCategory, job_name: jobName })
+                });
+
+                notify(`Injection triggered for '${currentCategory}/${jobName}'.`);
+
+                // Start polling for output
+                pollForJobCompletion();
+
+            } catch (e) {
+                console.error("Run error:", e);
+                alert("Execution failed: " + e.message);
+                document.getElementById('outputConsole').textContent += `\n[Error] ${e.message}`;
+                btn.disabled = false;
+                btn.textContent = '⚡ INJECT & RUN CURRENT JOB';
+            }
+        }
+
+        async function pollForJobCompletion() {
+            let attempts = 0;
+            const maxAttempts = 40; // 40 seconds timeout
+
+            const timer = setInterval(async () => {
+                attempts++;
+                try {
+                    // Check health / worker status
+                    const health = await api('/health');
+                    const worker = health.worker_status || {};
+                    const status = worker.llm_status || 'idle';
+
+                    updateWorkerStatusDisplay(status);
+
+                    if (health.extended_llm_stats) {
+                        updateTelemetryDisplay(health.extended_llm_stats);
+                    }
+
+                    // Check latest output
+                    const outputsRes = await api('/api/jobs/outputs/list');
+                    if (outputsRes.outputs && outputsRes.outputs.length > 0) {
+                        const latest = outputsRes.outputs[0];
+                        if (latest.filename !== lastOutputFilename) {
+                            lastOutputFilename = latest.filename;
+                            await displayOutput(latest.filename);
+                        }
+                    }
+
+                    if (status === 'idle' && attempts > 3) {
+                        clearInterval(timer);
+                        document.getElementById('btnRunJob').disabled = false;
+                        document.getElementById('btnRunJob').textContent = '⚡ INJECT & RUN CURRENT JOB';
+                        notify("Job execution completed.");
+                    }
+                } catch(e) {}
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(timer);
+                    document.getElementById('btnRunJob').disabled = false;
+                    document.getElementById('btnRunJob').textContent = '⚡ INJECT & RUN CURRENT JOB';
+                }
+            }, 1000);
+        }
+
+        async function loadLatestJobOutput() {
+            try {
+                const outputsRes = await api('/api/jobs/outputs/list');
+                if (outputsRes.outputs && outputsRes.outputs.length > 0) {
+                    await displayOutput(outputsRes.outputs[0].filename);
+                } else {
+                    document.getElementById('outputConsole').textContent = "No completions found in job_output/ yet.";
+                }
+            } catch (e) {
+                document.getElementById('outputConsole').textContent = "Error reading output: " + e.message;
+            }
+        }
+
+        async function displayOutput(filename) {
+            try {
+                const res = await api(`/api/jobs/outputs/file/${filename}`);
+                const content = res.content || '';
+                const consoleEl = document.getElementById('outputConsole');
+                consoleEl.textContent = content;
+
+                // Inspect completion for affordance
+                const match = content.match(/##AF:\s*(.*?)\s*##/);
+                const decisionBox = document.getElementById('affordanceDecisionBox');
+                const decisionText = document.getElementById('affordanceDecisionText');
+
+                if (match) {
+                    const picked = match[1].trim();
+                    const isValid = currentAffordances.length === 0 || currentAffordances.includes(picked);
+
+                    decisionBox.style.display = 'block';
+                    if (isValid) {
+                        decisionBox.style.borderColor = 'var(--success)';
+                        decisionText.innerHTML = `<span class="badge badge-success">✓ VALID ACTION</span> <span class="highlight-affordance">##AF: ${escapeHtml(picked)}##</span>`;
+                    } else {
+                        decisionBox.style.borderColor = 'var(--warning)';
+                        decisionText.innerHTML = `<span class="badge badge-warning">⚠ UNLISTED</span> <span class="highlight-affordance">##AF: ${escapeHtml(picked)}##</span>`;
+                    }
+                } else {
+                    decisionBox.style.display = 'none';
+                }
+            } catch (e) {
+                document.getElementById('outputConsole').textContent = "Error loading completion file: " + e.message;
+            }
+        }
+
+        async function sendStopTrigger() {
+            try {
+                // Drop stop_trigger.txt by creating it
+                await api('/api/jobs/inject/run', {
+                    method: 'POST',
+                    body: JSON.stringify({ category: "__stop__", job_name: "__stop__" })
+                });
+            } catch(e) {}
+            notify("Sent stop signal.");
+        }
+
+        /* =========================================
+           MONITOR & TELEMETRY
+           ========================================= */
+        function startWorkerMonitor() {
+            setInterval(async () => {
+                try {
+                    const health = await api('/health');
+                    const worker = health.worker_status || {};
+                    const status = worker.llm_status || 'idle';
+                    updateWorkerStatusDisplay(status);
+
+                    if (health.extended_llm_stats) {
+                        updateTelemetryDisplay(health.extended_llm_stats);
+                    }
+                } catch(e) {}
+            }, 2500);
+        }
+
+        function updateWorkerStatusDisplay(status) {
+            const badge = document.getElementById('workerStatusBadge');
+            const text = document.getElementById('workerStatusText');
+            text.textContent = status.toUpperCase();
+
+            let dotClass = 'dot-idle';
+            badge.className = 'badge badge-dim';
+
+            if (status === 'idle') {
+                dotClass = 'dot-idle';
+                badge.className = 'badge badge-success';
+            } else if (status === 'busy') {
+                dotClass = 'dot-busy';
+                badge.className = 'badge badge-purple';
+            } else if (status === 'loading') {
+                dotClass = 'dot-loading';
+                badge.className = 'badge badge-warning';
+            } else if (status === 'error' || status === 'stopped') {
+                dotClass = 'dot-error';
+                badge.className = 'badge badge-danger';
+            }
+
+            badge.innerHTML = `<span class="status-dot ${dotClass}"></span> <span>${status.toUpperCase()}</span>`;
+        }
+
+        function updateTelemetryDisplay(stats) {
+            if (!stats) return;
+            if (stats.kv_cache_reused !== undefined) {
+                document.getElementById('metricKvCache').textContent = stats.kv_cache_reused;
+            }
+            if (stats.eval_speed !== undefined) {
+                document.getElementById('metricGenSpeed').innerHTML = `${stats.eval_speed.toFixed(1)} <small style="font-size: 10px; color: var(--text-dim);">tok/s</small>`;
+            }
+            if (stats.total_tokens !== undefined) {
+                document.getElementById('metricTotalTokens').textContent = stats.total_tokens;
+            }
+            if (stats.total_time !== undefined) {
+                document.getElementById('metricTotalTime').innerHTML = `${stats.total_time.toFixed(2)} <small style="font-size: 10px; color: var(--text-dim);">s</small>`;
+            }
+        }
+
+        /* =========================================================================
+           VIEW SWITCHER (BUILDER / SPREADSHEET TABLE / RAW CSV)
+           ========================================================================= */
+        function switchViewMode(mode) {
+            document.getElementById('btnViewBuilder').classList.toggle('active', mode === 'builder');
+            document.getElementById('btnViewTable').classList.toggle('active', mode === 'table');
+            document.getElementById('btnViewRaw').classList.toggle('active', mode === 'raw');
+
+            document.getElementById('builderView').style.display = mode === 'builder' ? 'flex' : 'none';
+            document.getElementById('csvTableView').style.display = mode === 'table' ? 'flex' : 'none';
+            document.getElementById('csvRawView').style.display = mode === 'raw' ? 'flex' : 'none';
+
+            if (mode === 'table') {
+                renderCSVTable();
+            } else if (mode === 'raw') {
+                loadRawCSV();
+            }
+        }
+
+        function renderCSVTable() {
+            document.getElementById('tableCategoryTitle').textContent = `Category CSV: ${currentCategory}`;
+            document.getElementById('tableCategoryPath').textContent = `runtime/jobs/categories/${currentCategory}.csv`;
+
+            const tbody = document.getElementById('csvTableBody');
+            tbody.innerHTML = '';
+
+            if (currentJobs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 20px;">No jobs in this category.</td></tr>`;
+                return;
+            }
+
+            currentJobs.forEach(j => {
+                const tr = document.createElement('tr');
+                const statusBadge = j.enabled ? `<span class="badge badge-success">ON</span>` : `<span class="badge badge-dim">OFF</span>`;
+                const excerpt = (j.instruction_layer || '').slice(0, 90) + (j.instruction_layer && j.instruction_layer.length > 90 ? '...' : '');
+
+                tr.innerHTML = `
+                    <td>${statusBadge}</td>
+                    <td style="font-weight: 600; color: var(--text-head);">${escapeHtml(j.job_name)}</td>
+                    <td><code>${escapeHtml(j.trigger_name)}</code></td>
+                    <td><small>${escapeHtml(j.affordances || '-')}</small></td>
+                    <td><small>${escapeHtml(j.scripts || '-')}</small></td>
+                    <td>${j.max_retries || 1}</td>
+                    <td style="color: var(--text-dim); font-size: 10px;">${escapeHtml(excerpt)}</td>
+                    <td>
+                        <button class="btn-sm" onclick="editJobFromTable('${j.job_id}')">Edit</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function editJobFromTable(jobId) {
+            selectJob(jobId);
+            switchViewMode('builder');
+        }
+
+        async function loadRawCSV() {
+            if (!currentCategory) return;
+            try {
+                const res = await api(`/api/jobs/categories/${currentCategory}/csv`);
+                document.getElementById('rawCsvTextarea').value = res.csv_content || '';
+            } catch (e) {
+                alert("Failed to load raw CSV: " + e.message);
+            }
+        }
+
+        async function saveRawCSV() {
+            if (!currentCategory) return;
+            const content = document.getElementById('rawCsvTextarea').value;
+            try {
+                await api(`/api/jobs/categories/${currentCategory}/csv`, {
+                    method: 'POST',
+                    body: JSON.stringify({ csv_content: content })
+                });
+                notify("Raw CSV saved successfully.");
+                await loadJobsForCategory(currentCategory);
+            } catch (e) {
+                alert("Failed to save raw CSV: " + e.message);
+            }
+        }
+
+        /* =========================================================================
+           IMPORT / EXPORT
+           ========================================================================= */
+        function openImportModal() {
+            document.getElementById('inpPasteCsv').value = '';
+            document.getElementById('inpCsvFileUpload').value = '';
+            document.getElementById('importModal').style.display = 'flex';
+        }
+
+        function handleCsvFileSelected(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('inpPasteCsv').value = e.target.result;
+                };
+                reader.readAsText(input.files[0]);
+            }
+        }
+
+        async function confirmImportCSV() {
+            const csvText = document.getElementById('inpPasteCsv').value.trim();
+            if (!csvText) {
+                alert("Please select a file or paste CSV content.");
+                return;
+            }
+            if (!confirm(`Overwrite ${currentCategory}.csv with this content?`)) return;
+
+            try {
+                await api(`/api/jobs/categories/${currentCategory}/csv`, {
+                    method: 'POST',
+                    body: JSON.stringify({ csv_content: csvText })
+                });
+                closeModal('importModal');
+                notify("CSV imported successfully.");
+                await loadJobsForCategory(currentCategory);
+            } catch (e) {
+                alert("Import failed: " + e.message);
+            }
+        }
+
+        async function exportCurrentCSV() {
+            if (!currentCategory) return;
+            try {
+                const res = await api(`/api/jobs/categories/${currentCategory}/csv`);
+                const blob = new Blob([res.csv_content || ''], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentCategory}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+                notify(`Exported ${currentCategory}.csv`);
+            } catch (e) {
+                alert("Export failed: " + e.message);
+            }
+        }
+
+        /* =========================================================================
+           TRIGGER SETTINGS
+           ========================================================================= */
+        async function openTriggerConfigModal() {
+            try {
+                const res = await api('/api/jobs/config/trigger');
+                document.getElementById('inpGlobalTriggerText').value = res.trigger_text || '##JOB_START##';
+                document.getElementById('triggerConfigModal').style.display = 'flex';
+            } catch (e) {
+                alert("Failed to load settings: " + e.message);
+            }
+        }
+
+        async function saveTriggerConfig() {
+            const text = document.getElementById('inpGlobalTriggerText').value.trim();
+            if (!text) return;
+            try {
+                await api('/api/jobs/config/trigger', {
+                    method: 'POST',
+                    body: JSON.stringify({ trigger_text: text })
+                });
+                closeModal('triggerConfigModal');
+                notify("Global trigger settings saved.");
+            } catch (e) {
+                alert("Failed to save settings: " + e.message);
+            }
+        }
+
+        async function refreshAll() {
+            await loadCategories();
+            await loadLatestJobOutput();
+            notify("Refreshed.");
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "input_delta",
+    "name": "Input Delta",
+    "file": "input_delta.txt",
+    "enabled": true,
+    "order": 0,
+    "begin_bracket": "###INPUT_DELTA_START###",
+    "end_bracket": "###INPUT_DELTA_END###",
+    "description": "Active incoming operational payload."
+  }
+]

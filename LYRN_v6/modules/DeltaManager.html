@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LYRN Delta Manager (Layer 2)</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../themes/corporate-terminal.css" />
+  <link rel="stylesheet" href="../themes/corporate-2049.css" />
+  <link rel="stylesheet" href="../themes/cyber-dark.css" />
+
+  <style>
+    :root {
+      --bg-core: #050505;
+      --bg-panel: #0a0a0a;
+      --bg-input: #050505; 
+      --brand-purple: #7c5cff;
+      --brand-purple-dim: rgba(124, 92, 255, 0.1);
+      --brand-purple-glow: rgba(124, 92, 255, 0.3);
+      --text-head: #ffffff;
+      --text-body: #b0b0b0;
+      --text-dim: #666666;
+      --border-color: #222222;
+      --input-focus-bg: #111111;
+      --success-color: #10B981;
+      --error-color: #EF4444;
+
+      --btn-text: #e0e0e0;
+      --btn-border: #444444;
+      --btn-bg: rgba(255,255,255,0.03);
+
+      --font-size-base: 12px;
+    }
+    
+    body[data-theme="light"] {
+      --bg-core: #eef0f4;
+      --bg-panel: #ffffff;
+      --bg-input: #ffffff;
+      --brand-purple: #6a4ce0;
+      --brand-purple-dim: rgba(106, 76, 224, 0.1);
+      --brand-purple-glow: rgba(106, 76, 224, 0.2);
+      --text-head: #111111;
+      --text-body: #333333;
+      --text-dim: #555555;
+      --border-color: #d1d5db;
+      --input-focus-bg: #f9fafb;
+      --btn-text: #333;
+      --btn-border: #ccc;
+      --btn-bg: rgba(0,0,0,0.03);
+    }
+
+    * { box-sizing: border-box; }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
+    body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-core); color: var(--text-body);
+      font-family: 'Inter', system-ui, sans-serif;
+      height: 100vh; width: 100vw; overflow: hidden;
+      font-size: var(--font-size-base);
+    }
+
+    h1, h2, h3 { font-family: 'JetBrains Mono', monospace; color: var(--text-head); margin: 0; }
+
+    button {
+      font-family: 'JetBrains Mono', monospace; 
+      font-size: calc(var(--font-size-base) - 1px); 
+      background: var(--btn-bg); 
+      border: 1px solid var(--btn-border); color: var(--btn-text); padding: 8px 12px;
+      cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s ease; border-radius: 4px;
+      white-space: nowrap;
+    }
+    button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+    button.btn-primary { background: var(--brand-purple); color: #ffffff; border-color: var(--brand-purple); font-weight: 600; }
+    button.btn-primary:hover { background: #6a4ce0; }
+    .btn-group { display: flex; align-items: center; gap: 8px; }
+    .btn-square { width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--font-size-base) + 2px); }
+    .btn-save:hover { border-color: var(--success-color); color: var(--success-color); }
+    
+    .hidden { display: none !important; }
+
+    .delta-wrapper {
+      background: var(--bg-core);
+      height: 100vh; width: 100%;
+      display: flex; flex-direction: column; position: relative;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color); padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel); flex-shrink: 0;
+    }
+    
+    .meta-label { 
+      font-family: 'JetBrains Mono'; 
+      font-size: calc(var(--font-size-base) - 2px); 
+      color: var(--brand-purple); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; display: block; 
+    }
+    .panel-title { font-size: calc(var(--font-size-base) + 2px); font-weight: 600; }
+    .version-tag { font-family: 'JetBrains Mono'; font-size: calc(var(--font-size-base) - 2px); border: 1px solid var(--border-color); color: var(--text-dim); padding: 2px 6px; border-radius: 4px; margin-left: 10px; }
+
+    .main-grid { display: grid; grid-template-columns: 300px 1fr; flex: 1; overflow: hidden; }
+    
+    .left-panel { border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.02); overflow-y: auto; display: flex; flex-direction: column; }
+    .panel-header { padding: 10px 15px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
+    
+    .module-list-scroll { flex: 1; overflow-y: auto; padding: 6px 0; }
+    
+    .module-item {
+      display: flex; align-items: center; padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color); cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; font-size: calc(var(--font-size-base) - 1px);
+      transition: background 0.2s; user-select: none;
+      position: relative;
+    }
+    .module-item:hover { background: var(--bg-panel); }
+    .module-item.selected { background: var(--brand-purple-dim); border-left: 3px solid var(--brand-purple); }
+    .module-item.dragging { opacity: 0.4; background: var(--brand-purple-dim); }
+    .module-item.drag-over { border-top: 2px solid var(--brand-purple); }
+    
+    .drag-handle {
+      cursor: grab; color: var(--text-dim); margin-right: 10px;
+      font-size: 14px; display: flex; align-items: center; user-select: none;
+    }
+    .drag-handle:active { cursor: grabbing; }
+
+    .module-info { flex: 1; min-width: 0; margin-right: 10px; }
+    .module-name { color: var(--text-head); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .module-meta { font-size: 10px; color: var(--text-dim); margin-top: 2px; display: flex; gap: 8px; }
+    .file-tag { background: rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--border-color); }
+    
+    .panel { overflow-y: auto; height: 100%; position: relative; display: flex; flex-direction: column; }
+    .editor-scroll { padding: 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+    
+    .form-group { margin-bottom: 5px; }
+    .form-group label { display: block; font-size: calc(var(--font-size-base) - 2px); color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; font-family: 'JetBrains Mono'; }
+    
+    input[type="text"], textarea {
+      width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-head); padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base); border-radius: 4px;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: var(--brand-purple); outline: none; background: var(--input-focus-bg); }
+    input[readonly] { opacity: 0.7; cursor: default; }
+
+    .switch { position: relative; display: inline-block; width: 26px; height: 14px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-input); transition: .4s; border-radius: 14px; border: 1px solid var(--border-color); }
+    .slider:before { position: absolute; content: ""; height: 8px; width: 8px; left: 2px; bottom: 2px; background-color: var(--text-dim); transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--brand-purple); border-color: var(--brand-purple); }
+    input:checked + .slider:before { transform: translateX(12px); background-color: #fff; }
+
+    .delta-footer-bar { padding: 8px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); font-size: calc(var(--font-size-base) - 2px); font-family: 'JetBrains Mono'; color: var(--text-dim); flex-shrink: 0; }
+
+    #rwi-toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: var(--bg-panel); border: 1px solid var(--brand-purple);
+      color: var(--text-head); padding: 10px 20px; border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base);
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 11000;
+    }
+    #rwi-toast.show { opacity: 1; }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(2px);
+      z-index: 10000; display: flex; justify-content: center; align-items: center;
+    }
+    .modal-box {
+      background: var(--bg-panel); border: 1px solid var(--border-color);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 800px; height: 80%;
+      display: flex; flex-direction: column; border-radius: 8px; animation: slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { flex: 1; padding: 0; overflow: hidden; position: relative; }
+    .modal-body textarea { width: 100%; height: 100%; background: var(--bg-core); color: var(--text-body); font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base); border: none; padding: 20px; resize: none; outline: none; }
+    .modal-text-display { padding: 30px; overflow-y: auto; font-size: calc(var(--font-size-base) + 2px); line-height: 1.6; color: var(--text-body); }
+    .modal-footer { padding: 15px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
+
+    .badge-status {
+      display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; font-family: 'JetBrains Mono';
+    }
+    .badge-status.active { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981; }
+    .badge-status.inactive { background: rgba(239, 68, 68, 0.1); color: #EF4444; border: 1px solid #EF4444; }
+
+    @media (max-width: 768px) {
+      .main-grid { grid-template-columns: 1fr; grid-template-rows: 240px 1fr; }
+      .left-panel { border-right: none; border-bottom: 1px solid var(--border-color); }
+      header { flex-direction: column; gap: 10px; text-align: center; height: auto; }
+      header .btn-group { flex-wrap: wrap; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="delta-wrapper">
+    <header>
+      <div>
+        <div class="meta-label">LYRN SYSTEM MODULE // LAYER 2</div>
+        <h1 class="panel-title">Delta Manager <span class="version-tag">v1.0</span></h1>
+      </div>
+      <div class="btn-group">
+        <button onclick="refreshDeltaBlocks()" title="Reload from Disk">Refresh</button>
+        <button onclick="viewCompiledManifest()" title="View Compiled Manifest">View Manifest</button>
+        <button class="btn-primary" id="compile-btn" onclick="compileDeltaManifest()">Compile Manifest</button>
+        <button class="btn-square" onclick="showHelpModal()" title="Help">?</button>
+      </div>
+    </header>
+
+    <div class="main-grid">
+      <!-- Left Panel: Sortable Modules List -->
+      <div class="panel left-panel">
+        <div class="panel-header">
+          <h3 class="panel-title">Delta Modules</h3>
+          <div style="display: flex; gap: 5px;">
+            <button class="btn-square" onclick="moveSelectedBlock(-1)" title="Move Up">↑</button>
+            <button class="btn-square" onclick="moveSelectedBlock(1)" title="Move Down">↓</button>
+          </div>
+        </div>
+        <div id="module-list" class="module-list-scroll">
+          <div style="padding: 20px; text-align: center; color: var(--text-dim);">Loading modules...</div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Block Inspector / Live Source Editor -->
+      <div class="panel">
+        <div class="panel-header">
+          <h3 class="panel-title" id="editor-title">Module Inspector</h3>
+          <div class="btn-group">
+            <button class="btn-save btn-square" id="save-content-btn" onclick="saveActiveBlockContent()" title="Save Content & Update">💾</button>
+          </div>
+        </div>
+        <div id="editor-container" class="editor-scroll">
+          <p style="color: var(--text-dim); padding: 20px; text-align: center;">Select a delta module from the left list.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="delta-footer-bar">
+      <span>DELTA PIPELINE // LAYER 2 WORKING MEMORY // DETERMINISTIC RUNTIME</span>
+      <span id="footer-status">READY</span>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="rwi-toast">Operation Successful</div>
+
+  <!-- Preview Modal for Compiled Manifest -->
+  <div id="preview-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="panel-title" id="modal-title">Compiled Delta Manifest (Layer 2)</h3>
+        <button onclick="closeModal('preview-modal')" style="border:none; background:transparent; font-size:16px; color:var(--text-dim); cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="modal-content" readonly></textarea>
+      </div>
+      <div class="modal-footer">
+        <button onclick="copyModalContent()">Copy to Clipboard</button>
+        <button class="btn-primary" onclick="compileAndRefreshModal()">Recompile Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="help-modal" class="modal-overlay hidden">
+    <div class="modal-box" style="max-height: 500px;">
+      <div class="modal-header">
+        <h3 class="panel-title">Delta Working Memory Guide</h3>
+        <button onclick="closeModal('help-modal')" style="border:none; background:transparent; font-size:16px; color:var(--text-dim); cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-text-display">
+          <p><strong>Delta Working Memory (Layer 2)</strong> provides dynamic operational state between the static Layer 1 base snapshot and the Layer 3 job execution context.</p>
+          <ul>
+            <li><strong>KV Cache Prefix Hit:</strong> Layer 1 remains completely unmodified at prompt index 0. Layer 2 is injected as prompt index 1, strictly preserving 100% prefix match hit performance.</li>
+            <li><strong>Delta RWI:</strong> The compiler automatically generates a Relational Web Index header listing all active delta modules in configured order.</li>
+            <li><strong>Programmatic Updates:</strong> Automated jobs update delta source files on disk via <code>POST /api/deltas/update</code>.</li>
+            <li><strong>Code-Defined Modules:</strong> Modules are registered via <code>deltas/delta_config.json</code> with modular sources in <code>deltas/sources/</code>.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="closeModal('help-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let CORE_URL = window.location.protocol.startsWith('http') ? window.location.origin : "http://localhost:8080";
+    let authToken = localStorage.getItem('lyrn_admin_token') || null;
+    let deltaBlocks = [];
+    let selectedBlockId = null;
+    let draggedItemIndex = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const stored = localStorage.getItem('lyrn_core_url');
+      if (stored) {
+        if (stored.includes(":8000") && window.location.protocol.startsWith('http') && window.location.port !== "8000") {
+          CORE_URL = window.location.origin;
+          try { localStorage.setItem('lyrn_core_url', window.location.origin); } catch(e){}
+        } else {
+          CORE_URL = stored.replace(/\/$/, "");
+        }
+      } else if (window.location.protocol.startsWith('http')) {
+        CORE_URL = window.location.origin;
+      }
+
+      initDeltaManager();
+
+      // Theme Sync & URL Update from Dashboard
+      window.addEventListener('message', (event) => {
+        if (!event.data) return;
+        if (event.data.type === 'THEME_CHANGE') {
+          document.body.setAttribute('data-theme', event.data.theme);
+        }
+        if (event.data.type === 'FONT_CHANGE') {
+          const fs = event.data.fontSize;
+          document.documentElement.style.setProperty('--font-size-base', fs + 'px');
+          document.body.style.setProperty('--font-size-base', fs + 'px');
+          document.body.style.fontSize = fs + 'px';
+        }
+        if (event.data.type === 'TOKEN_UPDATE') {
+          authToken = event.data.token;
+          initDeltaManager();
+        }
+        if (event.data.type === 'CORE_URL_CHANGE') {
+          CORE_URL = event.data.url.replace(/\/$/, "");
+          initDeltaManager();
+        }
+      });
+    });
+
+    async function initDeltaManager() {
+      await refreshDeltaBlocks();
+    }
+
+    async function refreshDeltaBlocks() {
+      try {
+        let res = await fetch(`${CORE_URL}/api/deltas/blocks`, {
+          headers: authToken ? { 'X-Token': authToken } : {}
+        });
+        if (!res.ok && CORE_URL !== window.location.origin && window.location.protocol.startsWith('http')) {
+          res = await fetch(`${window.location.origin}/api/deltas/blocks`, {
+            headers: authToken ? { 'X-Token': authToken } : {}
+          });
+          if (res.ok) {
+            CORE_URL = window.location.origin;
+            try { localStorage.setItem('lyrn_core_url', window.location.origin); } catch(e){}
+          }
+        }
+        if (res.ok) {
+          deltaBlocks = await res.json();
+          renderModuleList();
+          if (deltaBlocks.length > 0) {
+            const currentSelected = deltaBlocks.find(b => b.id === selectedBlockId);
+            selectBlock(currentSelected ? currentSelected.id : deltaBlocks[0].id);
+          } else {
+            document.getElementById('editor-container').innerHTML = 
+              '<p style="color:var(--text-dim); padding:20px; text-align:center;">No delta modules registered in deltas/delta_config.json.</p>';
+          }
+          updateFooterStatus();
+        } else {
+          showToast("Failed to load delta blocks", true);
+        }
+      } catch (e) {
+        if (CORE_URL !== window.location.origin && window.location.protocol.startsWith('http')) {
+          try {
+            const fallbackRes = await fetch(`${window.location.origin}/api/deltas/blocks`, {
+              headers: authToken ? { 'X-Token': authToken } : {}
+            });
+            if (fallbackRes.ok) {
+              CORE_URL = window.location.origin;
+              try { localStorage.setItem('lyrn_core_url', window.location.origin); } catch(e){}
+              deltaBlocks = await fallbackRes.json();
+              renderModuleList();
+              if (deltaBlocks.length > 0) {
+                const currentSelected = deltaBlocks.find(b => b.id === selectedBlockId);
+                selectBlock(currentSelected ? currentSelected.id : deltaBlocks[0].id);
+              }
+              updateFooterStatus();
+              return;
+            }
+          } catch(err2) {
+            console.error("Fallback to same-origin failed:", err2);
+          }
+        }
+        console.error("Error loading delta blocks:", e);
+        showToast("Connection Error", true);
+      }
+    }
+
+    function renderModuleList() {
+      const listEl = document.getElementById('module-list');
+      listEl.innerHTML = '';
+
+      if (!deltaBlocks || deltaBlocks.length === 0) {
+        listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-dim);">No modules registered</div>';
+        return;
+      }
+
+      deltaBlocks.forEach((block, index) => {
+        block.order = index;
+        const item = document.createElement('div');
+        item.className = `module-item ${selectedBlockId === block.id ? 'selected' : ''}`;
+        item.setAttribute('draggable', 'true');
+        item.dataset.index = index;
+        item.dataset.id = block.id;
+
+        item.innerHTML = `
+          <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
+          <div class="module-info">
+            <div class="module-name">${escapeHtml(block.name || block.id)}</div>
+            <div class="module-meta">
+              <span class="file-tag">${escapeHtml(block.file || '')}</span>
+              <span class="badge-status ${block.enabled ? 'active' : 'inactive'}">${block.enabled ? 'ACTIVE' : 'MUTED'}</span>
+            </div>
+          </div>
+          <label class="switch" onclick="event.stopPropagation()" title="Toggle Module">
+            <input type="checkbox" ${block.enabled ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+        `;
+
+        item.onclick = () => selectBlock(block.id);
+
+        const chk = item.querySelector('input[type="checkbox"]');
+        if (chk) {
+          chk.onchange = (e) => {
+            toggleBlockEnabled(block.id, e.target.checked);
+          };
+        }
+
+        // Drag and drop event listeners
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('dragleave', handleDragLeave);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+
+        listEl.appendChild(item);
+      });
+    }
+
+    function selectBlock(blockId) {
+      selectedBlockId = blockId;
+      const block = deltaBlocks.find(b => b.id === blockId);
+      if (!block) return;
+
+      renderModuleList();
+
+      const titleEl = document.getElementById('editor-title');
+      const container = document.getElementById('editor-container');
+      titleEl.innerText = `Module: ${block.name || block.id}`;
+
+      container.innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div class="form-group">
+            <label>Module Identifier</label>
+            <input type="text" value="${escapeHtml(block.id)}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Source File (deltas/sources/)</label>
+            <input type="text" value="${escapeHtml(block.file || '')}" readonly>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div class="form-group">
+            <label>Begin Bracket</label>
+            <input type="text" value="${escapeHtml(block.begin_bracket || '')}" readonly>
+          </div>
+          <div class="form-group">
+            <label>End Bracket</label>
+            <input type="text" value="${escapeHtml(block.end_bracket || '')}" readonly>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Delta RWI Index Description</label>
+          <input type="text" id="edit-block-desc" value="${escapeHtml(block.description || '')}" placeholder="Short summary for the Delta RWI block...">
+        </div>
+
+        <div class="form-group" style="flex: 1; display: flex; flex-direction: column;">
+          <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom:0;">Live Source Content</label>
+            <span style="font-size:10px; color:var(--text-dim); font-family:'JetBrains Mono';" id="content-stats">
+              ${(block.content || '').length} chars
+            </span>
+          </div>
+          <textarea id="edit-block-content" style="flex: 1; min-height: 250px;" placeholder="Module working memory content...">${escapeHtml(block.content || '')}</textarea>
+        </div>
+      `;
+
+      const contentArea = document.getElementById('edit-block-content');
+      if (contentArea) {
+        contentArea.addEventListener('input', () => {
+          const statsEl = document.getElementById('content-stats');
+          if (statsEl) statsEl.innerText = `${contentArea.value.length} chars`;
+        });
+      }
+    }
+
+    async function toggleBlockEnabled(blockId, isEnabled) {
+      const block = deltaBlocks.find(b => b.id === blockId);
+      if (!block) return;
+      block.enabled = isEnabled;
+      await saveOrderToBackend();
+      showToast(isEnabled ? `${block.name || blockId} Activated` : `${block.name || blockId} Deactivated`);
+      updateFooterStatus();
+    }
+
+    async function moveSelectedBlock(direction) {
+      if (!selectedBlockId) return;
+      const index = deltaBlocks.findIndex(b => b.id === selectedBlockId);
+      if (index === -1) return;
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= deltaBlocks.length) return;
+
+      const temp = deltaBlocks[index];
+      deltaBlocks[index] = deltaBlocks[targetIndex];
+      deltaBlocks[targetIndex] = temp;
+
+      renderModuleList();
+      await saveOrderToBackend();
+    }
+
+    // Drag and drop handlers
+    function handleDragStart(e) {
+      draggedItemIndex = parseInt(this.dataset.index, 10);
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedItemIndex);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.classList.add('drag-over');
+    }
+
+    function handleDragLeave() {
+      this.classList.remove('drag-over');
+    }
+
+    async function handleDrop(e) {
+      e.preventDefault();
+      this.classList.remove('drag-over');
+      const targetIndex = parseInt(this.dataset.index, 10);
+      if (draggedItemIndex === null || draggedItemIndex === targetIndex) return;
+
+      const itemToMove = deltaBlocks.splice(draggedItemIndex, 1)[0];
+      deltaBlocks.splice(targetIndex, 0, itemToMove);
+
+      renderModuleList();
+      await saveOrderToBackend();
+      showToast("Order Updated");
+    }
+
+    function handleDragEnd() {
+      this.classList.remove('dragging');
+      document.querySelectorAll('.module-item').forEach(el => el.classList.remove('drag-over'));
+      draggedItemIndex = null;
+    }
+
+    async function saveOrderToBackend() {
+      try {
+        const payload = deltaBlocks.map((b, idx) => ({
+          id: b.id,
+          order: idx,
+          enabled: b.enabled,
+          name: b.name,
+          description: b.description,
+          begin_bracket: b.begin_bracket,
+          end_bracket: b.end_bracket
+        }));
+
+        const res = await fetch(`${CORE_URL}/api/deltas/order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { 'X-Token': authToken } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          showToast("Failed to save order", true);
+        }
+      } catch (e) {
+        showToast("Error updating order", true);
+      }
+    }
+
+    async function saveActiveBlockContent() {
+      if (!selectedBlockId) return;
+      const block = deltaBlocks.find(b => b.id === selectedBlockId);
+      if (!block) return;
+
+      const contentArea = document.getElementById('edit-block-content');
+      const descInput = document.getElementById('edit-block-desc');
+      if (!contentArea) return;
+
+      const newContent = contentArea.value;
+      if (descInput) block.description = descInput.value;
+
+      try {
+        // 1. Save Description / Order if updated
+        await saveOrderToBackend();
+
+        // 2. Programmatic Update Hook to persist source file and recompile
+        const res = await fetch(`${CORE_URL}/api/deltas/update`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { 'X-Token': authToken } : {})
+          },
+          body: JSON.stringify({
+            block_id: block.id,
+            file: block.file,
+            content: newContent,
+            recompile: true
+          })
+        });
+
+        if (res.ok) {
+          block.content = newContent;
+          showToast("Source Saved & Recompiled");
+          updateFooterStatus();
+        } else {
+          showToast("Failed to save source", true);
+        }
+      } catch (e) {
+        showToast("Error saving content", true);
+      }
+    }
+
+    async function compileDeltaManifest() {
+      const btn = document.getElementById('compile-btn');
+      const origText = btn.innerText;
+      btn.innerText = "Compiling...";
+
+      try {
+        const res = await fetch(`${CORE_URL}/api/deltas/compile`, {
+          method: 'POST',
+          headers: authToken ? { 'X-Token': authToken } : {}
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Manifest Compiled (${data.manifest_size} bytes)`);
+          updateFooterStatus();
+        } else {
+          showToast("Compilation Failed", true);
+        }
+      } catch (e) {
+        showToast("Connection Error", true);
+      } finally {
+        setTimeout(() => { btn.innerText = origText; }, 600);
+      }
+    }
+
+    async function viewCompiledManifest() {
+      try {
+        const res = await fetch(`${CORE_URL}/api/deltas/manifest`, {
+          headers: authToken ? { 'X-Token': authToken } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('modal-content').value = data.content || "[Manifest is empty. Enable delta modules and click 'Compile Manifest']";
+          openModal('preview-modal');
+        } else {
+          showToast("Failed to fetch manifest", true);
+        }
+      } catch (e) {
+        showToast("Error loading manifest", true);
+      }
+    }
+
+    async function compileAndRefreshModal() {
+      await compileDeltaManifest();
+      await viewCompiledManifest();
+    }
+
+    function updateFooterStatus() {
+      const activeCount = deltaBlocks.filter(b => b.enabled).length;
+      const footer = document.getElementById('footer-status');
+      if (footer) {
+        footer.innerText = `ACTIVE MODULES: ${activeCount} / ${deltaBlocks.length} // KV PREFIX INTACT`;
+      }
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function showHelpModal() {
+      openModal('help-modal');
+    }
+
+    function copyModalContent() {
+      const textarea = document.getElementById('modal-content');
+      textarea.select();
+      document.execCommand('copy');
+      showToast("Copied to clipboard!");
+    }
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('rwi-toast');
+      if (!t) return;
+      t.innerText = msg;
+      t.style.borderColor = isError ? 'var(--error-color)' : 'var(--brand-purple)';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function escapeHtml(text) {
+      if (!text) return "";
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

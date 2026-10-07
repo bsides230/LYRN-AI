@@ -1,0 +1,18 @@
+job_id,job_name,trigger_name,instruction_layer,affordances,scripts,max_retries,retry_error_message,enabled,created_at,updated_at,notes
+10000000-0000-0000-0000-000000000001,respond_to_input,##AF: General/respond_to_input##,"Read the active input payload in INPUT_DELTA and any relevant working memory. Formulate a direct, helpful, and grounded response to the user. Wrap your response inside:
+##RESPONSE:START##
+<your response here>
+##RESPONSE:END##
+If text summarization or task planning is requested, you may emit ##AF: General/summarize_text## or ##AF: General/task_planner##.",General/summarize_text|General/task_planner,none,2,Response failed. Ensure your output is wrapped inside ##RESPONSE:START## and ##RESPONSE:END##.,true,2026-10-06T12:00:00.000000,2026-10-06T12:00:00.000000,Standard response generation job that reads input_delta and outputs a grounded response.
+10000000-0000-0000-0000-000000000002,summarize_text,##AF: General/summarize_text##,"Analyze the text provided in INPUT_DELTA. Extract the essential concepts and key takeaways. Output a concise bulleted summary wrapped inside:
+##SUMMARY:START##
+- Key takeaway 1
+- Key takeaway 2
+##SUMMARY:END##
+Follow the summary with affordance ##AF: General/respond_to_input## to finalize the turn.",General/respond_to_input,none,2,Summarization failed. Output key points inside ##SUMMARY:START## and ##SUMMARY:END##.,true,2026-10-06T12:00:00.000000,2026-10-06T12:00:00.000000,Extracts concise bulleted summary from input_delta.
+10000000-0000-0000-0000-000000000003,task_planner,##AF: General/task_planner##,"Analyze the task or objective described in INPUT_DELTA. Deconstruct it into an orderly, sequential action plan. Wrap your plan inside:
+##PLAN:START##
+Step 1: ...
+Step 2: ...
+##PLAN:END##
+Follow the plan with affordance ##AF: General/respond_to_input## to finalize the turn.",General/respond_to_input,none,2,Planning failed. Output structured steps inside ##PLAN:START## and ##PLAN:END##.,true,2026-10-06T12:00:00.000000,2026-10-06T12:00:00.000000,Deconstructs tasks into sequential execution steps.

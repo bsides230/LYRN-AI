@@ -1,0 +1,2 @@
+Status: retry
+Errors: ["Trigger 'Unknown/invalid_affordance' is not in allowed affordances list: ['General/respond_to_input']"]

@@ -1,0 +1,5 @@
+##INPUT_DELTA:START##
+TYPE: chat_input
+CONTENT:
+Hello! Can you give me an overview of how the LYRN cognitive architecture works?
+##INPUT_DELTA:END##
