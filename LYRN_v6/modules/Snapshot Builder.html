@@ -281,10 +281,11 @@
             CORE_URL = window.location.origin;
         }
 
-        if(authToken) initRWIBuilder();
+        initRWIBuilder();
         
         // Theme Sync & URL Update
         window.addEventListener('message', (event) => {
+            if (!event.data) return;
             if (event.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', event.data.theme);
             }
@@ -301,7 +302,7 @@
             }
             if (event.data.type === 'CORE_URL_CHANGE') {
                 CORE_URL = event.data.url.replace(/\/$/, "");
-                if(authToken) initRWIBuilder();
+                initRWIBuilder();
             }
         });
     });
@@ -311,54 +312,59 @@
        ========================================= */
     async function initRWIBuilder() {
         if (!document.getElementById('components-list')) return;
-        if (!authToken) return;
 
         let components = [
             { name: "rwi", pinned: true, active: true, order: 0, config: { begin_bracket: "###RWI_INSTRUCTIONS_START###", end_bracket: "###RWI_INSTRUCTIONS_END###", rwi_text: "Relational Web Index header." }, content: "" },
-            { name: "system_instructions", pinned: true, active: true, order: 1, config: { begin_bracket: "###SYSTEM_INSTRUCTIONS_START###", end_bracket: "###SYSTEM_INSTRUCTIONS_END###", rwi_text: "Core system instructions." }, content: `This model operates as part of the LYRN cognitive architecture...` }
+            { name: "system_instructions", pinned: true, active: true, order: 1, config: { begin_bracket: "###SYSTEM_INSTRUCTIONS_START###", end_bracket: "###SYSTEM_INSTRUCTIONS_END###", rwi_text: "Core system instructions." }, content: "This model operates as part of the LYRN cognitive architecture.\nIt processes structured state components, maintains contextual continuity across cycles, and executes deterministic affordance-driven job loops." },
+            { name: "emotional_axes", pinned: false, active: true, order: 2, config: { begin_bracket: "###EMOTIONAL_AXES_START###", end_bracket: "###EMOTIONAL_AXES_END###", rwi_text: "Affective and homeostatic calibration vectors." }, content: "# Affective & Drive Calibration\nCuriosity: 0.72\nFocus: 0.85\nStation_Vigilance: 0.90" },
+            { name: "reasoning_axes", pinned: false, active: true, order: 3, config: { begin_bracket: "###REASONING_AXES_START###", end_bracket: "###REASONING_AXES_END###", rwi_text: "Analytical decomposition parameters." }, content: "# Reasoning Vectors\nPrioritize verifiable physical telemetry and spatial coordinates before selecting an action affordance." },
+            { name: "meta_tagging", pinned: false, active: true, order: 4, config: { begin_bracket: "###META_TAGGING_START###", end_bracket: "###META_TAGGING_END###", rwi_text: "Symbolic block delimiter protocol." }, content: "# Symbolic Output Tags\nWrap reasoning traces and final affordance selections in their designated delimiter blocks." }
         ];
 
-        // 1. Fetch Snapshot List & Active Settings
-        try {
-            // Get Config for active snapshot
-            const confRes = await fetch(CORE_URL + '/api/config', { headers: { 'X-Token': authToken } });
-            let activeSnap = null;
-            if(confRes.ok) {
-                const d = await confRes.json();
-                activeSnap = d.settings.active_snapshot;
-            }
+        const sel = document.getElementById('snapshot-select');
+        if (sel && sel.options.length <= 1) {
+            sel.innerHTML = '<option value="default_v6.sns">default_v6</option><option value="capsule_habitat.sns">capsule_habitat</option>';
+        }
 
-            // Get List
-            const listRes = await fetch(CORE_URL + '/api/snapshots', { headers: { 'X-Token': authToken } });
-            if(listRes.ok) {
-                const snaps = await listRes.json();
-                const sel = document.getElementById('snapshot-select');
-                sel.innerHTML = '<option value="">Select Snapshot...</option>';
-                snaps.forEach(s => {
-                    const opt = document.createElement('option');
-                    opt.value = s.name;
-                    opt.innerText = s.name.replace('.sns', '');
-                    sel.appendChild(opt);
+        // 1. Fetch Snapshot List & Active Settings (when connected to live backend)
+        if (authToken) {
+            try {
+                const confRes = await fetch(CORE_URL + '/api/config', { headers: { 'X-Token': authToken } });
+                let activeSnap = null;
+                if(confRes.ok) {
+                    const d = await confRes.json();
+                    activeSnap = d.settings.active_snapshot;
+                }
+
+                const listRes = await fetch(CORE_URL + '/api/snapshots', { headers: { 'X-Token': authToken } });
+                if(listRes.ok) {
+                    const snaps = await listRes.json();
+                    sel.innerHTML = '<option value="">Select Snapshot...</option>';
+                    snaps.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.name;
+                        opt.innerText = s.name.replace('.sns', '');
+                        sel.appendChild(opt);
+                    });
+
+                    if(activeSnap && snaps.find(s => s.name === activeSnap)) {
+                        sel.value = activeSnap;
+                        currentSnapshotName = activeSnap.replace('.sns', '');
+                    }
+                }
+
+                const res = await fetch(CORE_URL + '/api/snapshot', {
+                    headers: authToken ? { 'X-Token': authToken } : {}
                 });
-
-                if(activeSnap && snaps.find(s => s.name === activeSnap)) {
-                    sel.value = activeSnap;
-                    currentSnapshotName = activeSnap.replace('.sns', '');
+                if(res.ok) {
+                    const data = await res.json();
+                    if(Array.isArray(data) && data.length > 0) {
+                        components = data;
+                    }
                 }
+            } catch(e) {
+                console.warn("Static/offline mode: using built-in RWI components.");
             }
-
-            // Fetch Current Components (from build_prompt via legacy endpoint)
-            const res = await fetch(CORE_URL + '/api/snapshot', {
-                headers: authToken ? { 'X-Token': authToken } : {}
-            });
-            if(res.ok) {
-                const data = await res.json();
-                if(Array.isArray(data) && data.length > 0) {
-                    components = data;
-                }
-            }
-        } catch(e) {
-            console.warn("Failed to fetch snapshot from API, using defaults.", e);
         }
 
         let selectedComponent = null;

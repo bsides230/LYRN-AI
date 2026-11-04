@@ -393,8 +393,45 @@
             console.error("Fallback to same-origin failed:", err2);
           }
         }
-        console.error("Error loading delta blocks:", e);
-        showToast("Connection Error", true);
+        console.warn("Static/offline mode: using built-in working memory preview.");
+        deltaBlocks = [
+          {
+            id: "overall_summary",
+            name: "Overall Operational Summary",
+            file: "summary.txt",
+            begin_bracket: "###SUMMARY_START###",
+            end_bracket: "###SUMMARY_END###",
+            description: "Macroscopic operational state summary across ticks.",
+            enabled: true,
+            order: 0,
+            content: "Cycle #0142: Seed_Capsule_Alpha nominal. Power reserves at 94%. Hydroponic bay cultivar_basil_01 thriving (+4.2mm growth). Next scheduled maintenance check: Water Recycler filter inspection."
+          },
+          {
+            id: "spatial_telemetry",
+            name: "Active Spatial & Station Telemetry",
+            file: "input_delta.txt",
+            begin_bracket: "###INPUT_DELTA_START###",
+            end_bracket: "###INPUT_DELTA_END###",
+            description: "Current room coordinates, station wear counters, and environmental sensors.",
+            enabled: true,
+            order: 1,
+            content: "Location: Seed_Capsule_Alpha [E5]\nAmbient Temp: 21.8C | O2: 20.9% | Humidity: 58%\nNearby Fixtures: Hydroponic Grow Tray [D8-F9], Study Desk [I1-I3], 3D Printer [A1-B2]"
+          },
+          {
+            id: "contextual_indexes",
+            name: "Contextual Memory Indexes",
+            file: "topic_indexes.txt",
+            begin_bracket: "###TOPIC_INDEXES_START###",
+            end_bracket: "###TOPIC_INDEXES_END###",
+            description: "Loaded plain-text reference records for active task.",
+            enabled: true,
+            order: 2,
+            content: "[Botany/cultivar_basil_01] Optimal moisture: 65-72% | Target pH: 5.8-6.3 | Light cycle: 16h ON / 8h OFF."
+          }
+        ];
+        renderModuleList();
+        selectBlock(deltaBlocks[0].id);
+        updateFooterStatus();
       }
     }
 

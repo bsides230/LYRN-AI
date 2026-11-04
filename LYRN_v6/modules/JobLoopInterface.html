@@ -1043,11 +1043,83 @@
         });
 
         /* =========================================================================
+           STATIC DEMO FALLBACK (Used when previewing offline / on GitHub Pages)
+           ========================================================================= */
+        const STATIC_DEMO_JOBS = {
+            "Capsule_Habitat": [
+                {
+                    job_id: "demo_hab_1",
+                    job_name: "inspect_hydroponics",
+                    trigger_name: "tick_hydro_check",
+                    instruction_layer: "Inspect the Hydroponic Grow Tray [D8-F9] moisture, nutrient conductivity, and leaf turgor telemetry.\nDetermine whether irrigation or spectrum adjustment is required before the next capsule tick.",
+                    affordances: "Capsule_Habitat/adjust_nutrient_mix|Capsule_Habitat/log_growth_observation|Station_Diagnostics/idle_standby",
+                    scripts: "scripts/read_hydro_sensors.py",
+                    max_retries: 2,
+                    retry_error_message: "Select a valid habitat affordance from the provided ##AF## block.",
+                    notes: "Routine autonomous botanical check inside the 9x9 Seed Capsule.",
+                    enabled: true
+                },
+                {
+                    job_id: "demo_hab_2",
+                    job_name: "fabricate_component",
+                    trigger_name: "printer_queue_ready",
+                    instruction_layer: "Verify raw polymer/alloy spool mass at the 3D Printer [A1-B2] and initiate fabrication of the queued replacement seal or utility garment.",
+                    affordances: "Capsule_Habitat/verify_print_tolerance|Station_Diagnostics/run_wear_diagnostics",
+                    scripts: "scripts/printer_fabricate.py",
+                    max_retries: 1,
+                    retry_error_message: "Must output a valid ##AF## target.",
+                    notes: "Closed-loop matter fabrication and spare-part synthesis.",
+                    enabled: true
+                },
+                {
+                    job_id: "demo_hab_3",
+                    job_name: "log_growth_observation",
+                    trigger_name: "after_hydro_inspect",
+                    instruction_layer: "Record cultivar growth rate and leaf health metrics at the Study Desk [I1-I3] and update the botanical observation ledger.",
+                    affordances: "Station_Diagnostics/idle_standby",
+                    scripts: "scripts/append_botany_log.py",
+                    max_retries: 1,
+                    retry_error_message: "",
+                    notes: "Updates persistent plain-text botanical knowledge.",
+                    enabled: true
+                }
+            ],
+            "Station_Diagnostics": [
+                {
+                    job_id: "demo_diag_1",
+                    job_name: "run_wear_diagnostics",
+                    trigger_name: "tick_maintenance",
+                    instruction_layer: "Scan mechanical wear counters across the Air Scrubber, Water Recycler, and Recharge Station [A2-B3]. Prioritize preventative maintenance if any subsystem drops below 85% integrity.",
+                    affordances: "Capsule_Habitat/fabricate_component|Station_Diagnostics/calibrate_solar_array|Station_Diagnostics/idle_standby",
+                    scripts: "scripts/check_station_wear.py",
+                    max_retries: 2,
+                    retry_error_message: "Select a valid maintenance affordance.",
+                    notes: "Simulated mechanical wear and preventative upkeep loop.",
+                    enabled: true
+                },
+                {
+                    job_id: "demo_diag_2",
+                    job_name: "calibrate_solar_array",
+                    trigger_name: "low_charge_rate",
+                    instruction_layer: "Check external collector alignment via the North Viewport [D1-F1] telemetry and recalibrate charge distribution to the main bus.",
+                    affordances: "Station_Diagnostics/idle_standby",
+                    scripts: "scripts/align_collectors.py",
+                    max_retries: 1,
+                    retry_error_message: "",
+                    notes: "Restores optimal power intake.",
+                    enabled: true
+                }
+            ]
+        };
+        let isOfflineDemoMode = false;
+
+        /* =========================================================================
            CATEGORY MANAGEMENT
            ========================================================================= */
         async function loadCategories() {
             try {
                 const res = await api('/api/jobs/categories');
+                isOfflineDemoMode = false;
                 categories = res.categories || [];
                 const select = document.getElementById('categorySelect');
                 select.innerHTML = '';
@@ -1076,8 +1148,31 @@
 
                 await loadJobsForCategory(currentCategory);
             } catch (e) {
-                console.error("Failed to load categories:", e);
-                notify("Failed to load categories: " + e.message, "error");
+                console.warn("Backend API offline — activating interactive demo dataset.");
+                isOfflineDemoMode = true;
+                categories = Object.keys(STATIC_DEMO_JOBS);
+                const select = document.getElementById('categorySelect');
+                select.innerHTML = '';
+                categories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    opt.textContent = cat;
+                    select.appendChild(opt);
+                });
+                currentCategory = categories[0];
+                select.value = currentCategory;
+                document.getElementById('csvPathBadge').textContent = `runtime/jobs/categories/${currentCategory}.csv`;
+                updateWorkerStatusDisplay('idle');
+                updateTelemetryDisplay({ kv_cache_reused: 2480, eval_speed: 38.4, total_tokens: 312, total_time: 1.42 });
+                document.getElementById('outputConsole').textContent = `[Tick #0142 // Seed_Capsule_Alpha]\nTelemetry verified: Hydroponic Tray [D8-F9] moisture at 68.4%, pH 6.1.\n cultivar_basil_01 showing +4.2mm nodal growth.\nNo immediate irrigation required; logging observation to desk ledger.\n\n##AF: Capsule_Habitat/log_growth_observation##`;
+                const decisionBox = document.getElementById('affordanceDecisionBox');
+                const decisionText = document.getElementById('affordanceDecisionText');
+                if (decisionBox && decisionText) {
+                    decisionBox.style.display = 'block';
+                    decisionBox.style.borderColor = 'var(--success)';
+                    decisionText.innerHTML = `<span class="badge badge-success">✓ VALID ACTION</span> <span class="highlight-affordance">##AF: Capsule_Habitat/log_growth_observation##</span>`;
+                }
+                await loadJobsForCategory(currentCategory);
             }
         }
 
@@ -1089,6 +1184,17 @@
 
         async function loadJobsForCategory(category) {
             if (!category) return;
+            if (isOfflineDemoMode) {
+                currentJobs = (STATIC_DEMO_JOBS[category] || []).map(j => ({ ...j }));
+                renderJobsList();
+                renderCSVTable();
+                if (currentJobs.length > 0) {
+                    selectJob(currentJobs[0].job_id);
+                } else {
+                    createNewJobTemplate();
+                }
+                return;
+            }
             try {
                 const res = await api(`/api/jobs/${category}`);
                 currentJobs = res.jobs || [];

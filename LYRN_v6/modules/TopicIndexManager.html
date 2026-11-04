@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LYRN Topic Index Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  
+  <link rel="stylesheet" href="../themes/corporate-terminal.css" />
+  <link rel="stylesheet" href="../themes/corporate-2049.css" />
+  <link rel="stylesheet" href="../themes/cyber-dark.css" />
+
+  <style>
+    :root {
+      --bg-core: #050505;
+      --bg-panel: #0a0a0a;
+      --bg-input: #050505;
+      --brand-purple: #7c5cff;
+      --brand-purple-dim: rgba(124, 92, 255, 0.1);
+      --brand-purple-glow: rgba(124, 92, 255, 0.3);
+      --text-head: #ffffff;
+      --text-body: #b0b0b0;
+      --text-dim: #666666;
+      --border-color: #222222;
+      --border-focus: #7c5cff;
+      --input-focus-bg: #111111;
+      --success-color: #10b981;
+      --error-color: #ef4444;
+      --warning-color: #f59e0b;
+      --btn-text: #e0e0e0;
+      --btn-border: #444444;
+      --btn-bg: rgba(255, 255, 255, 0.03);
+      --font-size-base: 12px;
+    }
+
+    body[data-theme="light"] {
+      --bg-core: #eef0f4;
+      --bg-panel: #ffffff;
+      --bg-input: #ffffff;
+      --brand-purple: #6a4ce0;
+      --brand-purple-dim: rgba(106, 76, 224, 0.1);
+      --brand-purple-glow: rgba(106, 76, 224, 0.2);
+      --text-head: #111111;
+      --text-body: #333333;
+      --text-dim: #555555;
+      --border-color: #d1d5db;
+      --border-focus: #6a4ce0;
+      --input-focus-bg: #f9fafb;
+      --btn-text: #333333;
+      --btn-border: #cccccc;
+      --btn-bg: rgba(0, 0, 0, 0.03);
+    }
+
+    * { box-sizing: border-box; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
+    body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-core); color: var(--text-body);
+      font-family: 'Inter', system-ui, sans-serif;
+      height: 100vh; width: 100vw; overflow: hidden;
+      font-size: var(--font-size-base);
+    }
+
+    h1, h2, h3, h4 { font-family: 'JetBrains Mono', monospace; color: var(--text-head); margin: 0; }
+
+    button {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(var(--font-size-base) - 1px);
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      color: var(--btn-text);
+      padding: 8px 14px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      transition: all 0.2s ease;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+    button.btn-primary { background: var(--brand-purple); color: #ffffff; border-color: var(--brand-purple); font-weight: 600; }
+    button.btn-primary:hover { background: #6a4ce0; }
+    button.btn-danger { border-color: var(--error-color); color: var(--error-color); }
+    button.btn-danger:hover { background: rgba(239, 68, 68, 0.15); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    input, select, textarea {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: var(--font-size-base);
+      background: var(--bg-input);
+      color: var(--text-head);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--border-focus);
+      background: var(--input-focus-bg);
+    }
+
+    .app-wrapper {
+      height: 100vh; width: 100%;
+      display: flex; flex-direction: column;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel); flex-shrink: 0;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; padding: 2px 8px; border-radius: 4px;
+      background: var(--brand-purple-dim); color: var(--brand-purple);
+      border: 1px solid var(--brand-purple); text-transform: uppercase;
+    }
+    .badge-initial {
+      background: rgba(16, 185, 129, 0.15); color: #10b981;
+      border: 1px solid #10b981;
+    }
+
+    .tabs-nav {
+      display: flex; gap: 4px;
+      background: rgba(0, 0, 0, 0.2); padding: 4px; border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+    .tab-btn {
+      background: transparent; border: none; padding: 6px 14px;
+      color: var(--text-dim); border-radius: 4px; font-size: 11px;
+    }
+    .tab-btn.active {
+      background: var(--brand-purple); color: #ffffff; font-weight: 600;
+    }
+
+    .tab-content {
+      flex: 1; overflow: hidden; display: none;
+      position: relative;
+    }
+    .tab-content.active { display: flex; flex-direction: column; }
+
+    /* TAB Containers */
+    .tab1-container {
+      flex: 1; overflow-y: auto; padding: 24px 32px;
+      max-width: 1000px; width: 100%; margin: 0 auto;
+    }
+    .settings-header-card {
+      background: var(--bg-panel); border: 1px solid var(--border-color);
+      border-radius: 6px; padding: 16px 20px; margin-bottom: 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .category-select-group { display: flex; align-items: center; gap: 12px; }
+    .fields-card {
+      background: var(--bg-panel); border: 1px solid var(--border-color);
+      border-radius: 6px; overflow: hidden; margin-bottom: 20px;
+    }
+    .fields-card-header {
+      padding: 12px 18px; border-bottom: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.02);
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim);
+    }
+    .field-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 18px; border-bottom: 1px solid var(--border-color);
+      transition: background 0.15s ease;
+    }
+    .field-row:last-child { border-bottom: none; }
+    .field-row:hover { background: rgba(124, 92, 255, 0.03); }
+    .field-left { display: flex; align-items: center; gap: 14px; }
+    .field-name { font-family: 'JetBrains Mono', monospace; font-weight: 500; color: var(--text-head); }
+    .field-right { display: flex; align-items: center; gap: 16px; }
+    .limit-input-group { display: flex; align-items: center; gap: 8px; }
+    .limit-input-group label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+    .limit-input { width: 70px; text-align: center; }
+
+    /* Custom Checkbox */
+    .checkbox-container {
+      display: block; position: relative; cursor: pointer;
+      font-size: 16px; user-select: none; width: 18px; height: 18px;
+    }
+    .checkbox-container input {
+      position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0;
+    }
+    .checkmark {
+      position: absolute; top: 0; left: 0; height: 18px; width: 18px;
+      background-color: var(--bg-input); border: 1px solid var(--border-color);
+      border-radius: 4px; transition: all 0.2s ease;
+    }
+    .checkbox-container:hover input ~ .checkmark { border-color: var(--brand-purple); }
+    .checkbox-container input:checked ~ .checkmark {
+      background-color: var(--brand-purple); border-color: var(--brand-purple);
+    }
+    .checkmark:after {
+      content: ""; position: absolute; display: none;
+      left: 6px; top: 2px; width: 4px; height: 9px;
+      border: solid white; border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    .checkbox-container input:checked ~ .checkmark:after { display: block; }
+
+    /* TAB 2: Index Search & Editor */
+    .tab2-container {
+      flex: 1; display: flex; overflow: hidden;
+    }
+    .sidebar {
+      width: 320px; border-right: 1px solid var(--border-color);
+      background: var(--bg-panel); display: flex; flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-search {
+      padding: 14px; border-bottom: 1px solid var(--border-color);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .index-list {
+      flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 0;
+    }
+    .index-item {
+      padding: 12px 16px; border-bottom: 1px solid var(--border-color);
+      cursor: pointer; transition: all 0.15s ease;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .index-item:hover { background: rgba(124, 92, 255, 0.05); }
+    .index-item.active {
+      background: var(--brand-purple-dim);
+      border-left: 3px solid var(--brand-purple);
+    }
+    .item-top { display: flex; justify-content: space-between; align-items: center; }
+    .item-kw { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-head); }
+    .item-cat { font-size: 10px; color: var(--text-dim); text-transform: uppercase; }
+    .item-uuid { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+
+    .editor-pane {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      background: var(--bg-core);
+    }
+    .editor-header {
+      padding: 14px 24px; border-bottom: 1px solid var(--border-color);
+      background: var(--bg-panel); display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    .editor-body {
+      flex: 1; overflow-y: auto; padding: 24px 32px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+    .empty-state {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--text-dim); font-family: 'JetBrains Mono', monospace; gap: 8px;
+    }
+
+    .form-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px; margin-bottom: 16px;
+    }
+    .form-group {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .form-group.full-width { grid-column: 1 / -1; }
+    .form-group label {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--text-head); font-weight: 500; display: flex; justify-content: space-between;
+    }
+    .form-group label span.label-meta { color: var(--text-dim); font-weight: normal; }
+
+    .raw-preview-box {
+      border: 1px solid var(--border-color); border-radius: 6px;
+      background: #030303; padding: 14px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .raw-preview-box textarea {
+      width: 100%; height: 80px; resize: vertical; font-size: 11px; line-height: 1.4;
+    }
+
+    .history-card {
+      border: 1px solid var(--border-color); border-radius: 6px;
+      background: var(--bg-panel); padding: 14px; margin-top: 10px;
+    }
+    .history-card h4 {
+      font-size: 11px; margin-bottom: 8px; color: var(--brand-purple);
+    }
+    .history-card pre {
+      margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--text-body); white-space: pre-wrap; word-break: break-all;
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 10000;
+      padding: 10px 18px; border-radius: 6px; font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; display: none; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    }
+    #toast.success { background: var(--success-color); color: #ffffff; display: block; }
+    #toast.error { background: var(--error-color); color: #ffffff; display: block; }
+
+    /* Settings Button & Modal Styles */
+    .settings-btn {
+      background: var(--brand-purple-dim);
+      border: 1px solid var(--brand-purple);
+      color: var(--brand-purple);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; padding: 6px 14px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      transition: all 0.2s ease;
+    }
+    .settings-btn:hover {
+      background: var(--brand-purple); color: #ffffff;
+      box-shadow: 0 0 10px var(--brand-purple-glow);
+    }
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      width: 780px; max-width: 92vw;
+      max-height: 88vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9);
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .modal-close-btn {
+      background: transparent; border: none; color: var(--text-dim);
+      font-size: 22px; line-height: 1; padding: 2px 8px; cursor: pointer;
+    }
+    .modal-close-btn:hover { color: var(--text-head); }
+    .modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    .modal-footer {
+      padding: 12px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-top: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .settings-section {
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 16px;
+    }
+    .settings-section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; font-weight: 600;
+      color: var(--text-head);
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .settings-desc {
+      font-size: 11px; color: var(--text-body);
+      line-height: 1.5; margin: 0 0 14px 0;
+    }
+    .settings-desc code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(124, 92, 255, 0.1);
+      color: var(--brand-purple);
+      padding: 1px 4px; border-radius: 3px;
+    }
+    .settings-btn-row {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    }
+    .raw-config-editor {
+      width: 100%; height: 240px;
+      background: var(--bg-core);
+      color: var(--text-head);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 10px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      resize: vertical;
+      white-space: pre;
+    }
+    .raw-config-editor:focus {
+      border-color: var(--brand-purple);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+    <header>
+      <div class="header-left">
+        <h2>TOPIC INDEX MANAGER</h2>
+        <span class="badge">SCOPED DIRECTORY RAIL</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="tabs-nav">
+          <button class="tab-btn active" onclick="switchTab('tab-settings')">1. PROJECTION SETTINGS</button>
+          <button class="tab-btn" onclick="switchTab('tab-editor')">2. INDEX SEARCH & EDITOR</button>
+          <button class="tab-btn" onclick="switchTab('tab-creation')">3. CREATION MASKING</button>
+        </div>
+        <button class="settings-btn" onclick="openSettingsModal()" title="System Settings & Maintenance">⚙ SETTINGS</button>
+      </div>
+    </header>
+
+    <!-- TAB 1: Injection & Projection Settings -->
+    <div id="tab-settings" class="tab-content active">
+      <div class="tab1-container">
+        <div class="settings-header-card">
+          <div class="category-select-group">
+            <label style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">TARGET CATEGORY:</label>
+            <select id="config-cat-select" onchange="renderCategoryFieldsConfig()">
+              <option value="People">People (16 fields)</option>
+              <option value="Places">Places (13 fields)</option>
+              <option value="Things">Things (12 fields)</option>
+              <option value="Ideas">Ideas (11 fields)</option>
+              <option value="Projects">Projects (12 fields)</option>
+              <option value="Goals">Goals (12 fields)</option>
+              <option value="Item">Item (15 fields)</option>
+              <option value="Docs">Docs (15 fields)</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="toggleAllFields(true)">Enable All</button>
+            <button onclick="toggleAllFields(false)">Disable All</button>
+            <button class="btn-primary" onclick="saveProjectionConfig()">Save Settings</button>
+          </div>
+        </div>
+
+        <div class="fields-card">
+          <div class="fields-card-header">
+            <span>FIELD PROJECTION MAPPING (LAYER 2 MANIFEST)</span>
+            <span>DEPTH LIMIT CEILING</span>
+          </div>
+          <div id="fields-config-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Index Search & Editor -->
+    <div id="tab-editor" class="tab-content">
+      <div class="tab2-container">
+        <div class="sidebar">
+          <div class="sidebar-search">
+            <select id="search-cat-select" onchange="fetchIndexes()">
+              <option value="">All Categories</option>
+              <option value="People">People</option>
+              <option value="Places">Places</option>
+              <option value="Things">Things</option>
+              <option value="Ideas">Ideas</option>
+              <option value="Projects">Projects</option>
+              <option value="Goals">Goals</option>
+              <option value="Item">Item</option>
+              <option value="Docs">Docs</option>
+            </select>
+            <input type="text" id="search-input" placeholder="Search keyword..." oninput="debounceSearch()" />
+          </div>
+          <ul class="index-list" id="index-list-container">
+            <!-- Dynamically populated list -->
+          </ul>
+        </div>
+
+        <div class="editor-pane" id="editor-pane">
+          <div id="editor-empty" class="empty-state">
+            <div>SELECT A TOPIC INDEX RECORD FROM THE SIDEBAR TO INSPECT AND EDIT</div>
+          </div>
+          <div id="editor-form-wrapper" style="display: none; height: 100%; flex-direction: column;">
+            <div class="editor-header">
+              <div>
+                <h3 id="edit-header-kw" style="display: inline-block; margin-right: 10px;">-</h3>
+                <span class="badge" id="edit-header-cat">-</span>
+                <span style="margin-left: 12px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 11px;" id="edit-header-uuid"></span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn-danger" onclick="deleteCurrentRecord()">Delete</button>
+                <button onclick="revertCurrentRecord()">Cancel</button>
+                <button class="btn-primary" onclick="saveCurrentRecord()">Save</button>
+              </div>
+            </div>
+            <div class="editor-body">
+              <div class="form-grid" id="form-grid">
+                <!-- Dynamically populated inputs per schema -->
+              </div>
+              <div class="raw-preview-box">
+                <div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim);">
+                  <span>RAW PIPE RECORD (SYNCHRONIZED WITH FIELDS)</span>
+                  <span id="pipe-counter">Pipes: 0 / 0</span>
+                </div>
+                <textarea id="raw-record-text" oninput="onRawTextEdited()"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Creation Masking -->
+    <div id="tab-creation" class="tab-content">
+      <div class="tab1-container">
+        <div class="settings-header-card">
+          <div class="category-select-group">
+            <label style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">TARGET CATEGORY:</label>
+            <select id="creation-cat-select" onchange="renderCreationFieldsConfig()">
+              <option value="People">People (16 fields)</option>
+              <option value="Places">Places (13 fields)</option>
+              <option value="Things">Things (12 fields)</option>
+              <option value="Ideas">Ideas (11 fields)</option>
+              <option value="Projects">Projects (12 fields)</option>
+              <option value="Goals">Goals (12 fields)</option>
+              <option value="Item">Item (15 fields)</option>
+              <option value="Docs">Docs (15 fields)</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button onclick="resetCreationFieldsToDefault()">Reset Defaults</button>
+            <button onclick="toggleAllCreationFields(true)">Enable All</button>
+            <button onclick="toggleAllCreationFields(false)">Disable All</button>
+            <button class="btn-primary" onclick="saveCreationConfig()">Save Settings</button>
+          </div>
+        </div>
+
+        <div class="fields-card">
+          <div class="fields-card-header">
+            <span>FIELD CREATION MASKING (JOB 2: INITIAL TOUCH BLUEPRINT)</span>
+            <span>INITIAL TOUCH STATUS</span>
+          </div>
+          <div id="creation-fields-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); line-height: 1.5; padding: 0 4px;">
+          Note: Checked fields are requested in the minimal creation blueprint presented to Job 2 (create_index). Unselected fields remain unpopulated defaults in index.json until enriched during subsequent reflection cycles.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS & MAINTENANCE MODAL -->
+  <div id="settings-modal" class="modal-overlay" style="display: none;" onclick="onModalBackdropClick(event)">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 16px;">⚙</span>
+          <h3>SETTINGS & INDEX MAINTENANCE</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeSettingsModal()">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Section 1: JSON Configuration -->
+        <div class="settings-section">
+          <div class="settings-section-title">
+            <span>CONFIGURATION BACKING STORE (TAB 1 & TAB 3)</span>
+            <span class="badge" style="font-size: 9px;">data/topic_index_config.json</span>
+          </div>
+          <p class="settings-desc">
+            Tab 1 (Projection Settings) and Tab 3 (Creation Masking) settings are backed directly by <code>data/topic_index_config.json</code>. You can download the current JSON file, import/upload an updated configuration, or edit the raw JSON directly in the live editor below.
+          </p>
+          
+          <div class="settings-btn-row">
+            <button class="btn-primary" onclick="downloadConfigFile()">⬇ Download Config (JSON)</button>
+            <button onclick="document.getElementById('config-file-upload').click()">⬆ Upload Config (JSON)</button>
+            <input type="file" id="config-file-upload" accept=".json,application/json" style="display: none;" onchange="handleConfigFileUpload(event)" />
+            <button id="btn-toggle-raw" onclick="toggleRawEditor()">✏ Edit Raw JSON</button>
+          </div>
+
+          <!-- Inline Raw JSON Editor Container -->
+          <div id="raw-editor-container" style="display: none; margin-top: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim);">LIVE CONFIGURATION EDITOR:</span>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="formatRawEditorJson()" style="padding: 4px 8px; font-size: 10px;">Prettify</button>
+                <button onclick="reloadRawEditorJson()" style="padding: 4px 8px; font-size: 10px;">Reset</button>
+              </div>
+            </div>
+            <textarea id="raw-config-textarea" class="raw-config-editor" spellcheck="false"></textarea>
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+              <button class="btn-primary" onclick="saveRawEditorJson()">💾 Save & Apply JSON</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Storage & Archive -->
+        <div class="settings-section">
+          <div class="settings-section-title">
+            <span>INDEX STORAGE & MAINTENANCE</span>
+            <span class="badge" style="font-size: 9px;">storage/topic_indexes/</span>
+          </div>
+          <p class="settings-desc">
+            Archive all topic index scoped directories (<code>storage/topic_indexes/</code>), companion text files, and registry into a compressed <code>.zip</code> file, or purge all current indexes to reset storage and registry cleanly.
+          </p>
+          
+          <div class="settings-btn-row">
+            <button class="btn-primary" onclick="backupIndexesZip()" style="background: #2563eb; border-color: #2563eb;">
+              📦 Backup Indexes (.zip)
+            </button>
+            <button class="btn-danger" onclick="purgeAllIndexes()">
+              🗑 Purge All Indexes
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <span id="modal-status-text" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim);">Ready</span>
+        <button onclick="closeSettingsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const API_BASE = "/api/topic_index";
+    let categoriesMeta = {};
+    let fullConfig = {};
+    let currentIndexes = [];
+    let activeRecord = null;
+    let originalRecordState = null;
+    let searchTimer = null;
+
+    const DEFAULT_CREATION_FIELDS = {
+      "People": ["id", "status", "summary", "touch_history"],
+      "Places": ["id", "status", "summary", "type", "touch_history"],
+      "Things": ["id", "status", "summary", "identifier/type", "touch_history"],
+      "Ideas": ["id", "status", "summary", "domain_name", "touch_history"],
+      "Projects": ["id", "status", "summary", "project_name", "touch_history"],
+      "Goals": ["id", "status", "summary", "goal_name", "touch_history"],
+      "Item": ["id", "status", "summary", "item_name", "touch_history"],
+      "Docs": ["id", "status", "summary", "doc_title", "touch_history"],
+    };
+
+    async function init() {
+      try {
+        const catRes = await fetch(`${API_BASE}/categories`);
+        categoriesMeta = await catRes.json();
+        
+        const cfgRes = await fetch(`${API_BASE}/config`);
+        fullConfig = await cfgRes.json();
+
+        renderCategoryFieldsConfig();
+        renderCreationFieldsConfig();
+        fetchIndexes();
+      } catch (err) {
+        console.warn("API unavailable, falling back to local defaults:", err);
+      }
+    }
+
+    function showToast(msg, type = "success") {
+      const t = document.getElementById("toast");
+      t.innerText = msg;
+      t.className = type;
+      setTimeout(() => { t.className = ""; }, 3000);
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+      
+      const tabMap = {
+        'tab-settings': 0,
+        'tab-editor': 1,
+        'tab-creation': 2
+      };
+      const idx = tabMap[tabId] !== undefined ? tabMap[tabId] : 0;
+      document.querySelectorAll(".tab-btn")[idx].classList.add("active");
+
+      if (tabId === 'tab-creation') {
+        renderCreationFieldsConfig();
+      } else if (tabId === 'tab-settings') {
+        renderCategoryFieldsConfig();
+      }
+    }
+
+    // --- TAB 1: Injection & Projection Settings ---
+
+    function renderCategoryFieldsConfig() {
+      const cat = document.getElementById("config-cat-select").value;
+      const schema = categoriesMeta[cat];
+      if (!schema) return;
+
+      const catCfg = fullConfig[cat] || { enabled_fields: {}, field_limits: {} };
+      const enabledMap = catCfg.enabled_fields || {};
+      const limitsMap = catCfg.field_limits || {};
+
+      const container = document.getElementById("fields-config-list");
+      container.innerHTML = "";
+
+      schema.fields.forEach((fName) => {
+        const fLower = fName.toLowerCase();
+        const isEnabled = enabledMap[fName] !== false;
+        const isHierarchical = ["insights", "milestones", "blockers", "touch_history"].includes(fLower);
+        const limitVal = limitsMap[fLower] !== undefined ? limitsMap[fLower] : (fLower === "touch_history" ? 3 : 5);
+
+        const row = document.createElement("div");
+        row.className = "field-row";
+        row.innerHTML = `
+          <div class="field-left">
+            <label class="checkbox-container">
+              <input type="checkbox" id="chk_${cat}_${fName}" ${isEnabled ? "checked" : ""} onchange="updateConfigField('${cat}', '${fName}', this.checked)" />
+              <span class="checkmark"></span>
+            </label>
+            <span class="field-name">${fName}</span>
+            ${isHierarchical ? '<span class="badge" style="font-size: 9px; padding: 1px 6px;">LIST / HIERARCHICAL</span>' : ''}
+            ${fLower === 'summary' ? '<span class="badge" style="font-size: 9px; padding: 1px 6px; background: rgba(124, 92, 255, 0.2);">FIRST-PERSON</span>' : ''}
+          </div>
+          <div class="field-right">
+            ${isHierarchical ? `
+              <div class="limit-input-group">
+                <label>Depth Limit:</label>
+                <input type="number" class="limit-input" min="1" max="50" value="${limitVal}" onchange="updateConfigLimit('${cat}', '${fLower}', this.value)" />
+              </div>
+            ` : '<span style="color: var(--text-dim); font-size: 11px;">-</span>'}
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function updateConfigField(cat, fieldName, isChecked) {
+      if (!fullConfig[cat]) fullConfig[cat] = { enabled_fields: {}, field_limits: {} };
+      if (!fullConfig[cat].enabled_fields) fullConfig[cat].enabled_fields = {};
+      fullConfig[cat].enabled_fields[fieldName] = isChecked;
+    }
+
+    function updateConfigLimit(cat, fieldLower, val) {
+      if (!fullConfig[cat]) fullConfig[cat] = { enabled_fields: {}, field_limits: {} };
+      if (!fullConfig[cat].field_limits) fullConfig[cat].field_limits = {};
+      fullConfig[cat].field_limits[fieldLower] = parseInt(val) || 5;
+    }
+
+    function toggleAllFields(enable) {
+      const cat = document.getElementById("config-cat-select").value;
+      const schema = categoriesMeta[cat];
+      if (!schema) return;
+      if (!fullConfig[cat]) fullConfig[cat] = { enabled_fields: {}, field_limits: {} };
+      if (!fullConfig[cat].enabled_fields) fullConfig[cat].enabled_fields = {};
+      schema.fields.forEach(f => {
+        fullConfig[cat].enabled_fields[f] = enable;
+      });
+      renderCategoryFieldsConfig();
+    }
+
+    async function saveProjectionConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fullConfig)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast("Projection settings saved successfully!");
+        } else {
+          showToast("Failed to save settings: " + (data.detail || "Error"), "error");
+        }
+      } catch (err) {
+        showToast("Error saving config: " + err.message, "error");
+      }
+    }
+
+    // --- TAB 2: Index Search & Editor ---
+
+    function debounceSearch() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(fetchIndexes, 250);
+    }
+
+    async function fetchIndexes() {
+      const cat = document.getElementById("search-cat-select").value;
+      const q = document.getElementById("search-input").value;
+      const url = new URL(`${API_BASE}/indexes`, window.location.origin);
+      if (cat) url.searchParams.set("category", cat);
+      if (q) url.searchParams.set("search", q);
+
+      try {
+        const res = await fetch(url);
+        currentIndexes = await res.json();
+        renderIndexList();
+      } catch (err) {
+        console.error("Error fetching indexes:", err);
+      }
+    }
+
+    function renderIndexList() {
+      const container = document.getElementById("index-list-container");
+      container.innerHTML = "";
+
+      if (currentIndexes.length === 0) {
+        container.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-dim); font-family: monospace;">No topic indexes found.</li>';
+        return;
+      }
+
+      currentIndexes.forEach(idx => {
+        const li = document.createElement("li");
+        li.className = "index-item";
+        if (activeRecord && activeRecord.keyword === idx.keyword && activeRecord.category === idx.category) {
+          li.classList.add("active");
+        }
+        li.onclick = () => loadRecordToEditor(idx.category, idx.keyword);
+        li.innerHTML = `
+          <div class="item-top">
+            <span class="item-kw">${escapeHtml(idx.keyword)}</span>
+            <span class="item-cat">${escapeHtml(idx.category)}</span>
+          </div>
+          <span class="item-uuid">${escapeHtml(idx.uuid || 'No UUID')}</span>
+        `;
+        container.appendChild(li);
+      });
+    }
+
+    async function loadRecordToEditor(category, keyword) {
+      try {
+        const res = await fetch(`${API_BASE}/record?category=${encodeURIComponent(category)}&keyword=${encodeURIComponent(keyword)}`);
+        if (!res.ok) {
+          showToast("Failed to fetch topic index record", "error");
+          return;
+        }
+        activeRecord = await res.json();
+        originalRecordState = JSON.parse(JSON.stringify(activeRecord));
+        renderRecordEditor();
+        renderIndexList();
+      } catch (err) {
+        showToast("Error loading record: " + err.message, "error");
+      }
+    }
+
+    function renderRecordEditor() {
+      const emptyState = document.getElementById("editor-empty");
+      const formWrapper = document.getElementById("editor-form-wrapper");
+
+      if (!activeRecord) {
+        emptyState.style.display = "flex";
+        formWrapper.style.display = "none";
+        return;
+      }
+
+      emptyState.style.display = "none";
+      formWrapper.style.display = "flex";
+
+      document.getElementById("edit-header-kw").innerText = activeRecord.keyword;
+      document.getElementById("edit-header-cat").innerText = activeRecord.category;
+      document.getElementById("edit-header-uuid").innerText = `UUID: ${activeRecord.fields.id || 'N/A'}`;
+
+      const grid = document.getElementById("form-grid");
+      grid.innerHTML = "";
+
+      const schema = categoriesMeta[activeRecord.category];
+      const fieldNames = schema ? schema.fields : Object.keys(activeRecord.fields);
+
+      fieldNames.forEach(fName => {
+        const val = activeRecord.fields[fName] || "";
+        const fLower = fName.toLowerCase();
+        const isFull = ["summary", "insights", "milestones", "touch_history", "notes", "traits", "properties", "core_thesis"].includes(fLower);
+
+        const group = document.createElement("div");
+        group.className = "form-group" + (isFull ? " full-width" : "");
+        group.innerHTML = `
+          <label>
+            <span>${escapeHtml(fName)}</span>
+            ${fLower === 'touch_history' ? '<span class="label-meta">Chronological Turn Pointers</span>' : ''}
+            ${fLower === 'summary' ? '<span class="label-meta">First-Person Summary</span>' : ''}
+          </label>
+          <input type="text" id="field_inp_${fName}" value="${escapeHtml(val)}" oninput="onFieldInputChanged('${fName}', this.value)" />
+        `;
+        grid.appendChild(group);
+      });
+
+      updateRawBox();
+    }
+
+    function onFieldInputChanged(fieldName, newVal) {
+      if (!activeRecord) return;
+      activeRecord.fields[fieldName] = newVal;
+      const schema = categoriesMeta[activeRecord.category];
+      if (schema) {
+        const ordered = schema.fields.map(f => (activeRecord.fields[f] || "").trim());
+        activeRecord.raw_content = ordered.join(" | ");
+      }
+      updateRawBox();
+    }
+
+    function onRawTextEdited() {
+      if (!activeRecord) return;
+      const raw = document.getElementById("raw-record-text").value;
+      activeRecord.raw_content = raw;
+      const schema = categoriesMeta[activeRecord.category];
+      if (schema) {
+        const parts = raw.split("|").map(p => p.trim());
+        schema.fields.forEach((fName, i) => {
+          activeRecord.fields[fName] = parts[i] || "";
+          const el = document.getElementById(`field_inp_${fName}`);
+          if (el) el.value = activeRecord.fields[fName];
+        });
+      }
+      updatePipeCountIndicator();
+    }
+
+    function updateRawBox() {
+      const rawTextEl = document.getElementById("raw-record-text");
+      rawTextEl.value = activeRecord.raw_content;
+      updatePipeCountIndicator();
+    }
+
+    function updatePipeCountIndicator() {
+      const schema = categoriesMeta[activeRecord.category];
+      const expected = schema ? schema.expected_pipes : 0;
+      const actual = (activeRecord.raw_content.match(/\|/g) || []).length;
+      const counterEl = document.getElementById("pipe-counter");
+      counterEl.innerText = `Pipes: ${actual} / ${expected}`;
+      counterEl.style.color = actual === expected ? "var(--success-color)" : "var(--error-color)";
+    }
+
+    function revertCurrentRecord() {
+      if (originalRecordState) {
+        activeRecord = JSON.parse(JSON.stringify(originalRecordState));
+        renderRecordEditor();
+        showToast("Reverted unstaged edits.");
+      }
+    }
+
+    async function saveCurrentRecord() {
+      if (!activeRecord) return;
+      try {
+        const res = await fetch(`${API_BASE}/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: activeRecord.category,
+            keyword: activeRecord.keyword,
+            raw_content: activeRecord.raw_content,
+            fields: activeRecord.fields
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(`Saved index '${activeRecord.keyword}' successfully!`);
+          originalRecordState = JSON.parse(JSON.stringify(activeRecord));
+          fetchIndexes();
+        } else {
+          showToast("Validation Error: " + (data.detail || "Save failed"), "error");
+        }
+      } catch (err) {
+        showToast("Error saving: " + err.message, "error");
+      }
+    }
+
+    async function deleteCurrentRecord() {
+      if (!activeRecord) return;
+      if (!confirm(`Are you sure you want to delete topic index '${activeRecord.keyword}' from ${activeRecord.category}? This will purge its directory and registry entry.`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: activeRecord.category,
+            keyword: activeRecord.keyword
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(`Deleted index '${activeRecord.keyword}' and purged from registry.`);
+          activeRecord = null;
+          originalRecordState = null;
+          renderRecordEditor();
+          fetchIndexes();
+        } else {
+          showToast("Delete failed: " + (data.detail || "Error"), "error");
+        }
+      } catch (err) {
+        showToast("Error deleting: " + err.message, "error");
+      }
+    }
+
+    // --- TAB 3: Creation Masking ---
+
+    function renderCreationFieldsConfig() {
+      const cat = document.getElementById("creation-cat-select").value;
+      const schema = categoriesMeta[cat];
+      if (!schema) return;
+
+      const catCfg = fullConfig[cat] || { creation_fields: {} };
+      const creationMap = catCfg.creation_fields || {};
+      const defaults = DEFAULT_CREATION_FIELDS[cat] || ["id", "status", "summary", "touch_history"];
+
+      const container = document.getElementById("creation-fields-list");
+      container.innerHTML = "";
+
+      schema.fields.forEach((fName) => {
+        const isToggled = creationMap[fName] !== undefined ? creationMap[fName] : defaults.includes(fName);
+        const isDefault = defaults.includes(fName);
+        const fLower = fName.toLowerCase();
+
+        const row = document.createElement("div");
+        row.className = "field-row";
+        row.innerHTML = `
+          <div class="field-left">
+            <label class="checkbox-container">
+              <input type="checkbox" id="chk_create_${cat}_${fName}" ${isToggled ? "checked" : ""} onchange="updateCreationField('${cat}', '${fName}', this.checked)" />
+              <span class="checkmark"></span>
+            </label>
+            <span class="field-name">${fName}</span>
+            ${fLower === 'summary' ? '<span class="badge" style="font-size: 9px; padding: 1px 6px; background: rgba(124, 92, 255, 0.2);">FIRST-PERSON</span>' : ''}
+          </div>
+          <div class="field-right">
+            ${isDefault ? '<span class="badge badge-initial" style="font-size: 9px; padding: 1px 6px;">INITIAL-TOUCH</span>' : '<span style="color: var(--text-dim); font-size: 11px;">SECONDARY</span>'}
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function updateCreationField(cat, fieldName, isChecked) {
+      if (!fullConfig[cat]) fullConfig[cat] = { creation_fields: {} };
+      if (!fullConfig[cat].creation_fields) fullConfig[cat].creation_fields = {};
+      fullConfig[cat].creation_fields[fieldName] = isChecked;
+    }
+
+    function toggleAllCreationFields(enable) {
+      const cat = document.getElementById("creation-cat-select").value;
+      const schema = categoriesMeta[cat];
+      if (!schema) return;
+      if (!fullConfig[cat]) fullConfig[cat] = { creation_fields: {} };
+      if (!fullConfig[cat].creation_fields) fullConfig[cat].creation_fields = {};
+      schema.fields.forEach(f => {
+        fullConfig[cat].creation_fields[f] = enable;
+      });
+      renderCreationFieldsConfig();
+    }
+
+    function resetCreationFieldsToDefault() {
+      const cat = document.getElementById("creation-cat-select").value;
+      const schema = categoriesMeta[cat];
+      if (!schema) return;
+      const defaults = DEFAULT_CREATION_FIELDS[cat] || ["id", "status", "summary", "touch_history"];
+      if (!fullConfig[cat]) fullConfig[cat] = { creation_fields: {} };
+      fullConfig[cat].creation_fields = {};
+      schema.fields.forEach(f => {
+        fullConfig[cat].creation_fields[f] = defaults.includes(f);
+      });
+      renderCreationFieldsConfig();
+      showToast(`Reset ${cat} creation fields to essential defaults.`);
+    }
+
+    async function saveCreationConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fullConfig)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast("Creation masking settings saved successfully!");
+        } else {
+          showToast("Failed to save settings: " + (data.detail || "Error"), "error");
+        }
+      } catch (err) {
+        showToast("Error saving config: " + err.message, "error");
+      }
+    }
+
+    // --- Settings Menu & Modal Handlers ---
+
+    function openSettingsModal() {
+      const modal = document.getElementById("settings-modal");
+      modal.style.display = "flex";
+      document.getElementById("raw-config-textarea").value = JSON.stringify(fullConfig, null, 2);
+      document.getElementById("modal-status-text").innerText = "Ready";
+    }
+
+    function closeSettingsModal() {
+      const modal = document.getElementById("settings-modal");
+      modal.style.display = "none";
+    }
+
+    function onModalBackdropClick(event) {
+      if (event.target.id === "settings-modal") {
+        closeSettingsModal();
+      }
+    }
+
+    function downloadConfigFile() {
+      try {
+        const jsonStr = JSON.stringify(fullConfig, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "topic_index_config.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("Downloaded topic_index_config.json");
+        document.getElementById("modal-status-text").innerText = "Config downloaded.";
+      } catch (err) {
+        showToast("Error downloading config: " + err.message, "error");
+      }
+    }
+
+    function handleConfigFileUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (typeof parsed !== "object" || parsed === null) {
+            throw new Error("Uploaded content is not a valid JSON object.");
+          }
+          const res = await fetch(`${API_BASE}/config/upload`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(parsed)
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            fullConfig = data.config || parsed;
+            renderCategoryFieldsConfig();
+            renderCreationFieldsConfig();
+            document.getElementById("raw-config-textarea").value = JSON.stringify(fullConfig, null, 2);
+            showToast("Configuration uploaded and applied successfully!");
+            document.getElementById("modal-status-text").innerText = "Config uploaded and applied.";
+          } else {
+            showToast("Upload failed: " + (data.detail || "Invalid format"), "error");
+          }
+        } catch (err) {
+          showToast("JSON Parse Error: " + err.message, "error");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    function toggleRawEditor() {
+      const c = document.getElementById("raw-editor-container");
+      const btn = document.getElementById("btn-toggle-raw");
+      if (c.style.display === "none") {
+        c.style.display = "block";
+        btn.innerText = "Hide Raw Editor";
+        document.getElementById("raw-config-textarea").value = JSON.stringify(fullConfig, null, 2);
+      } else {
+        c.style.display = "none";
+        btn.innerText = "✏ Edit Raw JSON";
+      }
+    }
+
+    function formatRawEditorJson() {
+      const textarea = document.getElementById("raw-config-textarea");
+      try {
+        const obj = JSON.parse(textarea.value);
+        textarea.value = JSON.stringify(obj, null, 2);
+        showToast("JSON formatted.");
+      } catch (err) {
+        showToast("Cannot format invalid JSON: " + err.message, "error");
+      }
+    }
+
+    function reloadRawEditorJson() {
+      document.getElementById("raw-config-textarea").value = JSON.stringify(fullConfig, null, 2);
+      showToast("Reset to active configuration.");
+    }
+
+    async function saveRawEditorJson() {
+      const textarea = document.getElementById("raw-config-textarea");
+      let parsed;
+      try {
+        parsed = JSON.parse(textarea.value);
+      } catch (err) {
+        showToast("Invalid JSON syntax: " + err.message, "error");
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(parsed)
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          fullConfig = data.config || parsed;
+          renderCategoryFieldsConfig();
+          renderCreationFieldsConfig();
+          showToast("Saved raw configuration successfully!");
+          document.getElementById("modal-status-text").innerText = "Raw JSON saved and applied.";
+        } else {
+          showToast("Save failed: " + (data.detail || "Unknown error"), "error");
+        }
+      } catch (err) {
+        showToast("Error saving raw JSON: " + err.message, "error");
+      }
+    }
+
+    function backupIndexesZip() {
+      try {
+        window.location.href = `${API_BASE}/backup`;
+        showToast("Generating index backup archive (.zip)...");
+        document.getElementById("modal-status-text").innerText = "Backup archive download initiated.";
+      } catch (err) {
+        showToast("Error initiating backup: " + err.message, "error");
+      }
+    }
+
+    async function purgeAllIndexes() {
+      const confirmed = confirm(
+        "⚠️ PERMANENT DELETION WARNING:\n\n" +
+        "Are you sure you want to permanently PURGE ALL TOPIC INDEXES?\n\n" +
+        "This will:\n" +
+        "1. Remove all topic index folders and files from storage/topic_indexes/.\n" +
+        "2. Reset data/topic_registry.json to empty.\n" +
+        "3. Clear Layer 2 active topic deltas (deltas/sources/topic_indexes.txt).\n" +
+        "4. Recompile the compiled delta manifest.\n\n" +
+        "This action cannot be undone."
+      );
+
+      if (!confirmed) return;
+
+      try {
+        showToast("Purging topic indexes...", "warning");
+        document.getElementById("modal-status-text").innerText = "Purging in progress...";
+        const res = await fetch(`${API_BASE}/purge`, { method: "POST" });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(data.message || "All topic indexes purged successfully!", "success");
+          document.getElementById("modal-status-text").innerText = `Purged ${data.purged_records || 0} records.`;
+          activeRecord = null;
+          originalRecordState = null;
+          renderRecordEditor();
+          fetchIndexes();
+        } else {
+          showToast("Purge failed: " + (data.detail || "Error"), "error");
+          document.getElementById("modal-status-text").innerText = "Purge failed.";
+        }
+      } catch (err) {
+        showToast("Error during purge: " + err.message, "error");
+        document.getElementById("modal-status-text").innerText = "Purge error: " + err.message;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    window.addEventListener('message', (e) => {
+      if (!e.data) return;
+      if (e.data.type === 'THEME_CHANGE') {
+        document.body.setAttribute('data-theme', e.data.theme);
+      }
+      if (e.data.type === 'FONT_CHANGE') {
+        const fs = e.data.fontSize;
+        document.documentElement.style.setProperty('--font-size-base', fs + 'px');
+        document.body.style.setProperty('--font-size-base', fs + 'px');
+        document.body.style.fontSize = fs + 'px';
+      }
+      if (e.data.type === 'CORE_URL_CHANGE') {
+        API_BASE = `${e.data.url}/api/topic_index`;
+      }
+      if (e.data.type === 'TOKEN_UPDATE') {
+        authToken = e.data.token;
+      }
+    });
+
+    window.onload = init;
+  </script>
+</body>
+</html>

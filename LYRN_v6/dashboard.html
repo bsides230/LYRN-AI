@@ -19,30 +19,30 @@
            1. CORE VARIABLES & THEME
            ========================================= */
         :root {
-            --bg-core: #07050e;
-            --bg-panel: rgba(16, 12, 32, 0.88);
-            --bg-panel-solid: #100c20;
+            --bg-core: #08090d;
+            --bg-panel: #0e1017;
+            --bg-panel-solid: #0e1017;
             --brand-purple: #7c5cff;
-            --brand-purple-bright: #9061ff;
-            --brand-purple-neon: #a78bfa;
-            --brand-purple-dim: rgba(124, 92, 255, 0.12);
-            --brand-purple-glow: rgba(124, 92, 255, 0.5);
-            --text-head: #ffffff;
-            --text-body: #c4b5fd;
-            --text-dim: #7f749e;
-            --border-color: rgba(124, 92, 255, 0.22);
-            --border-highlight: rgba(167, 139, 250, 0.55);
+            --brand-purple-bright: #8b6eff;
+            --brand-purple-neon: #9b82ff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.14);
+            --brand-purple-glow: rgba(124, 92, 255, 0.35);
+            --text-head: #f8fafc;
+            --text-body: #cbd5e1;
+            --text-dim: #64748b;
+            --border-color: #1f2433;
+            --border-highlight: #32394f;
 
-            --dock-bg: rgba(14, 10, 28, 0.88);
-            --dock-border: rgba(124, 92, 255, 0.35);
+            --dock-bg: rgba(14, 16, 23, 0.88);
+            --dock-border: rgba(255, 255, 255, 0.09);
             --dock-blur: 24px;
 
             --font-size-base: 12px;
 
-            --bg-input: rgba(12, 9, 26, 0.85);
-            --error-color: #ff3b57;
+            --bg-input: #07080c;
+            --error-color: #ef4444;
             --success-color: #10b981;
-            --accent-cyan: #00f0ff;
+            --accent-cyan: #38bdf8;
         }
 
         body[data-theme="dark-legacy"] {
@@ -95,10 +95,10 @@
             color: var(--text-body);
             transition: background-color 0.5s ease;
             background-image:
-                linear-gradient(rgba(124, 92, 255, 0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(124, 92, 255, 0.04) 1px, transparent 1px),
-                radial-gradient(ellipse at 50% 0%, rgba(124, 92, 255, 0.18) 0%, rgba(7, 5, 14, 0.98) 75%);
-            background-size: 32px 32px, 32px 32px, 100% 100%;
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                radial-gradient(ellipse 80% 50% at 50% -15%, rgba(124, 92, 255, 0.15) 0%, rgba(8, 9, 13, 0.98) 70%);
+            background-size: 36px 36px, 36px 36px, 100% 100%;
             background-attachment: fixed;
             font-size: var(--font-size-base);
         }
@@ -117,16 +117,16 @@
         }
 
         /* =========================================
-           TOP SYSTEM BAR (FUTURISTIC COMMAND DECK)
+           TOP SYSTEM BAR (DIMENSIONAL COMMAND DECK)
            ========================================= */
         #top-system-bar {
             position: fixed; top: 0; left: 0; right: 0;
             height: 38px;
-            background: rgba(12, 9, 26, 0.88);
+            background: linear-gradient(180deg, rgba(19, 22, 32, 0.94) 0%, rgba(12, 14, 21, 0.94) 100%);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid rgba(124, 92, 255, 0.3);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(167, 139, 250, 0.2);
+            border-bottom: 1px solid #1f2433;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 20px rgba(0, 0, 0, 0.55);
             z-index: 10000;
             display: flex; justify-content: space-between; align-items: center;
             padding: 0 16px;
@@ -144,14 +144,15 @@
         .bar-section { display: flex; align-items: center; gap: 10px; }
 
         .topbar-brand {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 3px 8px;
-            background: rgba(124, 92, 255, 0.12);
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 4px 10px;
+            background: linear-gradient(180deg, rgba(124, 92, 255, 0.16) 0%, rgba(124, 92, 255, 0.08) 100%);
             border: 1px solid rgba(124, 92, 255, 0.35);
-            border-radius: 4px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
             font-family: 'JetBrains Mono', monospace;
             font-size: calc(var(--font-size-base, 12px) * 0.85);
-            letter-spacing: 0.1em;
+            letter-spacing: 0.08em;
             font-weight: 700;
             color: var(--text-head);
             user-select: none;
@@ -170,10 +171,11 @@
 
         .topbar-chip {
             display: inline-flex; align-items: center; gap: 6px;
-            padding: 3px 8px;
-            background: rgba(18, 14, 38, 0.7);
-            border: 1px solid rgba(124, 92, 255, 0.22);
-            border-radius: 4px;
+            padding: 4px 9px;
+            background: linear-gradient(180deg, #171b26 0%, #11141d 100%);
+            border: 1px solid #252b3d;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.35);
+            border-radius: 5px;
             font-family: 'JetBrains Mono', monospace;
             font-size: calc(var(--font-size-base, 12px) * 0.85);
             color: var(--text-head);
@@ -182,8 +184,8 @@
         }
         .topbar-chip:hover {
             border-color: var(--brand-purple);
-            background: rgba(124, 92, 255, 0.18);
-            box-shadow: 0 0 8px rgba(124, 92, 255, 0.35);
+            background: linear-gradient(180deg, #1e2333 0%, #151925 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 10px rgba(124, 92, 255, 0.25);
         }
         .topbar-chip .chip-label {
             font-weight: 600;
@@ -197,21 +199,23 @@
             font-size: calc(var(--font-size-base, 12px) * 0.88);
             color: var(--text-head);
             letter-spacing: 0.05em; cursor: help;
-            padding: 3px 8px;
-            background: rgba(18, 14, 38, 0.7);
-            border: 1px solid rgba(124, 92, 255, 0.2);
-            border-radius: 4px;
+            padding: 4px 9px;
+            background: linear-gradient(180deg, #151822 0%, #0f121a 100%);
+            border: 1px solid #222738;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
             display: inline-flex; align-items: center;
         }
-        #sys-cpu { color: var(--brand-purple-neon); border-color: rgba(124, 92, 255, 0.35); }
-        #sys-gpu { color: #00f0ff; border-color: rgba(0, 240, 255, 0.3); }
-        #sys-clock { color: #ffffff; font-weight: 600; }
-        #sys-date { color: var(--text-body); }
+        #sys-cpu { color: #cbd5e1; border-color: #262c3f; }
+        #sys-gpu { color: #38bdf8; border-color: rgba(56, 189, 248, 0.25); }
+        #sys-clock { color: #f8fafc; font-weight: 600; }
+        #sys-date { color: var(--text-dim); }
 
         .bar-btn {
-            background: rgba(18, 14, 38, 0.7);
-            border: 1px solid rgba(124, 92, 255, 0.22);
-            color: var(--text-dim);
+            background: linear-gradient(180deg, #181c28 0%, #11141d 100%);
+            border: 1px solid #252b3d;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.35);
+            color: var(--text-body);
             cursor: pointer;
             width: 28px; height: 28px;
             border-radius: 6px;
@@ -930,6 +934,12 @@
                 icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 20h20L12 3z"/><path d="M12 9l-4 7h8l-4-7z"/></svg>`
             },
             {
+                id: "mod_topic_index",
+                file: "TopicIndexManager.html",
+                name: "Topic Index Manager",
+                icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/><rect x="2" y="2" width="20" height="20" rx="3" stroke-dasharray="2 3"/></svg>`
+            },
+            {
                 id: "mod_builder",
                 file: "Snapshot Builder.html",
                 name: "Snapshot Builder",
@@ -956,7 +966,7 @@
         ];
 
         let appSettings = {
-            activeModules: ['mod_job_loop', 'mod_models', 'mod_deltas', 'mod_builder', 'mod_model_manager', 'mod_server_status', 'mod_logs'],
+            activeModules: ['mod_job_loop', 'mod_models', 'mod_deltas', 'mod_topic_index', 'mod_builder', 'mod_model_manager', 'mod_server_status', 'mod_logs'],
             dockPinned: true,
             dockPos: null, // Initial null to trigger center calculation
             theme: 'cyber-dark',
